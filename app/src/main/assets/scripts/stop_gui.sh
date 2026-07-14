@@ -8,6 +8,7 @@ export TERMUX_APP__PACKAGE_NAME="com.zenithblue.nativecode"
 export TERMUX__PREFIX="/data/data/com.zenithblue.nativecode/files/usr"
 export TERMUX__HOME="/data/data/com.zenithblue.nativecode/files/home"
 export HOME="/data/data/com.zenithblue.nativecode/files/home"
+export PROOT_TMP_DIR="/data/data/com.zenithblue.nativecode/files/usr/tmp"
 
 echo "========================================"
 echo "FluxLinux: Stopping GUI for $DISTRO"
