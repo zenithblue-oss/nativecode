@@ -72,7 +72,7 @@ PACKAGES = [
     # Python Libraries
     "libsqlite",
     "libbz2",
-    "libgdbm",
+    "gdbm",  # provides libgdbm
     "libandroid-selinux",
     "libandroid-glob",
     "libacl",
