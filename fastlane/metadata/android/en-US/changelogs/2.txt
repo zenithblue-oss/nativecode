@@ -1,0 +1,11 @@
+NativeCode 1.1
+
+• Onboarding redesign — clearer feature slides & install flow
+• Device readiness check — storage, RAM, swap & SoC guidance
+• Settings: Graphical desktop VIEW LOGS + COPY
+• Chroot guest shell, TTY & git reliability fixes
+• PRoot/chroot script polish & bootstrap updates
+• Play Store listing & privacy/policy polish
+• App upgrade restages host scripts automatically
+
+Requires Android 8.0+, ~10 GB free storage.

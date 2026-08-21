@@ -1,0 +1,10 @@
+NativeCode 1.2
+
+• Android 14+ Foreground Service special-use compliance & stability improvements
+• App upgrade workflow and service lifecycle enhancements
+• Onboarding slides redesign and install readiness checks
+• Settings graphical desktop log viewer & one-tap copy
+• PRoot/Chroot terminal execution, TTY & git reliability fixes
+• Updated local core packages and bootstrap dependencies
+
+Requires Android 8.0+, ~10 GB free storage.

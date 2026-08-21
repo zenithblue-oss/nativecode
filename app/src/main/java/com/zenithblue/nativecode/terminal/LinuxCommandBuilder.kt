@@ -25,4 +25,17 @@ object LinuxCommandBuilder {
             else -> ProotCommandBuilder.build(ctx, shellCmd, user, useSharedTmp)
         }
     }
+
+    /** Returns the executable path for TerminalSession. */
+    fun sessionExec(
+        ctx: Context,
+        args: Array<String>,
+        method: String = currentMethod
+    ): String {
+        return if (method == "chroot") {
+            ChrootCommandBuilder.SESSION_EXEC
+        } else {
+            args.firstOrNull() ?: TermuxHostPaths.libProot(ctx).absolutePath
+        }
+    }
 }

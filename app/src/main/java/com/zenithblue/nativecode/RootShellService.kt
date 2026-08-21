@@ -165,6 +165,33 @@ object RootShell {
     }
 
     /**
+     * Copy a host path the app UID cannot read (typically chroot rootfs) into [dest].
+     * Caller must place [dest] under app-private storage. Background thread only.
+     */
+    fun copyOutOfChroot(
+        hostSrc: File,
+        dest: File,
+        timeoutMs: Long = 60_000L
+    ): CaptureResult {
+        val srcPath = hostSrc.absolutePath
+        val destPath = dest.absolutePath
+        if (srcPath.contains("..") || destPath.contains("..")) {
+            return CaptureResult(-1, "invalid path")
+        }
+        val parent = dest.parentFile?.absolutePath ?: return CaptureResult(-1, "no dest parent")
+        fun shEsc(s: String): String = s.replace("'", "'\\''")
+        val cmd = buildString {
+            append("test -f '").append(shEsc(srcPath)).append("' && ")
+            append("mkdir -p '").append(shEsc(parent)).append("' && ")
+            append("cp -f '").append(shEsc(srcPath)).append("' '").append(shEsc(destPath)).append("' && ")
+            append("chmod 644 '").append(shEsc(destPath)).append("' && ")
+            append("test -f '").append(shEsc(destPath)).append("'")
+        }
+        Log.i(TAG, "copyOutOfChroot src=$srcPath dest=$destPath")
+        return captureResult(cmd, timeoutMs)
+    }
+
+    /**
      * Execute a shell command as root.
      * [onLine] is called on the Main thread for each stdout/stderr line.
      * [onDone] is called on the Main thread with the exit code.

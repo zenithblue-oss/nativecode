@@ -42,9 +42,12 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
+import android.app.DownloadManager
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
+import android.provider.MediaStore
 import android.view.ContextMenu
 import android.view.MenuItem
 import android.net.Uri
@@ -349,7 +352,6 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_CHROOT_LAST_MS = "chroot_last_check_ms"
         private const val PREF_CHROOT_PROC_COUNT = "chroot_proc_count"
         private const val PREF_CHROOT_PROC_LAST_MS = "chroot_proc_last_ms"
-        private const val REQ_POST_NOTIFICATIONS = 4401
         /** B12 outbound share stage under filesDir (and optional cache twin). */
         private const val SHARE_EXPORT_REL = "share/export"
         private const val SHARE_MAX_BYTES = 200L * 1024 * 1024
@@ -784,59 +786,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun ensurePostNotificationsPermission() {
-        if (Build.VERSION.SDK_INT < 33) return
-        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-            == android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) return
-        requestPermissions(
-            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-            REQ_POST_NOTIFICATIONS
-        )
+        NativeCodeFgs.ensurePostNotificationsPermission(this)
     }
 
     private fun startNativeCodeFgs(intent: Intent) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Failed to start FGS ${intent.component?.className}", e)
-            try {
-                startService(intent)
-            } catch (e2: Exception) {
-                Log.e("MainActivity", "Fallback startService failed", e2)
-            }
-        }
+        NativeCodeFgs.start(this, intent)
+    }
+
+    private fun acquireDesktopFgs() {
+        ensurePostNotificationsPermission()
+        NativeCodeFgs.acquire(this, NativeCodeFgs.OWNER_DESKTOP, BackgroundService.desktopIntent(this))
+    }
+
+    private fun releaseDesktopFgs() {
+        NativeCodeFgs.release(this, NativeCodeFgs.OWNER_DESKTOP)
     }
 
     private fun updateAppTerminalService() {
-        val count = sessionsList.size
-        val intent = Intent(this, AppTerminalService::class.java).apply {
-            putExtra("SESSION_COUNT", count)
-        }
-        if (count > 0) {
-            ensurePostNotificationsPermission()
-            startNativeCodeFgs(intent)
-        } else {
-            stopService(intent)
-        }
+        ensurePostNotificationsPermission()
+        TerminalService.updateService(
+            this,
+            appCount = sessionsList.size,
+            projectCount = workspaceSessions.size,
+            projectName = activeProjectName,
+            projectPath = activeProjectPath,
+            targetPage = 3
+        )
     }
 
     private fun updateProjectTerminalService() {
-        val count = workspaceSessions.size
-        val intent = Intent(this, ProjectTerminalService::class.java).apply {
-            putExtra("SESSION_COUNT", count)
-            putExtra("PROJECT_NAME", activeProjectName)
-            putExtra("PROJECT_PATH", activeProjectPath)
-        }
-        if (count > 0) {
-            ensurePostNotificationsPermission()
-            startNativeCodeFgs(intent)
-        } else {
-            stopService(intent)
-        }
+        ensurePostNotificationsPermission()
+        TerminalService.updateService(
+            this,
+            appCount = sessionsList.size,
+            projectCount = workspaceSessions.size,
+            projectName = activeProjectName,
+            projectPath = activeProjectPath,
+            targetPage = 10
+        )
     }
 
     // ── Unified Navigation & Switcher ────────────────────────────────────────
@@ -2068,8 +2055,7 @@ class MainActivity : AppCompatActivity() {
         if (!::sessionClient.isInitialized) {
             initTerminalView()
         }
-        val isChroot = LinuxCommandBuilder.currentMethod == "chroot"
-        val sessionExec = if (isChroot) ChrootCommandBuilder.SESSION_EXEC else shell
+        val sessionExec = LinuxCommandBuilder.sessionExec(this, args)
         val session = TerminalSession(sessionExec, cwd, args, env, 10000, sessionClient)
         sessionsList.add(session)
         terminalSessionTypes.add(type)
@@ -4016,6 +4002,10 @@ class MainActivity : AppCompatActivity() {
 
         // Privacy Policy — opens public GitHub markdown
         settingsHubLayout.addView(buildPrivacyPolicyCard())
+        settingsHubLayout.addView(spacer(20))
+
+        // App version code + commit from gradle BuildConfig
+        settingsHubLayout.addView(buildSettingsVersionFooter())
     }
 
     private fun buildX11SettingsSectionButton(): View {
@@ -4800,6 +4790,32 @@ class MainActivity : AppCompatActivity() {
             addView(icon)
             addView(details)
             addView(arrow)
+        }
+    }
+
+    private fun buildSettingsVersionFooter(): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(8), 0, dp(16))
+
+            val versionTv = TextView(this@MainActivity).apply {
+                text = "VERSION ${BuildConfig.VERSION_NAME} (BUILD ${BuildConfig.VERSION_CODE})"
+                textSize = 12f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
+            val commitTv = TextView(this@MainActivity).apply {
+                text = "COMMIT: ${BuildConfig.GIT_COMMIT}"
+                textSize = 11f
+                setTextColor(NC.OUTLINE)
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(0, dp(4), 0, 0)
+            }
+            addView(versionTv)
+            addView(commitTv)
         }
     }
 
@@ -6248,11 +6264,28 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(16) }
         }
 
-        val installBtn = primaryButton("INSTALL APK") {
-            installApkFile(file)
+        val hintTv = TextView(this).apply {
+            text = "NativeCode cannot install APKs. Save to Downloads, then tap the file to install."
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, dp(12), 0, 0)
+        }
+        apkCard.addView(hintTv)
+
+        val installBtn = primaryButton("SAVE TO DOWNLOADS & OPEN") {
+            confirmAndExportApk(file, pkgInfo)
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1.4f)
+        }
+        val shareBtn = secondaryButton("SHARE") {
+            shareApkFromProject(file)
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = dp(8) }
         }
 
         btnRow.addView(installBtn)
+        btnRow.addView(shareBtn)
         apkCard.addView(btnRow)
 
         container.addView(apkCard)
@@ -6498,17 +6531,147 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun installApkFile(file: File) {
+    /**
+     * Play-safe APK handoff: copy to Downloads / share sheet.
+     * Never ACTION_VIEW package-archive or PackageInstaller from this process.
+     */
+    private fun confirmAndExportApk(file: File, pkgInfo: android.content.pm.PackageInfo?) {
+        val targetSdk = pkgInfo?.applicationInfo?.targetSdkVersion ?: 0
+        val oldSdkWarn = if (targetSdk in 1 until 23) {
+            "\n\nThis APK targets SDK $targetSdk. Android 14+ will refuse to install it."
+        } else {
+            ""
+        }
+        val pkgLine = pkgInfo?.packageName?.takeIf { it.isNotBlank() }?.let { "\nPackage: $it" } ?: ""
+        val verLine = pkgInfo?.versionName?.let { "\nVersion: $it" } ?: ""
+        showBrutalistConfirmDialog(
+            title = "EXPORT APK?",
+            message = "${file.name}\n${formatFileSize(file.length())}$pkgLine$verLine\n\n" +
+                "Saves a copy to Downloads. Open that file to install." +
+                oldSdkWarn,
+            confirmLabel = "SAVE & OPEN",
+            onConfirm = { exportApkToDownloads(file) }
+        )
+    }
+
+    private fun exportApkToDownloads(file: File) {
+        Toast.makeText(this, "Preparing APK…", Toast.LENGTH_SHORT).show()
+        executor.execute {
+            try {
+                val staged = copyOutForShare(file)
+                val displayName = file.name.ifBlank { "app.apk" }
+                if (Build.VERSION.SDK_INT >= 29) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                        put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
+                        put(MediaStore.Downloads.IS_PENDING, 1)
+                    }
+                    val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                    val uri = contentResolver.insert(collection, values)
+                        ?: throw IllegalStateException("Downloads insert failed")
+                    try {
+                        contentResolver.openOutputStream(uri)?.use { out ->
+                            staged.inputStream().use { it.copyTo(out) }
+                        } ?: throw IllegalStateException("Cannot write Downloads")
+                        values.clear()
+                        values.put(MediaStore.Downloads.IS_PENDING, 0)
+                        contentResolver.update(uri, values, null, null)
+                    } catch (e: Exception) {
+                        runCatching { contentResolver.delete(uri, null, null) }
+                        throw e
+                    }
+                    mainHandler.post {
+                        Toast.makeText(
+                            this,
+                            "Saved to Downloads as $displayName. Tap it to install.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        openDownloadsUi()
+                    }
+                } else {
+                    mainHandler.post {
+                        Toast.makeText(
+                            this,
+                            "Use SHARE and save to Files, then tap the APK to install.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        shareApkFile(staged)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "exportApkToDownloads failed", e)
+                mainHandler.post {
+                    Toast.makeText(this, "Cannot export APK: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun shareApkFromProject(file: File) {
+        executor.execute {
+            try {
+                val staged = copyOutForShare(file)
+                mainHandler.post { shareApkFile(staged) }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "shareApkFromProject failed", e)
+                mainHandler.post {
+                    Toast.makeText(this, "Cannot share APK: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun shareApkFile(file: File) {
         val uri = getFileUri(file) ?: return
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/octet-stream"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri("APK", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         try {
-            startActivity(intent)
+            startActivity(Intent.createChooser(intent, "Share APK"))
         } catch (e: Exception) {
-            Toast.makeText(this, "Unable to launch APK installer: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Unable to share APK: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun openDownloadsUi() {
+        try {
+            startActivity(
+                Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                "Open Files → Downloads and tap the APK to install.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    /** Readable copy under share/export. Chroot may need root cp. */
+    private fun copyOutForShare(source: File): File {
+        require(source.isFile) { "not a file" }
+        if (source.length() > SHARE_MAX_BYTES) {
+            throw IllegalArgumentException(
+                "File too large to export (${formatFileSize(source.length())}; max ${formatFileSize(SHARE_MAX_BYTES)})"
+            )
+        }
+        if (source.canRead()) {
+            return stageForShare(source)
+        }
+        purgeOldShareExports()
+        val safeName = source.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val dest = File(shareStagingDir(), "${System.currentTimeMillis()}_$safeName")
+        val result = RootShell.copyOutOfChroot(source, dest)
+        if (result.exitCode != 0 || !dest.isFile) {
+            throw IllegalStateException(
+                "Cannot read APK from chroot. Grant root, or copy it into a proot project."
+            )
+        }
+        return dest
     }
 
     private fun openExternalFile(file: File, mimeType: String = "*/*") {
@@ -12741,7 +12904,7 @@ class MainActivity : AppCompatActivity() {
         ensurePostNotificationsPermission()
         ensureBootstrapExtracted()
         deployScripts()
-        startNativeCodeFgs(Intent(this, BackgroundService::class.java))
+        acquireDesktopFgs()
 
         val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
         if (method == "chroot" && !ProjectPathResolver.isChrootInstalled()) {
@@ -12766,7 +12929,7 @@ class MainActivity : AppCompatActivity() {
             guiLogAppend("ERROR: missing host script ${script.absolutePath} (deployScripts failed?)")
             Toast.makeText(this, "GUI script missing — check VIEW LOGS after fix", Toast.LENGTH_LONG).show()
             setGuiCardIdle()
-            stopService(Intent(this, BackgroundService::class.java))
+            releaseDesktopFgs()
             return
         }
         Log.i("GUI", "startGui method=$method script=${script.absolutePath}")
@@ -12816,7 +12979,7 @@ class MainActivity : AppCompatActivity() {
         val stopBroadcast = Intent("com.termux.x11.ACTION_STOP")
         stopBroadcast.setPackage(packageName)
         sendBroadcast(stopBroadcast)
-        stopService(Intent(this, BackgroundService::class.java))
+        releaseDesktopFgs()
 
         deployScripts()
         guiShellJob?.cancel()
@@ -12845,7 +13008,7 @@ class MainActivity : AppCompatActivity() {
         if (::displayBtn.isInitialized) {
             displayBtn.visibility = View.GONE
         }
-        stopService(Intent(this, BackgroundService::class.java))
+        releaseDesktopFgs()
     }
 
     /** VIEW LOGS from Graphical Desktop card → short host cat on the script page. */
@@ -13072,9 +13235,8 @@ class MainActivity : AppCompatActivity() {
         dismissGithubAuthOverlay()
         super.onDestroy()
         resourceMonitorRunnable?.let { mainHandler.removeCallbacks(it) }
-        stopService(Intent(this, BackgroundService::class.java))
-        stopService(Intent(this, AppTerminalService::class.java))
-        stopService(Intent(this, ProjectTerminalService::class.java))
+        releaseDesktopFgs()
+        stopService(Intent(this, TerminalService::class.java))
         for (session in sessionsList) {
             session.finishIfRunning()
         }
@@ -18049,8 +18211,7 @@ class MainActivity : AppCompatActivity() {
             override fun logStackTrace(tag: String, e: java.lang.Exception) { Log.e(tag, "Stacktrace", e) }
         }
 
-        val isChroot = method == "chroot"
-        val sessionExec = if (isChroot) ChrootCommandBuilder.SESSION_EXEC else shell
+        val sessionExec = LinuxCommandBuilder.sessionExec(this, args, method = method)
         val session = TerminalSession(sessionExec, cwd, args, env, 10000, sessionClient)
         workspaceSessions.add(session)
         workspaceTabNames.add(type)

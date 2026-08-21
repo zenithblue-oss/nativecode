@@ -12,6 +12,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
+import android.os.Looper
 import android.view.MotionEvent
 import android.util.Base64
 import android.util.Log
@@ -88,6 +89,8 @@ class OnboardingActivity : AppCompatActivity() {
     private var setupPhases: List<SetupPhase> = emptyList()
     private var setupFailed = false
     private var setupFinished = false
+    private var setupFgsStarted = false
+    private var setupFgsGeneration = 0
 
     /** Displayed progress 0–100f (animated toward [setupOverallPercent]). */
     private var setupAnimatedPercent = 0f
@@ -1804,6 +1807,7 @@ class OnboardingActivity : AppCompatActivity() {
             AiCliProvisionState.setPlanAccepted(this, true)
             AiCliProvisionState.setEnableAiCliInstall(this, enableAiCliInstall)
             AiCliProvisionState.setEnableCustomization(this, enableDebianCustomization)
+            NativeCodeFgs.ensurePostNotificationsPermission(this)
             if (!enableAiCliInstall) {
                 AiCliProvisionState.markAiCliProvisioned(this, selectedIsolationMethod, false)
                 aiCliSetupOutcome = "SKIPPED"
@@ -2236,6 +2240,7 @@ class OnboardingActivity : AppCompatActivity() {
         setupPhaseIndex = idx
         setupPhaseFraction = 0.05f
         val phase = setupPhases[idx]
+        updateSetupFgs(phase.label)
         mainHandler.post {
             if (::setupStepTitleText.isInitialized) {
                 setupStepTitleText.text = phase.label
@@ -2284,6 +2289,7 @@ class OnboardingActivity : AppCompatActivity() {
         setupOverallPercent = 100
         setupPhaseFraction = 1f
         stopSetupElapsedTimer()
+        stopSetupFgs()
         mainHandler.post {
             stopProgressPulse()
             if (::setupStepTitleText.isInitialized) {
@@ -2304,6 +2310,7 @@ class OnboardingActivity : AppCompatActivity() {
     private fun failSetupProgress(message: String) {
         setupFailed = true
         stopSetupElapsedTimer()
+        stopSetupFgs()
         mainHandler.post {
             stopProgressPulse()
             if (::setupStepTitleText.isInitialized) {
@@ -2477,10 +2484,58 @@ class OnboardingActivity : AppCompatActivity() {
         setupElapsedRunning = false
         mainHandler.removeCallbacks(setupElapsedTicker)
         cancelSetupProgressAnimators()
+        // Keep FGS if install is still running so the process is not killed.
+        if (setupFinished || setupFailed || !isDebianBaseSetupStarted) {
+            stopSetupFgs()
+        }
         super.onDestroy()
     }
 
+    private fun startSetupFgs(detail: String? = null) {
+        NativeCodeFgs.ensurePostNotificationsPermission(this)
+        val gen = ++setupFgsGeneration
+        setupFgsStarted = true
+        mainHandler.post { applySetupFgs(gen, detail) }
+    }
+
+    private fun updateSetupFgs(detail: String) {
+        if (!setupFgsStarted || setupFinished || setupFailed) return
+        val gen = setupFgsGeneration
+        mainHandler.post { applySetupFgs(gen, detail) }
+    }
+
+    private fun applySetupFgs(gen: Int, detail: String?) {
+        if (gen != setupFgsGeneration || !setupFgsStarted || setupFinished || setupFailed) return
+        NativeCodeFgs.acquire(
+            this,
+            NativeCodeFgs.OWNER_INSTALL,
+            BackgroundService.installIntent(this, detail)
+        )
+    }
+
+    private fun stopSetupFgs() {
+        setupFgsGeneration++
+        setupFgsStarted = false
+        val release = { NativeCodeFgs.release(this, NativeCodeFgs.OWNER_INSTALL) }
+        if (Looper.myLooper() == Looper.getMainLooper()) release()
+        else mainHandler.post(release)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != NativeCodeFgs.REQ_POST_NOTIFICATIONS) return
+        if (!setupFgsStarted || setupFinished || setupFailed) return
+        applySetupFgs(setupFgsGeneration, currentSetupPhase()?.label)
+    }
+
     private fun runDebianBaseSetup() {
+        startSetupFgs(
+            "Installing Debian ${selectedIsolationMethod} — setup scripts running"
+        )
         // ── CHROOT path (KernelSU / Magisk root required) ────────────────────
         if (selectedIsolationMethod == "chroot") {
             beginSetupPhases("chroot")
@@ -2650,11 +2705,10 @@ class OnboardingActivity : AppCompatActivity() {
                 updateBaseStatus("D. Initializing Host Environment...")
                 // Always re-validate host deps after bootstrap; clear stale marker
                 HostCommandBuilder.clearSetupMarker(this@OnboardingActivity)
-                val proot = TermuxHostPaths.libProot(this@OnboardingActivity).absolutePath
                 val bash = TermuxHostPaths.libBash(this@OnboardingActivity).absolutePath
                 check(
                     runShellCommand(
-                        arrayOf(proot, bash, File(homeDir, "setup_termux.sh").absolutePath),
+                        arrayOf(bash, File(homeDir, "setup_termux.sh").absolutePath),
                         forceHostSetup = true
                     ) == 0
                 ) { "Host setup failed" }
@@ -3254,7 +3308,9 @@ class OnboardingActivity : AppCompatActivity() {
         cmd: Array<String>,
         forceHostSetup: Boolean = false
     ): Int {
-        val adjusted = if (cmd.isNotEmpty() && cmd[0].startsWith("/data/data/"))
+        val exe = cmd.firstOrNull() ?: ""
+        val underAppData = exe.startsWith("/data/data/") || exe.startsWith("/data/app/") || exe.startsWith("/data/user/")
+        val adjusted = if (underAppData && exe != "/system/bin/linker64" && !exe.startsWith("/system/"))
             arrayOf("/system/bin/linker64") + cmd else cmd
         val pb = ProcessBuilder(*adjusted)
         HostCommandBuilder.applyTo(this, pb, forceHostSetup = forceHostSetup)

@@ -4,15 +4,15 @@
 **Type:** `specialUse`  
 **Services:** `BackgroundService`, `AppTerminalService`, `ProjectTerminalService`  
 **Demo video:** [`fgs-special-use-demo.mp4`](./fgs-special-use-demo.mp4) — **~50s live UI**  
-Path: open app → Terminal → Debian Shell (session + FGS) → shade shows **NativeCode — Terminal** → Settings → **START XFCE DESKTOP** → shade shows **Desktop Session** + Terminal together.
+Path: open app → Terminal → Debian Shell (session + FGS) → shade shows **NativeCode — Terminal** → Settings → **START XFCE DESKTOP** → shade shows **Desktop Session** + Terminal together. Onboarding install uses the same `BackgroundService` with **Environment Setup**.
 
 ## Justification (≤ 300 characters — paste into Console)
 
 ```
-NativeCode keeps user-started Linux terminals, per-project shells, and optional XFCE desktop (Termux-X11) alive after leaving the app. specialUse fits this developer environment (not media/location). Ongoing notifications show status; closing sessions or Stop Desktop ends the service.
+NativeCode keeps user-started Linux terminals, project shells, XFCE desktop, and onboarding Debian install/setup alive after leaving the app. specialUse fits this developer environment. Ongoing notifications show status; close sessions, Stop Desktop, or finish setup ends it.
 ```
 
-**Character count:** 285
+**Character count:** 275
 
 ## User-visible stop paths
 
@@ -21,6 +21,7 @@ NativeCode keeps user-started Linux terminals, per-project shells, and optional 
 | App terminal | NativeCode — Terminal | Close all terminal tabs in app |
 | Project terminal | NativeCode — Project Terminal | Close project terminal tabs |
 | XFCE desktop | NativeCode — Desktop Session | Settings hub → Stop XFCE Desktop |
+| Onboarding install | NativeCode — Environment Setup | Auto-stops on setup finish or fail |
 
 ## Manifest properties
 
@@ -29,5 +30,5 @@ Each FGS declares `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` with a short su
 ## Reviewer notes
 
 - Open-source, local-first: guest data stays in proot/chroot on device.
-- FGS starts only after user opens a terminal session or starts XFCE.
+- FGS starts only after user opens a terminal session, starts XFCE, or starts onboarding Debian install.
 - `POST_NOTIFICATIONS` requested on Android 13+ so the ongoing notification is visible.

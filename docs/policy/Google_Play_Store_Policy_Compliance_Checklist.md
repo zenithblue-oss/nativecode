@@ -348,7 +348,7 @@ Items below are **followed** relative to the guide and current code.
 |-------|--------|
 | **Guide §** | §1 Hostile downloaders, §4.6, §4.8(b) |
 | **Status** | **FOLLOWED** |
-| **Evidence** | Removed from `app/src/main/AndroidManifest.xml` (2026-07-31). No `PackageInstaller` usage in app Kotlin. Guest apt/deb installs are not Android APK installs. |
+| **Evidence** | Removed from `app/src/main/AndroidManifest.xml` (2026-07-31). No `PackageInstaller` / `ACTION_INSTALL_PACKAGE` / `ACTION_VIEW` package-archive from the host app. Directory `.apk` cards export to Downloads / share sheet; the user installs from Files. Guest apt/deb installs are not Android APK installs. |
 | **Reason** | Avoids restricted-permission review and hostile-downloader classification. |
 | **How to keep fixed** | Do not re-add unless product becomes a genuine user-initiated APK installer with Console declaration. |
 
@@ -652,7 +652,7 @@ Missing or clearly non-compliant as of this audit.
 |-------|--------|
 | **Guide §** | §4.8(b) Hostile Downloaders |
 | **Status** | **FOLLOWED** (see A25) |
-| **Evidence** | `REQUEST_INSTALL_PACKAGES` removed from app manifest. No host APK install flow. |
+| **Evidence** | `REQUEST_INSTALL_PACKAGES` removed from app manifest. Directory APK flow is user-initiated export to Downloads; install origin is Files/Downloads, not NativeCode. |
 | **Reason** | App no longer claims Android package-install capability. |
 | **How to keep fixed** | Do not re-add without full Console justification. |
 
