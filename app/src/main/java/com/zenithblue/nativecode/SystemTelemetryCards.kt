@@ -2,7 +2,6 @@ package com.zenithblue.nativecode
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -79,8 +77,6 @@ fun SystemTelemetryCards(
     swapTotalMb: Long = 0,
     diskPercentage: Int = 0
 ) {
-    val scrollState = rememberScrollState()
-
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -105,10 +101,9 @@ fun SystemTelemetryCards(
             )
         }
 
-        // Edge-to-Edge Horizontal Scroll Cards Row
+        // Edge-to-Edge Horizontal Scroll Cards Row - fixed: no infinite width on tablet DrawerLayout
         Row(
             modifier = Modifier
-                .horizontalScroll(scrollState)
                 .padding(start = 16.dp, end = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
