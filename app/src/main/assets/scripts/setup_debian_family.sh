@@ -34,6 +34,7 @@ export PULSE_SERVER=127.0.0.1
 xrdb $HOME/.Xresources
 startxfce4" > /home/flux/.vnc/xstartup
 chmod +x /home/flux/.vnc/xstartup
-chown -R flux:flux /home/flux/.vnc
+FLUX_GROUP="$(id -gn flux 2>/dev/null || echo users)"
+chown -R "flux:${FLUX_GROUP}" /home/flux/.vnc
 
 echo "FluxLinux: ${DISTRO_NAME} Setup Complete!"

@@ -64,7 +64,7 @@ object GhGuestCommands {
             "2>&1"
 
     /**
-     * Read token from a guest path file (avoids shell pipe + quoting through proot zsh -c).
+     * Read token from a guest path file (avoids shell pipe + quoting through the Bash runtime).
      * File should contain only the token, one line.
      */
     fun authLoginWithTokenFile(guestTokenPath: String): String {

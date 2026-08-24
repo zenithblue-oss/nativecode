@@ -2045,12 +2045,15 @@ class MainActivity : AppCompatActivity() {
         if (LinuxCommandBuilder.currentMethod == "chroot") {
             executor.execute { try { RootShell.isRootAvailable() } catch (_: Exception) {} }
         }
-        val nld     = applicationInfo.nativeLibraryDir
-        val shell   = File(nld, "libbash.so").absolutePath
         val cwd     = File(filesDir, "home").absolutePath
-        val shellCmd = ChrootCommandBuilder.buildToolShellCommand(this, type, workDir = null)
         val user = LinuxCommandBuilder.sessionUserForType(type)
-        val (args, envMap) = LinuxCommandBuilder.build(this, shellCmd, user = user)
+        val method = LinuxCommandBuilder.currentMethod
+        val (args, envMap) = if (type == "shell" || type == "shell-root") {
+            LinuxCommandBuilder.buildInteractive(this, user = user, workDir = null, method = method)
+        } else {
+            val shellCmd = ChrootCommandBuilder.buildToolShellCommand(this, type, workDir = null)
+            LinuxCommandBuilder.build(this, shellCmd, user = user, method = method)
+        }
         val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
         if (!::sessionClient.isInitialized) {
             initTerminalView()
@@ -5672,7 +5675,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     "bash /data/data/com.zenithblue.nativecode/files/home/$scriptName"
                 }
-                val (a, e) = LinuxCommandBuilder.build(this, scriptCmd, user = "root")
+                val (a, e) = LinuxCommandBuilder.buildGuestBash(this, scriptCmd, user = "root")
                 args = a; envMap = e
             }
             else -> { // "host"
@@ -7297,14 +7300,14 @@ class MainActivity : AppCompatActivity() {
             try {
                 val gitCmd = GitGuestCommands.diffFile(activeProjectPath, name)
                 val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, gitCmd, method = method)
-                val env = HashMap(lcEnv).apply { putAll(GitGuestCommands.gitEnv()) }
+                val env = HashMap(lcEnv).apply { putAll(GitGuestCommands.gitEnv(activeProjectPath)) }
                 val (_, out) = ShellCommandRunner.runCaptureExit(this, lcArgs, env)
                 var filteredLines = filterDiff(out.lines())
 
                 if (filteredLines.isEmpty()) {
                     val untrackedCmd = GitGuestCommands.diffUntracked(activeProjectPath, name)
                     val (utArgs, utEnv) = LinuxCommandBuilder.build(this, untrackedCmd, method = method)
-                    val utFull = HashMap(utEnv).apply { putAll(GitGuestCommands.gitEnv()) }
+                    val utFull = HashMap(utEnv).apply { putAll(GitGuestCommands.gitEnv(activeProjectPath)) }
                     val (_, utOut) = ShellCommandRunner.runCaptureExit(this, utArgs, utFull)
                     val filteredUntracked = filterDiff(utOut.lines())
                     if (filteredUntracked.isNotEmpty()) {
@@ -7540,12 +7543,12 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Discard") { _, _ ->
                 executor.execute {
                     val method = projectGitMethod()
-                    val discardCmd = "cd $activeProjectPath && (git checkout -- \"$fileName\" || rm -rf \"$fileName\")"
+                    val discardCmd = "cd $activeProjectPath && (${GitGuestCommands.gitCommand(activeProjectPath, "checkout -- \"$fileName\"")} || rm -rf \"$fileName\")"
                     val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, discardCmd, method = method)
                     val pb = ProcessBuilder(*lcArgs)
                     val env = pb.environment()
                     env.putAll(lcEnv)
-                    env.putAll(GitGuestCommands.gitEnv())
+                    env.putAll(GitGuestCommands.gitEnv(activeProjectPath))
                     env["GIT_PAGER"] = "cat"
                     env["GIT_TERMINAL_PROMPT"] = "0"
                     env["TERM"] = "dumb"
@@ -7594,12 +7597,12 @@ class MainActivity : AppCompatActivity() {
                     val method = projectGitMethod()
                     val safeMsg = msg.replace("'", "'\\''")
                     val commitCmd =
-                        "cd $activeProjectPath && git add \"$fileName\" && git commit -m '$safeMsg'"
+                        "cd $activeProjectPath && ${GitGuestCommands.gitCommand(activeProjectPath, "add \"$fileName\" && commit -m '$safeMsg'")}"
                     val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, commitCmd, method = method)
                     val pb = ProcessBuilder(*lcArgs)
                     val env = pb.environment()
                     env.putAll(lcEnv)
-                    env.putAll(GitGuestCommands.gitEnv())
+                    env.putAll(GitGuestCommands.gitEnv(activeProjectPath))
                     env["GIT_PAGER"] = "cat"
                     env["GIT_TERMINAL_PROMPT"] = "0"
                     env["TERM"] = "dumb"
@@ -18331,14 +18334,16 @@ class MainActivity : AppCompatActivity() {
             executor.execute { try { RootShell.isRootAvailable() } catch (_: Exception) {} }
         }
         val method = projectGitMethod()
-        val nld = applicationInfo.nativeLibraryDir
-        val shell = File(nld, "libbash.so").absolutePath
         val cwd = File(filesDir, "home").absolutePath
         // shell-root: login at /root (no project cwd — avoid root-owned files under flux home)
         val workDir = if (type == "shell-root") null else activeProjectPath
-        val shellCmd = ChrootCommandBuilder.buildToolShellCommand(this, type, workDir)
         val user = LinuxCommandBuilder.sessionUserForType(type)
-        val (args, envMap) = LinuxCommandBuilder.build(this, shellCmd, user = user, method = method)
+        val (args, envMap) = if (type == "shell" || type == "shell-root") {
+            LinuxCommandBuilder.buildInteractive(this, user = user, workDir = workDir, method = method)
+        } else {
+            val shellCmd = ChrootCommandBuilder.buildToolShellCommand(this, type, workDir)
+            LinuxCommandBuilder.build(this, shellCmd, user = user, method = method)
+        }
         val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
 
         val sessionClient = object : TerminalSessionClient {

@@ -1,0 +1,10 @@
+NativeCode 1.5
+
+• Bash runtime ABI with optional zsh interactive UX
+• PRoot, Chroot and PRoot-fast shell-policy parity
+• Rooted Chroot terminal, AI CLI, repair and package-manager reliability
+• Workspace Git diff, quoted paths and project backend preservation
+• Safer XFCE4/X11 startup without START-side service kills
+• Debian 13 setup, CLI provisioning and upgrade migrations
+
+Requires Android 8.0+, ~10 GB free storage.

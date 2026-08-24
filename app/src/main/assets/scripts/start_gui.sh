@@ -30,13 +30,8 @@ export XKB_CONFIG_ROOT="$TERMUX_PREFIX/share/X11/xkb"
 export PULSE_RUNTIME_PATH="${HOME}/.pulse"
 mkdir -p "$PULSE_RUNTIME_PATH" 2>/dev/null
 
-# Kill stale processes — use our package, not com.termux.x11
-am force-stop "$PKG" 2>/dev/null
-pkill -f "virgl_test_server" 2>/dev/null
-pkill -f pulseaudio 2>/dev/null
-pkill -f termux-x11 2>/dev/null
-pkill -f "app_process.*termux-x11" 2>/dev/null
-sleep 2
+# Do not stop apps or services here. Explicit user STOP runs stop_gui.sh.
+# Keeping START side-effect free avoids killing NativeCode or unrelated sessions.
 
 # Start PulseAudio over TCP
 if $IS_ROOT; then
@@ -68,6 +63,12 @@ fi
 echo "FluxLinux: Starting termux-x11 server..."
 export XDG_RUNTIME_DIR="$TMPDIR"
 export DISPLAY=:0
+
+# A crashed X11 loader can leave only its lock/socket behind. Remove those
+# exact stale endpoints when no server process exists; never kill a live server.
+if ! pgrep -f '[t]ermux-x11' >/dev/null 2>&1; then
+  rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X11-unix/X0" 2>/dev/null || true
+fi
 
 # Fix Android 14 SecurityException for writable dex files (loader.apk must be read-only)
 chmod 0400 "$TERMUX_PREFIX/libexec/termux-x11/loader.apk" 2>/dev/null || true

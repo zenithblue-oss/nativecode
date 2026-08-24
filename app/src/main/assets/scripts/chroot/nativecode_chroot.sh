@@ -1,14 +1,14 @@
 #!/system/bin/sh
-# nativecode-chroot v2.2
+# nativecode-chroot v2.3
 # SSOT chroot runner for NativeCode Debian 13 (requires root).
 # Do not nest this under run_debian13_root.sh — it already owns mounts + one chroot.
 # Guest entry always uses env -i + Debian PATH (never Android /system PATH).
-# v2.2: TTY-safe b64 (no stdin pipe), login --workdir, devpts ptmx heal.
+# v2.3: Bash runtime shell, optional marker-selected interactive zsh, TTY-safe b64.
 #
 # Usage:
 #   nativecode_chroot.sh version
 #   nativecode_chroot.sh mount [--x11]
-#   nativecode_chroot.sh login [--user flux|root] [--shell zsh|bash] [--workdir PATH]
+#   nativecode_chroot.sh login [--user flux|root] [--shell auto|bash|zsh] [--workdir PATH]
 #   nativecode_chroot.sh sh    [--user flux|root] -- 'shell string'
 #   nativecode_chroot.sh exec  [--user flux|root] -- CMD [ARGS...]
 #   nativecode_chroot.sh b64   [--user flux|root] -- BASE64_PAYLOAD
@@ -17,12 +17,12 @@
 #   NC_CHROOT  NC_PACKAGE  NC_HOST_TMP  NC_PREFIX  NC_BB  NC_SHELL
 set -u
 
-VERSION_STR="nativecode-chroot v2.2"
+VERSION_STR="nativecode-chroot v2.3"
 NC_PACKAGE="${NC_PACKAGE:-com.zenithblue.nativecode}"
 NC_CHROOT="${NC_CHROOT:-/data/local/tmp/chrootDebian13}"
 NC_HOST_TMP="${NC_HOST_TMP:-/data/data/${NC_PACKAGE}/files/usr/tmp}"
 NC_PREFIX="${NC_PREFIX:-/data/data/${NC_PACKAGE}/files/usr}"
-LOGIN_SHELL="${NC_SHELL:-zsh}"
+LOGIN_SHELL="${NC_SHELL:-auto}"
 USER_NAME="flux"
 LOGIN_WORKDIR=""
 WANT_X11=0
@@ -39,7 +39,7 @@ usage() {
 usage:
   nativecode_chroot.sh version
   nativecode_chroot.sh mount [--x11]
-  nativecode_chroot.sh login [--user flux|root] [--shell zsh|bash] [--workdir PATH]
+  nativecode_chroot.sh login [--user flux|root] [--shell auto|bash|zsh] [--workdir PATH]
   nativecode_chroot.sh sh    [--user flux|root] -- SHELL_STRING
   nativecode_chroot.sh exec  [--user flux|root] -- CMD [ARGS...]
   nativecode_chroot.sh b64   [--user flux|root] -- BASE64_PAYLOAD
@@ -250,52 +250,64 @@ guest_chroot_env() {
 }
 
 guest_login() {
-  # Optional project cwd (workspace shell). Path must not contain single quotes.
-  _cd=""
-  if [ -n "${LOGIN_WORKDIR:-}" ]; then
-    case "$LOGIN_WORKDIR" in
-      *"'"*) die "workdir must not contain single quotes" ;;
+  _interactive_bin=/bin/bash
+  if [ "$USER_NAME" = "flux" ]; then
+    case "$LOGIN_SHELL" in
+      auto)
+        _requested=$(cat "$NC_CHROOT/home/flux/.config/fluxlinux/interactive-shell" 2>/dev/null || true)
+        ;;
+      bash)
+        _requested=/bin/bash
+        ;;
+      zsh)
+        _requested=/bin/zsh
+        ;;
+      *)
+        die "unsupported --shell $LOGIN_SHELL"
+        ;;
     esac
-    _cd="cd '$LOGIN_WORKDIR' 2>/dev/null || true; "
+    case "$_requested" in
+      /bin/bash|/usr/bin/bash|/bin/zsh|/usr/bin/zsh)
+        if [ -x "$NC_CHROOT$_requested" ]; then
+          _interactive_bin="$_requested"
+        elif [ -n "$_requested" ]; then
+          echo "nativecode_chroot: WARN $_requested unavailable; using /bin/bash" >&2
+        fi
+        ;;
+      "")
+        ;;
+      *)
+        echo "nativecode_chroot: WARN invalid interactive-shell marker; using /bin/bash" >&2
+        ;;
+    esac
+  elif [ "$LOGIN_SHELL" != "auto" ] && [ "$LOGIN_SHELL" != "bash" ]; then
+    die "root interactive shell is always bash"
   fi
-  case "$USER_NAME" in
-    root)
-      case "$LOGIN_SHELL" in
-        zsh)
-          if [ -n "$_cd" ]; then
-            guest_chroot_env /bin/zsh -c "${_cd}exec /bin/zsh -l"
-          else
-            guest_chroot_env /bin/zsh -l
-          fi
-          ;;
-        bash|*)
-          if [ -n "$_cd" ]; then
-            guest_chroot_env /bin/bash --login -c "${_cd}exec /bin/bash --login"
-          else
-            guest_chroot_env /bin/bash --login
-          fi
-          ;;
-      esac
-      ;;
-    flux|*)
-      case "$LOGIN_SHELL" in
-        bash)
-          if [ -n "$_cd" ]; then
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/bash -c "${_cd}exec /bin/bash -l"
-          else
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/bash
-          fi
-          ;;
-        zsh|*)
-          if [ -n "$_cd" ]; then
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/zsh -c "${_cd}exec /bin/zsh -l"
-          else
-            guest_chroot_env /bin/su - "$USER_NAME" -s /bin/zsh
-          fi
-          ;;
-      esac
-      ;;
-  esac
+
+  if [ -z "$LOGIN_WORKDIR" ]; then
+    if [ "$USER_NAME" = "root" ]; then
+      guest_chroot_env "$_interactive_bin" -l
+    else
+      guest_chroot_env /bin/su - "$USER_NAME" -s "$_interactive_bin"
+    fi
+    return
+  fi
+
+  # Store the host argument in guest tmpfs, then read it as one guest value.
+  # This avoids reparsing spaces, quotes, dollar signs, or backticks as code.
+  _work_file="/tmp/.nc_interactive_workdir_$$"
+  printf '%s' "$LOGIN_WORKDIR" > "$NC_CHROOT$_work_file" || die "cannot stage interactive workdir"
+  chmod 644 "$NC_CHROOT$_work_file" 2>/dev/null || true
+  _guest_cmd="\
+p=\$(cat $_work_file 2>/dev/null || true); \
+rm -f $_work_file; \
+if [ -n \"\$p\" ]; then mkdir -p -- \"\$p\" 2>/dev/null || true; cd -- \"\$p\" 2>/dev/null || true; fi; \
+exec $_interactive_bin -l"
+  if [ "$USER_NAME" = "root" ]; then
+    guest_chroot_env /bin/bash --noprofile --norc -c "$_guest_cmd"
+  else
+    guest_chroot_env /bin/su - "$USER_NAME" -s "$_interactive_bin" -c "$_guest_cmd"
+  fi
 }
 
 # Non-interactive: one shell string as USER_NAME (single chroot + one su layer).
@@ -406,7 +418,7 @@ resolve_bb
 REMAINING_ARGS=""
 WANT_X11=0
 USER_NAME="flux"
-LOGIN_SHELL="${NC_SHELL:-zsh}"
+LOGIN_SHELL="${NC_SHELL:-auto}"
 
 case "$MODE" in
   mount)

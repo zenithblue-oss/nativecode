@@ -5,7 +5,7 @@
 # Usage:
 #   nativecode_proot_fast.sh exec   [--profile cli|gpu-turnip|gpu-virgl|compat] -- CMD [ARGS...]
 #   nativecode_proot_fast.sh sh     [--profile ...] -- 'shell string'
-#   nativecode_proot_fast.sh login  [--shell zsh|bash] [--profile ...]
+#   nativecode_proot_fast.sh login  [--shell auto|bash|zsh] [--profile ...]
 #   nativecode_proot_fast.sh root-exec [--profile ...] -- CMD [ARGS...]
 #
 # Env overrides:
@@ -19,7 +19,7 @@ TERMUX__HOME="${TERMUX__HOME:-/data/data/${NC_PACKAGE}/files/home}"
 ROOTFS="${ROOTFS:-${PREFIX}/var/lib/proot-distro/containers/debian/rootfs}"
 PROOT_BIN="${PROOT_BIN:-${PREFIX}/bin/proot}"
 PROFILE="${NC_PROOT_PROFILE:-cli}"
-LOGIN_SHELL="${NC_SHELL:-zsh}"
+LOGIN_SHELL="${NC_SHELL:-auto}"
 MODE=""
 GUEST_UID=""
 GUEST_GID=""
@@ -37,7 +37,7 @@ usage() {
 usage:
   nativecode_proot_fast.sh exec   [--profile cli|gpu-turnip|gpu-virgl|compat] -- CMD [ARGS...]
   nativecode_proot_fast.sh sh     [--profile ...] -- SHELL_STRING
-  nativecode_proot_fast.sh login  [--shell zsh|bash] [--profile ...]
+  nativecode_proot_fast.sh login  [--shell auto|bash|zsh] [--profile ...]
   nativecode_proot_fast.sh root-exec [--profile ...] -- CMD [ARGS...]
 EOF
   exit 2
@@ -90,6 +90,36 @@ load_flux_ids() {
   GUEST_USER=flux
   [ -n "$GUEST_UID" ] && [ -n "$GUEST_GID" ] || die "bad flux passwd line"
   [ -n "$GUEST_HOME" ] || GUEST_HOME=/home/flux
+}
+
+resolve_login_shell() {
+  if [ "$IS_ROOT_EXEC" = "1" ]; then
+    SH_BIN=/bin/bash
+    return 0
+  fi
+  case "$LOGIN_SHELL" in
+    auto)
+      requested=$(cat "${ROOTFS}${GUEST_HOME}/.config/fluxlinux/interactive-shell" 2>/dev/null || true)
+      ;;
+    bash) requested=/bin/bash ;;
+    zsh) requested=/bin/zsh ;;
+    *) die "unsupported --shell $LOGIN_SHELL" ;;
+  esac
+  case "$requested" in
+    /bin/bash|/usr/bin/bash|/bin/zsh|/usr/bin/zsh)
+      if [ -x "${ROOTFS}${requested}" ]; then
+        SH_BIN=$requested
+      else
+        echo "nativecode_proot_fast: WARN $requested unavailable; using /bin/bash" >&2
+        SH_BIN=/bin/bash
+      fi
+      ;;
+    "") SH_BIN=/bin/bash ;;
+    *)
+      echo "nativecode_proot_fast: WARN invalid interactive-shell marker; using /bin/bash" >&2
+      SH_BIN=/bin/bash
+      ;;
+  esac
 }
 
 # Append bind if source exists. Usage: add_bind SRC [DST]
@@ -353,15 +383,10 @@ case "$MODE" in
     CMD_STR=$*
     [ -n "$CMD_STR" ] || die "sh requires a shell string"
     # shellcheck disable=SC2086
-    run_proot /usr/bin/env -i $ENV_ARGS /bin/sh -c "$CMD_STR"
+    run_proot /usr/bin/env -i $ENV_ARGS /bin/bash --noprofile --norc -c "$CMD_STR"
     ;;
   login)
-    case "$LOGIN_SHELL" in
-      zsh) SH_BIN=/bin/zsh ;;
-      bash) SH_BIN=/bin/bash ;;
-      sh|dash) SH_BIN=/bin/sh ;;
-      *) die "unsupported --shell $LOGIN_SHELL" ;;
-    esac
+    resolve_login_shell
     # interactive login shell
     # shellcheck disable=SC2086
     run_proot /usr/bin/env -i $ENV_ARGS "$SH_BIN" -l

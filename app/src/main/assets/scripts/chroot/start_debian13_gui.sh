@@ -42,17 +42,8 @@ if [ ! -x "$DEBIANPATH/usr/bin/startxfce4" ] && [ ! -f "$DEBIANPATH/usr/bin/star
   exit 1
 fi
 
-# Soft SELinux (HyperOS / enforcing) — flux pattern; fail soft
 if command -v getenforce >/dev/null 2>&1; then
-  SELINUX_STATUS=$(getenforce 2>/dev/null || true)
-  echo "NativeCode: SELinux=$SELINUX_STATUS"
-  if [ "$SELINUX_STATUS" = "Enforcing" ]; then
-    setenforce 0 2>/dev/null && echo "NativeCode: SELinux → Permissive (until reboot)" \
-      || echo "NativeCode: [WARN] setenforce 0 failed"
-  fi
-fi
-if command -v chcon >/dev/null 2>&1; then
-  chcon -R u:object_r:tmpfs:s0 "$TARGET_PREFIX/tmp" 2>/dev/null || true
+  echo "NativeCode: SELinux=$(getenforce 2>/dev/null || echo unknown)"
 fi
 
 HELPER="${HELPER:-/data/local/tmp/nativecode_chroot.sh}"
@@ -105,15 +96,11 @@ else
     || mount --bind "$TARGET_PREFIX/tmp/.X11-unix" "$DEBIANPATH/tmp/.X11-unix" 2>/dev/null || true
 fi
 
-echo "[3/5] Kill stale XFCE in chroot..."
-if [ -f "$HELPER" ]; then
-  sh "$HELPER" sh --user root -- \
-    "killall -9 xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon 2>/dev/null; true" \
-    >/dev/null 2>&1 || true
-else
-  $BB chroot "$DEBIANPATH" /bin/su - root -c \
-    "killall -9 xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon 2>/dev/null; true" \
-    >/dev/null 2>&1
+echo "[3/5] Checking existing XFCE session..."
+if $BB chroot "$DEBIANPATH" /bin/bash -c \
+  'command -v pgrep >/dev/null 2>&1 && pgrep -x xfce4-session >/dev/null 2>&1'; then
+  echo "NativeCode: XFCE already running; leaving existing session untouched"
+  exit 0
 fi
 
 echo "[4/5] GPU mode + launch XFCE as $USERNAME..."

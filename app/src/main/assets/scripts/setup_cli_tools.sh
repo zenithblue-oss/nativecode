@@ -75,7 +75,11 @@ flux_has() {
             _n=\$(ls -1d \"\$NVM_DIR/versions/node\"/v* 2>/dev/null | sort -V | tail -1)
             [ -n \"\$_n\" ] && PATH=\"\$_n/bin:\$PATH\"
         fi
-        command -v $cmd >/dev/null 2>&1
+        command -v $cmd >/dev/null 2>&1 || exit 1
+        # opencode's npm shim exists even when its native postinstall was skipped.
+        if [ "$cmd" = "opencode" ]; then
+            opencode --version >/dev/null 2>&1
+        fi
     "
 }
 
@@ -108,9 +112,8 @@ else
     echo ">>> musl loader already present"
 fi
 
-# ── PATH / NVM env for shells (zshenv critical for non-interactive zsh -c) ───
-# zsh order: .zshenv (always) → .zprofile (login) → .zshrc (interactive)
-# bash: .bashrc / .profile
+# ── PATH / NVM env for shells (Bash runtime; zsh wiring optional) ────────────
+# bash: .bashrc / .profile; zsh files are touched only when zsh is installed.
 
 ENV_DIR="$FLUX_HOME/.config/fluxlinux"
 ENV_FILE="$ENV_DIR/cli-tools.env"
@@ -183,12 +186,11 @@ RCEOF
 }
 
 echo ">>> wiring PATH into zsh/bash startup files..."
-# .zshenv: always loaded (interactive + non-interactive zsh -c)
-ensure_source_line "$FLUX_HOME/.zshenv" "zshenv"
-# .zprofile: login zsh (su - flux)
-ensure_source_line "$FLUX_HOME/.zprofile" "zprofile"
-# .zshrc: interactive zsh (after oh-my-zsh may reshuffle; re-apply PATH at end)
-ensure_source_line "$FLUX_HOME/.zshrc" "zshrc"
+if [ -x /bin/zsh ] || [ -x /usr/bin/zsh ]; then
+    ensure_source_line "$FLUX_HOME/.zshenv" "zshenv"
+    ensure_source_line "$FLUX_HOME/.zprofile" "zprofile"
+    ensure_source_line "$FLUX_HOME/.zshrc" "zshrc"
+fi
 # bash fallbacks
 ensure_source_line "$FLUX_HOME/.bashrc" "bashrc"
 ensure_source_line "$FLUX_HOME/.profile" "profile"
@@ -246,6 +248,24 @@ npm_global_install() {
         echo ">>> skip $pkg ($bin already on PATH)"
         record_skip "$bin"
         return 0
+    fi
+    if [ "$bin" = "opencode" ]; then
+        echo ">>> repairing opencode postinstall..."
+        if as_flux '
+            export NVM_DIR="$HOME/.nvm"
+            . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 || true
+            _opencode_root=$(npm root -g 2>/dev/null)/opencode-ai
+            if [ -f "$_opencode_root/postinstall.mjs" ]; then
+                cd "$_opencode_root" && node postinstall.mjs
+            else
+                exit 1
+            fi
+        '; then
+            if flux_has "$bin"; then
+                record_ok "$bin"
+                return 0
+            fi
+        fi
     fi
     echo ">>> npm install -g $pkg..."
     if as_flux "
@@ -326,9 +346,11 @@ fi
 # ── re-apply PATH block (installers may rewrite .zshrc) ──────────────────────
 
 echo ">>> re-wire shell PATH after installers..."
-ensure_source_line "$FLUX_HOME/.zshenv" "zshenv"
-ensure_source_line "$FLUX_HOME/.zprofile" "zprofile"
-ensure_source_line "$FLUX_HOME/.zshrc" "zshrc"
+if [ -x /bin/zsh ] || [ -x /usr/bin/zsh ]; then
+    ensure_source_line "$FLUX_HOME/.zshenv" "zshenv"
+    ensure_source_line "$FLUX_HOME/.zprofile" "zprofile"
+    ensure_source_line "$FLUX_HOME/.zshrc" "zshrc"
+fi
 ensure_source_line "$FLUX_HOME/.bashrc" "bashrc"
 ensure_source_line "$FLUX_HOME/.profile" "profile"
 

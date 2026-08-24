@@ -17,7 +17,7 @@ object ChrootCommandBuilder {
     const val CHROOT_HELPER = "/data/local/tmp/nativecode_chroot.sh"
     const val CHROOT_HELPER_ASSET = "scripts/chroot/nativecode_chroot.sh"
     /** Must match first `# nativecode-chroot vN` line in the asset. */
-    const val CHROOT_HELPER_VERSION = "nativecode-chroot v2.2"
+    const val CHROOT_HELPER_VERSION = "nativecode-chroot v2.3"
 
     /** Compat wrappers (thin → helper); setup still installs for ADB users. */
     const val RUNNER_ROOT = "/data/local/tmp/run_debian13_root.sh"
@@ -27,7 +27,7 @@ object ChrootCommandBuilder {
     /** Session executable — must be a system binary (SELinux blocks exec of app-data scripts). */
     const val SESSION_EXEC = "/system/bin/sh"
 
-    private const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v2"
+    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v3"
     private const val TERM_WRAPPER_VERSION = "nativecode-chroot-term-wrapper v3"
 
     fun build(
@@ -39,24 +39,11 @@ object ChrootCommandBuilder {
         ensureHelperScript(ctx)
 
         val u = if (user == "root") "root" else "flux"
-        val workdir = parseInteractiveWorkdir(shellCmd)
-        val isInteractive = workdir != null ||
-            shellCmd == "exec zsh" ||
-            shellCmd == "/bin/bash --login" ||
-            shellCmd.isBlank()
         val toolExec = parseToolExec(shellCmd)
 
         // Always `sh $HELPER` (not bare exec of script) — SELinux often blocks exec of
         // /data/local/tmp/*.sh; /system/bin/sh interpreting the script is reliable.
         val rootInner: String = when {
-            isInteractive && u == "root" -> {
-                val wd = workdir?.let { " --workdir ${shellSingleQuote(it)}" } ?: ""
-                "exec sh $CHROOT_HELPER login --user root --shell bash$wd"
-            }
-            isInteractive -> {
-                val wd = workdir?.let { " --workdir ${shellSingleQuote(it)}" } ?: ""
-                "exec sh $CHROOT_HELPER login --user flux --shell zsh$wd"
-            }
             toolExec != null -> {
                 val (dir, argv) = toolExec
                 if (dir != null) {
@@ -99,6 +86,32 @@ object ChrootCommandBuilder {
         envMap["XDG_RUNTIME_DIR"] = "/tmp"
         envMap["TMPDIR"] = "/tmp"
 
+        return arrayOf(SESSION_EXEC, "-c", winchCmd) to envMap
+    }
+
+    fun buildInteractive(
+        ctx: Context,
+        user: String = "flux",
+        workDir: String? = null
+    ): Pair<Array<String>, HashMap<String, String>> {
+        ensureHelperScript(ctx)
+        val u = if (user == "root") "root" else "flux"
+        val shell = if (u == "root") "bash" else "auto"
+        val wd = workDir?.takeIf { it.isNotBlank() }
+            ?.let { " --workdir ${shellSingleQuote(it)}" }
+            ?: ""
+        val rootInner = "exec sh $CHROOT_HELPER login --user $u --shell $shell$wd"
+        val cmd = RootShell.shellRootCommand(rootInner)
+        val winchCmd =
+            "trap 'kill -WINCH -\$\$ 2>/dev/null; kill -WINCH 0 2>/dev/null' WINCH; $cmd"
+        val envMap = HashMap(System.getenv())
+        envMap["PATH"] = "/system/bin:/system/xbin:/sbin:" + (envMap["PATH"] ?: "")
+        envMap["TERM"] = "xterm-256color"
+        envMap["HOME"] = if (u == "root") "/root" else "/home/flux"
+        envMap["LANG"] = "en_US.UTF-8"
+        envMap["LC_ALL"] = "en_US.UTF-8"
+        envMap["XDG_RUNTIME_DIR"] = "/tmp"
+        envMap["TMPDIR"] = "/tmp"
         return arrayOf(SESSION_EXEC, "-c", winchCmd) to envMap
     }
 
@@ -166,21 +179,7 @@ object ChrootCommandBuilder {
     }
 
     private fun shellSingleQuote(s: String): String =
-        "'" + s.replace("'", "'\\''") + "'"
-
-    /**
-     * Workspace shell: `mkdir -p DIR && cd DIR && exec zsh` → interactive login + --workdir.
-     * Returns workdir path, or null if not that form. Empty string = interactive home (no workdir).
-     * Pure `exec zsh` / blank handled separately (null here, isInteractive true).
-     */
-    private fun parseInteractiveWorkdir(shellCmd: String): String? {
-        val t = shellCmd.trim()
-        // mkdir -p DIR && cd DIR && exec zsh  (DIR unquoted, no spaces in practice)
-        val m = Regex("""^mkdir -p (.+) && cd \1 && exec zsh$""").matchEntire(t)
-            ?: return null
-        val dir = m.groupValues[1].trim()
-        return dir.takeIf { it.isNotEmpty() && !it.contains('\'') }
-    }
+        ShellQuoting.singleQuote(s)
 
     /**
      * AI tool launch: `/tmp/launch_tool.sh TOOL` or `mkdir -p DIR && cd DIR && /tmp/launch_tool.sh TOOL`.
@@ -246,7 +245,7 @@ exit ${'$'}?
      */
     fun ensureLauncherScript(ctx: Context): Boolean {
         val scriptPath = "${ctx.filesDir}/usr/tmp/launch_tool.sh"
-        val script = """#!/bin/zsh
+        val script = """#!/bin/bash
 # $LAUNCH_TOOL_VERSION
 export HOME=/home/flux
 export TERM="${'$'}{TERM:-xterm-256color}"
@@ -255,6 +254,9 @@ export LC_ALL=en_US.UTF-8
 export XDG_RUNTIME_DIR=/tmp
 export TMPDIR=/tmp
 export NVM_DIR="${'$'}{NVM_DIR:-${'$'}HOME/.nvm}"
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=safe.directory
+export GIT_CONFIG_VALUE_0="${'$'}PWD"
 
 export PATH="${'$'}HOME/.local/bin:${'$'}HOME/bin:${'$'}HOME/.cargo/bin:/opt/nodejs/bin:/usr/local/bin:/usr/bin:/bin:/sbin"
 
@@ -292,18 +294,12 @@ exec "${'$'}@"
         }
     }
 
-    /**
-     * Guest shell env one-liner (fallback only; tools prefer launch_tool.sh).
-     * Null-glob-safe nvm scan; single-quoted by ProotCommandBuilder so host bash
-     * does not expand $HOME/$PATH.
-     */
+    /** Bash-safe fallback environment for legacy callers; launch_tool.sh is preferred. */
     fun toolEnvInit(): String =
-        "setopt NULL_GLOB 2>/dev/null; " +
-            "[ -f \$HOME/.config/fluxlinux/cli-tools.env ] && . \$HOME/.config/fluxlinux/cli-tools.env; " +
+        "if [ -f \$HOME/.config/fluxlinux/cli-tools.env ]; then . \$HOME/.config/fluxlinux/cli-tools.env; fi; " +
             "export PATH=\$HOME/.local/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH; " +
             "export NVM_DIR=\${NVM_DIR:-\$HOME/.nvm}; " +
-            "for _n in \$NVM_DIR/versions/node/v*/bin; do " +
-            "[ -d \"\$_n\" ] && export PATH=\$_n:\$PATH; done; unset _n"
+            "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=\"\$PWD\""
 
     fun toolBinaryName(type: String): String = when (type) {
         "opencode" -> "opencode"
@@ -313,7 +309,7 @@ exec "${'$'}@"
         "qwen-code" -> "qwen"
         "grok" -> "grok"
         "kiro" -> "kiro-cli"
-        else -> "zsh"
+        else -> error("Unknown Linux tool type: $type")
     }
 
     /**
@@ -322,16 +318,8 @@ exec "${'$'}@"
      * @param workDir guest cwd; null = user home (/home/flux or /root for shell-root)
      */
     fun buildToolShellCommand(ctx: Context, type: String, workDir: String?): String {
-        if (type == "shell" || type == "shell-root") {
-            val home = if (type == "shell-root") "/root" else "/home/flux"
-            val dir = workDir?.takeIf { it.isNotBlank() } ?: home
-            return if (workDir.isNullOrBlank()) {
-                // Interactive login: builders use su -/proot --user (HOME from login)
-                "exec zsh"
-            } else {
-                // Chroot maps this to login --workdir (preserves TTY); proot still zsh -c
-                "mkdir -p $dir && cd $dir && exec zsh"
-            }
+        require(type != "shell" && type != "shell-root") {
+            "Interactive shell types must use LinuxCommandBuilder.buildInteractive"
         }
         val dir = workDir?.takeIf { it.isNotBlank() } ?: "/home/flux"
         val tool = toolBinaryName(type)

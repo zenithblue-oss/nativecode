@@ -1,6 +1,6 @@
 # NativeCode Chroot SSOT component
 
-**Status:** Implemented (**v2.2**); helper ADB smoke PASS; UI M1–M10 needs signed APK  
+**Status:** Implemented (**v2.3**); helper ADB smoke PASS; UI M1–M10 needs signed APK
 **Date:** 2026-08-01  
 **Plan (hub):** [`docs/plan/chroot-ssot-shell-runner.md`](../plan/chroot-ssot-shell-runner.md)  
 **Guest env (v2.1 PATH):** [`docs/plan/chroot-ssot-guest-env-fix.md`](../plan/chroot-ssot-guest-env-fix.md) — **partial**; superseded for TTY/git  
@@ -30,12 +30,13 @@ Kotlin and other scripts **must not** re-implement mounts or raw `busybox chroot
 | Item | Value |
 |------|--------|
 | Asset (source) | `app/src/main/assets/scripts/chroot/nativecode_chroot.sh` |
-| Version stamp | `nativecode-chroot v2.2` (must match `ChrootCommandBuilder.CHROOT_HELPER_VERSION`) |
+| Version stamp | `nativecode-chroot v2.3` (must match `ChrootCommandBuilder.CHROOT_HELPER_VERSION`) |
 | On-device path | `/data/local/tmp/nativecode_chroot.sh` |
 | Rootfs | `/data/local/tmp/chrootDebian13` |
 | Host tmp bridge | `/data/data/com.zenithblue.nativecode/files/usr/tmp` → guest `/mnt/host-tmp` |
 | Guest sticky tmp | `$CHROOT/tmp` disk-backed `1777` — **never** full-bind host over `/tmp` |
-| Default user | `flux` (uid 1000, shell zsh) |
+| Runtime user | `flux` (uid 1000, `/etc/passwd` shell Bash) |
+| Interactive UX | `/home/flux/.config/fluxlinux/interactive-shell` marker; zsh optional, Bash fallback |
 | Session host exec | `/system/bin/sh` + WINCH trap (SELinux) |
 
 ### Version history (helper stamp)
@@ -45,6 +46,7 @@ Kotlin and other scripts **must not** re-implement mounts or raw `busybox chroot
 | v1 | SSOT hub: mounts + login/sh/exec/b64 |
 | v2.1 | Guest `env -i` + Debian PATH + absolute `/usr/bin/base64` |
 | **v2.2** | TTY-safe b64 (no stdin pipe); `login --workdir`; devpts `ptmxmode` heal; Kotlin `'` → b64 |
+| **v2.3** | Bash runtime shell; marker-selected interactive zsh; `/etc/passwd` remains Bash |
 
 ---
 
@@ -53,7 +55,7 @@ Kotlin and other scripts **must not** re-implement mounts or raw `busybox chroot
 ```text
 nativecode_chroot.sh version
 nativecode_chroot.sh mount [--x11]
-nativecode_chroot.sh login [--user flux|root] [--shell zsh|bash] [--workdir PATH]
+nativecode_chroot.sh login [--user flux|root] [--shell auto|bash|zsh] [--workdir PATH]
 nativecode_chroot.sh sh    [--user flux|root] -- 'shell string'
 nativecode_chroot.sh exec  [--user flux|root] -- CMD [ARGS...]
 nativecode_chroot.sh b64   [--user flux|root] -- BASE64_PAYLOAD
@@ -68,7 +70,7 @@ nativecode_chroot.sh b64   [--user flux|root] -- BASE64_PAYLOAD
 | `NC_HOST_TMP` | `/data/data/$NC_PACKAGE/files/usr/tmp` |
 | `NC_PREFIX` | `/data/data/$NC_PACKAGE/files/usr` |
 | `NC_BB` | auto-detect |
-| `NC_SHELL` | default login shell hint (`zsh`) |
+| `NC_SHELL` | interactive shell request (`auto`, `bash`, or `zsh`); default `auto` |
 
 ### Semantics
 
@@ -293,28 +295,25 @@ nativecode_chroot.sh
   ensure_mounts (idempotent) + ensure_devpts heal
   guest_chroot_env → env -i + Debian PATH + chroot
   login [--workdir] | exec | b64→tempfile→bash (TTY-safe)
-  root: bash/zsh; flux: su - $user  (single layer)
+  root: bash; flux: su - $user with marker-selected shell (single layer)
 ```
 
 ---
 
-## 7. Kotlin thin builder (v2.2 shape)
+## 7. Kotlin thin builder (v2.3 shape)
 
 ```kotlin
 // ChrootCommandBuilder — live shape (abbrev)
 const val CHROOT_HELPER = "/data/local/tmp/nativecode_chroot.sh"
-const val CHROOT_HELPER_VERSION = "nativecode-chroot v2.2"
+const val CHROOT_HELPER_VERSION = "nativecode-chroot v2.3"
 
 fun build(ctx, shellCmd, user): Pair<Array<String>, HashMap<…>> {
   ensureLauncherScript(ctx)
   ensureHelperScript(ctx) // restage if stamp mismatch
 
-  val workdir = parseInteractiveWorkdir(shellCmd) // mkdir&&cd&&exec zsh
+  // Interactive shells use buildInteractive(user, workDir); tool commands use build().
   val tool = parseToolExec(shellCmd)               // launch_tool.sh …
   val rootInner = when {
-    interactive || workdir != null ->
-      "exec $CHROOT_HELPER login --user $u --shell …" +
-        (workdir?.let { " --workdir '$it'" } ?: "")
     tool != null && tool.dir == null ->
       "exec $CHROOT_HELPER exec --user $u -- ${tool.argv}"
     tool != null ->

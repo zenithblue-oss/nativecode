@@ -17,7 +17,7 @@ object GitRepoService {
         return try {
             val cmd = GitGuestCommands.isInsideWorkTree(projectPath)
             val (args, env) = LinuxCommandBuilder.build(ctx, cmd, method = method)
-            val fullEnv = HashMap(env).apply { putAll(GitGuestCommands.gitEnv()) }
+            val fullEnv = HashMap(env).apply { putAll(GitGuestCommands.gitEnv(projectPath)) }
             val (exit, out) = ShellCommandRunner.runCaptureExit(ctx, args, fullEnv)
             exit == 0 && out.contains("true")
         } catch (_: Exception) {
@@ -33,7 +33,7 @@ object GitRepoService {
         return try {
             val script = GitGuestCommands.branchesBundle(projectPath)
             val (args, env) = LinuxCommandBuilder.build(ctx, script, method = method)
-            val fullEnv = HashMap(env).apply { putAll(GitGuestCommands.gitEnv()) }
+            val fullEnv = HashMap(env).apply { putAll(GitGuestCommands.gitEnv(projectPath)) }
             val (exit, out) = ShellCommandRunner.runCaptureExit(ctx, args, fullEnv)
             if (exit == 2) {
                 return BranchInfo(isRepo = false, current = null, localBranches = emptyList())
@@ -56,7 +56,7 @@ object GitRepoService {
         return try {
             val script = GitGuestCommands.statusSummaryBundle(projectPath)
             val (args, env) = LinuxCommandBuilder.build(ctx, script, method = method)
-            val fullEnv = HashMap(env).apply { putAll(GitGuestCommands.gitEnv()) }
+            val fullEnv = HashMap(env).apply { putAll(GitGuestCommands.gitEnv(projectPath)) }
             val (exit, out) = ShellCommandRunner.runCaptureExit(ctx, args, fullEnv)
             if (exit == 2) {
                 return DiffSummaryResult.NotGit("Project path not found")

@@ -21,16 +21,11 @@ object CliGuestCommands {
     /**
      * PATH + nvm + managed env so npm-global / curl bins resolve.
      *
-     * Quote-safe for both:
-     * - proot: single-quoted zsh -c (host must not expand $HOME)
-     * - chroot: nested double-quoted su -c (no bare "…" around $vars)
-     *
-     * Zsh-safe: no bare v* globs (NOMATCH aborts whole zsh -c → false MISSING).
+     * Snippets execute under NativeCode's non-interactive Bash contract.
+     * Host builders quote the payload so guest variables are not expanded early.
      * Absolute /home/flux paths (flux is fixed guest user).
      */
     fun pathBootstrap(): String = listOf(
-        // zsh NOMATCH aborts whole -c script → false MISSING for every tool
-        "setopt NULL_GLOB 2>/dev/null || setopt nonomatch 2>/dev/null || true",
         "export HOME=/home/flux",
         "export USER=flux",
         "export PATH=/home/flux/.local/bin:/home/flux/bin:/home/flux/.cargo/bin:/opt/nodejs/bin:/usr/local/bin:/usr/bin:/bin:/sbin",
@@ -39,7 +34,6 @@ object CliGuestCommands {
         "if [ -d /home/flux/.nvm/versions/node ]; then " +
             "_n=\$(find /home/flux/.nvm/versions/node -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1); " +
             "case \$_n in /home/flux/.nvm/*) PATH=\$_n/bin:\$PATH;; esac; unset _n; fi",
-        // source after NULL_GLOB so cli-tools.env nvm ls globs cannot kill shell
         "[ -f /home/flux/.config/fluxlinux/cli-tools.env ] && . /home/flux/.config/fluxlinux/cli-tools.env 2>/dev/null || true",
         "[ -f /home/flux/.config/fluxlinux/cli-auth.env ] && . /home/flux/.config/fluxlinux/cli-auth.env 2>/dev/null || true"
     ).joinToString("; ")

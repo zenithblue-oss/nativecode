@@ -414,7 +414,7 @@ EOF
 HELPER=/data/local/tmp/nativecode_chroot.sh
 [ -f "$HELPER" ] || { echo "nativecode_chroot.sh missing" >&2; exit 127; }
 echo "Entering Debian 13 Chroot (CLI)..."
-exec sh "$HELPER" login --user flux --shell zsh
+exec sh "$HELPER" login --user flux --shell auto
 EOF
     chmod 755 "$CLI_SCRIPT"
     success "CLI Launcher created: $CLI_SCRIPT"

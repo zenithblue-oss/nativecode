@@ -47,12 +47,8 @@ fi
 export PULSE_RUNTIME_PATH="${HOME}/.pulse"
 mkdir -p "$PULSE_RUNTIME_PATH" "$TMPDIR" 2>/dev/null
 
-# Stale host services only — do NOT force-stop $PKG
-pkill -f "virgl_test_server" 2>/dev/null || true
-pkill -f pulseaudio 2>/dev/null || true
-pkill -f termux-x11 2>/dev/null || true
-pkill -f "app_process.*termux-x11" 2>/dev/null || true
-sleep 1
+# Start is side-effect free: never kill the app, X11, audio, or GPU services.
+# Existing host services are reused; explicit user STOP owns shutdown.
 
 # PulseAudio (app uid — flux requirement)
 echo "NativeCode: Starting PulseAudio..."
@@ -63,9 +59,13 @@ pacmd load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymou
 
 # VirGL optional
 if command -v virgl_test_server_android >/dev/null; then
-  echo "NativeCode: Starting VirGL server..."
-  virgl_test_server_android --socket-path "$TERMUX_PREFIX/tmp/.virgl_test" >/dev/null 2>&1 &
-  sleep 2
+  if [ -S "${TMPDIR}/.virgl_test" ]; then
+    echo "NativeCode: Reusing VirGL server"
+  else
+    echo "NativeCode: Starting VirGL server..."
+    virgl_test_server_android --socket-path "$TERMUX_PREFIX/tmp/.virgl_test" >/dev/null 2>&1 &
+    sleep 2
+  fi
   test -S "${TMPDIR}/.virgl_test" && echo "NativeCode: VirGL socket ready" \
     || echo "NativeCode: [WARN] VirGL socket not found"
 else
@@ -108,17 +108,25 @@ fi
 
 mkdir -p "$TMPDIR/.X11-unix"
 chmod 1777 "$TMPDIR/.X11-unix" 2>/dev/null || true
-rm -f "$TMPDIR/.X0-lock" 2>/dev/null || true
 
-LD_LIBRARY_PATH="" LD_PRELOAD="" \
-CLASSPATH="$TERMUX_PREFIX/libexec/termux-x11/loader.apk" \
-TERMUX_X11_APK_PATH="$TERMUX_X11_APK_PATH" \
-TERMUX_X11_OVERRIDE_PACKAGE="$PKG" \
-LANG=en_US.UTF-8 \
-/system/bin/app_process / \
-  --nice-name="termux-x11" com.termux.x11.Loader :0 -legacy-drawing &
-XSERVER_PID=$!
-echo "NativeCode: X server PID=$XSERVER_PID"
+# Remove only stale endpoints after a crashed loader. Never remove live X11 state.
+if ! pgrep -f '[t]ermux-x11' >/dev/null 2>&1; then
+  rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X11-unix/X0" 2>/dev/null || true
+fi
+
+if pgrep -f '[t]ermux-x11' >/dev/null 2>&1; then
+  echo "NativeCode: Reusing existing termux-x11 server"
+else
+  LD_LIBRARY_PATH="" LD_PRELOAD="" \
+  CLASSPATH="$TERMUX_PREFIX/libexec/termux-x11/loader.apk" \
+  TERMUX_X11_APK_PATH="$TERMUX_X11_APK_PATH" \
+  TERMUX_X11_OVERRIDE_PACKAGE="$PKG" \
+  LANG=en_US.UTF-8 \
+  /system/bin/app_process / \
+    --nice-name="termux-x11" com.termux.x11.Loader :0 -legacy-drawing &
+  XSERVER_PID=$!
+  echo "NativeCode: X server PID=$XSERVER_PID"
+fi
 sleep 3
 
 echo "NativeCode: Opening X11 activity..."

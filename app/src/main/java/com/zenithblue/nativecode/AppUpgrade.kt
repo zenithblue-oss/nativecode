@@ -69,23 +69,66 @@ object AppUpgrade {
         if (File(ctx.filesDir, "usr/lib/libtermux-exec.so").exists()) {
             TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir)
         }
-        runVersionMigrations(ctx, from, to)
+        runVersionMigrations(from, to)
     }
 
     /**
      * Add one block per release that needs extra work beyond full script restage.
      * Prefer idempotent shells under assets/scripts/migrations when needed.
      */
-    private fun runVersionMigrations(ctx: Context, from: Int, to: Int) {
+    private fun runVersionMigrations(from: Int, to: Int) {
         if (from == 0) {
             Log.i(TAG, "first run (install) → scripts staged only; no version steps")
             return
+        }
+        if (from < 5 && to >= 5) {
+            migrateProotFluxRuntimeShell()
         }
         Log.i(TAG, "version steps $from→$to: none registered (full restage already done)")
         // Future example:
         // if (from < 2 && to >= 2) {
         //     runMigrationScript(ctx, "scripts/migrations/migrate_to_2.sh")
         // }
+    }
+
+    /** Keep legacy customized zsh as UX preference while restoring Bash for proot-distro runtime. */
+    private fun migrateProotFluxRuntimeShell() {
+        val rootfs = File(
+            TermuxHostPaths.PREFIX,
+            "var/lib/proot-distro/containers/debian/rootfs"
+        )
+        val passwd = File(rootfs, "etc/passwd")
+        if (!passwd.isFile || !passwd.canRead() || !passwd.canWrite()) return
+
+        val original = passwd.readText()
+        val lines = original.split("\n").toMutableList()
+        val fluxIndex = lines.indexOfFirst { it.startsWith("flux:") }
+        if (fluxIndex < 0) return
+        val fields = lines[fluxIndex].split(":", limit = 0).toMutableList()
+        if (fields.size < 7) return
+        val oldShell = fields[6]
+        if (oldShell != "/bin/zsh" && oldShell != "/usr/bin/zsh") return
+
+        val marker = File(rootfs, "home/flux/.config/fluxlinux/interactive-shell")
+        if (!marker.exists()) {
+            marker.parentFile?.mkdirs()
+            marker.writeText("$oldShell\n")
+            marker.setReadable(true, false)
+        }
+
+        fields[6] = "/bin/bash"
+        lines[fluxIndex] = fields.joinToString(":")
+        val updated = lines.joinToString("\n")
+        if (updated == original) return
+        val temp = File(passwd.parentFile, ".passwd.nativecode.tmp")
+        temp.writeText(updated)
+        temp.setReadable(true, false)
+        if (!temp.renameTo(passwd)) {
+            temp.delete()
+            Log.w(TAG, "runtime shell migration could not replace ${passwd.path}")
+            return
+        }
+        Log.i(TAG, "migrated legacy flux zsh login shell to Bash runtime")
     }
 
     /**

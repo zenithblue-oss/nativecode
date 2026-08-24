@@ -26,6 +26,29 @@ object LinuxCommandBuilder {
         }
     }
 
+    fun buildInteractive(
+        ctx: Context,
+        user: String = "flux",
+        workDir: String? = null,
+        useSharedTmp: Boolean = true,
+        method: String = currentMethod
+    ): Pair<Array<String>, HashMap<String, String>> {
+        return when (method) {
+            "chroot" -> ChrootCommandBuilder.buildInteractive(ctx, user, workDir)
+            else -> ProotCommandBuilder.buildInteractive(ctx, user, workDir, useSharedTmp)
+        }
+    }
+
+    /** System automation entry point. Every backend executes this through guest Bash. */
+    fun buildGuestBash(
+        ctx: Context,
+        shellCmd: String,
+        user: String = "flux",
+        useSharedTmp: Boolean = true,
+        method: String = currentMethod
+    ): Pair<Array<String>, HashMap<String, String>> =
+        build(ctx, shellCmd, user, useSharedTmp, method)
+
     /** Returns the executable path for TerminalSession. */
     fun sessionExec(
         ctx: Context,

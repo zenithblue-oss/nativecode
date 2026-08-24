@@ -787,6 +787,10 @@ export TERM="${TERM:-xterm-256color}"
 # PATH setup - local bin, npm global modules
 export PATH="$HOME/.local/bin:/opt/nodejs/bin:$PATH"
 
+if [ -f "$HOME/.config/fluxlinux/cli-tools.env" ]; then
+    . "$HOME/.config/fluxlinux/cli-tools.env"
+fi
+
 # Setup Locales
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
@@ -821,18 +825,11 @@ curl -fsSL https://raw.githubusercontent.com/zenithblue-oss/Linux_Setup/dev/conf
 
 # Fastfetch and pokemon are already included in the optimized .zshrc above (backgrounded)
 
-# Set zsh as default shell for flux user
-if grep -q "^/bin/zsh" /etc/shells 2>/dev/null; then
-    chsh -s /bin/zsh "$CUSTOM_USER" 2>/dev/null || true
-    # Verify chsh worked; fallback to direct /etc/passwd edit if not
-    CURRENT_SHELL=$(grep "^${CUSTOM_USER}:" /etc/passwd | cut -d: -f7)
-    if [ "$CURRENT_SHELL" != "/bin/zsh" ]; then
-        echo "FluxLinux: chsh failed, patching /etc/passwd directly..."
-        sed -i "s|^${CUSTOM_USER}:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:|${CUSTOM_USER}:x:1000:100::/home/${CUSTOM_USER}:/bin/zsh|" /etc/passwd 2>/dev/null || true
-    fi
-else
-    echo "FluxLinux: WARN /bin/zsh not in /etc/shells, keeping current shell"
-fi
+# Keep /etc/passwd flux shell as Bash: proot-distro uses it for every command.
+# NativeCode owns the optional human interactive preference separately.
+mkdir -p "$USER_HOME/.config/fluxlinux"
+printf '%s\n' /bin/zsh > "$USER_HOME/.config/fluxlinux/interactive-shell"
+chown "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config/fluxlinux/interactive-shell"
 
 # Fix ownership
 chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.oh-my-zsh" "$USER_HOME/.zshrc" "$USER_HOME/.local" 2>/dev/null

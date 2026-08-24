@@ -1,7 +1,7 @@
 # Plan: debian-bash-runtime-zsh-optional
 
-**PLAN_STATUS:** READY
-**PASS:** 4 (revised after plan-reviewer REVISE ×2 + external REVISE)
+**PLAN_STATUS:** APPROVED FOR IMPLEMENTATION
+**PASS:** 5 (revised after upstream PRoot verification)
 **SCOPE:** PRoot, Chroot, CLI tool launchers, CLI auth/probes, Repairs, interactive Debian shells, future PRoot-fast path
 **PRIMARY CONTRACT:** `/bin/bash` is required runtime infrastructure; `/bin/zsh` is optional customization.
 
@@ -32,6 +32,25 @@ NativeCode currently couples internal guest execution to zsh even though zsh is 
 - <source: setup_debian_family.sh:16 + setup_customization_debian.sh:826,830-831 — guest `/etc/passwd` is SSOT of configured login shell (base `-s /bin/bash`; customization `chsh -s /bin/zsh` + direct-passwd fallback)>
 - <source: nativecode_chroot.sh:11,:42 — both usage strings `[--shell zsh|bash]`; :22 — `NC_CHROOT` rootfs var for `$NC_CHROOT/etc/passwd` resolution; :289 — `zsh|*)` catch-all defaults flux to zsh today>
 - <source: docs/environment/plans/suite/nativecode_proot_fast.sh:22 — maintained mirror with same zsh-default behavior>
+- <source: upstream proot-distro `commands/login/__init__.py` — normal login resolves `/etc/passwd` shell, validates it, then runs supplied commands as `<login_shell> -c ...`; `--` does not bypass the login-shell wrapper>
+
+### PASS 5 architectural correction
+
+Upstream `proot-distro login` does not execute the command after `--` directly for a normal container. It reads the selected user's shell from guest `/etc/passwd`, verifies that shell exists, and invokes it with `-c` when a command is supplied. Therefore customization must not change `flux`'s runtime login shell to zsh: doing so would make every programmatic login depend on zsh and would fail before a Bash payload starts if zsh is removed.
+
+The runtime and UX contracts are now separate:
+
+```text
+guest /etc/passwd flux shell = /bin/bash
+    ↓
+proot-distro automation, Repairs, probes, AI launchers, setup scripts
+
+/home/flux/.config/fluxlinux/interactive-shell = /bin/zsh (optional marker)
+    ↓
+NativeCode interactive shell selection only
+```
+
+Customization writes the marker and leaves `/etc/passwd` unchanged. Missing, invalid, or non-executable marker values fall back to `/bin/bash`. This marker is shared by PRoot, Chroot, and PRoot-fast.
 - <source: docs/plan/terminal-auto-resize.md:275,438 — shipped `launch_tool.sh` = nativecode-launch-tool v2>
 
 ## Current Architecture
@@ -74,8 +93,8 @@ This is an **execution-contract bug**, not a couple of string replacements.
 | Non-interactive internal command | `/bin/bash` | deterministic, no user shell dependency |
 | AI CLI launcher | `/bin/bash` | explicit PATH/env bootstrap then `exec TOOL` |
 | Repair/setup scripts | `/bin/bash` | matches actual script shebangs/features |
-| Interactive Debian shell | configured login shell | read user's shell from guest `/etc/passwd`; validate executable; Bash fallback. **Root interactive is always `/bin/bash`.** zsh is used because the user is *configured* for zsh (customization `chsh`), not merely because the package is installed |
-| Customization | zsh | optional enhancement only; sets `/etc/passwd` via `chsh -s /bin/zsh` (setup_customization_debian.sh:826,830) |
+| Interactive Debian shell | NativeCode preference | flux reads `/home/flux/.config/fluxlinux/interactive-shell`, validates `/bin/zsh` or `/bin/bash`, then falls back to Bash; root is always Bash |
+| Customization | zsh | optional enhancement only; installs zsh and writes the interactive-shell marker; never changes `/etc/passwd` |
 
 Lifecycle after fix:
 
@@ -140,33 +159,33 @@ Retain `LinuxCommandBuilder.build(...)` for non-interactive strings. Backends im
 
 | user | shell policy | workDir |
 | --- | --- | --- |
-| `flux` | configured login shell from guest `/etc/passwd`, validated executable, `/bin/bash` fallback | optional workspace cwd |
+| `flux` | `/home/flux/.config/fluxlinux/interactive-shell`, validated executable, `/bin/bash` fallback | optional workspace cwd |
 | `root` | always `/bin/bash` | current app contract passes `null` (MainActivity.kt:18337-18338 — root gets no project workdir to avoid root-owned project files); builder must still tolerate non-null by cd'ing as root |
 
-**PRoot backend interactive emission (explicit spec).** Today's interactive path already emits a **bare** login (ProotCommandBuilder.kt:18-22) — preserve it; bare `proot-distro login` starts the user's configured `/etc/passwd` login shell natively:
+**PRoot backend interactive emission (explicit spec).** Because `/etc/passwd` permanently keeps Bash as the runtime shell, NativeCode uses a Bash bootstrap for both home and workspace sessions. The bootstrap reads the NativeCode preference marker and then `exec`s the selected human shell:
 
 ```text
-buildInteractive(ctx, user, workDir=null, method=proot):
-  exec python proot-distro login debian [--shared-tmp] --user <user>
-  # passwd-shell semantics for free; no zsh logic anywhere
+buildInteractive(ctx, user=root, workDir=null, method=proot):
+  exec python proot-distro login debian [--shared-tmp] --user root -- \
+    /bin/bash --noprofile --norc -c 'exec /bin/bash -l'
 
 buildInteractive(ctx, user=flux, workDir=<path>, method=proot):
   exec python proot-distro login debian --shared-tmp --user flux -- \
     /bin/bash --noprofile --norc -c \
     'mkdir -p -- "$1" && cd -- "$1" &&
-     sh=$(awk -F: -v u="$(id -un)" '"'"'$1==u {print $7; exit}'"'"' /etc/passwd 2>/dev/null)
-     case "$sh" in /bin/bash|/bin/zsh) [ -x "$sh" ] || sh=/bin/bash ;; *) sh=/bin/bash ;; esac
+     sh=$(cat /home/flux/.config/fluxlinux/interactive-shell 2>/dev/null || true)
+     case "$sh" in /bin/bash|/bin/zsh|/usr/bin/bash|/usr/bin/zsh) [ -x "$sh" ] || sh=/bin/bash ;; *) sh=/bin/bash ;; esac
      exec "$sh" -l' \
     nativecode-interactive '<workDir>'
 
-buildInteractive(ctx, user=root, ...):
-  same shape with resolved shell forced to /bin/bash
+buildInteractive(ctx, user=flux, workDir=null, method=proot):
+  same Bash bootstrap without the workdir/`$1` prefix
 ```
 
 Rules:
+- Host Kotlin must call `shellSingleQuote(workDir)` before appending the workdir after `nativecode-interactive`; this preserves one positional argument for spaces, quotes, and literal `$`.
 - **workDir is a positional argv (`$1`), never interpolated into the script body.** Exactly one quoting layer exists — the host-side single-quote escaping of the outer command string (same `'` → `'\''` mechanism as today, ProotCommandBuilder.kt:26). Guest body references `$1` only, so spaces/quotes/`$`/backticks in project paths are safe. Do **not** implement `cd $workDir && ...`. The payload shown above is the **assembled host command**, not the Kotlin string literal — in Kotlin, write the awk program with raw single quotes and let the existing `replace("'","'\\''")` layer do the escaping; do not hand-embed `'"'"'`.
-- **Shell lookup uses `$(id -un)`, not `$USER`** — proot-distro may not export USER for the target user; unset would silently fall back to Bash on the workspace path. Guest-side awk is fine here (Debian ships mawk; this payload runs inside the guest, unlike the chroot helper which runs on the Android host).
-- **workDir == null → bare login** (no guest wrapper). Do not introduce `proot-distro login -- bash -c 'exec ...'` for this case; that would take over login-shell startup `proot-distro` already handles.
+- **workDir == null still uses the Bash bootstrap** so the marker can select zsh for the normal interactive terminal; root's bootstrap always execs Bash.
 - The zero-zsh-token static check applies to **non-interactive execution paths only**; interactive auto-resolution referencing zsh is explicitly allowed per the "Allowed zsh references" clause.
 
 **Chroot backend interactive emission:** `login --user <u> --shell auto [--workdir <q>]`; helper resolves per §Interactive-Chroot below.
@@ -174,18 +193,22 @@ Rules:
 **MainActivity branching (required change):** both call sites (MainActivity.kt:2051 startNewTerminalSession, :18339 startWorkspaceTerminalTab) currently route **all** types through `buildToolShellCommand(...)` → `LinuxCommandBuilder.build(...)`. Split explicitly:
 
 ```kotlin
-if (type == "shell" || type == "shell-root") {
-    val argsEnv = LinuxCommandBuilder.buildInteractive(
+val method = projectGitMethod() // startNewTerminalSession uses currentMethod
+val user = LinuxCommandBuilder.sessionUserForType(type)
+val (args, envMap) = if (type == "shell" || type == "shell-root") {
+    LinuxCommandBuilder.buildInteractive(
         this,
-        user = LinuxCommandBuilder.sessionUserForType(type),
+        user = user,
         workDir = workDir,   // MainActivity.kt:18338: null for shell-root
         method = method
     )
 } else {
     val command = ChrootCommandBuilder.buildToolShellCommand(this, type, workDir)
-    LinuxCommandBuilder.build(this, command)
+    LinuxCommandBuilder.build(this, command, user = user, method = method)
 }
 ```
+
+Both branches must carry the resolved `method`; Workspace AI launches must use `projectGitMethod()` and never fall back to `LinuxCommandBuilder.currentMethod`.
 
 Then make `buildToolShellCommand()` **tool-only**: reject `shell`/`shell-root` (throw/require) instead of retaining the compatibility branch at ChrootCommandBuilder.kt:325-326.
 
@@ -222,26 +245,23 @@ line 409: LOGIN_SHELL="${NC_SHELL:-zsh}"  →  LOGIN_SHELL="${NC_SHELL:-auto}"
 
 Update **both usage strings** (`[--shell zsh|bash]` → `[--shell auto|bash|zsh]`) at nativecode_chroot.sh:11 (header comment) and :42 (usage heredoc), plus env doc line :17.
 
-Resolution inside rootfs — **`auto` means the user's configured login shell, not "zsh binary exists"**. The SSOT is guest `/etc/passwd`: base setup creates flux with Bash (`useradd -m -s /bin/bash flux`, setup_debian_family.sh:16) and customization later flips it via `chsh -s /bin/zsh` (setup_customization_debian.sh:826; direct-passwd fallback :830). Helper runs as host root, so resolve from `$NC_CHROOT/etc/passwd` (nativecode_chroot.sh:22):
+Resolution inside rootfs — **`auto` means the NativeCode interactive preference marker, not `/etc/passwd` and not "zsh binary exists"**. Base setup creates flux with Bash (`useradd -m -s /bin/bash flux`, setup_debian_family.sh:16). Customization installs zsh and writes `/home/flux/.config/fluxlinux/interactive-shell` without changing `/etc/passwd`. Helper runs as host root, so resolve the marker from `$NC_CHROOT/home/flux/.config/fluxlinux/interactive-shell`:
 
 ```text
 requested=auto:
   user=root:
     always /bin/bash
   user=flux:
-    # helper runs on Android HOST under /system/bin/sh — bare awk NOT guaranteed
-    # (toybox omits it); busybox IS guaranteed by resolve_bb() (nativecode_chroot.sh:54-83)
-    configured=$("$BB" awk -F: -v u="$USER_NAME" '$1==u{print $7; exit}' "$NC_CHROOT/etc/passwd" 2>/dev/null)
-    [ -n "$configured" ] || configured=$(grep "^${USER_NAME}:" "$NC_CHROOT/etc/passwd" 2>/dev/null | cut -d: -f7)
+    configured=$(cat "$NC_CHROOT/home/flux/.config/fluxlinux/interactive-shell" 2>/dev/null || true)
     case configured in
-      /bin/zsh|/usr/bin/zsh) [ -x "$NC_CHROOT$configured" ] && use zsh || WARN+fallback /bin/bash ;;
-      *)                     WARN if non-empty+unrecognized; use /bin/bash ;;
+      /bin/zsh|/usr/bin/zsh|/bin/bash|/usr/bin/bash) [ -x "$NC_CHROOT$configured" ] && use configured || WARN+fallback /bin/bash ;;
+      *)                                                WARN if non-empty+unrecognized; use /bin/bash ;;
     esac
 
 requested=zsh missing → WARN → /bin/bash (never kill terminal)
 ```
 
-Rationale: executable-existence auto ("apt install zsh but customization not run") would wrongly switch flux to zsh while `/etc/passwd` still says Bash. With passwd-based auto, `apt install zsh` alone changes nothing — exactly the product contract. Rewrite the current resolution branches (nativecode_chroot.sh:262-298), which today default flux to `su -s /bin/zsh` via the `zsh|*)` catch-all (:289).
+Rationale: executable-existence auto ("apt install zsh but customization not run") would wrongly switch flux to zsh while the preference marker is absent. Marker-based auto makes zsh an explicit UX choice and leaves the runtime shell permanently Bash. Rewrite the current resolution branches (nativecode_chroot.sh:262-298), which today default flux to `su -s /bin/zsh` via the `zsh|*)` catch-all (:289).
 
 Change callers from `login --user flux --shell zsh` (ChrootCommandBuilder.kt:58, setup_debian13_chroot.sh:417) to `--shell auto`. Root interactive shells are pinned to Bash on both sides (ChrootCommandBuilder.kt:54 already emits `--shell bash`; keep).
 
@@ -257,7 +277,7 @@ nativecode-chroot v2.2 → v2.3
 
 Without this, upgraded devices silently keep the old zsh-default v2.2 helper while fresh installs pass tests; mismatched stamps would re-stage via su on every build() call.
 
-Result: before customization Terminal→Bash; after customization Terminal→zsh; AI cards stay Bash-backed in both cases.
+Result: before customization Terminal→Bash; after customization Terminal→zsh; `/etc/passwd` remains Bash and AI cards stay Bash-backed in both cases.
 
 ### PR2 — Remove zsh assumptions from CLI auth/status
 
@@ -292,7 +312,15 @@ Optional zsh wiring — only touch `~/.zshenv`, `~/.zprofile`, `~/.zshrc` when `
 
 `cli-tools.env` remains SSOT; startup files merely source it.
 
-**Customization integration:** `setup_customization_debian.sh` writes complete `.zshrc` (lines 772+); inside generated `.zshrc` add:
+**Customization integration:** `setup_customization_debian.sh` writes complete `.zshrc` (lines 772+), writes the marker, and must not run `chsh` or patch `/etc/passwd`. Add:
+
+```bash
+mkdir -p "$USER_HOME/.config/fluxlinux"
+printf '%s\n' /bin/zsh > "$USER_HOME/.config/fluxlinux/interactive-shell"
+chown "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config/fluxlinux/interactive-shell"
+```
+
+Inside generated `.zshrc` add:
 
 ```bash
 if [ -f "$HOME/.config/fluxlinux/cli-tools.env" ]; then
@@ -328,9 +356,9 @@ Repair runner calls this so intent is visible: repairs are system automation, al
 
 ### PR2 — Patch PRoot-fast paths
 
-- `nativecode_proot_fast.sh:22` `LOGIN_SHELL="${NC_SHELL:-zsh}"` → same **passwd-based auto policy** as the chroot helper (resolve user's shell from `${ROOTFS}/etc/passwd`, validate executable, Bash fallback; root always Bash) — use the script's established `grep "^$user:" | cut -d: -f7` idiom (:87-89), NOT awk (Termux host does not guarantee awk). Direct exec mode unchanged.
+- `nativecode_proot_fast.sh:22` `LOGIN_SHELL="${NC_SHELL:-zsh}"` → same **marker-based auto policy** as the chroot helper (resolve `${ROOTFS}/home/flux/.config/fluxlinux/interactive-shell`, validate executable, Bash fallback; root always Bash). Direct exec mode unchanged.
 - `nativecode_proot_fast.sh:356` non-interactive string mode `/bin/sh -c "$CMD_STR"` → `/bin/bash --noprofile --norc -c` (script-side parity with builder change below).
-- `ProotFastCommandBuilder.kt:135` normal interactive sessions select `/bin/zsh` → apply same passwd-based auto resolution (builder may read `${ROOTFS}/etc/passwd` host-side or resolve guest-side per §3.2 pattern); `ProotFastCommandBuilder.kt:143` `/bin/sh -c` → `/bin/bash --noprofile --norc -c`; interactive detection via `exec zsh` regex (:12-14) removed in favor of `buildInteractive()`.
+- `ProotFastCommandBuilder.kt:135` normal interactive sessions select `/bin/zsh` → apply the same marker-based auto resolution (builder reads `${ROOTFS}/home/flux/.config/fluxlinux/interactive-shell` host-side); `ProotFastCommandBuilder.kt:143` `/bin/sh -c` → `/bin/bash --noprofile --norc -c`; interactive detection via `exec zsh` regex (:12-14) removed in favor of `buildInteractive()`.
 - Non-interactive shell-string mode uses `/bin/bash --noprofile --norc -c` (not `/bin/sh -c`) because NativeCode's Debian automation contract is Bash and existing snippets use Bash semantics.
 
 **Maintained mirror:** `docs/environment/plans/suite/nativecode_proot_fast.sh` is a second copy currently carrying the same zsh-default behavior (mirror :22). Keep it synchronized — apply the identical patch **byte-for-byte** with the production asset and note the sync in the PR. Add to change map + regression check ("both copies identical after patch": `cmp` must pass).
@@ -343,7 +371,7 @@ Patch now so enabling PRoot-fast later does not reintroduce the bug.
 
 ### Do NOT solve by installing zsh in base setup
 
-Prohibited fix: `apt install zsh` inside `setup_debian_family.sh` or base Chroot installer. It would hide the architectural problem. `setup_debian_family.sh:16` is correct as-is. `setup_customization_debian.sh` keeps owning zsh install, Oh My Zsh, theme, plugins, `.zshrc`, `chsh`.
+Prohibited fix: `apt install zsh` inside `setup_debian_family.sh` or base Chroot installer. It would hide the architectural problem. `setup_debian_family.sh:16` is correct as-is. `setup_customization_debian.sh` owns zsh install, Oh My Zsh, theme, plugins, `.zshrc`, and the interactive-shell marker; it must not change `flux`'s `/etc/passwd` shell.
 
 ### Suggested implementation order
 
@@ -362,17 +390,19 @@ Prohibited fix: `apt install zsh` inside `setup_debian_family.sh` or base Chroot
 
 | File | Change | Rationale |
 | --- | --- | --- |
-| app/src/main/java/com/zenithblue/nativecode/terminal/ProotCommandBuilder.kt | `zsh -c` → `/bin/bash --noprofile --norc -c`; add `buildInteractive()` per §3.2 spec (bare login for workDir=null; positional-argv wrapper for workDir; root→Bash); drop `exec zsh` marker checks | P0 execution contract |
+| app/src/main/java/com/zenithblue/nativecode/terminal/ProotCommandBuilder.kt | `zsh -c` → `/bin/bash --noprofile --norc -c`; add `buildInteractive()` with Bash bootstrap, marker resolution, explicit positional workdir argv, and root→Bash; drop `exec zsh` marker checks | P0 execution contract |
 | app/src/main/java/com/zenithblue/nativecode/terminal/LinuxCommandBuilder.kt | add `buildInteractive(ctx, user, workDir, method)`, `buildGuestBash(...)` | explicit interactive/system-Bash APIs |
 | app/src/main/java/com/zenithblue/nativecode/MainActivity.kt | :2051 + :18339 — shell/shell-root → `buildInteractive(sessionUserForType(type), workDir, method)`; AI/tool types → `buildToolShellCommand` + `build` | shell-vs-tool split at call sites |
-| app/src/main/java/com/zenithblue/nativecode/terminal/ChrootCommandBuilder.kt | launcher `#!/bin/bash` + version bump v3; `CHROOT_HELPER_VERSION` → v2.3; emit `--shell auto`; `buildToolShellCommand` becomes tool-only (rejects shell types); delete/rewrite `toolEnvInit`; `toolBinaryName` strict; stop emitting `exec zsh`/`parseInteractiveWorkdir` | launcher + interactive decoupling |
+| app/src/main/java/com/zenithblue/nativecode/terminal/ChrootCommandBuilder.kt | launcher `#!/bin/bash` + version bump v3; `CHROOT_HELPER_VERSION` → v2.3; add `buildInteractive` emitting `--shell auto`; `buildToolShellCommand` becomes tool-only (rejects shell types); delete/rewrite `toolEnvInit`; `toolBinaryName` strict; stop emitting `exec zsh`/`parseInteractiveWorkdir` | launcher + interactive decoupling |
 | app/src/main/java/com/zenithblue/nativecode/cliauth/CliGuestCommands.kt | remove `setopt`; Bash-safe bootstrap | auth probes run anywhere (auth/status/login/logout route via LinuxCommandBuilder.build — CliAuthService.kt:861, GitHubCliService.kt:1029) |
-| app/src/main/java/com/zenithblue/nativecode/terminal/ProotFastCommandBuilder.kt | passwd-based auto shell resolution (:135); `/bin/sh -c` (:143) → Bash; drop `exec zsh` regex (:12-14) via `buildInteractive` | future-proof fast path |
-| app/src/main/assets/scripts/chroot/nativecode_chroot.sh | header stamp :2 + `VERSION_STR` → v2.3 (lockstep with const); **BOTH** `NC_SHELL:-zsh` (:25 AND :409) → `:-auto`; usage strings :11+:42 → auto\|bash\|zsh; passwd-based resolution replacing :262-298 branches via `$BB awk` (busybox guaranteed, resolve_bb :54-83) + grep/cut fallback | helper contract + upgrade-path restage |
+| app/src/main/java/com/zenithblue/nativecode/git/GitGuestCommands.kt + GitRepoService.kt | path-scoped `safe.directory` env/inline Git commands; valid one-line status bundle | Android-owned PRoot bind trees remain usable by guest Git Diff/branches/status |
+| app/src/main/assets/scripts/start_gui.sh | remove START-side app/service kills; clear only stale X11 lock/socket when no X server process exists | safe XFCE startup and repeatable X11 display validation |
+| app/src/main/java/com/zenithblue/nativecode/terminal/ProotFastCommandBuilder.kt | marker-based auto shell resolution; `/bin/sh -c` (:143) → Bash; drop `exec zsh` regex (:12-14) via `buildInteractive` | future-proof fast path |
+| app/src/main/assets/scripts/chroot/nativecode_chroot.sh | header stamp :2 + `VERSION_STR` → v2.3 (lockstep with const); **BOTH** `NC_SHELL:-zsh` (:25 AND :409) → `:-auto`; usage strings :11+:42 → auto\|bash\|zsh; marker-based resolution replacing :262-298 branches | helper contract + upgrade-path restage |
 | app/src/main/assets/scripts/chroot/setup_debian13_chroot.sh | emit `--shell auto` | caller alignment |
 | app/src/main/assets/scripts/setup_cli_tools.sh | mandatory bash wiring; conditional zsh wiring (skip zsh ensure_source_line at both :187-191 and :329-331) | zsh optional |
 | app/src/main/assets/scripts/setup_customization_debian.sh | source `cli-tools.env` in generated `.zshrc` | both install orders |
-| app/src/main/assets/scripts/nativecode_proot_fast.sh | `NC_SHELL:-auto` w/ passwd resolution; usage :8+:40 → auto\|bash\|zsh; login case :359-363 gains `auto)` branch; :356 `/bin/sh -c` → `/bin/bash --noprofile --norc -c` | fast-path parity |
+| app/src/main/assets/scripts/nativecode_proot_fast.sh | `NC_SHELL:-auto` w/ marker resolution; usage :8+:40 → auto\|bash\|zsh; login case :359-363 gains `auto)` branch; :356 `/bin/sh -c` → `/bin/bash --noprofile --norc -c` | fast-path parity |
 | docs/environment/plans/suite/nativecode_proot_fast.sh | byte-for-byte sync with production asset after patch (`cmp` clean) | maintained mirror must not drift |
 | Repair runner call site(s) | use `buildGuestBash` | regression defense |
 
@@ -387,6 +417,7 @@ Test primary state: deliberately **un-customized Debian** (`test ! -x /bin/zsh`)
 | Debian setup only | Debian Shell | Bash prompt |
 | Debian setup only | `setup_cli_tools.sh` | installs successfully |
 | Debian setup only | OpenCode/Claude/Qwen/Agy/Grok/Kiro/Codex cards | launch |
+| broken installed OpenCode shim | `setup_cli_tools.sh` rerun | executes `postinstall.mjs`, then `opencode --version` passes |
 | Debian setup only | CLI auth/status page | probes work |
 | Debian setup only | workspace AI CLI | launches in requested cwd |
 | after customization | Debian Shell | zsh prompt |
@@ -419,7 +450,7 @@ testImplementation("junit:junit:4.13.2")
 
 New source set `app/src/test/java/com/zenithblue/nativecode/terminal/...` covering **pure helpers only** (no Robolectric; builders' `Context` use stays on host paths):
 
-1. guest shell resolution (passwd-based auto, fallback, root pin)
+1. guest shell resolution (marker-based auto, fallback, root pin)
 2. single-quote/argv escaping behavior (incl. paths with spaces/quotes/`$`)
 3. interactive workdir construction (positional argv, never interpolated)
 4. root-vs-flux shell policy in `buildInteractive`
@@ -447,8 +478,8 @@ Static regression check scope: the no-`zsh` grep applies to **non-interactive ex
 ## Acceptance Criteria (objective, verifiable)
 
 - [ ] `ProotCommandBuilder` emits no `zsh` token on **non-interactive paths**; non-interactive payload wrapped in `/bin/bash --noprofile --norc -c` (interactive auto-resolution per §3.2 spec allowed)
-- [ ] PRoot interactive matches §3.2 spec exactly: workDir=null → bare `proot-distro login --user <user>`; workDir≠null → positional-argv Bash wrapper (`"$1"`, never interpolated); user=root → `/bin/bash`
-- [ ] Interactive shell selection is **passwd-based**: flux gets configured `/etc/passwd` shell (validated, Bash fallback) — installing zsh WITHOUT customization does NOT switch flux to zsh (device-verifiable)
+- [ ] PRoot interactive always enters through the `/etc/passwd` Bash runtime shell, then applies the marker for flux UX; workDir≠null uses positional argv (`"$1"`, never interpolated); user=root → `/bin/bash`
+- [ ] Interactive shell selection is **marker-based**: flux `/etc/passwd` remains `/bin/bash`; missing/invalid/non-executable marker falls back to Bash; installing zsh WITHOUT customization does NOT switch flux to zsh (device-verifiable)
 - [ ] Root interactive is always `/bin/bash` on all three paths (chroot helper, PRoot, PRoot-fast), including `shell-root` sessions with null workdir
 - [ ] `MainActivity.kt:2051/:18339` branch shell/shell-root → `buildInteractive`; `buildToolShellCommand` rejects shell types
 - [ ] No `"exec zsh"` emitter or parser remains anywhere in Kotlin (legacy shim removed, not deferred)
@@ -458,9 +489,9 @@ Static regression check scope: the no-`zsh` grep applies to **non-interactive ex
 - [ ] Interactive Debian shell pre-customization = bash; post-customization = zsh
 - [ ] Explicitly removing zsh post-customization: cards, repairs, probes still work; interactive falls back to bash
 - [ ] No `setopt` in CliGuestCommands or toolEnvInit; `toolBinaryName` never returns zsh for unknown type
-- [ ] Chroot helper default shell = auto (BOTH :25 and :409 assignments); usage strings :11+:42 updated; passwd extraction uses `$BB awk` w/ grep/cut fallback (no bare host `awk`); explicit zsh request falls back gracefully when absent
+- [ ] Chroot helper default shell = auto (BOTH :25 and :409 assignments); usage strings :11+:42 updated; marker resolution validates guest executable; explicit zsh request falls back gracefully when absent
 - [ ] `CHROOT_HELPER_VERSION` and helper `VERSION_STR` both = v2.3; **upgraded install** (old v2.2 helper present) gets restaged helper automatically
-- [ ] PRoot-fast script/builder follow passwd-based auto policy; usage :8+:40 + case `auto)` branch (:359-363) updated; non-interactive mode uses Bash not `/bin/sh` (script :356 + builder :143); suite mirror byte-identical to production asset (`cmp` clean)
+- [ ] PRoot-fast script/builder follow marker-based auto policy; usage :8+:40 + case `auto)` branch (:359-363) updated; non-interactive mode uses Bash not `/bin/sh` (script :356 + builder :143); suite mirror byte-identical to production asset (`cmp` clean)
 - [ ] JUnit scaffold added (`testImplementation junit:4.13.2`, `app/src/test/...`); listed pure-helper tests pass (`./gradlew :app:testDebugUnitTest`)
 - [ ] Mandatory static checks pass: `:app:compileDebugKotlin`, `bash -n` ×2, `sh -n` ×3
 - [ ] Static grep checks listed in Testing Strategy all pass (non-interactive scope)
@@ -469,11 +500,11 @@ Static regression check scope: the no-`zsh` grep applies to **non-interactive ex
 
 - **Behavioral drift:** some payloads may rely on zsh globbing/quoting quirks → audit call-site payloads during migration; unit-test escaped payloads. (Reviewer-verified: GhGuestCommands/GitGuestCommands/CliGuestCommands payloads contain no zsh-only syntax — bash-safe.)
 - **Legacy `exec zsh` markers:** removed entirely in the same PR, no compat shim. Reviewer-verified nil persisted-state risk (sessions in-memory; single emitter + both consumers updated here).
-- **Passwd parsing edge:** malformed/missing `$NC_CHROOT/etc/passwd` or unknown user must resolve to `/bin/bash` fallback (never empty shell string) — covered by unit test 1 and helper WARN path.
+- **Preference marker edge:** malformed/missing marker or unknown value must resolve to `/bin/bash` fallback (never empty shell string) — covered by unit test 1 and helper WARN path.
 - **Upgrade-path silent staleness:** version-gated asset deployment means unchanged stamps never restage → mitigated by lockstep v2.3 bumps for helper (+ v3 launcher stamp) and new acceptance criterion.
 - **Mirror drift:** suite copy of `nativecode_proot_fast.sh` patched in lockstep + `cmp` check prevents divergence.
 - **Oh My Zsh rewrite of `.zshrc`:** customization rewrites `.zshrc` and could clobber CLI env → mitigated by sourcing `cli-tools.env` inside generated `.zshrc` (§PR2 integration) and `setup_cli_tools.sh` re-apply block (existing lines 326-331).
-- **Research limitation:** no web/GitHub/ctx7 sources were needed; all claims verified against local repo files (citations above). No inconclusive areas remain.
+- **Research:** upstream `proot-distro` login source was checked; normal-container commands are wrapped by the `/etc/passwd` shell before the supplied command. The marker split is required by that behavior.
 - **PRoot-fast not yet production-default:** lower priority but included to prevent reintroduction when enabled.
 
 ## Done Definition
@@ -487,16 +518,29 @@ install Debian → run Debian Family repair → create flux user → run CLI Too
 
 Then, after Debian Customization installs zsh, only the human interactive shell experience changes from Bash to zsh. Nothing else notices. **Bash = runtime ABI; zsh = optional UX.**
 
-## Handoff to Plan Reviewer (PASS 4)
+## Device validation
 
-PASS 3 reviewer verdict was REVISE (1 major, 1 minor, 3 suggestions) — all 6 prior external findings verified as correctly resolved. PASS 4 deltas:
-1. ~~Host-side bare `awk` unreliable~~ → chroot-helper passwd extraction now mandates `$BB awk` (busybox guaranteed by resolve_bb(), nativecode_chroot.sh:54-83 dies without it) + `grep "^user:" | cut -d: -f7` fallback; guest-side awk in PRoot §3.2 wrapper unchanged (Debian ships mawk).
-2. ~~PRoot-fast auto not itemized~~ → script usage strings :8+:40 and login case :359-363 (`auto)` branch added, unknown still dies) explicitly itemized for both copies.
-3. Suggestion folded: `$USER` → `$(id -un)` in PRoot wrapper lookup (env-independent); spec-rendering note added (assembled host command ≠ Kotlin literal — no hand-embedded `'"'"'`); citation fixed to :830-831.
-4. Accepted cosmetic deferral: PR1/PR2 heading renumbering (changelog clarity only, no semantic content).
+MediaTek target `Y5WWBMJVOZSK4HU8` (`MT6897Z_A/ZA`, KernelSU root) passed release install, upgrade restaging, Bash runtime probes, marker-selected zsh UX, quoted workspace workdir, all nine CLI version probes, host/guest repair scripts, and Software Manager search/expand/refresh. Root was available and was tested through the app and the staged chroot helper; no service-kill or SELinux-weakening command was used.
+
+Additional device acceptance passed:
+
+- Create/import cloned `https://github.com/octocat/Hello-World.git` into PRoot; Project Directory showed `README` and Project Git Diff reported a clean repository (`DIFF SUMMARY`, zero changes).
+- Workspace shell and Workspace `opencode` launched with the project path; global Debian Shell and global `opencode` launched through the PRoot Bash wrapper. Project AI launch retained the project backend/cwd.
+- Existing project Directory exposed `app-release.apk`; Save/Open reached Android's `FluxLinux` update installer, then the prompt was cancelled without replacing the installed app. Release APK installation itself passed through `pm install`.
+- Root terminal opened in-app with `uid=0`; the in-app Chroot AI suite install completed with all expected probes (`node`, `npm`, `opencode`, `codex`, `qwen`, `agy`, `claude`, `grok`, `kiro-cli`), and an in-app root-mode OpenCode launch reached its TUI. Root-backed clone, project workdir with spaces, Git status/diff, and workspace/global backend/cwd isolation passed.
+- Root Software Manager showed `CHROOT` and searched/expanded Debian packages successfully. Root Debian Family, customization, hardware-acceleration, and CLI-tool repairs completed; the VNC ownership repair now uses the actual `flux` primary group (`users`).
+- Root XFCE4 display passed from the in-app Graphical Desktop card: `Chroot mode` was shown, `termux-x11`, `xfce4-session`, `xfwm4`, `xfce4-panel`, and `xfdesktop` rendered the desktop and remained alive for a 60-second stability check.
+
+## Handoff to Plan Reviewer (PASS 5)
+
+PASS 4 had 2 major and 1 minor finding after upstream PRoot verification. PASS 5 resolves them:
+1. Normal `proot-distro login -- COMMAND` still starts the shell from `/etc/passwd`; flux therefore remains permanently `/bin/bash` for runtime automation.
+2. Customization writes `/home/flux/.config/fluxlinux/interactive-shell` instead of changing `/etc/passwd`; all three interactive backends validate this marker and Bash-fallback.
+3. Workspace AI launches pass `method = projectGitMethod()` explicitly, matching Workspace shells.
+4. Workspace workdirs use explicit host `shellSingleQuote(workDir)` and guest positional `$1`.
 
 **Expected verdict:** APPROVE.
 
-Validate PASS 3 external-review resolutions still intact: passwd-based auto everywhere (root pinned Bash), PRoot 3-case buildInteractive spec (bare login / positional-argv / root), MainActivity branching + tool-only `buildToolShellCommand` + same-PR shim removal, both NC_SHELL assignments (:25,:409) + usage :11+:42, JUnit scaffold + mandatory compile/syntax checks, suite-mirror sync + `cmp`.
+Validate: Bash runtime shell remains in `/etc/passwd`, marker-based UX resolution is consistent across PRoot/Chroot/PRoot-fast, MainActivity preserves project backend for shell and AI branches, both NC_SHELL assignments and usage strings update, JUnit/static checks pass, and the suite mirror remains byte-identical.
 
 **PASS 2 verdict:** APPROVE (0 critical, 0 major; 1 minor resolved above — asset header stamp nativecode_chroot.sh:2 added to lockstep bump).
