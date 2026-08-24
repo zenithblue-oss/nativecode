@@ -1373,11 +1373,18 @@ class MainActivity : AppCompatActivity() {
             bottomNavContainer.visibility = if (!isLandscape && !isKeyboardOpen && (showGlobalNav || showProjectNav)) android.view.View.VISIBLE else android.view.View.GONE
         }
         
+        // Material rails hidden - using custom cyber-brutalist side rails (portrait bottom nav design)
         if (::globalNavRail.isInitialized) {
-            globalNavRail.visibility = if (showGlobalNav) android.view.View.VISIBLE else android.view.View.GONE
+            globalNavRail.visibility = android.view.View.GONE
         }
         if (::projectNavRail.isInitialized) {
-            projectNavRail.visibility = if (showProjectNav) android.view.View.VISIBLE else android.view.View.GONE
+            projectNavRail.visibility = android.view.View.GONE
+        }
+        if (::customSideNav.isInitialized) {
+            customSideNav.visibility = if (showGlobalNav) android.view.View.VISIBLE else android.view.View.GONE
+        }
+        if (::customSideProjectNav.isInitialized) {
+            customSideProjectNav.visibility = if (showProjectNav) android.view.View.VISIBLE else android.view.View.GONE
         }
         if (::bottomNavigation.isInitialized) {
             bottomNavigation.visibility = android.view.View.GONE
@@ -1406,20 +1413,8 @@ class MainActivity : AppCompatActivity() {
         // Use visible page, not stack peek (stack can lag after nested subpage backs).
         val currentPage = currentPageId
 
-        if (isLandscape && showGlobalNav && ::globalNavRail.isInitialized) {
-            globalNavRail.setOnItemSelectedListener(null)
-            if (globalNavRail.menu.findItem(currentPage) != null) {
-                globalNavRail.selectedItemId = currentPage
-            }
-            setupGlobalNavRailListener()
-        }
-        if (isLandscape && showProjectNav && ::projectNavRail.isInitialized) {
-            projectNavRail.setOnItemSelectedListener(null)
-            if (projectNavRail.menu.findItem(currentPage) != null) {
-                projectNavRail.selectedItemId = currentPage
-            }
-            setupProjectNavRailListener()
-        }
+        // Side rail selection handled via updateCustomSideNavSelection (custom view, centered per ui_design.md)
+        // Rails hidden - no selectedItemId needed
         if (!isLandscape && showGlobalNav && ::bottomNavigation.isInitialized) {
             bottomNavigation.setOnItemSelectedListener(null)
             if (bottomNavigation.menu.findItem(currentPage) != null) {
@@ -1488,7 +1483,7 @@ class MainActivity : AppCompatActivity() {
 
         sideNavContainer = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(WRAP, MATCH)
-            setBackgroundColor(android.graphics.Color.parseColor("#120F16"))
+            setBackgroundColor(NC.SURFACE_LOWEST)
             visibility = android.view.View.GONE
         }
         rootLayout.addView(sideNavContainer)
@@ -1725,7 +1720,7 @@ class MainActivity : AppCompatActivity() {
         )
         val navColors = intArrayOf(
             NC.SURFACE_LOWEST,
-            Color.parseColor("#99FFFFFF")
+            NC.ON_SURF_VAR
         )
         val navTintList = android.content.res.ColorStateList(navStates, navColors)
 
@@ -1770,10 +1765,11 @@ class MainActivity : AppCompatActivity() {
 
         globalNavRail = com.google.android.material.navigationrail.NavigationRailView(this).apply {
             layoutParams = FrameLayout.LayoutParams(WRAP, MATCH)
-            setBackgroundColor(android.graphics.Color.parseColor("#120F16"))
+            setBackgroundColor(NC.SURFACE_LOWEST)
             itemIconTintList = navTintList
             itemTextColor = navTintList
             labelVisibilityMode = com.google.android.material.navigationrail.NavigationRailView.LABEL_VISIBILITY_LABELED
+            menuGravity = 1 // MENU_GRAVITY_CENTER - vertically center items per ui_design.md
             menu.add(android.view.Menu.NONE, ID_HOME,          android.view.Menu.NONE, "Home").setIcon(R.drawable.ic_home)
             menu.add(android.view.Menu.NONE, ID_PROJECTS_LIST, android.view.Menu.NONE, "Projects").setIcon(R.drawable.ic_folder)
             menu.add(android.view.Menu.NONE, ID_TERMINAL,      android.view.Menu.NONE, "Terminal").setIcon(R.drawable.ic_terminal)
@@ -1796,10 +1792,11 @@ class MainActivity : AppCompatActivity() {
 
         projectNavRail = com.google.android.material.navigationrail.NavigationRailView(this).apply {
             layoutParams = FrameLayout.LayoutParams(WRAP, MATCH)
-            setBackgroundColor(android.graphics.Color.parseColor("#120F16"))
+            setBackgroundColor(NC.SURFACE_LOWEST)
             itemIconTintList = navTintList
             itemTextColor = navTintList
             labelVisibilityMode = com.google.android.material.navigationrail.NavigationRailView.LABEL_VISIBILITY_LABELED
+            menuGravity = 1 // MENU_GRAVITY_CENTER
             menu.add(android.view.Menu.NONE, ID_PROJECT_WORKSPACE, android.view.Menu.NONE, "Workspace").setIcon(R.drawable.ic_home)
             menu.add(android.view.Menu.NONE, ID_PROJECT_DIR_TREE, android.view.Menu.NONE, "Directory").setIcon(R.drawable.ic_folder)
             menu.add(android.view.Menu.NONE, ID_PROJECT_GIT_DIFF, android.view.Menu.NONE, "Diff").setIcon(R.drawable.ic_git)
@@ -1822,6 +1819,9 @@ class MainActivity : AppCompatActivity() {
         
         sideNavContainer.addView(globalNavRail)
         sideNavContainer.addView(projectNavRail)
+        // Custom cyber-brutalist side rail (portrait bottom nav design, vertical, centered)
+        sideNavContainer.addView(buildCustomSideNav())
+        sideNavContainer.addView(buildCustomSideProjectNav())
 
 
         // Initialize all layout panels
@@ -2643,6 +2643,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var customProjectBottomNav: LinearLayout
     private val projectNavTabViews = ArrayList<LinearLayout>()
 
+    private lateinit var customSideNav: LinearLayout
+    private val sideNavTabViews = ArrayList<LinearLayout>()
+    private lateinit var customSideProjectNav: LinearLayout
+    private val sideProjectNavTabViews = ArrayList<LinearLayout>()
+
     private fun buildCustomBottomNav(): LinearLayout {
         customBottomNav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -2735,8 +2740,8 @@ class MainActivity : AppCompatActivity() {
                     labelTv?.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
                 } else {
                     tab.setBackgroundColor(NC.SURFACE_LOWEST)
-                    iconIv?.imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#99FFFFFF"))
-                    labelTv?.setTextColor(Color.parseColor("#99FFFFFF"))
+                    iconIv?.imageTintList = android.content.res.ColorStateList.valueOf(NC.ON_SURF_VAR)
+                    labelTv?.setTextColor(NC.ON_SURF_VAR)
                     labelTv?.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
                 }
             }
@@ -2756,11 +2761,15 @@ class MainActivity : AppCompatActivity() {
                     labelTv?.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
                 } else {
                     tab.setBackgroundColor(NC.SURFACE_LOWEST)
-                    iconIv?.imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#99FFFFFF"))
-                    labelTv?.setTextColor(Color.parseColor("#99FFFFFF"))
+                    iconIv?.imageTintList = android.content.res.ColorStateList.valueOf(NC.ON_SURF_VAR)
+                    labelTv?.setTextColor(NC.ON_SURF_VAR)
                     labelTv?.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
                 }
             }
+        }
+        // Sync side rails (same cyber-brutalist design, vertically centered)
+        if (::customSideNav.isInitialized || ::customSideProjectNav.isInitialized) {
+            try { updateCustomSideNavSelection(activeId) } catch (_: Exception) {}
         }
     }
 
@@ -2817,6 +2826,163 @@ class MainActivity : AppCompatActivity() {
         }
 
         return customProjectBottomNav
+    }
+
+    private fun buildCustomSideNav(): LinearLayout {
+        customSideNav = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(dp(80), MATCH)
+            setBackgroundColor(NC.SURFACE_LOWEST)
+        }
+        val tabsData = listOf(
+            Triple(ID_HOME, R.drawable.ic_home, "Home"),
+            Triple(ID_PROJECTS_LIST, R.drawable.ic_folder, "Projects"),
+            Triple(ID_TERMINAL, R.drawable.ic_terminal, "Terminal"),
+            Triple(ID_SETTINGS, R.drawable.ic_settings, "Settings")
+        )
+        sideNavTabViews.clear()
+        for ((pageId, iconRes, label) in tabsData) {
+            val tabLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(0, dp(12), 0, dp(12))
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                    topMargin = dp(4); bottomMargin = dp(4)
+                }
+                setOnClickListener {
+                    if (pageStack.isEmpty() || pageStack.peek() != pageId) pageStack.push(pageId)
+                    navigateToPage(pageId)
+                }
+            }
+            val iconIv = ImageView(this).apply {
+                tag = "TAB_ICON"
+                setImageResource(iconRes)
+                layoutParams = LinearLayout.LayoutParams(dp(26), dp(26)).apply { gravity = Gravity.CENTER_HORIZONTAL }
+            }
+            val labelTv = TextView(this).apply {
+                tag = "TAB_LABEL"
+                text = label
+                textSize = 10f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) }
+            }
+            tabLayout.addView(iconIv)
+            tabLayout.addView(labelTv)
+            tabLayout.tag = pageId
+            sideNavTabViews.add(tabLayout)
+            customSideNav.addView(tabLayout)
+        }
+        updateCustomSideNavSelection(ID_HOME)
+        return customSideNav
+    }
+
+    private fun buildCustomSideProjectNav(): LinearLayout {
+        customSideProjectNav = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(dp(80), MATCH)
+            setBackgroundColor(NC.SURFACE_LOWEST)
+            visibility = View.GONE
+        }
+        val tabsData = listOf(
+            Triple(ID_PROJECT_WORKSPACE, R.drawable.ic_home, "Workspace"),
+            Triple(ID_PROJECT_DIR_TREE, R.drawable.ic_folder, "Directory"),
+            Triple(ID_PROJECT_GIT_DIFF, R.drawable.ic_git, "Diff"),
+            Triple(ID_PROJECT_SETTINGS, R.drawable.ic_project_config, "Config")
+        )
+        sideProjectNavTabViews.clear()
+        for ((pageId, iconRes, label) in tabsData) {
+            val tabLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(0, dp(12), 0, dp(12))
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                    topMargin = dp(4); bottomMargin = dp(4)
+                }
+                setOnClickListener {
+                    if (pageStack.isEmpty() || pageStack.peek() != pageId) pageStack.push(pageId)
+                    navigateToPage(pageId)
+                }
+            }
+            val iconIv = ImageView(this).apply {
+                tag = "TAB_ICON"
+                setImageResource(iconRes)
+                layoutParams = LinearLayout.LayoutParams(dp(26), dp(26)).apply { gravity = Gravity.CENTER_HORIZONTAL }
+            }
+            val labelTv = TextView(this).apply {
+                tag = "TAB_LABEL"
+                text = label
+                textSize = 10f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) }
+            }
+            tabLayout.addView(iconIv)
+            tabLayout.addView(labelTv)
+            tabLayout.tag = pageId
+            sideProjectNavTabViews.add(tabLayout)
+            customSideProjectNav.addView(tabLayout)
+        }
+        return customSideProjectNav
+    }
+
+    private fun updateCustomSideNavSelection(activeId: Int) {
+        val isProjectPage = activeId == ID_PROJECT_WORKSPACE ||
+            activeId == ID_PROJECT_DIR_TREE ||
+            activeId == ID_PROJECT_GIT_DIFF ||
+            activeId == ID_PROJECT_SETTINGS
+        if (::customSideNav.isInitialized) {
+            customSideNav.visibility = if (isProjectPage) View.GONE else View.VISIBLE
+        }
+        if (::customSideProjectNav.isInitialized) {
+            customSideProjectNav.visibility = if (isProjectPage) View.VISIBLE else View.GONE
+        }
+        if (::customSideNav.isInitialized) {
+            for (tab in sideNavTabViews) {
+                val pageId = tab.tag as? Int ?: continue
+                val isSelected = when (pageId) {
+                    ID_HOME -> activeId == ID_HOME
+                    ID_PROJECTS_LIST -> activeId == ID_PROJECTS_LIST
+                    ID_TERMINAL -> activeId == ID_TERMINAL
+                    ID_SETTINGS -> activeId == ID_SETTINGS
+                    else -> pageId == activeId
+                }
+                val iconIv = tab.findViewWithTag<ImageView>("TAB_ICON")
+                val labelTv = tab.findViewWithTag<TextView>("TAB_LABEL")
+                if (isSelected) {
+                    tab.setBackgroundColor(NC.PRIMARY)
+                    iconIv?.imageTintList = android.content.res.ColorStateList.valueOf(NC.SURFACE_LOWEST)
+                    labelTv?.setTextColor(NC.SURFACE_LOWEST)
+                    labelTv?.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                } else {
+                    tab.setBackgroundColor(NC.SURFACE_LOWEST)
+                    iconIv?.imageTintList = android.content.res.ColorStateList.valueOf(NC.ON_SURF_VAR)
+                    labelTv?.setTextColor(NC.ON_SURF_VAR)
+                    labelTv?.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+                }
+            }
+        }
+        if (::customSideProjectNav.isInitialized) {
+            for (tab in sideProjectNavTabViews) {
+                val pageId = tab.tag as? Int ?: continue
+                val isSelected = pageId == activeId
+                val iconIv = tab.findViewWithTag<ImageView>("TAB_ICON")
+                val labelTv = tab.findViewWithTag<TextView>("TAB_LABEL")
+                if (isSelected) {
+                    tab.setBackgroundColor(NC.PRIMARY)
+                    iconIv?.imageTintList = android.content.res.ColorStateList.valueOf(NC.SURFACE_LOWEST)
+                    labelTv?.setTextColor(NC.SURFACE_LOWEST)
+                    labelTv?.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                } else {
+                    tab.setBackgroundColor(NC.SURFACE_LOWEST)
+                    iconIv?.imageTintList = android.content.res.ColorStateList.valueOf(NC.ON_SURF_VAR)
+                    labelTv?.setTextColor(NC.ON_SURF_VAR)
+                    labelTv?.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+                }
+            }
+        }
     }
 
     // ── Screen Builders ──────────────────────────────────────────────────────
