@@ -1,306 +1,342 @@
-# Plan: proot-parity-v2 — Product-level PRoot/Chroot Parity
+# Plan: proot-parity-v2 — Product-level PRoot/Chroot Parity (Rev 3)
 
 ## Task Summary
 
-Achieve **product-level parity** between rootless PROOT and rooted chroot for the workloads NativeCode users feel, without claiming impossible ptrace parity. Targets: install time ~1.0–1.15× chroot, `true`/small command launch 80–150 ms (vs 816 ms today), interactive shell <250 ms warm, pure CPU ~95–100% chroot, pure RAM memcpy 95–100%, syscall-heavy + sequential I/O substantially improved but with honest gap. Implement via: (1) native fast rootfs extractor (one-pass SHA+decompress, transactional, atomic), (2) CI golden rootfs (pre-installed dev stack, no on-device apt), (3) direct PRoot launcher (no Python, no double shell, profiled binds), (4) shell/Node lazy init, (5) optional persistent broker, (6) fair bench suite + thermal/safety gates, (7) feature-flagged rollout. Classic ptrace cannot be made identical to chroot for 4K-metadata/GPU workloads; architecture keeps `PROOT_FAST | CHROOT | NATIVE_GLIBC(future)` backends.
+Achieve **product-level parity** between rootless PROOT and rooted chroot without claiming impossible ptrace parity. Targets: install ~1.0–1.15× `tar -xf` to `/data/local/tmp`, launch `/bin/true` <150 ms (vs 816 ms today), CPU ~95–100%, RAM memcpy ~95–100%, syscall-heavy/seq-I/O gap documented. Delivered via (1) transactional native extractor (one-pass SHA+decompress, dirfd+flock, RENAME_NOREPLACE fresh-install-only), (2) CI golden rootfs with capability manifest + signed artifact provider, (3) direct PRoot launcher (no Python, no double shell, profiled binds, `/opt/nativecode/node-v26` unification), (4) shell/Node lazy init, (5) optional persistent broker with pdeathsig+private bind, (6) fair Debian/glibc bench suite + host thermal watchdog, (7) feature-flagged rollout. **P0 repo hygiene**: remove `app/build.gradle.kts:32-37` signing credentials from VCS before any release branch.
+
+> Rev 3 addresses Iteration 3 REVISE: 10 primary blockers (atomicity, flock interop, TOCTOU dirfd, symlink/hardlink policy, UID injection, golden marker→capabilities, authenticated Release, data-loss replacement, broker pdeathsig, AC9 scan) + 6 PR1 benchmark corrections.
 
 ## Research Sources
 
-- <source: app/src/main/java/com/zenithblue/nativecode/terminal/ProotCommandBuilder.kt:6-36 | current PROOT path = `libbash → python proot-distro login debian --user flux -- zsh -c '...'` → double shell>
-- <source: app/src/main/assets/scripts/flux_install.sh:13-261 | current install = sha256sum → python tar extraction → proot-distro login bash setup script → apt/dpkg/NVM on device>
-- <source: app/src/main/assets/scripts/nativecode_proot_fast.sh:1-369 | existing fast launcher design: exec/sh/login/root-exec, profiles cli/gpu-turnip/gpu-virgl/compat, `env -i` clean env, flux UID from guest passwd>
-- <source: app/src/main/java/com/zenithblue/nativecode/terminal/TermuxHostPaths.kt:9-120 | SSOT package com.zenithblue.nativecode, PREFIX/HOME/TMPDIR, fluxlinux-host.env generation, applyPackageToExtractedPrefix rewrite>
-- <source: app/src/main/assets/scripts/setup_debian_family.sh:1-35 | on-device apt: `apt update && apt install sudo xfce4 xfce4-goodies dbus-x11 tigervnc git` worst-case PRoot workload>
-- <source: app/src/main/assets/scripts/setup_cli_tools.sh:1-150 | NVM v0.40.5, node 26, sources nvm.sh in .zshenv/.zprofile/.zshrc → shell startup tax>
-- <source: app/src/main/assets/scripts/optimize_debian_rootfs_perf.sh:1-120 | safe vs aggressive optimizations, dash check, tmp perms, apt conf 99nativecode-perf>
-- <source: docs/environment/proot-vs-chroot-baseline.md:1-80 | Snapdragon baseline: sysbench 0.65×, sysbench mem 0.06×, mbw 0.90×, dd write 0.71× read 0.40×, glmark 0.32×>
-- <source: docs/environment/proot-vs-chroot-perf-report-mediatek.md:1-80 | MediaTek MT6897: CPU ~1.0×, mem 0.88×, dd read 0.49× — device-dependent tax>
-- <source: docs/environment/proot-fast-launcher-design.md:1-250 | launch inventory: 21 binds, measured 816 ms distro vs 104 ms plain proot vs 30 ms chroot, binds not bottleneck>
-- <source: docs/environment/plans/task-01-inventory-startup.md:1-120 | Task1 gates, plain proot ~8× faster, minimal profile still slow with shell wrap>
-- <source: https://proot-me.github.io/ | PRoot = ptrace-based chroot/bind/binfmt without privilege>
-- <source: https://arxiv.org/pdf/2405.06085v1 — seccomp as performance optimization to avoid ptrace notification for unintercepted syscalls>
-- <source: https://deepwiki.com/proot-me/proot/2.3-syscall-translation-framework | seccomp filtering system uses BPF to notify PRoot only about needed syscalls>
-- <source: https://github.com/proot-me/proot — upstream ptrace implementation>
-- <source: https://github.com/termux/proot / https://github.com/termux/proot-distro — Termux forks with Android patches, seccomp.h accelerator>
-- <source: https://github.com/termux/termux-app/issues/5245 | Proroot LD_PRELOAD experimental zero-overhead proposal (not production ready)>
-- <source: websearch PRoot ptrace seccomp 2025 | confirms proot translates syscalls through ptrace, significant I/O overhead>
-- <source: git log --oneline -20 | current master d8dd6e5, prior fast launcher asset already in repo but not wired as default>
+- <source: app/src/main/java/com/zenithblue/nativecode/terminal/ProotCommandBuilder.kt:6-36 | current `libbash → python proot-distro → zsh -c` double shell>
+- <source: bootstrap_root/.../site-packages/proot_distro/locking.py:21-72,244-272 | `ContainerLock` = flock(2) on `$PREFIX/var/lib/proot-distro/locks/<name>.lock`, shared=login/run inheritable, exclusive=install/remove/reset, non-blocking>
+- <source: bootstrap_root/.../site-packages/proot_distro/constants.py:75-77 | `RUNTIME_DIR=$PREFIX/var/lib/proot-distro`, `LOCKS_DIR`, `CONTAINERS_DIR`>
+- <source: bootstrap_root/.../site-packages/proot_distro/commands/install.py:140 | `with ContainerLock(install_name, exclusive=True)`>
+- <source: bootstrap_root/.../site-packages/proot_distro/commands/login/__init__.py:85,519 | shared inheritable flock held entire session via exec>
+- <source: app/src/main/assets/scripts/nativecode_proot_fast.sh:1-369 | direct proot model exists but uses `/opt/nodejs` legacy path>
+- <source: app/src/main/java/com/zenithblue/nativecode/terminal/TermuxHostPaths.kt:9-120 | SSOT package com.zenithblue.nativecode>
+- <source: app/build.gradle.kts:32-43 | **P0**: `storePassword="REDACTED"` committed — must rotate>
+- <source: https://github.com/libarchive/libarchive/blob/master/libarchive/archive.h | `ARCHIVE_EXTRACT_SECURE_SYMLINKS|SECURE_NODOTDOT|SECURE_NOABSOLUTEPATHS` guard **entry paths** only>
+- <source: https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job | `ubuntu-24.04-arm` valid hosted arm64 runner>
+- <source: https://support.google.com/googleplay/android-developer/answer/9859372 | Play Asset Delivery supports large on-demand asset packs; 150 MB is product budget not arch limit>
+- <source: docs/environment/proot-vs-chroot-baseline.md + proot-vs-chroot-perf-report-mediatek.md | Snapdragon vs MT6897 gaps device-dependent>
+- <source: docs/environment/proot-fast-launcher-design.md:1-250 | 816 ms distro vs 104 ms plain proot vs 30 ms chroot, binds not bottleneck>
+- <source: git log --oneline -20 | master d8dd6e5>
 
 ## Current Architecture
 
-### Installation Path (PROOT vs CHROOT)
+**CHROOT** `setup_debian13_chroot.sh`: `assets/rootfs/debian_13_rootfs.tar.xz → /data/local/tmp/chrootDebian13 .flux_configured` native `tar/unxz`.
 
-**CHROOT** `app/src/main/assets/scripts/chroot/setup_debian13_chroot.sh:15-150`:
-```
-APK debian_13_rootfs.tar.xz (assets/rootfs/debian_13_rootfs.tar.xz) → native tar/unxz → /data/local/tmp/chrootDebian13 .flux_configured
-```
-Deployed by `OnboardingActivity.kt:3290` and `MainActivity.kt:12771` via `assets.open("rootfs/debian_13_rootfs.tar.xz")` copy to $HOME.
+**PROOT today** `flux_install.sh:163-261`: APK `debian_13_rootfs.tar.xz` (xz only, SHA `13e29f…6803`) → `sha256sum` full read → `python proot-distro install` (python tar, Deus: install holds exclusive `ContainerLock("debian")`, login holds shared) → `proot-distro login --shared-tmp -- bash /tmp/flux_setup_temp.sh` → `setup_debian_family.sh` apt + `setup_cli_tools.sh` NVM on device. Two full reads, thousands ptrace ops.
 
-**PROOT today** `flux_install.sh:163-261`:
-```
-APK → $HOME/debian_13_rootfs.tar.xz → sha256sum (full read) → python proot-distro install archive --name debian (python tar, security checks, resolv.conf fixups, UID/GID) → python proot-distro login --shared-tmp -- bash /tmp/flux_setup_temp.sh → setup_debian_family.sh apt install + setup_cli_tools.sh (NVM/node/npm 1k-file trees) on device
-```
-SHA is `13e29f...6803` hardcoded, ROOTFS_NAME `debian_13_rootfs.tar.xz` (xz, not zst). Two full archive reads. Container at `TermuxHostPaths.PREFIX/var/lib/proot-distro/containers/debian/rootfs` via `ProjectPathResolver.kt:16`.
+**Runtime** `ProotCommandBuilder.kt:18-31` always `arrayOf(shell,"-c","exec python $prootDistro login … -- zsh -c '…'")`. Chroot uses direct `nativecode_chroot.sh`. Fast launcher asset already implements `exec proot --kill-on-exit --link2symlink -L --change-id --rootfs --cwd` + `env -i` but not wired, still `/opt/nodejs`.
 
-### Runtime Launch Path
-
-`ProotCommandBuilder.kt:18-31` always generates:
-```kotlin
-arrayOf(shell, "-c", "exec python $prootDistro login debian --user $user")
-arrayOf(shell, "-c", "exec python $prootDistro login debian --user $user -- zsh -c '$escaped'")
-```
-`ChrootCommandBuilder.kt:33-102` uses `nativecode_chroot.sh` with base64+b64 modes, direct `sh $HELPER exec/login/b64`.
-
-Measured launch taxonomy `docs/environment/proot-fast-launcher-design.md`:
-- distro `cmd true` = 816 ms avg (596–966)
-- plain proot direct `/bin/true` 5 binds = 104 ms (87–119)
-- plain proot full binds = 113 ms (bind count not bottleneck)
-- chroot direct = 30 ms
-- distro `bash -lc exit` = 489 ms vs plain `bash -lc exit` 147 ms
-Root cause: Python startup + `zsh -c "bash -lc ..."` double shell. Guest flux shell = `/bin/zsh` heavy, `/bin/sh` already dash (good).
-
-Host env injection `HostCommandBuilder.kt:17-63` sets `PD_PROOT_BIN=libproot.so`, `PROOT_LOADER=libloader.so`, `LD_PRELOAD=libtermux-exec.so`, `PREFIX/HOME/TMPDIR/TERMUX__*`.
-
-Existing fast launcher `nativecode_proot_fast.sh` already implements correct model: safety check package == com.zenithblue.nativecode, `load_flux_ids` from guest `/etc/passwd`, bind profiles `cli (core+storage) / gpu-turnip (+ /system,/vendor,/apex) / gpu-virgl / compat`, flags `--kill-on-exit --link2symlink -L --change-id --rootfs --cwd`, clean `env -i` with `HOME/USER/PATH/LANG/TMPDIR` + gpu vars, `exec proot $FLAGS $BINDS /usr/bin/env -i ... "$@"`. Not yet wired as default `ProotCommandBuilder` path; remains ADB asset.
-
-### Guest Configuration
-
-`setup_debian_family.sh` + `setup_cli_tools.sh` + `setup_hw_accel_debian.sh` + `setup_customization_debian.sh` + `optimize_debian_rootfs_perf.sh` all run *on device inside PRoot* after extraction. This drives thousands of `create/stat/rename/symlink/chmod/unlink/fsync` through ptrace. Node via NVM: `ENV_FILE=$HOME/.config/fluxlinux/cli-tools.env` sources `nvm.sh` every shell (also in `.zshenv` always loaded per zsh order), `latest=$(ls -1d $NVM_DIR/versions/node/v*)` scan per startup.
-
-### Performance Baselines
-
-- Snapdragon Adreno 750: stress-ng ~1.0×, mbw memcpy 0.90×, sysbench mem 0.06× (16× slower), sysbench cpu 0.65×, dd read 0.40× write 0.71×, glmark build 229 vs 725 (0.32×)
-- MediaTek MT6897: cpu 1.00×, sysbench mem 0.88×, dd read 0.49× write 0.90× — confirms gaps device/kernel dependent, cannot use single sysbench number as RAM truth. `fio` fails in chroot `shmget: Function not implemented` (no SYSV IPC) so no fair 4K comparison exists.
-
-### Safety & Persistence
-
-`docs/environment/plans/regression-test-suite.md` + `docs/environment/chroot-adb-device-crash-postmortem.md` prohibit `glmark2-*-drm` (caused black-screen). Device-safety veto list exists per user prompt (su/mount/sysctl/dev/block/governor/killall). Terminal ownership currently fragmented: `AppTerminalService` + `ProjectTerminalService` + `BackgroundService` + `MainActivity` session lists (per `terminal_proot_optimization_plan.md`), target unified `TerminalService`.
+**Guest**: `setup_*.sh` + `optimize_debian_rootfs_perf.sh` run inside PRoot. Node via NVM `source nvm.sh` every shell.
 
 ## Affected Components & Dependencies
 
 | Component | Files | Impact |
 |-----------|-------|--------|
-| **Rootfs asset & build** | `app/src/main/assets/rootfs/debian_13_rootfs.tar.xz`, `app/build.gradle.kts:androidResources noCompress xz/tar`, `assemble_bootstrap.py`, `bootstrap.tar`, `termux-packages/` | APK size, archive format choice (xz vs zst 3-6), manifest/SBOM |
-| **Fast installer (Kotlin+JNI)** | `flux_install.sh`, `TermuxHostPaths.kt`, `OnboardingActivity.kt:3290`, `MainActivity.kt:12771`, `ProjectPathResolver.kt`, `ChrootSizeManager.kt` | New: `FastRootfsInstaller.kt`, `NativeRootfsExtractor` JNI (libarchive+libzstd), transactional staging `.debian.installing-<rand>/rootfs` |
-| **Proot launcher** | `ProotCommandBuilder.kt`, `ChrootCommandBuilder.kt`, `LinuxCommandBuilder.kt`, `ShellCommandRunner.kt`, `nativecode_proot_fast.sh`, `TermuxHostPaths.kt` | New: `ProotFastCommandBuilder.kt`, profiles cli/package/interactive/turnip/virgl/compat |
-| **CI golden rootfs** | `setup_debian_family.sh`, `setup_cli_tools.sh`, `optimize_debian_rootfs_perf.sh`, `.github/workflows/*`, `Dockerfile*` | CI pipeline builds `nativecode-debian-{core,dev,desktop}`-arm64.tar.zst with manifest |
-| **Shell startup** | `setup_cli_tools.sh` env generation, guest `/home/flux/.zshenv/.zprofile/.zshrc`, `ChrootCommandBuilder.kt:247-283 launch_tool.sh` | Lazy NVM, minimal .zshenv, cached .zcompdump, dash for `sh -c` |
-| **Node/npm** | `CliToolsInstaller.kt`, `ToolLauncherCatalog.kt`, `ChrootCommandBuilder.kt:308-317` | Bundled `/opt/nativecode/node-v26`, symlinks `/usr/local/bin`, lazy nvm function, npm cache on internal /data |
-| **Benchmark suite** | `docs/environment/bench_quick.sh`, `bench_nongpu.sh`, `docs/environment/*perf-report*` | New: `nc-io-bench.c`, `nc-membench.c`, `bench/run-safe-suite.sh`, `bench/result-schema.json` |
-| **Persistent broker** | `TerminalService.kt`, `AppTerminalService.kt`, `ProjectTerminalService.kt`, `BackgroundService.kt`, `NativeCodeFgs.kt` | Optional Unix socket broker inside app UID, session-scoped, kill-on-exit |
-| **Safety/watchdog** | `DeviceRequirements.kt`, `CpuUtilizationProvider.kt`, `RootShellService.kt` | Thermal/storage/RAM checks, deny list enforcement, CID-verified kill |
-| **Testing/regression** | `docs/environment/plans/regression-test-suite.md`, `docs/environment/plans/suite/` | Matrix Android 13-16 × Snapdragon/MediaTek, fresh/upgrade/interrupted/corrupt cases |
-| **Dependencies** | `libproot.so` (termux/proot), `libarchive`, `libzstd` (NDK), `python proot-distro` (fallback) | Need `proot -V` + `proot -v 1` feature probe, seccomp/process_vm flags |
+| **Signing hygiene (P0)** | `app/build.gradle.kts:32-43`, `keys/`, CI secrets | Rotate credentials, move to `gradle.properties`/`~/.gradle/gradle.properties`+env, `.gitignore` keys |
+| **Rootfs asset & build** | `app/src/main/assets/rootfs/`, `app/build.gradle.kts:androidResources`, `assemble_bootstrap.py` | core in APK, dev/desktop via signed provider or Play Asset Delivery; zst+xz dual |
+| **Fast installer (Kotlin+JNI)** | `flux_install.sh`, `TermuxHostPaths.kt`, `OnboardingActivity.kt:3290`, `MainActivity.kt:12771`, `ProjectPathResolver.kt` | NEW `FastRootfsInstaller.kt`, `NativeRootfsExtractor` JNI (libarchive+libzstd+liblzma, arm64-v8a NDK PIC), dirfd+flock+RENAME_NOREPLACE |
+| **Proot launcher** | `ProotCommandBuilder.kt`, `LinuxCommandBuilder.kt`, `ShellCommandRunner.kt`, `nativecode_proot_fast.sh` | NEW `ProotFastCommandBuilder.kt`, profiles cli/turnip/virgl/compat, unified `/opt/nativecode/node-v26` |
+| **CI golden rootfs** | `setup_debian_family.sh`, `setup_cli_tools.sh`, `optimize_debian_rootfs_perf.sh`, `.github/workflows/*` | Workflow builds core/dev/desktop arm64.tar.zst + `image.json` + signed `rootfs-manifest.json` |
+| **Shell/Node** | guest `~/.zshenv/.zprofile/.zshrc`, `ChrootCommandBuilder.kt:247-283` | lazy nvm function, bundled `/opt/nativecode/node-v26` |
+| **Benchmark suite** | `docs/environment/bench*` | NEW `nc-io-bench.c` (glibc arm64), `nc-membench.c`, `SafeBenchController.kt`, `bench/run-safe-suite.sh` |
+| **Persistent broker** | `TerminalService.kt`, `NativeCodeFgs.kt` | `ProotSessionRunner.kt` + native pdeathsig launcher, private bind `$filesDir/run/proot-broker → /run/nativecode-host` |
+| **Safety** | `DeviceRequirements.kt` | thermal/storage/RAM guards, veto grep |
 
 ## Implementation Steps (ordered, smallest correct change)
 
-### PR1 — perf/proot-benchmark-v2 — Fair measurement before any speedup (no behavior change)
+### PR0 — repo/p0-signing-rotation — Must land before any release/PR merge (no behavior change)
 
-1. Add `bench/nc-io-bench.c` (no SYSV IPC, no /dev/block, no root): seq-read/seq-write `pread/pwrite` 1M, rand4k-read/write/mix `prange 4KiB + PRNG`, metadata create/stat/rename/unlink N files. Single ARM64 binary runs in both guests. Dataset 128–512 MiB capped by free storage check.
-2. Add `bench/nc-membench.c`: memcpy/memset/RO-scan/WO-scan/random access, tight loop with **zero syscalls** inside timed section, reports MiB/s. Document distinction: `nc-membench` = pure userspace memcpy (expected ~parity, like `mbw` 0.90×) vs `sysbench memory` = syscall/page path (shows ptrace tax, e.g. Snapdragon 0.06× vs MediaTek 0.88×); both reported, not conflated.
-3. Add `bench/result-schema.json` and `bench/run-safe-suite.sh` (watchdog: check `StorageInfo` freeBytes, `MemInfo`, thermal status via `DeviceRequirements`, cancellation flag; defaults: RAM test min(256 MiB, avail/8), I/O file 256 MiB, cpu 5–10s, rand 10s; streaming only).
-4. Add `docs/perf/proot-parity-v2.md` fingerprint template: commit, PRoot version (`proot -V`), `proot -v 1 /bin/true` seccomp/process_vm lines, proot-distro version, Android/kernel/SoC/filesystem/SHA/thermal. Refuse to run DRM/KMS, glmark2-drm, block device tests.
-5. Wire bench into CI artifact check but do not yet gate installs. Acceptance: same binary produces results in both proot and chroot with <5% variance on repeat warm runs; `fio` removed from cross-env comparison.
+0. Remove `app/build.gradle.kts:32-37` passwords + `storeFile` absolute path from VCS. Replace with:
+   ```kotlin
+   signingConfigs {
+     create("release") {
+       storeFile = file(findProperty("nativecode.keystore.path") as? String ?: System.getenv("NATIVECODE_KEYSTORE") ?: "debug.keystore")
+       storePassword = findProperty("nativecode.keystore.password") as? String ?: System.getenv("NATIVECODE_KEYSTORE_PASSWORD") ?: ""
+       keyAlias = findProperty("nativecode.key.alias") as? String ?: System.getenv("NATIVECODE_KEY_ALIAS") ?: "nativecode"
+       keyPassword = findProperty("nativecode.key.password") as? String ?: System.getenv("NATIVECODE_KEY_PASSWORD") ?: ""
+     }
+   }
+   buildTypes { release { signingConfig = if (hasProperty("nativecode.keystore.path")||System.getenv("NATIVECODE_KEYSTORE")!=null) signingConfigs.getByName("release") else signingConfigs.getByName("debug") } }
+   ```
+   Add `keys/` to `.gitignore`, rotate keystore/password (`REDACTED` compromised), store new secret in GitHub Actions `NATIVECODE_KEYSTORE_BASE64` + secrets. Verify `git log --diff-filter=D` does not leak history; if needed `git filter-repo` note. CI `assembleRelease` reads env. Document in `docs/setup/signing.md`.
 
-### PR2 — perf/proot-fast-extractor — Transactional native extraction (install speedup, no guest changes)
+### PR1 — perf/proot-benchmark-v2 — Fair measurement before speedup (no behavior change) — APPROVED_TO_START
 
-6. Create `FastRootfsInstaller.kt`:
-   - Inputs: `File apkAsset` (`assets/rootfs/debian_*` resolved via `OnboardingActivity` copy logic), `String expectedSha256` compiled-in (`FLUX_ROOTFS_SHA256`), `File containersDir = $PREFIX/var/lib/proot-distro/containers`.
-   - State: exclusive `FileLock` on `containers/.install.lock` (close+release on all paths, `tryLock` with 30s timeout); staging dir `.debian.installing-<random>/rootfs` beneath `containers/` only; verify depth `staging.getCanonicalPath().startsWith(containersDir.canonicalPath + "/.debian.installing-")` before any delete; never `rm -rf` target directory before atomic rename.
-   - Pipeline: one streaming read `compressed chunk → SHA256.update + decompressor → secure tar extraction` (buffers 64–256 KiB, no archive in RAM). Use JNI `NativeRootfsExtractor` backed by `libarchive` + `libzstd` + `liblzma` supporting **both** `.tar.xz` and `.tar.zst` (PR2 must land dual-format before PR3 needs zst). Decompressor auto-detected via magic.
-   - Secure extraction: use `libarchive` flags `ARCHIVE_EXTRACT_SECURE_SYMLINKS | ARCHIVE_EXTRACT_SECURE_NODOTDOT | ARCHIVE_EXTRACT_NO_OVERWRITE` + manual checks: reject absolute paths, `..` escapes, special files (device/fifo/socket), clamp symlink resolution inside rootfs via `openat(dirfd, path, O_NOFOLLOW|O_CREAT)` + write through directory fds, symlink race defense (do not follow extracted symlink when creating next entry; `fstatat` + `readlinkat`驗證). On-disk symlink target validated `!target.startsWith("/") && !target.contains("..")` relative to dirfd.
-   - SHA streaming note: decompression+extraction proceeds to staging while SHA accumulates, but **commit is gated** — if `SHA != expected`, delete staging uncommitted, never rename; staging file presence does not mean trusted. Reject on mismatch before `fsync`/commit. Security of extraction flags protects staging even before SHA gate.
-   - Post-extraction fixups (reuse distro logic): `resolv.conf` from host, `/etc/hosts`, Android UID/GID registration for `flux` (parse `getAppUid` → write `/etc/passwd`/`/group`), fake system data, `sys_empty` etc. Verify `rootfs/bin/sh` exists. Do **not** bake flux UID in CI; injector writes correct per-device UID at commit time (see PR3).
-   - Atomic commit: `fsync` staging tree (`syncfs` on dest fd), write marker `staging/.install_complete`, then **atomic swap without `rm -rf` window**: `rename(containers/debian, containers/debian.old.<ts>)` if exists (backup), `rename(stagingParent, containers/debian)` (stagingParent = `.debian.installing-<rand>`), `fsync` parent dir, then delete `debian.old.*`. If first rename fails (no existing), second rename is sole atomic publish. Failure at any point before final rename → delete staging only, existing `containers/debian` untouched, offer fallback `python proot-distro install` (for `FLUX_ROOTFS_PATH` user-supplied tarballs). Parent dir fsync ensures directory entry durable.
-   - Accept only trusted app-packaged artifact with compiled SHA; generic `FLUX_ROOTFS_PATH` continues via upstream python path. Verify `ROOTFS_ARCHIVE` canonical path is under `$HOME` or `$PREFIX/var/lib/...` or explicit allowlist; never operate on `/` or `/data/local/tmp` chroot path.
+1. **Toolchain**: compile `bench/nc-io-bench` and `bench/nc-membench` as **ARM64 Debian/glibc binaries** (not NDK/Bionic). Build on `ubuntu-24.04-arm` runner with `aarch64-linux-gnu-gcc` against glibc; same ELF runs in both PRoot and chroot. Add `bench/README.md` with `file` output proof.
+2. **`bench/nc-io-bench.c`** interface (single binary, subcommands):
+   ```
+   nc-io-bench prepare FILE --size 256M
+   nc-io-bench seq-read FILE --bs 1M [--direct]
+   nc-io-bench seq-write FILE --bs 1M
+   nc-io-bench rand-read FILE --bs 4K --jobs 1 --time 10s
+   nc-io-bench rand-write FILE --bs 4K --jobs 1 --time 10s
+   nc-io-bench rand-mix FILE --bs 4K --read-pct 70 --time 10s
+   nc-io-bench metadata DIR --files 4096
+   ```
+   Impl: `clock_gettime(CLOCK_MONOTONIC_RAW)` helper `now_ns()`, `posix_memalign(&buf,4096,1<<20)` for seq (1 MiB) and 4 KiB for rand, `pread/pwrite` loops, PRNG `xorshift64` index array **pre-generated before timing**. Reports `write_data_ns` and `fdatasync_ns` separately (call `fdatasync(fd)` after write loop, time it separately); never hide sync cost nor time dirty-cache only. Provide both `buffered` and `direct-if-supported` (`O_DIRECT`, fallback to buffered if `EINVAL`). No `drop_caches`, no `/dev/block`, no `shmget`.
+3. **`bench/nc-membench.c`**: sizes 8–64 MiB, ops: `memcpy`, `memset`, `RO-scan` (sum bytes), `WO-scan`, `random-access` (permute). Pre-touch: `for(i=0;i<size;i+=4096) src[i]^=1`; timed loop `for(r=0;r<iters;++r) memcpy(dst,src,size);` prevent optimization `volatile uint64_t sink; sink ^= ((uint8_t*)dst)[size/2];` + `asm volatile(""::"r"(dst):"memory")`. Generate random indices before timing. Zero `malloc/printf/random/open/clock` inside measured loop.
+4. **`bench/SafeBenchController.kt`** (host) + **`bench/run-safe-suite.sh`** (guest): Kotlin owns thermal/storage/RAM/cancellation; shell owns process-local limits. Controller: `PowerManager.currentThermalStatus` (API≥29) poll every 2s via `Handler.postDelayed` while child alive; if `THERMAL_STATUS_SEVERE|EMERGENCY` abort child (`SIGTERM`→`SIGKILL`) and report `THERMAL_ABORT`. `StatFs` freeBytes check <1 GiB abort, `ActivityManager.MemoryInfo` availMem, caps: I/O file `min(256MiB, free/10)`, RAM test `min(256MiB, avail/8)`. Shell sets `ulimit -v` / dataset caps, runs bench subcommands, writes `bench/result-schema.json`.
+5. **`bench/result-schema.json`** + **`docs/perf/proot-parity-v2.md`** fingerprint template: commit, `proot -V`, `proot -v 1 /bin/true` seccomp/process_vm lines, proot-distro version, Android/kernel/SoC/filesystem/SHA/thermal, archive cache state. Ban `glmark2-*-drm`, block devices, `fio` cross-env.
+6. **Gate**: same binary in both envs, warm repeat <5% variance. Document `fio shmget Function not implemented` in chroot vs `nc-io-bench` fair.
 
-7. JNI layer `app/src/main/cpp/native_rootfs_extractor.cpp` + `NativeRootfsExtractor.kt`: `init(archivePath, destStaging, expectedSha) -> {shaOk, bytesExtracted, error}` streaming, progress callback for UI (`onProgress(bytes)`). **Build plumbing**: `app/src/main/cpp/CMakeLists.txt` (static `libarchive.a` + `libzstd` + `liblzma` prebuilt under `app/src/main/cpp/third_party/`), `app/build.gradle.kts` add `ndkVersion = "26.1.10909125"` + `android { externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } } defaultConfig { ndk { abiFilters += "arm64-v8a" } externalNativeBuild { cmake { arguments += listOf("-DANDROID_STL=c++_static") } } } }`, `packaging.jniLibs.useLegacyPackaging true` already present. Only arm64-v8a (matches existing `libproot.so`/`libbash.so` arm64-v8a). Fallback to python path if `System.loadLibrary("native_rootfs_extractor")` fails.
+### PR2 — perf/proot-fast-extractor — Transactional native extraction (fresh-install-only, dirfd+flock+ caps)
 
-8. Integrate into `OnboardingActivity.kt` and `MainActivity.kt` install flows behind flag `proot_fast_install`. Add fallback switch one tap. Add `ProjectPathResolver` helper for `stagingDir()` + `isInstalling()` + `cleanStaleStaging()`. **Stale GC**: on every install start, list `containers/.debian.installing-*` and delete those where `elapsedRealtime` since `dir.lastModified()` > 1h **or** `boot_id` (`/proc/sys/kernel/random/boot_id`) changed since `staging/.boot_id` marker written at creation; do not rely on wall-clock alone. Add tests: zip-slip, symlink escape, absolute path, device file rejection, wrong SHA, corrupt archive, app killed during extraction (process death → staging remains, `FileLock` released, next install `cleanStaleStaging` removes), low storage.
+7. **Scope rule (P0 data-loss fix)**: fast installer is **fresh-install-only**.
+   ```
+   target absent               → fast install allowed (RENAME_NOREPLACE)
+   target present + valid      → return ALREADY_INSTALLED, never replace
+   target present + incomplete → explicit repair/reset flow (user-confirmed, no auto-delete)
+   ```
+   Existing `flux_install.sh` already skips when valid; PR2 preserves it. No automatic `debian → debian.old → staging → debian` exchange; future upgrades use `renameat2(RENAME_EXCHANGE)` *only after* migration design that preserves `/home/flux`. Document in `FastRootfsInstaller` kdoc.
+8. **Locking — reuse upstream namespace (P0)**: Do **not** use `FileChannel.lock()` on `containers/.install.lock`. Use JNI `flock(2)` on **same** file as `proot-distro.locking.ContainerLock`: `$PREFIX/var/lib/proot-distro/locks/debian.lock` (`RUNTIME_DIR/locks/debian.lock` per `constants.py:67`). Impl in `native_rootfs_lock.cpp`:
+   ```cpp
+   int locksFd = openat(prefixFd, "var/lib/proot-distro/locks",
+                        O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW);
+   int fd = openat(locksFd, "debian.lock",
+                   O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW, 0600);
+   if (flock(fd, LOCK_EX|LOCK_NB)!=0) { close(fd); return CONTAINER_BUSY; }
+   // keep fd open entire extraction+publish; close = unlock
+   // write PID+command like locking.py:177 for diagnostics
+   ```
+   Open locks dir via dirfd with `O_NOFOLLOW`; never reconstruct path via `canonicalPath`. Login holds shared flock inheritable through exec (`locking.py:519`); fast install correctly blocks against both. Handle `filesystem does not support flock` → proceed unlocked (match `locking.py:182`) but log warning.
+9. **Dirfd atomic publish (P0 TOCTOU fix)**: never `canonicalPath.startsWith`. Open once:
+   ```cpp
+   int cfd = open(containersPath, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW);
+   ```
+   Staging: `mkdirat(cfd, ".debian.installing-<rand>",0700)` → `mkdirat(stagingFd,"rootfs",0755)`. Verify `fstatat(cfd,".debian.installing-…",AT_SYMLINK_NOFOLLOW)` is directory owned by app. Publish:
+   ```cpp
+   if (renameat2(cfd,".debian.installing-abc123", cfd,"debian", RENAME_NOREPLACE)<0){
+     if(errno==EEXIST) return ALREADY_INSTALLED;
+     if(errno==ENOSYS||errno==EINVAL) { /* fallback: renameat without flag after re-checking absent */ }
+     else fail();
+   }
+   fsync(cfd); // parent dir durable
+   ```
+   No `debian → debian.old` window; `debian` never absent. Future exchange needs `RENAME_EXCHANGE` but **not implemented** in PR2. Writer keeps `cfd` alive entire operation; all file creates via `openat(dirfd,…,O_NOFOLLOW|O_CREAT)` + `fstatat(AT_SYMLINK_NOFOLLOW)` chain.
+10. **Secure extraction (P0)** — distinguish entry path vs symlink content:
+    - `ARCHIVE ENTRY PATH` must never escape staging (use `ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS|SECURE_NODOTDOT|SECURE_SYMLINKS` as tar-parser hints, but **custom dirfd writer is authoritative**).
+    - `SYMLINK CONTENT` may be absolute (`/usr/lib/… -> /usr/lib/…`) or contain `..` — valid inside guest; danger is **following** it on host during extraction. So: store absolute target verbatim via `symlinkat(target, dirfd, name)`; never validate `!startsWith("/")`.
+    - Writer invariant: before every `openat/mkdirat/symlinkat/linkat`, `fstatat(dirfd, name, AT_SYMLINK_NOFOLLOW)` to detect symlink; if symlink, abort entry. Use `O_NOFOLLOW` on opens; `readlinkat` to record. Hardlinks: validate `linkat` source is inside staging via dirfd pair, reject `../../host` and `hardlink through symlink`.
+    - Reject: device nodes, FIFOs, sockets, `S_ISUID` unexpected? (warn), duplicate conflicting entry, very large file, too many entries. AC3 matrix 12 cases: `entry /absolute`, `entry ../../escape`, `symlink followed by child`, `absolute symlink target`, `relative symlink with ..`, `hardlink ../../host`, `hardlink through symlink`, `device node`, `FIFO`, `duplicate conflicting`, `very large declared`, `too many entries`.
+    - Libarchive as `decompressor+tar parser` only; do not assume `archive_write_disk` flags stack with custom writer — writer enforces invariant.
+11. **Bounded one-pass SHA + caps (P0)**: stream `compressed chunk → SHA256_update + decompressor → dirfd writer` (buffers 64–256 KiB streaming only, never 2–4 GB). Gate commit on `SHA==expected`; if mismatch delete staging uncommitted. Before/during extraction enforce `rootfs-manifest.json` ceilings:
+    ```json
+    { "schema":2, "profile":"core|dev|desktop", "compressedBytes":92381231, "maxExtractedBytes":1073741824, "maxFiles":125000, "sha256":"…", "maxSingleFile":1073741824 }
+    ```
+    Abort if `sum(entry.size)>maxExtractedBytes || files>maxFiles || availStorage<reserve || single>maxSingleFile`. On mismatch/corrupt `fdatasync` failure → `unlinkat` staging, return error.
+12. **Fixups after verify, before publish**: `resolv.conf` from host, `/etc/hosts`, `sys_empty`, **do not** inject `getAppUid()` into guest `flux`. CI bakes `flux:x:1000:1000:…:/bin/zsh` (see PR3); installer verifies `rootfs/etc/passwd` contains flux 1000:1000, `rootfs/bin/sh→dash` exists, else fail. If legacy UID mapping proven needed later, gate behind experiment with evidence.
+13. **JNI + CMake (P0 build correctness)**:
+    - `app/src/main/cpp/CMakeLists.txt` imported targets (not `libs.versions.toml`):
+      ```cmake
+      cmake_minimum_required(VERSION 3.22)
+      project(nativecode_extractor)
+      add_library(archive STATIC IMPORTED)
+      set_target_properties(archive PROPERTIES IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/third_party/${ANDROID_ABI}/libarchive.a")
+      add_library(zstd STATIC IMPORTED)
+      set_target_properties(zstd PROPERTIES IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/third_party/${ANDROID_ABI}/libzstd.a")
+      add_library(lzma STATIC IMPORTED)
+      set_target_properties(lzma PROPERTIES IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/third_party/${ANDROID_ABI}/liblzma.a")
+      add_library(boringssl_crypto STATIC IMPORTED) # or use CommonCrypto SHA256; document choice
+      set_target_properties(boringssl_crypto PROPERTIES IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/third_party/${ANDROID_ABI}/libcrypto.a")
+      add_library(native_rootfs_extractor SHARED native_rootfs_extractor.cpp native_rootfs_lock.cpp native_rootfs_writer.cpp)
+      target_link_libraries(native_rootfs_extractor archive zstd lzma boringssl_crypto log)
+      target_compile_options(native_rootfs_extractor PRIVATE -fPIC -O2 -Wall -Werror)
+      ```
+    - `app/build.gradle.kts`: `ndkVersion="26.1.10909125"`, `externalNativeBuild.cmake.path file("src/main/cpp/CMakeLists.txt")`, `defaultConfig.ndk.abiFilters+="arm64-v8a"`, `packaging.jniLibs.useLegacyPackaging true` (existing), `androidResources.noCompress+=listOf("zst","xz","tar")`. Only `arm64-v8a` (matches `libproot.so`/`libbash.so`). Fallback to `python proot-distro` if `System.loadLibrary` fails; log `NativeCode: extractor native load failed`.
+    - **Reproducibility**: `third_party/README.md` records source URL, commit, SHA256, build script, `CFLAGS="-fPIC -O2 -DANDROID -ffunction-sections"` , NDK API 26+, licenses (`libarchive BSD`, `xz PD`, `zstd BSD`, `boringssl ISC`). Minimal libarchive config `--enable-bsdtar=no --enable-bsdcpio=no --with-zstd --with-lzma` (tar+xz+zst only). Do not check in opaque `.a` without metadata.
+    - Kotlin `NativeRootfsExtractor.kt`: `fun extract(archivePath: String, containersDirFd: Int, expectedSha: String, onProgress: (Long)->Unit): Result` streaming, progress every 1 MiB.
+14. **Stale GC (P0 clock bug fix)**: on every install start, list `containers/.debian.installing-*` dirs. Each staging creation writes `staging/.boot_id` (`/proc/sys/kernel/random/boot_id`) and `staging/.started_elapsed_ms` (`SystemClock.elapsedRealtime()`). GC:
+    ```kotlin
+    val curBoot = File("/proc/sys/kernel/random/boot_id").readText().trim()
+    val savedBoot = File(staging,".boot_id").readTextOrNull()?.trim()
+    val started = File(staging,".started_elapsed_ms").readTextOrNull()?.toLongOrNull()
+    val stale = savedBoot!=curBoot || (started!=null && SystemClock.elapsedRealtime()-started > 60*60*1000)
+    if(stale) deleteRecursively(dirfdVerified)
+    ```
+    Never `File.lastModified()` vs `elapsedRealtime`. Use dirfd-verified delete depth check.
+15. Keep `flux_install.sh` for `FLUX_ROOTFS_PATH` generic tarballs (python path). Fast path only for app-packaged `FLUX_ROOTFS_SHA256` compiled-in.
 
-9. Keep `flux_install.sh` for legacy `FLUX_ROOTFS_PATH` path; do not delete.
+### PR3 — perf/prebuilt-debian-dev-rootfs — Golden rootfs with capabilities + signed artifacts
 
-### PR3 — perf/prebuilt-debian-dev-rootfs — Eliminate on-device apt (largest install-time win)
-
-10. Create CI workflow `.github/workflows/build-golden-rootfs.yml`:
-    - Runner: **native ARM64** (`ubuntu-24.04-arm` GitHub hosted) — not qemu (qemu too slow for GitHub 10m timeout). Fallback self-hosted ARM if unavailable. Base: `debian:13` (trixie) container via `run-on-arch` only for non-arm fallback, but prefer native.
-    - Install once: `bash/dash/zsh sudo git curl wget ca-certificates python3 build-essential gcc g++ make ninja cmake pkg-config ccache unzip locales` + `apt clean` hygiene.
-    - Node 26: extract official `node-v26-linux-arm64.tar.xz` to **`/opt/nativecode/node-v26`** (canonical; unify with PR4 `buildGuestPath` — not `/opt/nodejs`), symlink `/usr/local/bin/node|npm|npx -> /opt/nativecode/node-v26/bin/*`.
-    - Apply `optimize_debian_rootfs_perf.sh --safe` as source material: `/etc/apt/apt.conf.d/99nativecode-perf` (Install-Recommends false, Acquire::Languages none), `policy-rc.d` exit 101, `C.UTF-8` locale, `ldconfig`, `update-ca-certificates`, `/bin/sh → dash` check, tmp perms 1777.
-    - Generate shell speed: minimal `.zshenv` (env only), `.zcompdump` prebuilt, no plugin-update scans.
-    - Cleanup: `apt clean; rm -rf /var/lib/apt/lists/* /var/cache/* /tmp/* /var/log/*; rm -f /etc/machine-id; dpkg --audit; verify ELF arch aarch64; symlink safety scan; create manifest`.
-    - Pack: `tar --sort-name --owner=0 --group=0 --mtime=@<epoch> -I "zstd -6 -T0" -cf nativecode-debian-dev-arm64.tar.zst -C rootfs .` + also `.tar.xz` fallback for compatibility (upstream `proot-distro` recognizes `.tar.zst`). **Do not bake flux UID/GID**; leave placeholder `flux:x:1000:1000` to be overwritten by installer per-device.
-    - Outputs: `nativecode-debian-{core,dev,desktop}-arm64.tar.zst`, `rootfs-manifest.json`, `rootfs-files.sha256`, `SBOM.txt`, `SHA256SUMS`. Upload as GitHub Release artifacts; **APK inclusion**: only `nativecode-debian-core-arm64.tar.zst` in APK (`app/src/main/assets/rootfs/`), `dev` (default onboarding) and `desktop` as separate Release downloads fetched on-demand (or bundled only for internal test builds). Keeps APK <150 MB vs 300 MB if dev bundled.
-    - Profiles: `core` (Debian+bash/dash/zsh+SSL+git/curl) in APK, `dev` = core + toolchain+Ninja+ccache+Node (default onboarding, fetched from Release if not in APK), `desktop` = dev + XFCE+Mesa. AI tools payload optional separate layer.
-
-11. Update `app/src/main/assets/rootfs/` pipeline: `assemble_bootstrap.py` consumes CI zst artifact (core in APK); `build.gradle.kts` `noCompress += listOf("zst","xz")` (already has xz/tar; add zst). Benchmark on device before final choice: same manifest packed as `.tar.xz` vs `.tar.zst` levels 3–6 vs `.tar` → table `APK size | decompress time | install time`; PR2 dual-format must land before PR3 benchmark winner decision. Expect zst production winner but keep xz fallback.
-
-12. Adjust `setup_debian_family.sh` / `setup_cli_tools.sh` to become no-ops when marker `/etc/nativecode-golden` present; device fixups remain only tiny UID/hostname/resolv steps performed by fast installer.
+16. CI `.github/workflows/build-golden-rootfs.yml` on **`ubuntu-24.04-arm`** native (not qemu): `debian:13` base, install build deps once + `apt clean`.
+17. Node 26 to **`/opt/nativecode/node-v26`** canonical (not `/opt/nodejs`), symlink `/usr/local/bin/node|npm|npx`. Apply `optimize_debian_rootfs_perf.sh --safe` as lib (`99nativecode-perf`, `policy-rc.d 101`, `C.UTF-8`, `ldconfig`, `dash` check, tmp 1777).
+18. Shell speed: minimal `.zshenv` (env only), `.zcompdump` prebuilt, no plugin scans.
+19. Create **` /etc/nativecode/image.json`** (replaces boolean marker):
+    ```json
+    { "schema":2, "imageVersion":"2026.08.24.1", "profile":"core", "capabilities":["base","git","zsh"] }
+    // dev: ["base","git","zsh","compiler","node26","npm","ccache"]
+    // desktop: +["xfce","mesa"]
+    ```
+    Bake `flux:x:1000:1000::/home/flux:/bin/zsh` + home/group/sudoers/login shell/caches in CI; installer does not inject UID.
+20. Make `setup_debian_family.sh` / `setup_cli_tools.sh` capability-aware: `if jq -e '.capabilities|index("node26")' /etc/nativecode/image.json >/dev/null; then skip Node provisioning; fi` vs `base` marker boolean. Device fixups (resolv/hostname) remain tiny steps in fast installer.
+21. Pack `tar --sort-name --owner=0 --group=0 --mtime=@<epoch> -I "zstd -6 -T0" -cf nativecode-debian-{core,dev,desktop}-arm64.tar.zst -C rootfs .` + `.tar.xz` fallback. Outputs: tar.zst, `rootfs-manifest.json` (with `compressedBytes/maxExtractedBytes/maxFiles/sha256/profile`), `rootfs-files.sha256`, `SBOM.txt`, `SHA256SUMS`, `image.json`.
+22. **Authenticated artifacts**: `rootfs-manifest.json` signed with Ed25519 (CI private key, public key embedded in APK `assets/keys/rootfs_ed25519.pub`). Alternative A (simpler, less flexible): embed exact version+SHA in `BuildConfig.FLUX_ROOTFS_SHA256` and require app update for rootfs update. Plan implements **B**:
+    ```kotlin
+    interface RootfsArtifactProvider {
+      fun resolve(profile: String): Artifact // {url, sha256, sig}
+      fun verify(manifest: ByteArray, sig: ByteArray): Boolean // Ed25519 pub in APK
+    }
+    class BundledAssetProvider : RootfsArtifactProvider // core in APK
+    class PlayAssetPackProvider : RootfsArtifactProvider // on-demand asset pack (preferred for Play)
+    class SignedReleaseProvider : RootfsArtifactProvider // GitHub Release with sig
+    ```
+    APK includes only `core` (keeps APK <150 MB product budget); `dev/desktop` fetched via provider, SHA checked after signature. Document 150 MB as budget not arch limit; investigate Play Asset Delivery per <source: Play Console Help>.
+23. Update `app/build.gradle.kts` `noCompress+=zst`, benchmark 4-format table `APK size | decompress time | install time` using PR2 dual-format before winner choice; keep xz fallback.
+24. Reference-tree parity check (P0 gate before ship): extract same archive with current `python proot-distro` extractor and `NativeRootfsExtractor` to two temp dirs, build manifests `relative path | type | mode | size | sha256 | symlink target`, `diff -u`; expect 100% parity, ownership `0:0` vs flux diff documented only.
 
 ### PR4 — perf/proot-fast-launcher — Direct exec, no Python, no double shell
 
-13. Create `ProotFastCommandBuilder.kt` (Kotlin analog of `nativecode_proot_fast.sh`):
-    - Safety: refuse `com.termux` PREFIX/ROOTFS, require `TERMUX_APP__PACKAGE_NAME == com.zenithblue.nativecode`, check `libproot.so` + `ROOTFS` existence.
-    - UID: `loadFluxIds()` parse `${ROOTFS}/etc/passwd` `flux:x:uid:gid:home:shell`; fallback 0:0 for root-exec. Handle missing ROOTFS (fresh install) by deferring to installer before launcher use.
-    - Binds: `buildBinds(profile)` per design — `cli` core: `/dev,/proc,/sys, /dev/urandom→/dev/random, $PREFIX/tmp→/tmp, $ROOTFS/tmp→/dev/shm, sys_empty→/sys/fs/selinux, storage /sdcard if readable`. `gpu-turnip` + `/system,/vendor,/apex,/linkerconfig,/dev/kgsl-3d0,/dev/dri`. `gpu-virgl` + X11 socket. `compat` = full distro set plus `/odm,/product,/system_ext,/data/app,dalvik-cache,$PREFIX,$HOME`. Document measured ~104 vs 113 ms proves binds not launch bottleneck.
-    - Flags: `--kill-on-exit --link2symlink -L --change-id=uid:gid --rootfs=ROOTFS --cwd=HOME`; optional `--sysvipc` only when `NC_PROOT_SYSVIPC=1` or compat, optional `--kernel-release` only when `NC_PROOT_FAKE_UNAME=1`. Map Kotlin `pref proot_fast_launcher` + `SharedPreferences NC_PROOT_*` to shell envs `NC_PROOT_PROFILE/NC_PROOT_SYSVIPC/NC_PROOT_FAKE_UNAME` for `nativecode_proot_fast.sh` parity.
-    - Env: `buildGuestEnv()` → clean `env -i HOME/USER/LOGNAME/PATH/LANG=C.UTF-8/TERM/TMPDIR/XDG_RUNTIME_DIR/NVM_DIR/DEBIAN_FRONTEND=noninteractive/FLUX_QUIET_SHELL=1` plus GPU vars; `buildGuestPath()` = `$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:/opt/nativecode/node-v26/bin:$HOME/.nvm/versions/node/v*/bin:/usr/local/...` (**unified to `/opt/nativecode/node-v26`**, not `/opt/nodejs`) without sourcing `nvm.sh` (host-side scan of `$ROOTFS$HOME/.nvm/...` via `File(rootfsHome + "/.nvm/versions/node").listFiles()?.map{it.name}?.sortedWith(compareBy{SemVer})?.lastOrNull()` fallback to no nvm bin if absent).
-    - Exec: `exec proot $FLAGS $BINDS /usr/bin/env -i $ENV_ARGS "$@"` for argv commands; `/bin/dash -c "$cmd"` for generic shell strings; `/bin/bash -c` only when bash-specific; interactive `/bin/zsh -l` or `/bin/bash -l`; never `zsh -c "bash -lc ..."`. Keep `ProotCommandBuilder` Python path as `compat` fallback.
+25. `ProotFastCommandBuilder.kt`: safety `PACKAGE_NAME==com.zenithblue.nativecode`, `libproot.so` exists; `loadFluxIds()` parse `${ROOTFS}/etc/passwd` `flux:x:1000:1000`; fallback 0:0 for root-exec, defer if ROOTFS absent. `buildBinds(profile)` cli: `/dev,/proc,/sys, urandom→random, $PREFIX/tmp→/tmp, $ROOTFS/tmp→/dev/shm, sys_empty→/sys/fs/selinux, storage /sdcard if readable`; turnip + `/system,/vendor,/apex,/linkerconfig,/dev/kgsl-3d0,/dev/dri`; virgl + X11 socket; compat = full distro set plus `/odm,/product,/system_ext,/data/app,dalvik-cache,$PREFIX,$HOME`. Flags `--kill-on-exit --link2symlink -L --change-id=uid:gid --rootfs=ROOTFS --cwd=HOME` + optional `--sysvipc/--kernel-release` behind flags. Env `env -i HOME/USER/LOGNAME/PATH/LANG=C.UTF-8/TERM/TMPDIR/XDG_RUNTIME_DIR/NVM_DIR/DEBIAN_FRONTEND=noninteractive/FLUX_QUIET_SHELL=1` + gpu vars; `buildGuestPath()` = `$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:/opt/nativecode/node-v26/bin:…` host-side `File(rootfsHome+"/.nvm/versions/node").listFiles()?.sortedWith(compareBy{SemVer})?.lastOrNull()` fallback. Exec `exec proot $FLAGS $BINDS /usr/bin/env -i $ENV "$@"`, shell strings via `/bin/dash -c`, bash only when needed, interactive `zsh -l`, never `zsh -c "bash -lc"`. Keep `ProotCommandBuilder` as compat fallback.
+26. Wire `LinuxCommandBuilder.kt:24-25` flag `proot_fast_launcher`; `ShellCommandRunner.kt` keep `linker64` prefix for ET_DYN. Update `TerminalService.kt`/`MainActivity.kt` workDir/profile (login vs exec). Ship `nativecode_proot_fast.sh` synced to `/opt/nativecode/node-v26`.
 
-14. Wire `LinuxCommandBuilder.kt:24-25` to route via `ProotFastCommandBuilder` when `pref proot_fast_launcher == true`, else legacy `ProotCommandBuilder`. Add `ShellCommandRunner.kt` adjustHostCmd preservation (`/system/bin/linker64` prefix for app-data ET_DYN).
+### PR5 — perf/proot-shell-node — Zsh + Node lazy
 
-15. Update `TerminalService.kt` / `MainActivity.kt` session creation to pass `workDir` + `profile` correctly: interactive via `login`, one-shot via `exec`, keep `ChrootCommandBuilder` intact for chroot method.
-
-16. Ship updated `nativecode_proot_fast.sh` asset (already at `app/src/main/assets/scripts/nativecode_proot_fast.sh`) as ADB debug mirror.
-
-### PR5 — perf/proot-shell-node — Zsh/bash + Node lazy redesign
-
-17. Shell: rewrite guest `/home/flux/.zshenv` to tiny env only (source `cli-tools.env` fast path, no `compinit`); keep `.zprofile` minimal; `.zshrc` interactive only with `compinit -C` using cached `.zcompdump` generated at golden-rootfs build time; remove `nvm.sh` sourcing from `.zshenv`; instead create lazy `nvm()` function:
+27. Rewrite `/home/flux/.zshenv` env-only, `.zprofile` minimal, `.zshrc` interactive `compinit -C` with cached `.zcompdump`; remove `nvm.sh` from `.zshenv`; lazy:
     ```bash
     nvm() { unset -f nvm; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm "$@"; }
     ```
-    Normal `node/npm` never loads `nvm.sh`. Direct `PATH` already contains default node bin via launcher's `buildGuestPath`.
+    Bundled `/opt/nativecode/node-v26` + `/usr/local/bin` symlinks; NVM optional; `~/.npmrc` `audit=false fund=false progress=false cache=$HOME/.cache/npm` internal never `/sdcard`; prefer single-binary AI CLIs; remove `--ignore-scripts` fallback (allowlist only).
 
-18. Node: ensure golden rootfs has `/opt/nativecode/node-v26/bin/{node,npm,npx}` and symlinks `/usr/local/bin/*`. In `setup_cli_tools.sh`, make NVM optional: if bundled node exists, skip NVM install unless user requests version switch. Remove `~/.nvm` heavy init from interactive hot path.
+### PR6 — perf/proot-session-runner — Persistent broker (depends on launcher)
 
-19. npm hygiene: guest `/etc/npmrc` or `~/.npmrc` with `audit=false fund=false progress=false update-notifier=false cache=$HOME/.cache/npm`; document `npm install --prefer-offline --no-audit --no-fund --progress=false`. Keep cache on internal `/data/data/com.zenithblue.nativecode/files/.../`, never `/sdcard` (FUSE penalty). For bundled AI CLIs (opencode, claude, codex, grok, agy, kiro, qwen per `CliToolCatalog.kt`), prefer official single-binary dist when available over thousands-of-file JS trees; verify fewer stat calls.
+28. **Broker bind**: host `$filesDir/run/proot-broker/` (0700) bind-mounted as `/run/nativecode-host/` inside guest (broker-only bind, not shared `/tmp`). Socket `broker.sock` 0600, same FS view both sides. Directory via dirfd, `mkdirat` 0700, `bind` + `listen` with `0600` chmod.
+29. **Lifecycle + auth**: `ProotSessionRunner.kt` requires `proot_fast_launcher==true` (if off → fallback to `ProotFastCommandBuilder.exec`). Broker started with `TerminalService`/`NativeCodeFgs` owner `OWNER_BROKER`, `START_NOT_STICKY`, `Process.destroyForcibly` on service destroy, `DirectBoot` aware. **Parent-death**: tiny native launcher `native_proot_launcher.cpp` does `prctl(PR_SET_PDEATHSIG,SIGKILL); if(getppid()!=expected) _exit(1); execve(proot,…)`. Chain `app dies → PDEATHSIG → outer proot dies → --kill-on-exit → guest tree dies`. No `killall` by name. Auth `SO_PEERCRED` (uid==appUid) + random per-session capability token passed via env `NATIVECODE_BROKER_TOKEN`.
+30. Protocol `exec{id,argv,env,cwd,pty?} → stream{stdout,stderr,exit}`; fallback to direct exec if socket missing. Warm caches on internal storage, short `$HOME/projects/<name>` not `/sdcard`.
 
-20. Fix `--ignore-scripts` anti-pattern: remove generic fallback; only per-package allowlist.
+### PR7 — perf/proot-syscall-experiments — Flagged, last
 
-21. Regression: preserve interactive colors, PATH, Node/npm, AI CLIs, SSH/git env, terminal resize/WINCH (`ChrootCommandBuilder.kt:90-92 trap`), Ctrl-C, exit codes.
+31. Count syscall classes via aggregate counters; verify `proot -V`, `proot -v 1`, seccomp filter, `process_vm_readv/writev`; if missing vendor Termux proot commit gated on Android 13–16; experiment path cache behind `proot_experimental_cache` default off; publish per-area target table, note 4K metadata cannot guarantee chroot parity.
 
-### PR6 — perf/proot-session-runner — Persistent PRoot guest broker (after PR4)
-
-22. Implement `ProotSessionRunner.kt`:
-    - Unix socket **`"$PREFIX/tmp/nativecode-proot-broker.sock"` moved to `"$PREFIX/tmp"` with `0700` dir and `0600` socket + `SO_REUSEADDR=0` but note: `$PREFIX/tmp` is bind-mounted to guest `/tmp` (world-readable inside guest). Mitigate by creating socket under **`$PREFIX/var/run/nativecode-broker.sock`** (host-private, not bind-mounted) or `ctx.filesDir + "/run/broker.sock"` with `0700`; do not place world-readable broker socket on shared `/tmp`. Access only via host UID.
-    - One long-lived `proot` process started via `ProotFastCommandBuilder` flags, `--cwd=/home/flux`, running broker binary (`/usr/local/bin/nativecode-broker` inside guest, small Rust/Go or sh loop) that `fork/exec` children `git/npm/gcc/codex/shell` without recreating Python+PRoot+shell each time.
-    - Protocol: `exec {id, argv, env, cwd, pty?}` → `stream {stdout,stderr,exit}` with timeout, kill-on-exit inherited (`--kill-on-exit` on outer proot). Lifecycle: `ProotSessionRunner` is **dependent on `proot_fast_launcher`** (flag `proot_persistent_runner` requires `proot_fast_launcher==true`; if launcher off, broker unavailable → fallback). Broker starts with `TerminalService`/`NativeCodeFgs` owner `OWNER_BROKER`, dies when `NativeCodeFgs` owners zero, never detached daemon, `START_NOT_STICKY`, host `Process.destroyForcibly` on service destroy.
-    - Keep `ProotFastCommandBuilder.exec` as fallback if broker not running or socket missing.
-
-23. Add `ProjectPathResolver` + `DirectoryScanner` integration: warm local caches on internal storage, short project paths (`$HOME/projects/<name>`), not `/sdcard`.
-
-24. Evaluate compiler workloads (Agent 7 scope merged): `ccache` config `~/.cache/ccache`, prefer `ninja` over `make`, test `git config core.untrackedCache true` + `feature.manyFiles true` before defaulting; **no** default `core.fsyncObjectFiles=0` / `eatmydata` / `dpkg --force-unsafe-io` (aggressive only behind flag).
-
-### PR7 — perf/proot-syscall-experiments — Syscall acceleration & optional proot patches (feature-flagged, last)
-
-25. Instrument development `proot` build to count syscall classes (openat/newfstatat/statx/readlinkat/getdents64/execve/mmap/mprotect/ioctl/rename/unlink) via aggregate counters (no per-syscall logging).
-26. Verify on each bench device: `proot -V`, `proot -v 1 /bin/true` output, check `seccomp_filter` compile-time and runtime active, `process_vm_readv/writev` accelerator, bundled version vs Termux proot commit, kernel/Android/SoC. If accelerators missing, vendor known Termux PRoot commit with them enabled, regression test Android 13/14/15/16 (ptrace/seccomp varies, per https://github.com/termux/proot-distro/issues/567).
-27. Only after profiling, experiment behind `proot_experimental_cache`: path-resolution cache, lookup cache with invalidation on mutation (`rename/unlink/chmod` flush). Remains flag `proot_experimental_cache` default off, independently falls back.
-28. Document hard boundary: even with cache, `4K metadata/create/stat` cannot guarantee chroot parity; publish per-area target table vs classic limit.
-
-Across all PRs: never recursively delete outside `.../containers/`, never start `su/mount/umount/remount/sysctl/drop_caches/dev/block/governor/gpu sysfs/swap/zram/killall/pkill/system_server/SurfaceFlinger/DRM` from performance code (veto enforced by Agent 9 review), never kill by name — only `PIDs ⊆ spawnedByNativeCode ∧ uid==appUid ∧ inSession`, streaming extraction only, no 2–4 GB buffers, thermal pause when `DeviceRequirements.thermal`.
+Across PRs: never `rm -rf` outside verified `.../containers/.debian.installing-*` via dirfd, never `su/mount/umount/remount/sysctl/drop_caches/dev/block/governor/killall/pkill/system_server/SurfaceFlinger/DRM` (veto), streaming 64–256 KiB only, thermal pause via `DeviceRequirements`.
 
 ## File-Level Change Map
 
 | File | Change | Rationale |
 |------|--------|-----------|
-| `app/src/main/java/com/zenithblue/nativecode/terminal/FastRootfsInstaller.kt` | **NEW** — transactional extractor, SHA streaming, atomic rename, fallback | PR2 core: 1-pass SHA+decompress, secure extraction |
-| `app/src/main/cpp/native_rootfs_extractor.cpp` + `.../h` | **NEW** JNI libarchive/libzstd extractor | Native fast path, reuse Termux NDK infra |
-| `app/src/main/cpp/CMakeLists.txt` | **NEW** — cmake for native extractor, static libs | Build plumbing per reviewer gap 3 |
-| `app/src/main/cpp/third_party/libarchive.a` + `libzstd.a` + `liblzma.a` | **NEW** prebuilt arm64 | Native deps |
-| `app/src/main/java/com/zenithblue/nativecode/terminal/NativeRootfsExtractor.kt` | **NEW** Kotlin JNI wrapper + progress | UI progress, error mapping |
-| `app/src/main/java/com/zenithblue/nativecode/terminal/ProotFastCommandBuilder.kt` | **NEW** direct proot builder, profiles, env | PR4: eliminate Python + double shell, 80–150 ms |
-| `app/src/main/java/com/zenithblue/nativecode/terminal/ProotCommandBuilder.kt:6-37` | **EDIT** — keep as `compat` fallback, deprecate default | Preserve bug-for-bug path, flag-gated |
-| `app/src/main/java/com/zenithblue/nativecode/terminal/LinuxCommandBuilder.kt:24-36` | **EDIT** — route `proot` → Fast builder when flag, else legacy | Single switchboard |
-| `app/src/main/java/com/zenithblue/nativecode/terminal/ProotSessionRunner.kt` | **NEW** persistent broker client | PR6: eliminate per-command PRoot creation (depends on fast launcher) |
-| `app/src/main/java/com/zenithblue/nativecode/terminal/ProjectPathResolver.kt` | **EDIT** — add stagingDir(), brokerSocket(), golden marker helpers, cleanStaleStaging() | Path SSOT |
-| `app/src/main/java/com/zenithblue/nativecode/terminal/TermuxHostPaths.kt` | **EDIT** — add `GOLDEN_MARKER=/etc/nativecode-golden`, `FAST_INSTALL_FLAG` keys | Package truth |
-| `app/src/main/java/com/zenithblue/nativecode/OnboardingActivity.kt:3290` | **EDIT** — call FastRootfsInstaller, progress callback, flag fallback | Install flow |
-| `app/src/main/java/com/zenithblue/nativecode/MainActivity.kt:12771` | **EDIT** — same fast install for repairs page | Consistent repair |
-| `app/src/main/java/com/zenithblue/nativecode/terminal/ShellCommandRunner.kt` | **EDIT** — minor: expose `runCaptureExit` for bench, keep linker64 prefix | Bench harness |
-| `app/src/main/assets/scripts/nativecode_proot_fast.sh` | **UPDATE** — sync with Kotlin builder (already exists), unify `/opt/nativecode/node-v26` | ADB mirror |
-| `app/src/main/assets/scripts/flux_install.sh:13-197` | **EDIT** — add early exit when golden marker + fast installer present | Defer to native path |
-| `app/src/main/assets/scripts/setup_debian_family.sh` | **EDIT** — no-op when `/etc/nativecode-golden` exists | Avoid on-device apt |
-| `app/src/main/assets/scripts/setup_cli_tools.sh` | **EDIT** — NVM lazy, bundled node check, no forced nvm install | Shell startup |
-| `app/src/main/assets/scripts/optimize_debian_rootfs_perf.sh` | **REF** — material for CI golden build (no device change) | Source of safe opts |
-| `app/src/main/assets/rootfs/debian_13_core_arm64.tar.zst` | **NEW artifact** — core in APK only; dev/desktop as Release downloads | PR3 output (APK bloat fix) |
-| `app/build.gradle.kts` | **EDIT** — add `ndkVersion 26.1.10909125`, `externalNativeBuild.cmake`, `abiFilters arm64-v8a`, `noCompress += "zst"` | Native build + keep zst uncompressed |
-| `.github/workflows/build-golden-rootfs.yml` | **NEW** — CI build native arm64, SBOM, manifest, SHA | Automated golden |
-| `bench/nc-io-bench.c` | **NEW** — fair 4K/seq/metadata bench | Fix fio SYSV IPC gap |
-| `bench/nc-membench.c` | **NEW** — syscall-free RAM bench | Separate RAM vs ptrace |
-| `bench/run-safe-suite.sh` | **NEW** — watchdog, thermal/storage guards | Safe bench runner |
-| `bench/result-schema.json` | **NEW** — JSON schema for results | Agent 0 SSOT |
-| `docs/perf/proot-parity-v2.md` | **NEW** — fingerprint template + before/after gate | No change without numbers |
-| `docs/plans/proot-parity-v2-plan.md` | **NEW** — this plan |  |
-| `gradle/libs.versions.toml` (if NDK) | **EDIT** — add `libarchive` prebuilt | Native dep |
+| `app/build.gradle.kts:32-43` | **EDIT** remove hardcoded passwords, env/property signing | P0 credential rotation |
+| `.gitignore` | **EDIT** add `keys/` | hygiene |
+| `docs/setup/signing.md` | **NEW** CI secret setup | docs |
+| `app/src/main/cpp/CMakeLists.txt` | **NEW** imported targets cmake | correct NDK PIC build |
+| `app/src/main/cpp/third_party/*` | **NEW** `libarchive.a/libzstd.a/liblzma.a/libcrypto.a` + `README.md` with provenance | reproducible, minimal |
+| `app/src/main/cpp/native_rootfs_extractor.cpp` | **NEW** streaming parser+SHA+ caps | PR2 |
+| `app/src/main/cpp/native_rootfs_writer.cpp` | **NEW** dirfd writer O_NOFOLLOW+ symlink/hardlink | PR2 security |
+| `app/src/main/cpp/native_rootfs_lock.cpp` | **NEW** flock(2) on `locks/debian.lock` | upstream interop |
+| `app/src/main/cpp/native_proot_launcher.cpp` | **NEW** prctl PDEATHSIG launcher | PR6 orphan fix |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/FastRootfsInstaller.kt` | **NEW** fresh-install-only, RENAME_NOREPLACE, caps | PR2 core |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/NativeRootfsExtractor.kt` | **NEW** JNI wrapper + progress | UI |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/RootfsArtifactProvider.kt` | **NEW** Bundled/Play/Signed providers + Ed25519 verify | PR3 auth |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/ProotFastCommandBuilder.kt` | **NEW** direct proot, profiles, `/opt/nativecode/node-v26` | PR4 |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/ProotSessionRunner.kt` | **NEW** broker client, private bind, SO_PEERCRED+token, requires launcher | PR6 |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/SafeBenchController.kt` | **NEW** host thermal/storage/Mem poll | PR1 watchdog split |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/ProjectPathResolver.kt` | **EDIT** stagingDir/brokerSocket/imageJson helpers + cleanStaleStaging boot_id | SSOT |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/TermuxHostPaths.kt` | **EDIT** `IMAGE_JSON=/etc/nativecode/image.json` | marker→capabilities |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/ProotCommandBuilder.kt` | **EDIT** keep compat fallback | flag gate |
+| `app/src/main/java/com/zenithblue/nativecode/terminal/LinuxCommandBuilder.kt` | **EDIT** route via Fast when flag | switchboard |
+| `app/src/main/java/com/zenithblue/nativecode/OnboardingActivity.kt` | **EDIT** call FastRootfsInstaller, ALREADY_INSTALLED path | install flow |
+| `app/src/main/java/com/zenithblue/nativecode/MainActivity.kt` | **EDIT** same | repair |
+| `app/src/main/assets/scripts/nativecode_proot_fast.sh` | **UPDATE** sync Kotlin, unify node path | ADB mirror |
+| `app/src/main/assets/scripts/flux_install.sh` | **EDIT** early exit when image.json capability present | no-op |
+| `app/src/main/assets/scripts/setup_debian_family.sh` | **EDIT** capability check not boolean | PR3 |
+| `app/src/main/assets/scripts/setup_cli_tools.sh` | **EDIT** lazy nvm, bundled node check | PR5 |
+| `app/src/main/assets/rootfs/debian_13_core_arm64.tar.zst` | **NEW** core in APK; dev/desktop via Release/Play | size |
+| `app/build.gradle.kts:ndkVersion+externalNativeBuild+noCompress zst` | **EDIT** NDK plumbing | build |
+| `.github/workflows/build-golden-rootfs.yml` | **NEW** native arm64, image.json, signed manifest, parity | CI |
+| `bench/nc-io-bench.c` | **NEW** glibc arm64, seq/rand/metadata, buffered/direct, fdatasync split | PR1 |
+| `bench/nc-membench.c` | **NEW** syscall-free, pre-touch, volatile sink | PR1 |
+| `bench/run-safe-suite.sh` | **NEW** guest limits | PR1 |
+| `bench/result-schema.json` | **NEW** schema | SSOT |
+| `docs/perf/proot-parity-v2.md` | **NEW** fingerprint template + before/after | gate |
 
-No edits to `app/src/main/jniLibs/*` proot binaries in early PRs; PR7 vendors new proot only after regression matrix passes.
+No edits to `jniLibs` proot in early PRs; PR7 vendors only after matrix.
 
 ## Testing Strategy
 
-**Unit (JVM):**
-- `FastRootfsInstallerTest` — staging path validation, SHA streaming (chunked), atomic rename, lock contention, corrupt archive rejects, wrong SHA rejects.
-- `ProotFastCommandBuilderTest` — argv generation per profile (cli/turnip/virgl/compat counts), env map contains PATH/LANG/TMPDIR/gpu vars, safety refuses `com.termux` PREFIX, `loadFluxIds` parses passwd correctly, never emits `zsh -c "bash -lc"`.
-- `NativeRootfsExtractorTest` — symlink escape, absolute path, `..` traversal, device node, fifo, symlink race — all rejected; symlink inside rootfs allowed.
+**Unit (JVM + native gtest):**
+- `FastRootfsInstallerTest` — fresh-only logic (absent→ok, present valid→ALREADY_INSTALLED, incomplete→repair), SHA streaming chunked, lock contention via 2 processes contending `locks/debian.lock` (flock NB), wrong SHA rejects, corrupt archive rejects, caps abort (maxBytes/maxFiles), app kill mid → staging only deleted.
+- `NativeRootfsExtractorTest` + native `writer_test` — 12 zip-slip cases: absolute entry, `../`, symlink→child, absolute symlink target allowed, relative `..` target allowed but not followed, hardlink `../../host`, hardlink through symlink, device, FIFO, duplicate conflicting, very large file, too many entries. Also check dirfd invariant: `openat` with `O_NOFOLLOW` never follows planted symlink.
+- `ProotFastCommandBuilderTest` — per-profile bind counts, env contains PATH/LANG/TMPDIR/gpu vars, unified `/opt/nativecode/node-v26`, never `zsh -c "bash -lc"`, safety refuses `com.termux`.
+- `RootfsArtifactProviderTest` — Ed25519 verify accepts good sig rejects bad, bundled/play/signed routing.
 
-**Instrumented / host-side shell (no device mutation without approval):**
-- Extraction cancellation: `kill -9` installer mid-stream → staging deleted, existing rootfs untouched, fallback to python path works.
-- Archive format bench: same manifest packed as `.tar.xz` vs `.tar.zst` (levels 3–6) vs `.tar` → APK size vs `time unzstd/tar` on device.
+**Instrumented / host:**
+- Kill-mid-extract: `kill -9` installer at 25/50/75% → staging removed, `containers/debian` untouched, next install succeeds via `cleanStaleStaging` boot_id path.
+- Archive format bench: same manifest as `.tar.xz` vs `.tar.zst` L3–6 vs `.tar` → table APK size vs decompress.
+- Reference-tree parity: `python proot-distro` vs `NativeRootfsExtractor` same archive → manifests `path|type|mode|size|sha256|symlink` diff 100% identical except documented `uid:gid`.
 
-**Device (two devices minimum, both envs):**
-- Snapdragon Adreno 750 + MediaTek MT6897, Android 13–16 matrix per PR7.
-- Launch microbench: `/bin/true` median <150 ms, `/bin/sh -c true` <175 ms, `git --version` <200 ms warm, 100/100 launch cycles exit 0 (`docs/environment/proot-fast-launcher-design.md` baselines 816 vs 104 vs 30 ms).
-- Bench suite `bench/run-safe-suite.sh`: sysbench cpu, stress-ng, nc-membench, nc-io-bench seq 1M + rand 4K + metadata, dd 256 MiB, `npm --version`, `node --version`, AI CLI startup, small C compile (single file), 100-file make vs ninja, `git clone/status/diff/checkout` on internal `/data/...` vs `/sdcard` (expect internal faster).
-- Provisioning: `npm install small pkg` cold vs warm cache, TypeScript project install.
-- Safety guards: low storage (<1 GB) aborts, thermal `SEVERE` pauses, RAM test capped `min(256 MiB, avail/8)`.
+**Device (MT6897 + Adreno750, Android 13–16):**
+- Launch microbench 20-run medians cli profile, fast_launcher on, no double shell: `/bin/true` <150 ms, `/bin/sh -c true` <175 ms, `git --version` <200 ms; compat still exit 0.
+- `SafeBenchController` + `nc-*` suite: sysbench cpu/stress-ng, seq 1M buffered+direct, rand 4K IOPS, metadata ops/s, dd 256 MiB, `npm/node --version`, AI CLI startup, small C compile, 100-file make vs ninja, git clone/status/diff on `/data/...` vs `/sdcard`.
+- Thermal abort test: heat to `SEVERE` → controller aborts, toast, no continued stress.
+- Provisioning: npm small pkg cold vs warm, TS install.
+- Guards: storage <1 GiB abort, RAM cap `min(256MiB,avail/8)`, streaming buffers ≤256 KiB (extractor) vs bench 1 MiB/4 KiB documented separately.
 
-**Regression (existing suite + new gates):**
-- Interactive: colors, PATH, Node/npm, AI CLIs (opencode/codex/claude/agy/qwen/grok/kiro) via `launch_tool.sh`, SSH/git env, resize/WINCH, Ctrl-C, exit code propagation, `--shared-tmp` semantics (`$PREFIX/tmp` ↔ `/tmp`).
-- Install: fresh, upgrade, interrupted, wrong SHA, corrupt archive, app killed during extraction, low storage, `FLUX_ROOTFS_PATH` override still uses python path.
-- Profiles: each of cli/package/interactive/turnip/virgl/compat at least boots, `vulkaninfo` shows Turnip on Adreno when turnip profile, no DRM/KMS test ever.
-- Chroot parity: chroot path untouched, chroot bench still passes.
+**Regression:**
+- Interactive colors/PATH/Node/npm/AI CLIs/SSH/WINCH/Ctrl-C/exit, `--shared-tmp`, storage binds.
+- Install fresh/upgrade (no auto-replace)/interrupted/SHA-corrupt/`FLUX_ROOTFS_PATH` python path.
+- Profiles cli/compat/turnip/virgl each 20/20 boots, `vulkaninfo` Turnip on Adreno when turnip.
+- Chroot parity untouched.
 
-**Review passes:**
-- `review` skill 8-pass (build, plan adherence, correctness, security, performance, style, tests, docs) after PR2, PR4; veto worker if any `su/mount/killall` or `com.termux` path.
+**8-pass review** after PR2 and PR4/PR6; veto any `su/mount/killall` in PR2–PR6 perf diff.
 
 ## Acceptance Criteria (objective, verifiable)
 
-- [ ] **AC1 Install cold** — On MediaTek MT6897 + Snapdragon Adreno 750 **reported per-SoC** (or one of each), fresh proot install via fast installer (zst core/dev artifact) cold time ≤ 1.15× direct `tar --use-compress-program=unzstd -xf` to `/data/local/tmp/chrootDebian13` equivalent size (±10% measurement noise, 3 runs median, watchdog no thermal throttle). Report separately: “MT6897 0.49× read device” vs “Snapdragon 0.40× read device” context.
-- [ ] **AC2 No partial install** — Forced cancellation (kill installer at 25/50/75% progress) 10/10 times leaves no `.../containers/debian/rootfs` mutation and next install succeeds without manual clean.
-- [ ] **AC3 Archive security** — Unit extractor rejects 6/6 malicious tar entries (absolute path, `../`, symlink escape, device node, fifo, symlink-race) and accepts 3/3 legitimate symlinks inside rootfs.
-- [ ] **AC4 Launch latency** — On MT6897 (reference device per proot-fast-launcher-design, profile `cli` + `proot_fast_launcher` on, no `zsh -c`), warm medians over 20 runs: `/bin/true` <150 ms, `/bin/sh -c true` <175 ms, `git --version` <200 ms; `zsh -c "bash -lc"` never emitted (grep argv log of `ProotFastCommandBuilder`). Compat fallback still exits 0 for same commands.
-- [ ] **AC5 Shell startup** — Non-interactive `dash -c 'echo ok'` does not source `nvm.sh`; `nvm` function lazy-loads only when invoked; interactive `zsh -l` prompt <300 ms warm (measured via `time zsh -ic exit` inside proot, 5 runs median).
-- [ ] **AC6 Golden rootfs** — CI artifact boots: `dpkg --audit` clean, `node --version` = pinned 26.x, `npm --version` present, `/opt/nativecode/node-v26/bin/node` exists and `/usr/local/bin/node -> /opt/nativecode/node-v26/bin/node` (unified path), `/etc/apt/apt.conf.d/99nativecode-perf` present, `locale -a` has `C.UTF-8`, `/bin/sh` → `dash`, no on-device `apt update` needed (marker `/etc/nativecode-golden` exists), placeholder flux UID overwritten by installer.
-- [ ] **AC7 Fair bench** — Same `nc-io-bench` ARM64 binary runs in both proot and chroot reporting seq-read/write (1M), rand4k IOPS, metadata ops/s; `nc-membench` shows <10% delta to mbw memcpy on both devices (pure userspace parity) while `sysbench memory` still shows device-dependent tax; `fio` removed from cross-env ratio, documented why `shmget` fails in chroot.
-- [ ] **AC8 Profile correctness** — `cli` boots with 5–7 binds, `compat` matches distro ~21 binds, `gpu-turnip` includes `/system,/vendor,/apex,kgsl` when present, `gpu-virgl` includes X11 socket; each profile 20/20 boots exit 0.
-- [ ] **AC9 Safety veto** — Grep of **PR2–PR6 perf diff scoped to `app/src/main/java/com/zenithblue/nativecode/terminal/Fast*` + `app/src/main/cpp/native*` + `bench/*` + `.github/workflows/build-golden*`** (exclude `app/src/main/assets/scripts/chroot/*` legacy and `ChrootCommandBuilder.kt` legit mounts) shows zero occurrences of `mount|umount|remount|sysctl|drop_caches|/dev/block|governor|devfreq|swap|zram|killall|pkill|kill -1|system_server|SurfaceFlinger|glmark.*drm` outside comments, and kill logic only uses `pid in sessionSet && uid==appUid`.
-- [ ] **AC10 Safe suite guards** — `run-safe-suite.sh` aborts if free storage <1 GB, pauses if thermal severe, caps I/O file to 256 MiB and RAM test to `min(256 MiB, avail/8)`, uses streaming buffers never >256 KiB.
-- [ ] **AC11 Rollout flags** — Four flags `proot_fast_install`, `proot_fast_launcher`, `proot_persistent_runner` (depends on launcher), `proot_experimental_cache` (depends on launcher). Each off → legacy behavior for that layer; `fast_install` and `fast_launcher` independently off → exact legacy `python proot-distro install` + distro login; `persistent_runner` off while launcher on → launcher direct exec still used; switchable without reinstall. Document dependency: broker requires launcher.
-- [ ] **AC12 No regression** — Existing `docs/environment/plans/regression-test-suite.md` P0 gates pass on both devices after PR4 and PR6 (elf proot, `nativecode_proot.sh cmd true`, no com.termux paths, chroot enter).
+- [ ] **AC0 Signing hygiene (P0)** — `git grep -n "storePassword\|keyPassword\|REDACTED"` zero hits; `app/build.gradle.kts` reads `gradle.properties`/env; GitHub secret rotated; `keys/` gitignored.
+- [ ] **AC1 Fresh-destination install** — Per-SoC report (MT6897 + Adreno750). **Fresh-destination / local-archive install, 3-run median**, archive cache state recorded (cold vs warm page cache). Fast installer (core zst, `RENAME_NOREPLACE`) ≤1.15× direct `tar --use-compress-program=unzstd -xf` to `/data/local/tmp` equivalent size (±10% noise). No `rm -rf` window, no missing target.
+- [ ] **AC2 No partial install** — Kill at 25/50/75% 10/10 leaves `containers/debian` untouched, next install succeeds without manual clean (stale GC boot_id path).
+- [ ] **AC3 Archive security (12 cases)** — Unit rejects 6/6 escapes + hardlink escapes + device/FIFO/duplicate/oversize; accepts 3/3 legitimate (relative symlink, absolute symlink `/usr/lib→/usr/lib`, hardlink inside rootfs). Libarchive flags + dirfd writer invariant both verified; hardlink threat covered.
+- [ ] **AC4 Launch latency** — MT6897 cli+fast_launcher, warm 20-run median: `/bin/true` <150 ms, `/bin/sh -c true` <175 ms, `git --version` <200 ms; `zsh -c "bash -lc"` never emitted (grep `ProotFastCommandBuilder` argv log).
+- [ ] **AC5 Shell startup** — `dash -c 'echo ok'` no `nvm.sh`; `nvm` lazy loads only on invoke; `zsh -l` prompt <300 ms warm via `time zsh -ic exit` 5-run median.
+- [ ] **AC6 Golden rootfs capabilities** — CI boots: `dpkg --audit` clean, `node --version` pinned 26.x at `/opt/nativecode/node-v26/bin/node` → `/usr/local/bin/node`, `99nativecode-perf` present, `C.UTF-8`, `/bin/sh→dash`, `/etc/nativecode/image.json` schema 2 with `profile`/`capabilities` correct per core/dev/desktop, `setup_*` skips based on capabilities not boolean marker, placeholder `flux:x:1000:1000` present.
+- [ ] **AC7 Fair bench ratio** — Same `nc-io-bench` glibc arm64 in both envs reports seq-read/write (1M buffered+direct) + rand4k + metadata; `nc-membench` ratio vs `mbw` validated as `R_nc=proot_nc/chroot_nc`, `R_mbw=proot_mbw/chroot_mbw`, `abs(R_nc - R_mbw) ≤0.10` (not absolute throughput). `fio` absent from cross-env ratio with doc why shmget fails in chroot. Write reports `write_data_ns` + `fdatasync_ns`.
+- [ ] **AC8 Profile correctness** — cli 5–7 binds, compat ~21, turnip includes `/system,/vendor,/apex,kgsl` when present, virgl includes X11 socket; each 20/20 boots exit 0.
+- [ ] **AC9 Safety veto (scoped + exhaustive)** — Grep of **all added production lines in PR2–PR6** (`FastRootfsInstaller.kt`, `NativeRootfsExtractor.kt`, `ProotFastCommandBuilder.kt`, `ProotSessionRunner.kt`, `LinuxCommandBuilder.kt`, `ShellCommandRunner.kt`, `nativecode_proot_fast.sh`, `app/src/main/cpp/*`, `bench/*`, `.github/workflows/build-golden-rootfs.yml`) **excluding legacy `chroot/*` mounts** shows zero `mount|umount|remount|sysctl|drop_caches|/dev/block|governor|devfreq|swap|zram|killall|pkill|kill -9 -1|system_server|SurfaceFlinger|glmark.*drm` in device runtime code (CI workflow `mount` allowed separately, documented). Kill logic only `pid in sessionSet && uid==appUid`. Explicit file list in CI `veto.sh`.
+- [ ] **AC10 Safe suite guards (buffer scope corrected)** — `SafeBenchController` aborts if free <1 GiB / thermal SEVERE / RAM cap; `run-safe-suite.sh` caps I/O 256 MiB, RAM `min(256MiB,avail/8)`, streaming **extractor/decompressor buffers ≤256 KiB**, **bench sequential buffer =1 MiB**, **rand buffer =4 KiB** (AC10 no longer claims bench buffers ≤256 KiB).
+- [ ] **AC11 Flag dependency** — Four flags `proot_fast_install`, `proot_fast_launcher`, `proot_persistent_runner` (requires launcher, unavailable if launcher off → fallback), `proot_experimental_cache` (requires launcher). Each off → legacy for that layer; `fast_install` off + `fast_launcher` off → exact `python proot-distro` path; switchable without reinstall; broker lifecycle `var/run` 0700/0600 + `START_NOT_STICKY` + `NativeCodeFgs` + `PR_SET_PDEATHSIG`.
+- [ ] **AC12 No regression** — `docs/environment/plans/regression-test-suite.md` P0 gates pass both devices after PR4/PR6 (elf proot, cmd true, no com.termux, chroot enter).
+- [ ] **AC13 Reference-tree parity** — Same archive extracted by current python vs `NativeRootfsExtractor` → manifest parity 100% path/content/symlink-target, ownership diff documented only.
 
 ## Risks & Mitigations (NEW_RISKS)
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| **libarchive symlink-escape bug** — fast extractor creates files outside rootfs → security | Low if review, High impact | Vet against proot-distro `proot_cmd.py` extraction checks (path escapes, special files, dirfd, symlink race); add unit zip-slip suite; stage under `.../containers/` only, never `/` | |
-| **libarchive/libzstd NDK size or missing arch** — APK bloat or arm64-only | Medium | Build only arm64-v8a (NativeCode minSdk 26, target 36, already arm64-v8a `libproot.so`); static link minimal libarchive; fallback to python path if native load fails | |
-| **Golden rootfs bake misses device-specific UID** — flux UID mismatch (proot 10416 vs chroot 1000) breaks permissions | Medium | Do not bake `flux` UID; installer injects UID/GID from `getAppUid`/`getUserId` at commit time (audit how NativeCode currently maps flux per prompt Agent 2); verify `passwd` after atomic rename | |
-| **Zstd vs xz tradeoff wrong** — APK too large or decompress not faster | Medium | Benchmark 4 formats table per prompt in PR1 bench; keep `.tar.xz` fallback artifact; `build.gradle.kts noCompress` ensures not double-compressed | |
-| **Seccomp accelerator not active** — syscall gap remains 0.65×/0.06× on Snapdragon, users blame new code | High | PR7 profiles first; record `proot -V` + `proot -v 1` evidence per bench run; if missing, vendor Termux proot commit but gate on Android 13-16 regression matrix; keep experimental cache flagged off | |
-| **Lazy NVM breaks user shell expectations** — `.zshrc` sourcing order differs | Low | Keep legacy `source ~/.nvm/nvm.sh` path behind flag; test `nvm use`, `npm`, `node --version` + AI CLIs; provide explicit upgrade note | |
-| **Persistent broker orphan** — daemon survives app kill → battery/FGS violation | Low | Broker parented to `TerminalService` / `NativeCodeFgs` owner, `kill-on-exit` on outer proot, socket in app-private tmp, `SO_REUSEADDR` off, watchdog kills broker when `FGS owners=0` | |
-| **FIO/SYSV IPC confusion** — future contributor re-adds fio to cross-env ratio | Low | Document in `docs/perf/proot-parity-v2.md` why fio fails in chroot (`shmget Function not implemented`), enforce `nc-io-bench` only for ratio | |
-| **Low storage / thermal** — bench or install bricks device | Medium | Watchdog (`DeviceRequirements`, `ChrootSizeManager`) pre-check free RAM/storage/thermal, streaming extraction, no 2–4 GB buffers, bench caps, abort with user toast | |
-| **proroot LD_PRELOAD experimental temptation** — team ships immature non-ptrace backend early | Low | Keep `NATIVE_GLIBC` as future `LinuxBackend` enum value only; track upstream issue https://github.com/termux/termux-app/issues/5245 but not production in this plan | |
-| **Context7 quota / ctx7@latest failure** | Low | Note fallback to local file reads + websearch; record in NEW_RISKS per planner checklist | |
+| libarchive escape if SECURE_* misconfigured | Low if dirfd writer authoritative | High | Dirfd `O_NOFOLLOW`+`fstatat` writer is source of truth; libarchive flags only hint; 12-case unit suite + parity test; stage under verified dirfd only |
+| NDK bloat / missing arch / generic .a | Medium | APK bloat or link fail | Only `arm64-v8a` PIC `-fPIC` API26+ built via NDK; minimal tar+xz+zst config; prebuilt with provenance README + licenses; fallback to python if load fails |
+| Fresh-only scope frustrates users wanting upgrade | Low | UX | Document `ALREADY_INSTALLED` toast with repair/reset explicit flow; future `RENAME_EXCHANGE` migration preserves `/home/flux` after design |
+| Zstd size vs xz winner wrong | Medium | APK size / decompress | Dual-format PR2, 4-format table before PR3, keep xz fallback, `noCompress` prevents double-compress |
+| Accelerator missing (seccomp/process_vm) 0.65× still | High on some kernels | Perceived regression | PR7 profile `proot -V`+`proot -v 1` evidence; vendor Termux proot commit gated on 13–16 matrix; cache flagged off |
+| Lazy NVM breaks shell | Low | Shell compat | Keep legacy flag, test `nvm use`+AI CLIs, upgrade note |
+| Broker orphan | Low | Battery/FGS | `filesDir/run` 0700/0600, bind to `/run/nativecode-host`, PDEATHSIG launcher, `kill-on-exit`, `START_NOT_STICKY`, SO_PEERCRED+token, refcount to FGS |
+| Fio/sysbench confusion re-add | Low | Unfair ratio | Doc why shmget fails, enforce `nc-io-bench` only for ratio, ratio criterion `abs(R_nc-R_mbw)≤0.10` |
+| Thermal/storage watchdog | Medium | Brick/heat | Host `SafeBenchController` aborts, storage/RAM caps, streaming only, toast |
+| Proroot premature adoption | Low | Stability | Keep `NATIVE_GLIBC` future only, track #5245 not prod |
+| Stale .old backup GC leak | Low | Storage | PR2 has no `debian.old` (fresh-only RENAME_NOREPLACE); future EXCHANGE later; stale `.debian.installing-*` GC via boot_id+elapsedRealtime |
+| Signing rotation incomplete | High if missed | Credential leak | PR0 blocks release; history scrub if needed; CI env validation |
 
-## Handoff to Plan Reviewer (Resubmission — prior REVISE addressed)
+## Handoff to Plan Reviewer
 
-Prior REVISE gaps fixed: atomic commit now backup+rename without `rm -rf` window + parent fsync; SHA-gated commit + libarchive secure flags (`SECURE_SYMLINKS|SECURE_NODOTDOT|NO_OVERWRITE`+`O_NOFOLLOW` dirfd); CMake/NDK plumbing + dual-format PR2; core-in-APK / dev-desktop Release split; unified Node path `/opt/nativecode/node-v26`; broker depends on launcher + socket moved to `var/run` 0700; AC9 scoped grep; `nc-membench` vs `sysbench` distinction; per-SoC AC1; stale GC via `boot_id`/`elapsedRealtime`.
+**Prior REVISE 10 blockers — all reshaped; PR1 approved to proceed, PR2 now unblocked:**
 
-Validate:
+1. **Atomicity** — Fresh-install-only `renameat2(RENAME_NOREPLACE)` on dirfd `cfd` + `fsync(cfd)`, no `debian→old` window; future upgrades deferred to `RENAME_EXCHANGE` with home preservation (not in PR2). Verify no missing-target window.
+2. **Extraction security** — Dirfd `O_NOFOLLOW` writer authoritative, `canonicalPath` only sanity check; symlink content may be absolute, writer never follows symlink; hardlink escape added; libarchive flags are entry-path hints not content policy. Verify 12-case matrix + `hardlink through symlink`.
+3. **CMake/NDK dual-format** — Imported targets, arm64-v8a API26+ `-fPIC` NDK-built PIC `.a`, minimal tar+xz+zst, provenance + licenses, boringssl SHA256 documented, `libs.versions.toml` not used. Verify xz+zst before PR3.
+4. **APK split** — `RootfsArtifactProvider` abstraction (Bundled/PlayAssetPack/SignedRelease), core in APK, dev/desktop via signed manifest (Ed25519 pub in APK) or Play Asset Delivery; 150 MB = budget not hard limit. Verify PLAY vs Release transport.
+5. **Node path** — `/opt/nativecode/node-v26` consistently in CI + `ProotFastCommandBuilder.buildGuestPath` + `nativecode_proot_fast.sh` + image.json capabilities; no `/opt/nodejs` remains. Verify semver sort Kotlin vs `sort -V`.
+6. **Broker** — Private `filesDir/run/proot-broker → /run/nativecode-host` bind 0700/0600, `SO_PEERCRED+token`, `START_NOT_STICKY` + `NativeCodeFgs` refcount + `PR_SET_PDEATHSIG` native launcher + `--kill-on-exit`; requires launcher. Verify guest visibility + orphan chain `pdeathsig→outer proot→kill-on-exit`.
+7. **Benchmark fairness** — Glibc arm64 binary, `seq/rand/mix/metadata` interface, `CLOCK_MONOTONIC_RAW` + `posix_memalign` + `write_data_ns/fdatasync_ns` split + buffered/direct fields, host `SafeBenchController` thermal abort, ratio `abs(R_nc-R_mbw)≤0.10`. Verify definitions.
+8. **Safety AC9** — Scan **all** new production files (FastRootfsInstaller, NativeRootfsExtractor, ProotFastCommandBuilder, ProotSessionRunner, LinuxCommandBuilder, ShellCommandRunner, nativecode_proot_fast.sh, cpp, bench) excluding legacy chroot mounts; separate CI workflow mount allowed. Verify glob covers ProotFastCommandBuilder/ProotSessionRunner.
+9. **UID injection** — CI bakes `flux:1000:1000`, installer verifies not injects appUid; host UID vs guest UID documented as distinct; rule do not ship conversion until proven. Verify PR4 parse.
+10. **Golden marker→capabilities** — `image.json` schema 2 with `capabilities`, setup scripts capability-aware not boolean, flux home baked in CI. Verify core vs dev node skip.
+11. **Stale GC** — `.boot_id` + `.started_elapsed_ms` + `elapsedRealtime` + `boot_id` comparison, not `File.lastModified`. Verify no wall-clock vs uptime mix.
+12. **Auth manifest** — Ed25519 signed `rootfs-manifest.json` gates archive SHA, caps enforce before commit, caps abort on `maxExtractedBytes/maxFiles`. Verify signature flow.
+13. **Signing P0** — `app/build.gradle.kts:32-37` removed, env/property inject, rotate.
+14. **Parity gate** — Reference-tree 100% manifest parity required before PR2 ship.
+15. **AC terminology** — `fresh-destination / local-archive install 3-run median` not "cold", buffer scope split.
 
-1. **Atomicity fix** — Does `rename(debian→debian.old.ts)` + `rename(staging→debian)` + parent fsync + delete `old` eliminate the prior `rm -rf` window and ensure only `containers/` touched? Verify `FileLock` on `.install.lock` covers both renames.
-2. **Extraction security** — Do `ARCHIVE_EXTRACT_SECURE_*` + manual dirfd/`O_NOFOLLOW` + symlink target checks fully replicate `proot-distro/proot_cmd.py` escapes? Is SHA-failed staging deleted before commit sufficient vs “writes briefly to disk” concern?
-3. **Build plumbing** — Does `CMakeLists.txt` + `ndkVersion 26.1.10909125` + `abiFilters arm64-v8a` + prebuilt `libarchive.a/libzstd/liblzma` correctly build for NativeCode (already arm64-v8a `libproot.so`) with fallback to python? Is PR2 dual-format (xz+zst) before PR3 valid?
-4. **APK bloat** — Is `core` in APK + `dev/desktop` as Release downloads acceptable vs Play limits; does `noCompress zst` + size table (xz vs zst 3-6) benchmarking gate the choice?
-5. **Path unification** — Is `/opt/nativecode/node-v26` consistently used in CI, `ProotFastCommandBuilder.buildGuestPath`, and `nativecode_proot_fast.sh` (fix legacy `/opt/nodejs`)? Does Kotlin `File.listFiles` semver sort match shell `sort -V`?
-6. **Broker dependency & socket** — Is `proot_persistent_runner requires proot_fast_launcher` documented, `var/run` socket `0700`/`0600` not on shared `/tmp` bind, `START_NOT_STICKY` + `NativeCodeFgs` refcount lifecycle correct, no orphan daemon?
-7. **Benchmark fairness** — Does `nc-membench` zero-syscall note clarify ~parity expected (like mbw 0.90×) vs `sysbench` tax, and does `nc-io-bench` without SYSV/block fix the `fio shmget` unfair ratio with proper caps?
-8. **Safety & flags** — Is AC9 grep correctly scoped to perf diff (excluding legacy chroot mounts) and does AC11 now state broker depends on launcher; are remaining 3 flags independently reversible? Confirm no `su/mount/governor/killall/DRM` in new code path.
-9. **UID timing & CI runner** — Is placeholder flux UID left for installer injection (not baked), and does native ARM runner (not qemu) avoid timeout?
+**Requested verdict**: `PLAN_STATUS: APPROVED` (or `APPROVE` with `PR1:IMPLEMENT, PR2:IMPLEMENT, PR3:IMPLEMENT_AFTER_PR2, PR4:IMPLEMENT_AFTER_PR1_BASELINE, PR5:AFTER_PR4, PR6:AFTER_PR4+PDEATHSIG, PR7:EXPERIMENTAL_ONLY`) — worker may start PR1 immediately per prior approval, PR2 unblocked by this revision.
 
-If REVISE, annotate which PR(s) still need reshaping; if APPROVE, worker may start at PR1.
-
-If REVISE, annotate which PR(s) need reshaping; if BLOCK, state whether ptrace hard limit makes any target unachievable without chroot/proroot.
+If REVISE, annotate which PR(s) still need reshaping; if BLOCK, state ptrace hard-limit unachievable target.
 
