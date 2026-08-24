@@ -108,7 +108,6 @@ fun SystemTelemetryCards(
         // Edge-to-Edge Horizontal Scroll Cards Row
         Row(
             modifier = Modifier
-                .fillMaxWidth()
                 .horizontalScroll(scrollState)
                 .padding(start = 16.dp, end = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
