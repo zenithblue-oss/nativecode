@@ -58,6 +58,7 @@ class OnboardingActivity : AppCompatActivity() {
     // ── Shared setup status state ──────────────────────────────────────────────
     private var isDebianBaseSetupStarted = false
     private var enableDebianCustomization = true
+    private var enableXfceGui = true
     /** C6: AI CLI suite opt-in (default OFF). Step H only when true. */
     private var enableAiCliInstall = false
     /** Complete-page truth: SKIPPED | READY | PARTIAL */
@@ -1523,7 +1524,7 @@ class OnboardingActivity : AppCompatActivity() {
             setPadding(0, dp(10), 0, 0)
         }
         customExtra.addView(TextView(this).apply {
-            text = "Include customization"
+            text = "Include shell/font customization"
             textSize = 12f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -1543,7 +1544,34 @@ class OnboardingActivity : AppCompatActivity() {
             )
         )
 
-        // C — AI CLI tools (default OFF)
+        // C — Graphical Desktop (XFCE4) toggle
+        val guiExtra = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(10), 0, 0)
+        }
+        guiExtra.addView(TextView(this).apply {
+            text = "Install XFCE4 graphical desktop"
+            textSize = 12f
+            setTextColor(NC.ON_SURFACE)
+            typeface = Typeface.MONOSPACE
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        })
+        guiExtra.addView(
+            CustomBrutalistToggle(this, enableXfceGui) { checked ->
+                enableXfceGui = checked
+            }
+        )
+        root.addView(
+            sectionCard(
+                "C · GRAPHICAL DESKTOP",
+                "OPTIONAL",
+                InstallPlanCatalog.guiInventory(),
+                guiExtra
+            )
+        )
+
+        // D — AI CLI tools (default OFF)
         val aiTableHost = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = if (enableAiCliInstall) View.VISIBLE else View.GONE
@@ -1599,7 +1627,7 @@ class OnboardingActivity : AppCompatActivity() {
         aiExtra.addView(aiTableHost)
         root.addView(
             sectionCard(
-                "C · AI CLI TOOLS",
+                "D · AI CLI TOOLS",
                 "DEFAULT OFF",
                 emptyList(),
                 aiExtra
@@ -1647,6 +1675,7 @@ class OnboardingActivity : AppCompatActivity() {
             AiCliProvisionState.setPlanAccepted(this, true)
             AiCliProvisionState.setEnableAiCliInstall(this, enableAiCliInstall)
             AiCliProvisionState.setEnableCustomization(this, enableDebianCustomization)
+            AiCliProvisionState.setEnableGui(this, enableXfceGui)
             if (!enableAiCliInstall) {
                 AiCliProvisionState.markAiCliProvisioned(this, selectedIsolationMethod, false)
                 aiCliSetupOutcome = "SKIPPED"
@@ -1954,14 +1983,17 @@ class OnboardingActivity : AppCompatActivity() {
             SetupPhase("B", "Extracting bootstrap assets…", 12),
             SetupPhase("C", "Deploying host configs…", 5),
             SetupPhase("D", "Initializing host environment…", 12),
-            SetupPhase("E", "Provisioning Debian guest…", 30),
+            SetupPhase("E", "Provisioning Debian guest…", 25),
             SetupPhase("F", "Configuring hardware acceleration…", 10)
         )
+        if (enableXfceGui) {
+            phases.add(SetupPhase("GUI", "Installing XFCE4 desktop…", 20))
+        }
         if (enableDebianCustomization) {
-            phases.add(SetupPhase("G", "Customizing guest environment…", 10))
+            phases.add(SetupPhase("G", "Customizing guest environment…", 8))
         }
         if (enableAiCliInstall) {
-            phases.add(SetupPhase("H", "Installing AI CLI tools…", 18))
+            phases.add(SetupPhase("H", "Installing AI CLI tools…", 15))
         }
         return phases
     }
@@ -1969,15 +2001,18 @@ class OnboardingActivity : AppCompatActivity() {
     private fun chrootSetupPhases(): List<SetupPhase> {
         val phases = mutableListOf(
             SetupPhase("R0", "Checking root access…", 2),
-            SetupPhase("R1", "Installing Debian chroot base…", 35),
-            SetupPhase("E", "Provisioning Debian packages…", 20),
+            SetupPhase("R1", "Installing Debian chroot base…", 30),
+            SetupPhase("E", "Provisioning Debian packages…", 15),
             SetupPhase("F", "Configuring hardware acceleration…", 10)
         )
+        if (enableXfceGui) {
+            phases.add(SetupPhase("GUI", "Installing XFCE4 desktop…", 20))
+        }
         if (enableDebianCustomization) {
-            phases.add(SetupPhase("G", "Customizing guest environment…", 10))
+            phases.add(SetupPhase("G", "Customizing guest environment…", 8))
         }
         if (enableAiCliInstall) {
-            phases.add(SetupPhase("H", "Installing AI CLI tools…", 18))
+            phases.add(SetupPhase("H", "Installing AI CLI tools…", 15))
         }
         return phases
     }
@@ -2440,27 +2475,46 @@ class OnboardingActivity : AppCompatActivity() {
                                         updateBaseStatus("[CHROOT] HW accel setup failed (exit $codeF). Continuing...")
                                     }
                                     setSetupPhaseFraction(1f)
-                                    // Step G (optional) → Step H (AI opt-in only) → finish
                                     fun afterChrootCustom() {
                                         maybeRunCliToolsSetupChroot { finishChrootBaseSetup() }
                                     }
-                                    if (enableDebianCustomization) {
-                                        enterSetupPhase("G", "Applying desktop theme…")
-                                        updateBaseStatus("[CHROOT] G. Customizing Guest Environment...")
-                                        copyAndRunInChroot(
-                                            assetName = "scripts/setup_customization_debian.sh",
-                                            scriptName = "setup_customization_debian.sh",
-                                            cmd = "env FLUX_THEME=dark bash /tmp/setup_customization_debian.sh"
-                                        ) { codeG ->
-                                            if (codeG != 0) {
-                                                updateBaseStatus("[CHROOT] Customization failed (exit $codeG). Continuing...")
+                                    fun runChrootCustomization() {
+                                        if (enableDebianCustomization) {
+                                            enterSetupPhase("G", "Applying shell polish…")
+                                            updateBaseStatus("[CHROOT] G. Customizing Guest Environment...")
+                                            copyAndRunInChroot(
+                                                assetName = "scripts/setup_customization_debian.sh",
+                                                scriptName = "setup_customization_debian.sh",
+                                                cmd = "bash /tmp/setup_customization_debian.sh"
+                                            ) { codeG ->
+                                                if (codeG != 0) {
+                                                    updateBaseStatus("[CHROOT] Customization failed (exit $codeG). Continuing...")
+                                                }
+                                                setSetupPhaseFraction(1f)
+                                                afterChrootCustom()
                                             }
-                                            setSetupPhaseFraction(1f)
+                                        } else {
+                                            updateBaseStatus("[CHROOT] G. Skipping Guest Customization (Toggle Off)...")
                                             afterChrootCustom()
                                         }
+                                    }
+                                    if (enableXfceGui) {
+                                        enterSetupPhase("GUI", "Installing XFCE4 desktop…")
+                                        updateBaseStatus("[CHROOT] GUI. Provisioning XFCE4 Desktop...")
+                                        copyAndRunInChroot(
+                                            assetName = "scripts/setup_xfce4.sh",
+                                            scriptName = "setup_xfce4.sh",
+                                            cmd = "env FLUX_THEME=dark bash /tmp/setup_xfce4.sh"
+                                        ) { codeGui ->
+                                            if (codeGui != 0) {
+                                                updateBaseStatus("[CHROOT] XFCE4 setup failed (exit $codeGui). Continuing...")
+                                            }
+                                            setSetupPhaseFraction(1f)
+                                            runChrootCustomization()
+                                        }
                                     } else {
-                                        updateBaseStatus("[CHROOT] G. Skipping Guest Customization (Toggle Off)...")
-                                        afterChrootCustom()
+                                        updateBaseStatus("[CHROOT] GUI. Skipping XFCE4 Desktop (Toggle Off)...")
+                                        runChrootCustomization()
                                     }
                                 }
                             }
@@ -2580,8 +2634,25 @@ class OnboardingActivity : AppCompatActivity() {
                 )) == 0) { "GPU setup failed" }
                 setSetupPhaseFraction(1f)
 
+                if (enableXfceGui) {
+                    enterSetupPhase("GUI", "Installing XFCE4 desktop…")
+                    updateBaseStatus("GUI. Provisioning XFCE4 Desktop...")
+                    val guiScript = File(File(usrDir, "tmp"), "setup_xfce4.sh")
+                    assets.open("scripts/setup_xfce4.sh").use { input -> FileOutputStream(guiScript).use { input.copyTo(it) } }
+                    guiScript.setExecutable(true)
+                    check(runShellCommand(arrayOf(
+                        TermuxHostPaths.BIN + "/python",
+                        TermuxHostPaths.PROOT_DISTRO,
+                        "login", "debian", "--shared-tmp", "--",
+                        "env", "FLUX_THEME=dark", "bash", "/tmp/setup_xfce4.sh"
+                    )) == 0) { "XFCE4 setup failed" }
+                    setSetupPhaseFraction(1f)
+                } else {
+                    updateBaseStatus("GUI. Skipping XFCE4 Desktop (Toggle Off)...")
+                }
+
                 if (enableDebianCustomization) {
-                    enterSetupPhase("G", "Applying desktop theme…")
+                    enterSetupPhase("G", "Applying shell polish…")
                     updateBaseStatus("G. Customizing Guest Environment...")
                     val customScript = File(File(usrDir, "tmp"), "setup_customization_debian.sh")
                     assets.open("scripts/setup_customization_debian.sh").use { input -> FileOutputStream(customScript).use { input.copyTo(it) } }
@@ -2590,7 +2661,7 @@ class OnboardingActivity : AppCompatActivity() {
                         TermuxHostPaths.BIN + "/python",
                         TermuxHostPaths.PROOT_DISTRO,
                         "login", "debian", "--shared-tmp", "--",
-                        "env", "FLUX_THEME=dark", "bash", "/tmp/setup_customization_debian.sh"
+                        "bash", "/tmp/setup_customization_debian.sh"
                     )) == 0) { "Customization failed" }
                     setSetupPhaseFraction(1f)
                 } else {

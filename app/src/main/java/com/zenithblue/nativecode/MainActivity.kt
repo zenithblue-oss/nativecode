@@ -5179,8 +5179,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 list.addView(hint)
                 val guestScripts = arrayOf(
-                    "setup_debian_family.sh" to "Create users and VNC startup configurations in guest.",
-                    "setup_customization_debian.sh" to "Apply dark themes and custom packages inside Debian guest.",
+                    "setup_debian_family.sh" to "Create users and core configurations in guest.",
+                    "setup_xfce4.sh" to "Install XFCE4 graphical desktop and themes in guest.",
+                    "setup_customization_debian.sh" to "Apply font, locales, and terminal enhancements in guest.",
                     "setup_hw_accel_debian.sh" to "Configure GPU accel: Turnip (Snapdragon/Adreno) or VirGL (others).",
                     "setup_cli_tools.sh" to "Install Node.js/NVM and AI CLI tools (Aider, Claude, Cline) in guest."
                 )
@@ -5551,6 +5552,7 @@ class MainActivity : AppCompatActivity() {
             "uninstall_debian13_chroot.sh" -> "Chroot Uninstall"
             "setup_debian13_chroot.sh" -> "Chroot Installation"
             "setup_debian_family.sh" -> "Debian Family Setup"
+            "setup_xfce4.sh" -> "XFCE4 Desktop Setup"
             "setup_customization_debian.sh" -> "Debian Customization"
             "setup_hw_accel_debian.sh" -> "Hardware Acceleration Setup"
             "setup_cli_tools.sh" -> "CLI Tools Setup"
@@ -7679,11 +7681,12 @@ class MainActivity : AppCompatActivity() {
         sectionTitleRow.addView(sectionTitleIcon)
         sectionTitleRow.addView(sectionTitle)
         val methodNow = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
+        val xfceReady = isXfceInstalled()
         val sectionSub = TextView(this).apply {
-            text = if (methodNow == "chroot") {
-                "Termux X11 + XFCE4 inside Debian (root)."
-            } else {
-                "Termux X11 + XFCE4 graphical environment."
+            text = when {
+                !xfceReady -> "Desktop not installed. Install via Settings → Repairs."
+                methodNow == "chroot" -> "Termux X11 + XFCE4 inside Debian (root)."
+                else -> "Termux X11 + XFCE4 graphical environment."
             }
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
@@ -12806,9 +12809,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onSetupComplete() {
         mainHandler.post {
-            if (::startGuiBtn.isInitialized) {
-                startGuiBtn.isEnabled = true; startGuiBtn.alpha = 1f
-            }
+            setGuiCardIdle()
             if (::stopGuiBtn.isInitialized) {
                 stopGuiBtn.isEnabled = true; stopGuiBtn.alpha = 1f
             }
@@ -12833,6 +12834,7 @@ class MainActivity : AppCompatActivity() {
                 "start_debian13_gui.sh",
                 "stop_debian13_gui.sh",
                 "setup_debian_family.sh",
+                "setup_xfce4.sh",
                 "setup_customization_debian.sh",
                 "setup_hw_accel_debian.sh",
                 "setup_cli_tools.sh",
@@ -12921,13 +12923,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isXfceInstalled(): Boolean {
+        val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
+        return if (method == "chroot") {
+            File("/data/local/tmp/chrootDebian13/usr/bin/startxfce4").exists()
+        } else {
+            val rootfs = File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/debian/rootfs")
+            File(rootfs, "usr/bin/startxfce4").exists()
+        }
+    }
+
     /** Idle: full-width START only (no VIEW LOGS). */
     private fun setGuiCardIdle() {
         if (!::startGuiBtn.isInitialized || !::stopGuiBtn.isInitialized) return
         guiDesktopRunning = false
         startGuiBtn.visibility = View.VISIBLE
-        startGuiBtn.isEnabled = true
-        startGuiBtn.alpha = 1f
+        val installed = isXfceInstalled()
+        if (installed) {
+            startGuiBtn.text = "  START XFCE DESKTOP"
+            startGuiBtn.isEnabled = true
+            startGuiBtn.alpha = 1f
+        } else {
+            startGuiBtn.text = "  XFCE NOT INSTALLED"
+            startGuiBtn.isEnabled = false
+            startGuiBtn.alpha = 0.4f
+        }
         startGuiBtn.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         stopGuiBtn.visibility = View.GONE
         stopGuiBtn.isEnabled = false

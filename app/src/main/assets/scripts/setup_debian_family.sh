@@ -9,7 +9,7 @@ echo "FluxLinux: Configuring ${DISTRO_NAME} (Debian Family)..."
 # 1. Update and Install Core Packages
 export DEBIAN_FRONTEND=noninteractive
 apt update -y || exit 1
-apt install -y sudo xfce4 xfce4-goodies dbus-x11 tigervnc-standalone-server git || exit 1
+apt install -y sudo git curl wget || exit 1
 
 # 2. Create User 'flux'
 if ! id "flux" &>/dev/null; then
@@ -26,15 +26,5 @@ fi
 
 # 3. Configure Sudo
 echo "flux ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/flux
-
-# 4. Configure VNC for User
-mkdir -p /home/flux/.vnc
-echo "#!/bin/bash
-export PULSE_SERVER=127.0.0.1
-xrdb $HOME/.Xresources
-startxfce4" > /home/flux/.vnc/xstartup
-chmod +x /home/flux/.vnc/xstartup
-FLUX_GROUP="$(id -gn flux 2>/dev/null || echo users)"
-chown -R "flux:${FLUX_GROUP}" /home/flux/.vnc
 
 echo "FluxLinux: ${DISTRO_NAME} Setup Complete!"

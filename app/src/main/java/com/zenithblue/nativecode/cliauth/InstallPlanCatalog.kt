@@ -26,7 +26,12 @@ object InstallPlanCatalog {
         }
 
     fun customizationInventory(): List<InventoryLine> = listOf(
-        InventoryLine("Desktop themes & shell polish", "setup_customization_debian.sh")
+        InventoryLine("Fonts & terminal polish", "setup_customization_debian.sh")
+    )
+
+    fun guiInventory(): List<InventoryLine> = listOf(
+        InventoryLine("XFCE4 desktop environment", "setup_xfce4.sh"),
+        InventoryLine("XFCE themes & panel config", "setup_xfce4.sh")
     )
 
     fun aiCliInventory(): List<InventoryLine> {

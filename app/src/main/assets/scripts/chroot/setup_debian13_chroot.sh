@@ -280,15 +280,6 @@ configure_debian_chroot() {
         chmod 0440 /etc/sudoers.d/$USERNAME
     " || goodbye
 
-    progress "Installing XFCE4..."
-    $BB chroot "$DEBIANPATH" /bin/bash -c '
-        export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-        export TMPDIR=/tmp
-        export DEBIAN_FRONTEND=noninteractive
-        chmod 1777 /tmp /var/tmp 2>/dev/null || true
-        apt-get install -y xfce4 xfce4-terminal
-    ' || goodbye
-
     touch "$DEBIANPATH/.flux_configured"
     success "Debian Environment Configured!"
 

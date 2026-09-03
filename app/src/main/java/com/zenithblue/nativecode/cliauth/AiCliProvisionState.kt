@@ -21,6 +21,7 @@ object AiCliProvisionState {
     /** @deprecated legacy; see [KEY_PROVISIONED]. */
     const val KEY_PROVISIONED_METHOD = "ai_cli_tools_provisioned_method"
     const val KEY_ENABLE_CUSTOM = "enable_debian_customization"
+    const val KEY_ENABLE_GUI = "enable_xfce_gui"
 
     private const val KEY_PROVISIONED_PROOT = "ai_cli_tools_provisioned_proot"
     private const val KEY_PROVISIONED_CHROOT = "ai_cli_tools_provisioned_chroot"
@@ -143,4 +144,11 @@ object AiCliProvisionState {
 
     fun isEnableCustomization(ctx: Context): Boolean =
         prefs(ctx).getBoolean(KEY_ENABLE_CUSTOM, true)
+
+    fun setEnableGui(ctx: Context, enabled: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_ENABLE_GUI, enabled).apply()
+    }
+
+    fun isEnableGui(ctx: Context): Boolean =
+        prefs(ctx).getBoolean(KEY_ENABLE_GUI, true)
 }
