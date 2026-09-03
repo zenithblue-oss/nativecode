@@ -19,7 +19,7 @@ object InstallPlanCatalog {
         } else {
             listOf(
                 InventoryLine("Host bootstrap", "bootstrap.tar + host configs"),
-                InventoryLine("Debian proot guest", "flux_install / proot-distro"),
+                InventoryLine("Debian Linux guest", "flux_install / debian"),
                 InventoryLine("Guest packages / users", "setup_debian_family.sh"),
                 InventoryLine("Hardware acceleration", "setup_hw_accel_debian.sh")
             )

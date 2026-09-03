@@ -3012,7 +3012,7 @@ class MainActivity : AppCompatActivity() {
         // 2. System Telemetry Cards (SYS_CPU & SYS_MEM)
         homeLayout.addView(buildSystemTelemetryCards())
 
-        // 3. Package ops — Marketplace + Software Manager
+        // 3. Package ops — Software Manager
         homeLayout.addView(buildHomePackageOpsSection())
         homeLayout.addView(spacer(8))
 
@@ -4125,11 +4125,7 @@ class MainActivity : AppCompatActivity() {
         settingsHubLayout.addView(buildTerminalSettingsCard())
         settingsHubLayout.addView(spacer(16))
 
-        // Environment card (proot / chroot switch)
-        settingsHubLayout.addView(buildEnvironmentCard())
-        settingsHubLayout.addView(spacer(16))
-
-        // GitHub account (per isolation method)
+        // GitHub account
         settingsHubLayout.addView(buildSettingsGithubCard())
         settingsHubLayout.addView(spacer(16))
 
@@ -4141,20 +4137,12 @@ class MainActivity : AppCompatActivity() {
         settingsHubLayout.addView(buildAiSafetySectionButton())
         settingsHubLayout.addView(spacer(16))
 
-        // Proot Settings — size-only (app storage rootfs); above chroot
+        // Linux Storage Settings — size-only (app storage rootfs)
         settingsHubLayout.addView(buildProotSettingsSectionButton())
-        settingsHubLayout.addView(spacer(16))
-
-        // Chroot Settings — opens dedicated page (size / root / uninstall)
-        settingsHubLayout.addView(buildChrootSettingsSectionButton())
         settingsHubLayout.addView(spacer(16))
 
         // Software Manager — apt inventory by category
         settingsHubLayout.addView(buildSoftwareManagerSectionButton())
-        settingsHubLayout.addView(spacer(16))
-
-        // Marketplace — curated components & apps
-        settingsHubLayout.addView(buildMarketplaceSectionButton())
         settingsHubLayout.addView(spacer(16))
 
         // X11 display settings (termux-x11 LoriePreferences)
@@ -4511,7 +4499,7 @@ class MainActivity : AppCompatActivity() {
                 typeface = Typeface.DEFAULT_BOLD
             }
             val sub = TextView(this@MainActivity).apply {
-                text = "Re-run host, guest, and chroot fix scripts"
+                text = "Re-run host and guest fix scripts"
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -4591,7 +4579,7 @@ class MainActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
             val name = TextView(this@MainActivity).apply {
-                text = "PROOT SETTINGS"
+                text = "STORAGE SETTINGS"
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
@@ -5071,7 +5059,7 @@ class MainActivity : AppCompatActivity() {
         }
         scriptsLayout.addView(repairsRootBadge)
 
-        // Segment tabs: HOST | GUEST | CHROOT*
+        // Segment tabs: HOST | GUEST
         val tabsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(16) }
@@ -5092,8 +5080,7 @@ class MainActivity : AppCompatActivity() {
             populateRepairsList()
         }
         tabsRow.addView(repairsTabHostBtn, LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) })
-        tabsRow.addView(repairsTabGuestBtn, LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) })
-        tabsRow.addView(repairsTabChrootBtn, LinearLayout.LayoutParams(0, WRAP, 1f))
+        tabsRow.addView(repairsTabGuestBtn, LinearLayout.LayoutParams(0, WRAP, 1f))
         scriptsLayout.addView(tabsRow)
 
         repairsListContainer = LinearLayout(this).apply {
@@ -5184,11 +5171,7 @@ class MainActivity : AppCompatActivity() {
             "guest" -> {
                 val rootOk = repairsRootOk == true
                 val hint = TextView(this).apply {
-                    text = if (rootOk) {
-                        "// DEBIAN GUEST — RUN ASKS PROOT OR CHROOT"
-                    } else {
-                        "// DEBIAN GUEST — PROOT ONLY (NO ROOT)"
-                    }
+                    text = "// DEBIAN GUEST ENVIRONMENT"
                     textSize = 10f
                     setTextColor(NC.ON_SURF_VAR)
                     typeface = Typeface.MONOSPACE
@@ -5239,25 +5222,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Guest Debian scripts run on proot and/or chroot.
-     * With root: pick target. Without root: proot only.
+     * Guest Debian scripts run in default guest environment.
      */
     private fun runGuestRepairScript(scriptName: String) {
         if (scriptName == "setup_cli_tools.sh") {
             confirmAiCliScriptRun {
-                if (repairsRootOk == true) {
-                    showGuestRunTargetDialog(scriptName)
-                } else {
-                    runScriptInTerminal(scriptName, "proot")
-                }
+                runScriptInTerminal(scriptName, "proot")
             }
             return
         }
-        if (repairsRootOk == true) {
-            showGuestRunTargetDialog(scriptName)
-        } else {
-            runScriptInTerminal(scriptName, "proot")
-        }
+        runScriptInTerminal(scriptName, "proot")
     }
 
     private fun confirmAiCliScriptRun(onConfirm: () -> Unit) {
@@ -7707,9 +7681,9 @@ class MainActivity : AppCompatActivity() {
         val methodNow = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
         val sectionSub = TextView(this).apply {
             text = if (methodNow == "chroot") {
-                "Chroot mode: Termux X11 + XFCE4 inside Debian chroot (root)."
+                "Termux X11 + XFCE4 inside Debian (root)."
             } else {
-                "Proot mode: Termux X11 + XFCE4 via proot-distro (debian)."
+                "Termux X11 + XFCE4 graphical environment."
             }
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
@@ -8066,8 +8040,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Home package ops: Software Manager + Marketplace.
-     * Distinct from project cards — twin module tiles with accent rails (ui_design cyber-brutalist).
+     * Home package ops: Software Manager.
+     * Full width module tile with accent rails (ui_design cyber-brutalist).
      */
     private fun buildHomePackageOpsSection(): View {
         val section = LinearLayout(this).apply {
@@ -8091,39 +8065,19 @@ class MainActivity : AppCompatActivity() {
         headerRow.addView(sectionTitle)
         section.addView(headerRow)
 
-        // Horizontal twin modules
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-        }
-
-        val marketCard = buildHomePackageModuleCard(
-            accentFill = true,
-            iconRes = R.drawable.ic_download,
-            kicker = "CATALOG",
-            title = "MARKETPLACE",
-            subtitle = "Curated apps &\ncompat runtimes",
-            footer = "INSTALL · LAUNCH",
-            pageId = ID_MARKETPLACE
-        ).apply {
-            layoutParams = LinearLayout.LayoutParams(0, MATCH, 1f).apply { rightMargin = dp(8) }
-        }
-
         val softwareCard = buildHomePackageModuleCard(
             accentFill = false,
             iconRes = R.drawable.ic_extension,
             kicker = "APT SCAN",
-            title = "SOFTWARE\nMANAGER",
-            subtitle = "Installed pkgs by\ncategory & size",
+            title = "SOFTWARE MANAGER",
+            subtitle = "Installed pkgs by category & size",
             footer = "BROWSE · REMOVE",
             pageId = ID_SOFTWARE_MANAGER
         ).apply {
-            layoutParams = LinearLayout.LayoutParams(0, MATCH, 1f).apply { leftMargin = dp(8) }
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         }
 
-        row.addView(marketCard)
-        row.addView(softwareCard)
-        section.addView(row)
+        section.addView(softwareCard)
         return section
     }
 
@@ -8649,7 +8603,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply { rightMargin = dp(10) }
         }
         val titleTv = TextView(this).apply {
-            text = "PROOT SETTINGS"
+            text = "STORAGE SETTINGS"
             textSize = 22f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -8659,7 +8613,7 @@ class MainActivity : AppCompatActivity() {
         headerTitleRow.addView(headerIcon)
         headerTitleRow.addView(titleTv)
         val subTitleTv = TextView(this).apply {
-            text = "// DEBIAN PROOT — APP STORAGE"
+            text = "// DEBIAN LINUX — APP STORAGE"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -8682,7 +8636,7 @@ class MainActivity : AppCompatActivity() {
         card.addView(sectionHeader(R.drawable.ic_storage, "Storage", NC.PRIMARY))
 
         val subTv = TextView(this).apply {
-            text = "// DEBIAN PROOT ROOTFS — MEASURED IN-APP"
+            text = "// DEBIAN ROOTFS — MEASURED IN-APP"
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -10604,7 +10558,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         chips.addView(chip("All", "all"))
-        chips.addView(chip("Marketplace", "mp"))
         chips.addView(chip("System", "system"))
         toolbar.addView(chips)
 
@@ -10881,34 +10834,13 @@ class MainActivity : AppCompatActivity() {
                 setPadding(0, dp(16), 0, dp(8))
             }
             empty.addView(TextView(this).apply {
-                text = if (appsItems.isEmpty())
-                    "No installed apps. Open Marketplace to install."
-                else
-                    "No apps match \"$appsSearchQuery\"."
+                text = if (appsItems.isEmpty()) "No installed apps found."
+                else "No apps match \"$appsSearchQuery\"."
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
                 textSize = 12f
                 setPadding(0, 0, 0, dp(12))
             })
-            if (appsItems.isEmpty()) {
-                empty.addView(TextView(this).apply {
-                    text = "OPEN MARKETPLACE"
-                    textSize = 13f
-                    gravity = Gravity.CENTER
-                    setTextColor(NC.ON_PRIMARY)
-                    typeface = Typeface.MONOSPACE
-                    paint.isFakeBoldText = true
-                    setPadding(dp(16), dp(12), dp(16), dp(12))
-                    background = cyberBrutalistBg(
-                        fillColor = NC.PRIMARY_CON,
-                        strokeColor = NC.PRIMARY,
-                        shadowColor = NC.SHADOW_DARK,
-                        offsetDp = 4,
-                        cornerRadiusDp = 0
-                    )
-                    setOnClickListener { openMarketplace() }
-                })
-            }
             container.addView(empty)
             return
         }
@@ -14789,13 +14721,6 @@ class MainActivity : AppCompatActivity() {
         }
         settingsGhSubtitle = sub
         card.addView(sub)
-        card.addView(TextView(this).apply {
-            text = "Auth is per isolation (proot ≠ chroot)"
-            textSize = 10f
-            setTextColor(NC.OUTLINE)
-            typeface = Typeface.MONOSPACE
-            setPadding(0, 0, 0, dp(10))
-        })
         val badge = textBadge("…", NC.SURFACE_HIGHEST, NC.ON_SURF_VAR)
         settingsGhBadge = badge
         card.addView(badge)
@@ -14946,12 +14871,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun paintCreateGithubStatus(status: GhAuthStatus) {
-        val methodLabel = status.method.uppercase()
         val sub = ghCreateSubtitle
         val btn = ghCreateActionBtn
         when {
             !status.ghInstalled || !status.loggedIn -> {
-                sub?.text = "Not connected · $methodLabel"
+                sub?.text = "Not connected"
                 btn?.apply {
                     text = "CONNECT"
                     isEnabled = !GitHubCliService.isSessionActive()
@@ -14963,7 +14887,7 @@ class MainActivity : AppCompatActivity() {
                 ghRepoCard?.visibility = View.GONE
             }
             else -> {
-                sub?.text = "@${status.username} · $methodLabel"
+                sub?.text = "@${status.username}"
                 btn?.apply {
                     text = "REFRESH"
                     isEnabled = true
@@ -14977,7 +14901,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         if (status.error != null) {
-            sub?.text = "Error · $methodLabel"
+            sub?.text = "Error"
             btn?.text = "RETRY"
         }
     }
@@ -15200,11 +15124,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshSettingsGithubCard() {
         val method = LinuxCommandBuilder.currentMethod
-        val methodLabel = method.uppercase()
-        settingsGhSubtitle?.text = "Checking… · $methodLabel"
+        settingsGhSubtitle?.text = "Checking…"
         settingsGhActionBtn?.isEnabled = false
         settingsGhLogoutBtn?.visibility = View.GONE
-        // Clear stale badge from other isolation (proot ≠ chroot)
+        // Clear stale badge
         settingsGhBadge?.apply {
             text = "…"
             setTextColor(NC.ON_SURF_VAR)
@@ -15220,10 +15143,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun paintSettingsGithubStatus(status: GhAuthStatus) {
-        val methodLabel = status.method.uppercase()
         when {
             status.loggedIn && !status.username.isNullOrBlank() -> {
-                settingsGhSubtitle?.text = "@${status.username} · $methodLabel"
+                settingsGhSubtitle?.text = "@${status.username}"
                 settingsGhBadge?.apply {
                     text = "LOGGED IN"
                     setTextColor(Color.parseColor("#0A0A0A"))
@@ -15240,7 +15162,7 @@ class MainActivity : AppCompatActivity() {
                 settingsGhLogoutBtn?.visibility = View.VISIBLE
             }
             else -> {
-                settingsGhSubtitle?.text = "Not signed in · $methodLabel"
+                settingsGhSubtitle?.text = "Not signed in"
                 settingsGhBadge?.apply {
                     text = "OFFLINE"
                     setTextColor(NC.ON_SURF_VAR)
@@ -16923,12 +16845,9 @@ class MainActivity : AppCompatActivity() {
 
         // Default proot; chroot only if root + install gates pass (refreshed below)
         projectCreateSelectedMethod = "proot"
-        if (LinuxCommandBuilder.currentMethod == "chroot" && isCreateChrootSelectable()) {
-            projectCreateSelectedMethod = "chroot"
-        }
 
         val prootChip = TextView(this).apply {
-            text = "PRoot"
+            text = "Standard"
             textSize = 13f
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
@@ -16938,7 +16857,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
         }
         val chrootChip = TextView(this).apply {
-            text = "Chroot"
+            text = "Root"
             textSize = 13f
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
@@ -17002,7 +16921,8 @@ class MainActivity : AppCompatActivity() {
         chipRow.addView(prootChip)
         chipRow.addView(chrootChip)
         methodCard.addView(chipRow)
-        projectCreateLayout.addView(methodCard)
+        // Project import: isolation selection removed per UI requirements
+        // projectCreateSelectedMethod stays default "proot"
 
         // --- Primary Button ---
         projectCreateBtn = primaryButton("CREATE / IMPORT PROJECT") {

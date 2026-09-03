@@ -48,7 +48,7 @@ class OnboardingActivity : AppCompatActivity() {
     private lateinit var rootLayout: FrameLayout
     private lateinit var pageContainer: FrameLayout
 
-    // 0 privacy → 1 intro → 2 slideshow → 3 requirements → 4 isolation → 5 plan → 6 setup → 7 complete
+    // 0 privacy → 1 intro → 2 slideshow → 3 requirements → 5 plan (isolation skipped) → 6 setup → 7 complete
     private var currentPageIndex = 0
 
     private val executor = Executors.newCachedThreadPool()
@@ -192,7 +192,7 @@ class OnboardingActivity : AppCompatActivity() {
             1 -> buildIntroPage()
             2 -> buildSlideshowPage()
             3 -> buildRequirementsPage()
-            4 -> buildIsolationPage()
+            4 -> buildInstallPlanPage() // skip isolation picker page
             5 -> buildInstallPlanPage()
             6 -> buildDebianBasePage()
             7, 8 -> buildCompletePage() // 8 = legacy deep-link after plan insert
@@ -494,18 +494,11 @@ class OnboardingActivity : AppCompatActivity() {
                 type = PreviewType.XFCE_GUI
             ),
             SlideData(
-                category = "LINUX OS",
-                title = "Debian Trixie Container",
+                category = "DEBIAN",
+                title = "Debian 13 Linux",
                 iconResId = R.drawable.ic_terminal,
                 desc = "Native glibc Debian 13 PRoot environment with apt package manager and full Linux userland.",
                 type = PreviewType.DEBIAN_ENV
-            ),
-            SlideData(
-                category = "MARKETPLACE",
-                title = "Software Marketplace",
-                iconResId = R.drawable.ic_extension,
-                desc = "Curated catalog from nativecode-marketplace: install scripts, deps, components (box64/FEX) and X11 apps with one-tap install & launch.",
-                type = PreviewType.MARKETPLACE
             ),
             SlideData(
                 category = "CONTROL",
@@ -934,7 +927,10 @@ class OnboardingActivity : AppCompatActivity() {
 
         val nextLabel = if (snap.hardBlocked) "Storage required" else "Continue"
         val nextBtn = primaryButton(nextLabel, if (snap.hardBlocked) null else R.drawable.ic_arrow_right) {
-            if (!snap.hardBlocked) showPage(4)
+            if (!snap.hardBlocked) {
+                selectedIsolationMethod = "proot"
+                showPage(5)
+            }
         }
         nextBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         if (snap.hardBlocked) {
@@ -1613,13 +1609,6 @@ class OnboardingActivity : AppCompatActivity() {
             typeface = Typeface.MONOSPACE
             setPadding(0, 0, 0, dp(12))
         })
-        root.addView(TextView(this).apply {
-            text = "Method: ${selectedIsolationMethod.uppercase()}"
-            textSize = 13f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.MONOSPACE
-            setPadding(0, 0, 0, dp(12))
-        })
 
         fun sectionCard(
             title: String,
@@ -1797,7 +1786,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(consentRow)
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val prevBtn = secondaryButton("Back") { showPage(4) }
+        val prevBtn = secondaryButton("Back") { showPage(3) } // requirements
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
         val startBtn = primaryButton("I understand — start install", R.drawable.ic_arrow_right) {
             if (!planAccepted) {
@@ -2147,10 +2136,9 @@ class OnboardingActivity : AppCompatActivity() {
         setupPhases.getOrNull(setupPhaseIndex)
 
     private fun setupPhaseMetaLabel(): String {
-        val method = selectedIsolationMethod.uppercase()
-        if (setupPhases.isEmpty()) return "SETUP · $method"
+        if (setupPhases.isEmpty()) return "SETUP"
         val step = (setupPhaseIndex + 1).coerceAtMost(setupPhases.size)
-        return "STEP $step / ${setupPhases.size} · $method"
+        return "STEP $step / ${setupPhases.size}"
     }
 
     private fun beginSetupPhases(method: String) {
@@ -2534,7 +2522,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     private fun runDebianBaseSetup() {
         startSetupFgs(
-            "Installing Debian ${selectedIsolationMethod} — setup scripts running"
+            "Installing Debian Linux — setup scripts running"
         )
         // ── CHROOT path (KernelSU / Magisk root required) ────────────────────
         if (selectedIsolationMethod == "chroot") {
