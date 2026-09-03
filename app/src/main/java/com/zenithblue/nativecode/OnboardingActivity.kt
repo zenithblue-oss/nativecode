@@ -12,6 +12,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
+import android.os.Build
 import android.os.Looper
 import android.view.MotionEvent
 import android.util.Base64
@@ -48,7 +49,7 @@ class OnboardingActivity : AppCompatActivity() {
     private lateinit var rootLayout: FrameLayout
     private lateinit var pageContainer: FrameLayout
 
-    // 0 privacy → 1 intro → 2 slideshow → 3 requirements → 5 plan (isolation skipped) → 6 setup → 7 complete
+    // 0 privacy → 1 intro → 2 slideshow → 3 requirements → 4 notifications → 5 plan → 6 setup → 7 complete
     private var currentPageIndex = 0
 
     private val executor = Executors.newCachedThreadPool()
@@ -192,7 +193,7 @@ class OnboardingActivity : AppCompatActivity() {
             1 -> buildIntroPage()
             2 -> buildSlideshowPage()
             3 -> buildRequirementsPage()
-            4 -> buildInstallPlanPage() // skip isolation picker page
+            4 -> buildNotificationPermissionPage()
             5 -> buildInstallPlanPage()
             6 -> buildDebianBasePage()
             7, 8 -> buildCompletePage() // 8 = legacy deep-link after plan insert
@@ -929,7 +930,7 @@ class OnboardingActivity : AppCompatActivity() {
         val nextBtn = primaryButton(nextLabel, if (snap.hardBlocked) null else R.drawable.ic_arrow_right) {
             if (!snap.hardBlocked) {
                 selectedIsolationMethod = "proot"
-                showPage(5)
+                showPage(4) // Notifications permission page
             }
         }
         nextBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
@@ -1337,250 +1338,100 @@ class OnboardingActivity : AppCompatActivity() {
         return row
     }
 
-    // ── Page 4: Method ────────────────────────────────────────────────────────
-    private fun buildIsolationPage(): View {
-
+    // ── Page 4: Notification Permission (for background setup FGS & service status) ───
+    private fun buildNotificationPermissionPage(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(20), dp(20), dp(20))
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            setBackgroundColor(NC.BG)
         }
 
-        root.addView(smallHeader("Method", R.drawable.ic_shield))
+        root.addView(smallHeader("Notifications", R.drawable.ic_stat_terminal))
 
-        val spacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
-        root.addView(spacer)
+        val spacer1 = View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
+        root.addView(spacer1)
 
-        // Mutable: flipped by RootShell.probeRootAvailable (same SSOT as chroot settings)
-        var chrootRootOk = false
-
-        // Helper to update selection state of the two method cards
-        fun updateIsolationCardSelections(selectedMethod: String,
-                prootCardRef: LinearLayout, chrootCardRef: LinearLayout) {
-            if (selectedMethod == "proot") {
-                prootCardRef.background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_CONTAINER, strokeColor = NC.PRIMARY,
-                    shadowColor = NC.SURFACE_BRIGHT, offsetDp = 6,
-                    cornerRadiusDp = 0, rightFaceColor = NC.OUTLINE_VAR)
-                prootCardRef.alpha = 1f
-                chrootCardRef.background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_LOW, strokeColor = NC.BORDER,
-                    shadowColor = NC.SURFACE_BRIGHT, offsetDp = 6,
-                    cornerRadiusDp = 0, rightFaceColor = NC.OUTLINE_VAR)
-                chrootCardRef.alpha = if (chrootRootOk) 0.65f else 0.4f
-            } else if (chrootRootOk) {
-                chrootCardRef.background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_CONTAINER, strokeColor = NC.SECONDARY,
-                    shadowColor = NC.SURFACE_BRIGHT, offsetDp = 6,
-                    cornerRadiusDp = 0, rightFaceColor = NC.OUTLINE_VAR)
-                chrootCardRef.alpha = 1f
-                prootCardRef.background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_LOW, strokeColor = NC.BORDER,
-                    shadowColor = NC.SURFACE_BRIGHT, offsetDp = 6,
-                    cornerRadiusDp = 0, rightFaceColor = NC.OUTLINE_VAR)
-                prootCardRef.alpha = 0.65f
-            } else {
-                // No root: never paint chroot as selected
-                selectedIsolationMethod = "proot"
-                prootCardRef.background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_CONTAINER, strokeColor = NC.PRIMARY,
-                    shadowColor = NC.SURFACE_BRIGHT, offsetDp = 6,
-                    cornerRadiusDp = 0, rightFaceColor = NC.OUTLINE_VAR)
-                prootCardRef.alpha = 1f
-                chrootCardRef.background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_LOW, strokeColor = NC.BORDER,
-                    shadowColor = NC.SURFACE_BRIGHT, offsetDp = 6,
-                    cornerRadiusDp = 0, rightFaceColor = NC.OUTLINE_VAR)
-                chrootCardRef.alpha = 0.4f
-            }
-        }
-
-        // Option A: PROOT (RECOMMENDED)
-        val prootCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_CONTAINER,
-                strokeColor = NC.PRIMARY,
-                shadowColor = NC.SURFACE_BRIGHT,
-                offsetDp = 6,
-                cornerRadiusDp = 0,
-                rightFaceColor = NC.OUTLINE_VAR
-            )
-            setPadding(dp(20), dp(18), dp(20), dp(18))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(16) }
-            isClickable = true
-            isFocusable = true
-        }
-        val prootTop = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val prootIcon = ImageView(this).apply {
-            setImageResource(R.drawable.ic_shield_thick)
-            setColorFilter(NC.PRIMARY)
-            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { rightMargin = dp(10) }
-        }
-        val prootTitle = TextView(this).apply {
-            text = "PROOT"
-            textSize = 16f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        val prootBadge = textBadge("RECOMMENDED", NC.PRIMARY_CON, NC.ON_PRIMARY_CON)
-        prootTop.addView(prootIcon); prootTop.addView(prootTitle)
-        prootTop.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) })
-        prootTop.addView(prootBadge)
-        prootCard.addView(prootTop)
-
-        val prootDesc = TextView(this).apply {
-            text = "User-space isolation mode. Runs completely rootless by mapping system paths via proot binder scripts. Perfectly stable for standard development."
-            textSize = 13f
-            setTextColor(NC.ON_SURF_VAR)
-            setLineSpacing(dp(2).toFloat(), 1.25f)
-            setPadding(0, dp(10), 0, 0)
-        }
-        prootCard.addView(prootDesc)
-        root.addView(prootCard)
-
-        // Option B: CHROOT (Root Required via KernelSU/Magisk)
-        val chrootCard = LinearLayout(this).apply {
+        val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = cyberBrutalistBg(
                 fillColor = NC.SURFACE_LOW,
-                strokeColor = NC.BORDER,
+                strokeColor = NC.OUTLINE_VAR,
                 shadowColor = NC.SURFACE_BRIGHT,
                 offsetDp = 6,
                 cornerRadiusDp = 0,
                 rightFaceColor = NC.OUTLINE_VAR
             )
-            setPadding(dp(20), dp(18), dp(20), dp(18))
-            alpha = 0.65f
+            setPadding(dp(20), dp(20), dp(20), dp(20))
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-            isClickable = true
-            isFocusable = true
         }
-        val chrootTop = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+
+        val icon = ImageView(this).apply {
+            setImageResource(R.drawable.ic_stat_terminal)
+            setColorFilter(NC.PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                bottomMargin = dp(14)
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
         }
-        val chrootIcon = ImageView(this).apply {
-            setImageResource(R.drawable.ic_lock_open)
-            setColorFilter(NC.SECONDARY)
-            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { rightMargin = dp(10) }
-        }
-        val chrootTitle = TextView(this).apply {
-            text = "CHROOT"
+        card.addView(icon)
+
+        val title = TextView(this).apply {
+            text = "FOREGROUND SERVICE STATUS"
             textSize = 16f
-            setTextColor(NC.ON_SURFACE)
+            setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, 0, 0, dp(8))
         }
-        val chrootBadge = textBadge("CHECKING…", NC.SURFACE_HIGHEST, NC.ON_SURF_VAR)
-        chrootTop.addView(chrootIcon); chrootTop.addView(chrootTitle)
-        chrootTop.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) })
-        chrootTop.addView(chrootBadge)
-        chrootCard.addView(chrootTop)
+        card.addView(title)
 
-        val chrootDesc = TextView(this).apply {
-            text = "Kernel-level isolation via Linux chroot(2). Requires KernelSU or Magisk root. Maximum hardware compatibility, native glibc performance."
-            textSize = 13f
-            setTextColor(NC.ON_SURF_VAR)
-            setLineSpacing(dp(2).toFloat(), 1.25f)
-            setPadding(0, dp(10), 0, 0)
-        }
-        chrootCard.addView(chrootDesc)
-
-        val chrootWarn = TextView(this).apply {
-            text = "⚠ NO ROOT — grant superuser in KernelSU/Magisk to use chroot"
+        val desc = TextView(this).apply {
+            text = "NativeCode runs long tasks (package installation, rootfs decompression, desktop sessions) in an Android Foreground Service. Notification permission allows you to monitor real-time setup progress and terminal background tasks without Android killing the process."
             textSize = 12f
-            setTextColor(NC.ERROR)
+            setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
-            setPadding(0, dp(10), 0, 0)
-            visibility = View.GONE
+            setLineSpacing(0f, 1.25f)
+            setPadding(0, 0, 0, dp(16))
         }
-        chrootCard.addView(chrootWarn)
-        root.addView(chrootCard)
+        card.addView(desc)
 
-        fun styleChrootBadge(rootOk: Boolean, probing: Boolean) {
-            when {
-                probing -> {
-                    chrootBadge.text = "CHECKING…"
-                    chrootBadge.setTextColor(NC.ON_SURF_VAR)
-                    chrootBadge.background = roundedBg(NC.SURFACE_HIGHEST, NC.OUTLINE_VAR, dp(4))
-                }
-                rootOk -> {
-                    chrootBadge.text = "ROOT REQUIRED"
-                    chrootBadge.setTextColor(NC.SECONDARY)
-                    chrootBadge.background = roundedBg(NC.SURFACE_HIGHEST, NC.SECONDARY, dp(4))
-                }
-                else -> {
-                    chrootBadge.text = "NO ROOT"
-                    chrootBadge.setTextColor(Color.parseColor("#0A0A0A"))
-                    chrootBadge.background = roundedBg(NC.ERROR, NC.ON_ERROR, dp(4))
+        val grantBtn = TextView(this).apply {
+            val granted = Build.VERSION.SDK_INT < 33 || checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            text = if (granted) "PERMISSION GRANTED" else "GRANT PERMISSION"
+            textSize = 13f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            gravity = Gravity.CENTER
+            setTextColor(NC.ON_PRIMARY)
+            background = cyberBrutalistBg(
+                fillColor = NC.PRIMARY_CON,
+                strokeColor = NC.PRIMARY,
+                shadowColor = NC.SHADOW_DARK,
+                offsetDp = 4,
+                cornerRadiusDp = 0
+            )
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+            setOnClickListener {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    NativeCodeFgs.ensurePostNotificationsPermission(this@OnboardingActivity)
+                } else {
+                    Toast.makeText(this@OnboardingActivity, "Notification permission already granted", Toast.LENGTH_SHORT).show()
                 }
             }
         }
+        card.addView(grantBtn)
+        root.addView(card)
 
-        fun applyChrootMethodGate(rootOk: Boolean, probing: Boolean) {
-            chrootRootOk = rootOk
-            styleChrootBadge(rootOk, probing)
-            chrootWarn.visibility = if (!probing && !rootOk) View.VISIBLE else View.GONE
-            if (probing) {
-                chrootCard.alpha = 0.55f
-                chrootCard.isClickable = false
-                chrootCard.isEnabled = false
-                return
-            }
-            if (!rootOk) {
-                // Force proot when chroot unavailable (also overrides preferred_isolation)
-                selectedIsolationMethod = "proot"
-                updateIsolationCardSelections("proot", prootCard, chrootCard)
-                chrootCard.isClickable = true // toast explain only
-                chrootCard.isEnabled = true
-                chrootCard.setOnClickListener {
-                    Toast.makeText(
-                        this,
-                        "No root. Grant superuser in KernelSU/Magisk to select chroot.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            } else {
-                chrootCard.isClickable = true
-                chrootCard.isEnabled = true
-                chrootCard.setOnClickListener {
-                    selectedIsolationMethod = "chroot"
-                    updateIsolationCardSelections("chroot", prootCard, chrootCard)
-                }
-                // Re-apply selection paint (proot default or preferred chroot)
-                updateIsolationCardSelections(selectedIsolationMethod, prootCard, chrootCard)
-            }
-        }
-
-        // Wire proot always; chroot gated after probe
-        prootCard.setOnClickListener {
-            selectedIsolationMethod = "proot"
-            updateIsolationCardSelections("proot", prootCard, chrootCard)
-        }
-
-        // Initial paint: proot selected while root probes (same RootShell as chroot settings page)
-        updateIsolationCardSelections(
-            if (selectedIsolationMethod == "chroot") "proot" else selectedIsolationMethod,
-            prootCard,
-            chrootCard
-        )
-        applyChrootMethodGate(rootOk = false, probing = true)
-        RootShell.probeRootAvailable(forceClearCache = false) { ok ->
-            applyChrootMethodGate(rootOk = ok, probing = false)
-        }
-
-        // Customization + AI opt-in live on Install Plan (page 5)
         val spacer2 = View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
         root.addView(spacer2)
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val prevBtn = secondaryButton("Back") { showPage(3) } // requirements
+        val prevBtn = secondaryButton("Back") { showPage(3) }
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
         val nextBtn = primaryButton("Continue", R.drawable.ic_arrow_right) {
-            showPage(5) // install plan + consent
+            showPage(5)
         }
         nextBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         btnRow.addView(prevBtn); btnRow.addView(nextBtn)
@@ -1786,7 +1637,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(consentRow)
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val prevBtn = secondaryButton("Back") { showPage(3) } // requirements
+        val prevBtn = secondaryButton("Back") { showPage(4) } // notifications permission
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
         val startBtn = primaryButton("I understand — start install", R.drawable.ic_arrow_right) {
             if (!planAccepted) {
@@ -1796,7 +1647,6 @@ class OnboardingActivity : AppCompatActivity() {
             AiCliProvisionState.setPlanAccepted(this, true)
             AiCliProvisionState.setEnableAiCliInstall(this, enableAiCliInstall)
             AiCliProvisionState.setEnableCustomization(this, enableDebianCustomization)
-            NativeCodeFgs.ensurePostNotificationsPermission(this)
             if (!enableAiCliInstall) {
                 AiCliProvisionState.markAiCliProvisioned(this, selectedIsolationMethod, false)
                 aiCliSetupOutcome = "SKIPPED"
