@@ -25,3 +25,5 @@ termux-packages/*
 .tokensave/
 *.hprof
 *.png
+!app/src/main/res/**/*.png
+!app/src/main/assets/images/**/*.png
