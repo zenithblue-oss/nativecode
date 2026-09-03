@@ -828,7 +828,7 @@ curl -fsSL https://raw.githubusercontent.com/zenithblue-oss/Linux_Setup/dev/conf
 # Keep /etc/passwd flux shell as Bash: proot-distro uses it for every command.
 # NativeCode owns the optional human interactive preference separately.
 mkdir -p "$USER_HOME/.config/fluxlinux"
-printf '%s\n' /bin/zsh > "$USER_HOME/.config/fluxlinux/interactive-shell"
+printf '%s\n' /bin/bash > "$USER_HOME/.config/fluxlinux/interactive-shell"
 chown "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config/fluxlinux/interactive-shell"
 
 # Fix ownership

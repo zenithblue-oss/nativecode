@@ -13,15 +13,7 @@ object InteractiveShellPolicy {
         "/usr/bin/zsh"
     )
 
-    fun resolve(marker: String?, isExecutable: (String) -> Boolean = { true }): String {
-        val candidate = marker?.trim()
-        return if (candidate != null && candidate in allowed && isExecutable(candidate)) {
-            candidate
-        } else {
-            BASH
-        }
-    }
+    fun resolve(marker: String?, isExecutable: (String) -> Boolean = { true }): String = BASH
 
-    fun resolveForUser(user: String, marker: String?, isExecutable: (String) -> Boolean = { true }): String =
-        if (user == "root") BASH else resolve(marker, isExecutable)
+    fun resolveForUser(user: String, marker: String?, isExecutable: (String) -> Boolean = { true }): String = BASH
 }

@@ -5,33 +5,12 @@ import org.junit.Test
 
 class InteractiveShellPolicyTest {
     @Test
-    fun missingMarkerFallsBackToBash() {
+    fun defaultsToBash() {
         assertEquals(InteractiveShellPolicy.BASH, InteractiveShellPolicy.resolve(null))
         assertEquals(InteractiveShellPolicy.BASH, InteractiveShellPolicy.resolve("/bin/fish"))
-    }
-
-    @Test
-    fun executableMarkerSelectsZsh() {
-        assertEquals(
-            InteractiveShellPolicy.ZSH,
-            InteractiveShellPolicy.resolve("/bin/zsh") { it == "/bin/zsh" }
-        )
-    }
-
-    @Test
-    fun missingZshFallsBackToBash() {
-        assertEquals(
-            InteractiveShellPolicy.BASH,
-            InteractiveShellPolicy.resolve("/bin/zsh") { false }
-        )
-    }
-
-    @Test
-    fun rootIsAlwaysBash() {
-        assertEquals(
-            InteractiveShellPolicy.BASH,
-            InteractiveShellPolicy.resolveForUser("root", "/bin/zsh") { true }
-        )
+        assertEquals(InteractiveShellPolicy.BASH, InteractiveShellPolicy.resolve("/bin/zsh"))
+        assertEquals(InteractiveShellPolicy.BASH, InteractiveShellPolicy.resolveForUser("flux", "/bin/zsh"))
+        assertEquals(InteractiveShellPolicy.BASH, InteractiveShellPolicy.resolveForUser("root", "/bin/zsh"))
     }
 
     @Test

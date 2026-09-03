@@ -9,18 +9,10 @@ object ProotCommandBuilder {
         "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=\"\$PWD\"; "
 
     private const val FLUX_INTERACTIVE_HOME =
-        GIT_SAFE_DIRECTORY +
-            "sh=\$(cat ${InteractiveShellPolicy.MARKER_PATH} 2>/dev/null || true); " +
-            "case \"\$sh\" in /bin/bash|/usr/bin/bash|/bin/zsh|/usr/bin/zsh) " +
-            "[ -x \"\$sh\" ] || sh=/bin/bash ;; *) sh=/bin/bash ;; esac; " +
-            "exec \"\$sh\" -l"
+        GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
 
     private const val FLUX_INTERACTIVE_WORKDIR =
-        "mkdir -p -- \"\$1\" && cd -- \"\$1\" && " + GIT_SAFE_DIRECTORY +
-            "sh=\$(cat ${InteractiveShellPolicy.MARKER_PATH} 2>/dev/null || true); " +
-            "case \"\$sh\" in /bin/bash|/usr/bin/bash|/bin/zsh|/usr/bin/zsh) " +
-            "[ -x \"\$sh\" ] || sh=/bin/bash ;; *) sh=/bin/bash ;; esac; " +
-            "exec \"\$sh\" -l"
+        "mkdir -p -- \"\$1\" && cd -- \"\$1\" && " + GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
 
     private const val ROOT_INTERACTIVE_HOME = GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
     private const val ROOT_INTERACTIVE_WORKDIR =

@@ -254,7 +254,7 @@ guest_login() {
   if [ "$USER_NAME" = "flux" ]; then
     case "$LOGIN_SHELL" in
       auto)
-        _requested=$(cat "$NC_CHROOT/home/flux/.config/fluxlinux/interactive-shell" 2>/dev/null || true)
+        _requested=/bin/bash
         ;;
       bash)
         _requested=/bin/bash

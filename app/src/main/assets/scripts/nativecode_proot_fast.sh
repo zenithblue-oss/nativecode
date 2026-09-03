@@ -99,7 +99,7 @@ resolve_login_shell() {
   fi
   case "$LOGIN_SHELL" in
     auto)
-      requested=$(cat "${ROOTFS}${GUEST_HOME}/.config/fluxlinux/interactive-shell" 2>/dev/null || true)
+      requested=/bin/bash
       ;;
     bash) requested=/bin/bash ;;
     zsh) requested=/bin/zsh ;;
