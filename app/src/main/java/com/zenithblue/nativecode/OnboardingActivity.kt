@@ -2645,19 +2645,34 @@ class OnboardingActivity : AppCompatActivity() {
                 val outZst = File(homeDir, "alpaquita_rootfs.tar.zst")
                 val outGz = File(homeDir, "alpine_rootfs.tar.gz")
                 val outTar = File(homeDir, "alpine_rootfs.tar")
-                val hasRootfs = (outZst.isFile && outZst.length() > 2L * 1024L * 1024L) ||
-                    (outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
-                    (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)
-                if (!hasRootfs) {
-                    val bytes = openRootfsAsset().use { it.readBytes() }
-                    val target = if (assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true) outZst else {
-                        val isGz = bytes.size > 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()
-                        if (isGz) outGz else outTar
+                val hasAlpaquitaAsset = assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true
+                val distroCandidate = if (hasAlpaquitaAsset || outZst.exists()) "alpaquita" else "alpine"
+
+                if (distroCandidate == "alpaquita") {
+                    if (!outZst.isFile || outZst.length() < 2L * 1024L * 1024L) {
+                        assets.open("rootfs/alpaquita_rootfs.tar.zst").use { input ->
+                            FileOutputStream(outZst).use { output ->
+                                input.copyTo(output, 1024 * 1024)
+                            }
+                        }
+                        Log.i("Onboarding", "Explicitly deployed alpaquita rootfs: ${outZst.absolutePath} (${outZst.length()} bytes)")
                     }
-                    FileOutputStream(target).use { it.write(bytes) }
-                    Log.i("Onboarding", "Explicitly deployed rootfs before flux_install: ${target.absolutePath} (${target.length()} bytes)")
+                } else {
+                    val hasAlpineRootfs = (outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
+                        (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)
+                    if (!hasAlpineRootfs) {
+                        val assetName = if (assets.list("rootfs")?.contains("alpine_rootfs.tar.gz") == true)
+                            "rootfs/alpine_rootfs.tar.gz" else "rootfs/alpine_rootfs.tar"
+                        val target = if (assetName.endsWith(".tar.gz")) outGz else outTar
+                        assets.open(assetName).use { input ->
+                            FileOutputStream(target).use { output ->
+                                input.copyTo(output, 1024 * 1024)
+                            }
+                        }
+                        Log.i("Onboarding", "Explicitly deployed alpine fallback rootfs: ${target.absolutePath} (${target.length()} bytes)")
+                    }
                 }
-                val distroCandidate = if (outZst.exists() || assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true) "alpaquita" else "alpine"
+
                 val familyScript = if (distroCandidate == "alpaquita" && assets.list("scripts")?.contains("setup_alpaquita_family.sh") == true)
                     "setup_alpaquita_family.sh" else "setup_alpine_family.sh"
                 val debBytes = assets.open("scripts/$familyScript").use { it.readBytes() }
@@ -3156,43 +3171,47 @@ class OnboardingActivity : AppCompatActivity() {
         }
     }
 
-    /** Copy assets/rootfs/alpaquita_rootfs.tar.zst → $HOME (skip if already present & large).
-     * Falls back to alpine_rootfs.tar.gz / alpine_rootfs.tar. */
-    private fun openRootfsAsset(): InputStream {
-        return try {
-            assets.open("rootfs/alpaquita_rootfs.tar.zst")
-        } catch (_: Exception) {
-            try {
-                assets.open("rootfs/alpine_rootfs.tar.gz")
-            } catch (_: Exception) {
-                assets.open("rootfs/alpine_rootfs.tar")
-            }
-        }
-    }
-
-    /** Copy assets/rootfs/alpaquita_rootfs.tar.zst → $HOME (skip if already present & large). */
+    /** Copy assets/rootfs/alpaquita_rootfs.tar.zst → $HOME by streaming (skip if already present & large). */
     private fun deployRootfsArchive(homeDir: File) {
         val outZst = File(homeDir, "alpaquita_rootfs.tar.zst")
         val outGz = File(homeDir, "alpine_rootfs.tar.gz")
         val outTar = File(homeDir, "alpine_rootfs.tar")
-        if ((outZst.isFile && outZst.length() > 2L * 1024L * 1024L) ||
-            (outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
-            (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)) {
-            Log.i("Onboarding", "Rootfs already deployed")
-            return
-        }
-        try {
-            openRootfsAsset().use { input ->
-                val peek = input.readBytes()
-                val target = if (assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true) outZst else {
-                    val isGz = peek.size > 2 && peek[0] == 0x1f.toByte() && peek[1] == 0x8b.toByte()
-                    if (isGz) outGz else outTar
-                }
-                FileOutputStream(target).use { it.write(peek) }
-                Log.i("Onboarding", "Deployed rootfs: ${target.absolutePath} (${target.length()} bytes)")
+        val hasAlpaquitaAsset = assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true
+
+        if (hasAlpaquitaAsset) {
+            if (outZst.isFile && outZst.length() > 2L * 1024L * 1024L) {
+                Log.i("Onboarding", "Alpaquita rootfs already deployed: ${outZst.absolutePath}")
+                return
             }
-        } catch (e: Exception) {
-            Log.e("Onboarding", "Failed to deploy rootfs archive from assets", e)
+            try {
+                assets.open("rootfs/alpaquita_rootfs.tar.zst").use { input ->
+                    FileOutputStream(outZst).use { output ->
+                        input.copyTo(output, 1024 * 1024)
+                    }
+                }
+                Log.i("Onboarding", "Streamed Alpaquita rootfs: ${outZst.absolutePath} (${outZst.length()} bytes)")
+            } catch (e: Exception) {
+                Log.e("Onboarding", "Failed to stream Alpaquita rootfs archive from assets", e)
+            }
+        } else {
+            if ((outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
+                (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)) {
+                Log.i("Onboarding", "Alpine fallback rootfs already deployed")
+                return
+            }
+            try {
+                val assetName = if (assets.list("rootfs")?.contains("alpine_rootfs.tar.gz") == true)
+                    "rootfs/alpine_rootfs.tar.gz" else "rootfs/alpine_rootfs.tar"
+                val target = if (assetName.endsWith(".tar.gz")) outGz else outTar
+                assets.open(assetName).use { input ->
+                    FileOutputStream(target).use { output ->
+                        input.copyTo(output, 1024 * 1024)
+                    }
+                }
+                Log.i("Onboarding", "Streamed Alpine fallback rootfs: ${target.absolutePath} (${target.length()} bytes)")
+            } catch (e: Exception) {
+                Log.e("Onboarding", "Failed to stream Alpine fallback rootfs archive from assets", e)
+            }
         }
     }
 

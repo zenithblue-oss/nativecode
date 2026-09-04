@@ -451,30 +451,39 @@ if ! grep -q 'sha256sum -c nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256
 fi
 echo "PASS: assemble-inside.sh strictly enforces GUI bundle checksum verification"
 
-echo "== test setup_alpaquita_chroot.sh exact stage sequence (E->F->GUI->G->H) =="
+echo "== test chroot path SSOT in setup_alpaquita_chroot.sh =="
 CHROOT_SCRIPT="$REPO_ROOT/app/src/main/assets/scripts/chroot/setup_alpaquita_chroot.sh"
-if ! grep -q 'setup_alpaquita_family.sh' "$CHROOT_SCRIPT" || \
-   ! grep -q 'setup_hw_accel_debian.sh' "$CHROOT_SCRIPT" || \
-   ! grep -q 'setup_xfce4.sh' "$CHROOT_SCRIPT" || \
-   ! grep -q 'setup_customization_alpine.sh' "$CHROOT_SCRIPT" || \
-   ! grep -q 'setup_cli_tools.sh' "$CHROOT_SCRIPT"; then
-    echo "FAIL: setup_alpaquita_chroot.sh missing one or more required stages!" >&2
+if ! grep -q 'FLUX_ROOTFS_PATH="${FLUX_CHROOT:-/data/local/tmp/chrootAlpine}"' "$CHROOT_SCRIPT"; then
+    echo "FAIL: setup_alpaquita_chroot.sh does not match ChrootCommandBuilder.CHROOT_PATH SSOT!" >&2
     exit 1
 fi
-if grep -q 'setup_desktop_xfce.sh' "$CHROOT_SCRIPT" || grep -q 'setup_ai_stack.sh' "$CHROOT_SCRIPT"; then
-    echo "FAIL: setup_alpaquita_chroot.sh still contains nonexistent script names!" >&2
-    exit 1
-fi
-echo "PASS: setup_alpaquita_chroot.sh uses exact production scripts and mandatory execution"
+echo "PASS: setup_alpaquita_chroot.sh matches app chroot path SSOT"
 
-echo "== test OnboardingActivity uses Alpaquita and deploys alpaquita scripts =="
-ONBOARDING_KT="$REPO_ROOT/app/src/main/java/com/zenithblue/nativecode/OnboardingActivity.kt"
-if ! grep -q 'setup_alpaquita_chroot.sh' "$ONBOARDING_KT" || \
-   ! grep -q 'setup_alpaquita_family.sh' "$ONBOARDING_KT" || \
-   ! grep -q 'alpaquita_rootfs.tar.zst' "$ONBOARDING_KT"; then
-    echo "FAIL: OnboardingActivity missing Alpaquita integration!" >&2
+echo "== test chroot does not duplicate E->H execution =="
+if grep -q 'FLUX_GPU=virgl' "$CHROOT_SCRIPT" || grep -q 'FLUX_THEME=dark.*setup_xfce4' "$CHROOT_SCRIPT"; then
+    echo "FAIL: setup_alpaquita_chroot.sh duplicates guest E->H execution instead of letting OnboardingActivity orchestrate!" >&2
     exit 1
 fi
-echo "PASS: OnboardingActivity properly configured for Alpaquita product path"
+echo "PASS: setup_alpaquita_chroot.sh extracts and stages without duplicating Onboarding E->H execution"
+
+echo "== test streaming rootfs deployment in OnboardingActivity =="
+ONBOARDING_KT="$REPO_ROOT/app/src/main/java/com/zenithblue/nativecode/OnboardingActivity.kt"
+if grep -q 'openRootfsAsset().use { it.readBytes() }' "$ONBOARDING_KT"; then
+    echo "FAIL: OnboardingActivity still reads full rootfs asset into memory via readBytes()!" >&2
+    exit 1
+fi
+if ! grep -q 'input.copyTo(output, 1024 \* 1024)' "$ONBOARDING_KT"; then
+    echo "FAIL: OnboardingActivity missing streaming copyTo(output, 1024 * 1024)!" >&2
+    exit 1
+fi
+echo "PASS: OnboardingActivity streams rootfs without loading entire file into heap"
+
+echo "== test ProotCommandBuilder imports File =="
+PCB_KT="$REPO_ROOT/app/src/main/java/com/zenithblue/nativecode/terminal/ProotCommandBuilder.kt"
+if ! grep -q 'import java.io.File' "$PCB_KT"; then
+    echo "FAIL: ProotCommandBuilder.kt missing import java.io.File!" >&2
+    exit 1
+fi
+echo "PASS: ProotCommandBuilder.kt imports java.io.File"
 
 echo "BUILD-PIPELINE: ALL PASS"

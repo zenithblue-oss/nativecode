@@ -10,7 +10,7 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
-FLUX_ROOTFS_PATH="${FLUX_CHROOT:-${FLUX_ROOTFS_PATH:-/data/local/tmp/chrootAlpine}}"
+FLUX_ROOTFS_PATH="${FLUX_CHROOT:-/data/local/tmp/chrootAlpine}"
 FLUX_ARCHIVE="${1:-}"
 
 PKG="${TERMUX_APP__PACKAGE_NAME:-com.zenithblue.nativecode}"
