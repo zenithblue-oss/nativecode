@@ -18,7 +18,16 @@ if ! grep -q 'chroot /rootfs /bin/sh' "$REPO_ROOT/tools/rootfs/build_alpine_root
 fi
 echo "PASS: build_alpine_rootfs.sh invokes chroot into /rootfs"
 
-echo "== checking finalize.sh verification enforcement =="
+echo "== checking chroot namespace staging =="
+# Verify instruction stages /pkg-lists and /opt-staging inside /rootfs before chrooting
+if ! grep -q 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging' "$REPO_ROOT/tools/rootfs/build_alpine_rootfs.sh" || \
+   ! grep -q 'cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/' "$REPO_ROOT/tools/rootfs/build_alpine_rootfs.sh"; then
+    echo "FAIL: build_alpine_rootfs.sh does not stage pkg-lists inside /rootfs before chroot" >&2
+    exit 1
+fi
+echo "PASS: build_alpine_rootfs.sh stages pkg-lists inside /rootfs before chroot"
+
+echo "== checking finalize.sh verification enforcement and helper bundling =="
 # Fake versions.env to satisfy the SHA gate for generating scripts
 export ALPINE_MINIROOTFS_SHA256_OVERRIDE="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 FAKE_MINI="$WORK/alpine-minirootfs-3.24.1-aarch64.tar.gz"
@@ -33,20 +42,43 @@ if grep -q 'verify_rootfs.sh.*|| true' "$WORK/finalize.sh"; then
     echo "FAIL: finalize.sh contains '|| true' on verify_rootfs" >&2
     exit 1
 fi
-echo "PASS: finalize.sh does not ignore verifier failure"
+if [ ! -f "$WORK/clean_rootfs.sh" ] || [ ! -f "$WORK/verify_rootfs.sh" ]; then
+    echo "FAIL: clean_rootfs.sh or verify_rootfs.sh was not copied into \$WORK" >&2
+    exit 1
+fi
+echo "PASS: finalize.sh helpers bundled and no '|| true'"
 
-echo "== negative test: verifier failure halts finalize.sh =="
-mkdir -p "$WORK/fake_rootfs"
-# Missing release file and all tools
+echo "== test verifier failure propagation in finalize.sh =="
+# Create isolated test directory with mock clean and failing mock verify (exit 47)
+MOCK_DIR="$WORK/mock_finalize"
+mkdir -p "$MOCK_DIR"
+cp "$WORK/finalize.sh" "$MOCK_DIR/finalize.sh"
+cp "$WORK/rootfs-release" "$MOCK_DIR/rootfs-release"
+
+cat > "$MOCK_DIR/clean_rootfs.sh" <<'EOF'
+#!/bin/bash
+echo "MOCK-CLEAN-RAN"
+exit 0
+EOF
+chmod +x "$MOCK_DIR/clean_rootfs.sh"
+
+cat > "$MOCK_DIR/verify_rootfs.sh" <<'EOF'
+#!/bin/bash
+echo "MOCK-VERIFY-RAN"
+exit 47
+EOF
+chmod +x "$MOCK_DIR/verify_rootfs.sh"
+
 set +e
-bash "$WORK/finalize.sh" "$WORK/fake_rootfs" "$WORK/out" >/dev/null 2>&1
-FINALIZE_RC=$?
+PROP_OUT="$(bash "$MOCK_DIR/finalize.sh" "$WORK/fake_rootfs" "$WORK/out" 2>&1)"
+PROP_RC=$?
 set -e
 
-if [ "$FINALIZE_RC" -ne 0 ]; then
-    echo "PASS: finalize.sh halted on verifier failure (exit=$FINALIZE_RC)"
+if [ "$PROP_RC" -eq 47 ] && echo "$PROP_OUT" | grep -q "MOCK-VERIFY-RAN" && echo "$PROP_OUT" | grep -q "finalize.sh: running mandatory verification"; then
+    echo "PASS: finalize.sh executed verifier and propagated exact non-zero exit code 47"
 else
-    echo "FAIL: finalize.sh succeeded despite broken rootfs!" >&2
+    echo "FAIL: finalize.sh did not properly run verifier or propagate exit code (rc=$PROP_RC)" >&2
+    echo "$PROP_OUT"
     exit 1
 fi
 
@@ -62,5 +94,15 @@ else
     echo "FAIL: verify_rootfs.sh did not fail on empty rootfs!" >&2
     exit 1
 fi
+
+echo "== test COMPONENT_DEV flag conditioned on staging =="
+grep -q '^COMPONENT_DEV=0' "$WORK/rootfs-release" || { echo "FAIL: expected COMPONENT_DEV=0 without android staging"; exit 1; }
+echo "PASS: COMPONENT_DEV=0 when staging absent"
+
+# With opt-staging/android-sdk present
+mkdir -p "$WORK/opt-staging/android-sdk"
+bash "$REPO_ROOT/tools/rootfs/build_alpine_rootfs.sh" --work "$WORK" --assemble-only
+grep -q '^COMPONENT_DEV=1' "$WORK/rootfs-release" || { echo "FAIL: expected COMPONENT_DEV=1 with android staging"; exit 1; }
+echo "PASS: COMPONENT_DEV=1 when staging present"
 
 echo "BUILD-PIPELINE: ALL PASS"

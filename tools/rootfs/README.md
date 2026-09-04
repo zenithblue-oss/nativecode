@@ -34,13 +34,12 @@ The release flow is structured in explicit stages:
 # 1. Download base & generate guest scripts
 tools/rootfs/build_alpine_rootfs.sh --work /tmp/nc-rootfs --out out/
 
-# 2. Run guest assembly inside rootfs (Docker ARM64 or native chroot)
+# 2. Run guest assembly inside rootfs (stages pkg-lists/opt-staging inside /rootfs before chroot)
 docker run --rm --privileged --platform linux/arm64 \
   -v /tmp/nc-rootfs/rootfs:/rootfs \
-  -v /tmp/nc-rootfs:/pkg-lists \
-  -v /tmp/nc-rootfs/opt-staging:/opt-staging \
+  -v /tmp/nc-rootfs:/host-work \
   arm64v8/alpine:3.24.1 \
-  sh -c 'cp /pkg-lists/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && chroot /rootfs /bin/sh /assemble.sh && rm -f /rootfs/assemble.sh'
+  sh -c 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging && cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/ && ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/) && cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && chroot /rootfs /bin/sh /assemble.sh && rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging'
 
 # 3 & 4. Finalize, clean, and run mandatory verification
 /tmp/nc-rootfs/finalize.sh /tmp/nc-rootfs/rootfs out/

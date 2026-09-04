@@ -83,6 +83,9 @@ fi
 # or run under docker --platform linux/arm64 with ROOTFS bind-mounted.
 ASSEMBLE="$WORK/assemble-inside.sh"
 cp "$SCRIPT_DIR/rootfs-common.sh" "$WORK/rootfs-common.sh"
+cp "$SCRIPT_DIR/clean_rootfs.sh" "$WORK/clean_rootfs.sh"
+cp "$SCRIPT_DIR/verify_rootfs.sh" "$WORK/verify_rootfs.sh"
+chmod +x "$WORK/clean_rootfs.sh" "$WORK/verify_rootfs.sh"
 grep -v '^#' "$SCRIPT_DIR/packages-alpine-base.txt" | grep -v '^$' | tr '\n' ' ' > "$WORK/base.pkgs"
 grep -v '^#' "$SCRIPT_DIR/packages-alpine-dev.txt" | grep -v '^$' | tr '\n' ' ' > "$WORK/dev.pkgs"
 
@@ -149,12 +152,12 @@ su -s /bin/sh flux -c '
   export PATH="\$HOME/.local/bin:\$PATH"
   npm config set prefix "\$HOME/.local"
   npm install -g opencode-ai@'"${OPENCODE_VERSION:-1.18.27}"' @openai/codex@'"${CODEX_VERSION:-0.153.2}"' @qwen-code/qwen-code@'"${QWEN_VERSION:-0.23.0}"'
-  curl -fsSL https://antigravity.google/cli/install.sh | bash || true
+  curl -fsSL "'"${AGY_INSTALLER_URL:-https://antigravity.google/cli/install.sh}"'" | bash || true
   # agy retry once during build (not user onboarding)
-  command -v agy >/dev/null 2>&1 || (sleep 5; curl -fsSL https://antigravity.google/cli/install.sh | bash || true)
-  curl -fsSL https://claude.ai/install.sh | bash || true
-  curl -fsSL https://x.ai/cli/install.sh | bash || true
-  curl -fsSL https://cli.kiro.dev/install | bash || true
+  command -v agy >/dev/null 2>&1 || (sleep 5; curl -fsSL "'"${AGY_INSTALLER_URL:-https://antigravity.google/cli/install.sh}"'" | bash || true)
+  curl -fsSL "'"${CLAUDE_INSTALLER_URL:-https://claude.ai/install.sh}"'" | bash || true
+  curl -fsSL "'"${GROK_INSTALLER_URL:-https://x.ai/cli/install.sh}"'" | bash || true
+  curl -fsSL "'"${KIRO_INSTALLER_URL:-https://cli.kiro.dev/install}"'" | bash || true
 '
 mkdir -p /home/flux/.config/fluxlinux
 cat > /home/flux/.config/fluxlinux/cli-tools.env <<'CLIEOF'
@@ -174,17 +177,27 @@ chmod +x "$ASSEMBLE"
 
 log "guest assemble script: $ASSEMBLE"
 log "ROOTFS=$ROOTFS"
-log "next: run guest assembly inside rootfs (targeting \$ROOTFS via chroot):"
+log "next: run guest assembly inside rootfs (staging pkg-lists/opt-staging inside /rootfs before chroot):"
 log "  docker run --rm --privileged --platform linux/arm64 \\"
 log "    -v $ROOTFS:/rootfs \\"
-log "    -v $WORK:/pkg-lists \\"
-log "    -v $WORK/opt-staging:/opt-staging \\"
+log "    -v $WORK:/host-work \\"
 log "    arm64v8/alpine:$ALPINE_VERSION \\"
-log "    sh -c 'cp /pkg-lists/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && chroot /rootfs /bin/sh /assemble.sh && rm -f /rootfs/assemble.sh'"
-log "  (or chroot /path/to/rootfs /bin/sh /assemble-inside.sh on rooted aarch64 device after bind-mounting /dev /proc /sys)"
+log "    sh -c 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging && cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/ && ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/) && cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && chroot /rootfs /bin/sh /assemble.sh && rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging'"
+log "  (or native chroot on rooted aarch64 device after staging /pkg-lists and /opt-staging inside target rootfs)"
 
-if [ "$SKIP_ANDROID" = "0" ]; then
-    log "Android staging not run in this step — download cmdline-tools $ANDROID_CMDLINE_TOOLS_VERSION + platform $ANDROID_PLATFORM + build-tools $ANDROID_BUILD_TOOLS + NDK $ANDROID_NDK + Kotlin $KOTLIN_VERSION + Gradle $GRADLE_VERSION into $WORK/opt-staging (verify checksums, ARM64/musl only)."
+# Determine actual COMPONENT_DEV status:
+# DEV is 1 only if Android SDK & build-tools are staged/present and not skipped.
+HAS_DEV_STAGED=0
+if [ "$SKIP_ANDROID" = "0" ] && [ -d "$WORK/opt-staging/android-sdk" ]; then
+    HAS_DEV_STAGED=1
+fi
+
+if [ "$HAS_DEV_STAGED" = "1" ]; then
+    COMPONENT_DEV=1
+    log "Android dev stack staged -> COMPONENT_DEV=1"
+else
+    COMPONENT_DEV=0
+    log "Android dev stack not staged (or --skip-android set) -> COMPONENT_DEV=0"
 fi
 
 # Write release marker (outer/host side; build script finalizes after assembly)
@@ -208,14 +221,14 @@ COMPONENT_GUI=1
 COMPONENT_G=1
 COMPONENT_H=1
 COMPONENT_GH=1
-COMPONENT_DEV=1
+COMPONENT_DEV=$COMPONENT_DEV
 RELEASE_EOF
 log "release marker staged at $WORK/rootfs-release (installed to /etc/nativecode/rootfs-release by finalize step)"
 
 # Finalize helper: install marker + scrub + verify (mandatory, no || true)
 cat > "$WORK/finalize.sh" <<'FINALIZE_EOF'
 #!/bin/bash
-# finalize.sh ROOTFS OUT
+# finalize.sh ROOTFS [OUT]
 # Sequence:
 #   1. install rootfs-release marker
 #   2. clean/scrub rootfs
@@ -230,24 +243,19 @@ cp "$(dirname "$0")/rootfs-release" "$ROOTFS/etc/nativecode/rootfs-release"
 chmod 644 "$ROOTFS/etc/nativecode/rootfs-release"
 
 SCRIPT_DIR_LOC="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR_LOC/../.." 2>/dev/null && pwd || true)"
 
 if [ -f "$SCRIPT_DIR_LOC/clean_rootfs.sh" ]; then
     bash "$SCRIPT_DIR_LOC/clean_rootfs.sh" "$ROOTFS"
-elif [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/tools/rootfs/clean_rootfs.sh" ]; then
-    bash "$REPO_ROOT/tools/rootfs/clean_rootfs.sh" "$ROOTFS"
 else
-    echo "finalize.sh: clean_rootfs.sh not found" >&2
+    echo "finalize.sh: clean_rootfs.sh not found in $SCRIPT_DIR_LOC" >&2
     exit 1
 fi
 
 echo "finalize.sh: running mandatory verification..."
 if [ -f "$SCRIPT_DIR_LOC/verify_rootfs.sh" ]; then
     bash "$SCRIPT_DIR_LOC/verify_rootfs.sh" "$ROOTFS"
-elif [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" ]; then
-    bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$ROOTFS"
 else
-    echo "finalize.sh: verify_rootfs.sh not found" >&2
+    echo "finalize.sh: verify_rootfs.sh not found in $SCRIPT_DIR_LOC" >&2
     exit 1
 fi
 echo "finalize.sh: verification passed"

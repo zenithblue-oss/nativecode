@@ -13,6 +13,11 @@ grep -q '^COMPONENT_E=1' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null || 
 grep -q '^COMPONENT_H=1' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null || { echo "MISS COMPONENT_H"; FAIL=1; }
 need /usr/local/lib/nativecode/rootfs-common.sh
 
+IS_DEV=0
+if grep -q '^COMPONENT_DEV=1' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null; then
+    IS_DEV=1
+fi
+
 echo "== base cmds =="
 for c in sh bash sudo git node npm python3 java javac adb fastboot kotlinc gradle gcc g++ cmake ninja clang rustc cargo go gh; do
     have "$c" || true
@@ -24,9 +29,13 @@ done
 echo "== desktop/gpu =="
 need /usr/bin/startxfce4
 [ -x "$ROOTFS/usr/bin/Xtigervnc" ] || [ -x "$ROOTFS/usr/bin/Xvnc" ] || { echo "MISS tigervnc server"; FAIL=1; }
-need /opt/android-sdk/platforms/android-36/android.jar
-[ -x "$ROOTFS/opt/android-sdk/build-tools/36.1.0/aapt2" ] || { echo "MISS aapt2 36.1.0"; FAIL=1; }
-[ -d "$ROOTFS/opt/android-sdk/ndk/29.0.14206865" ] || { echo "MISS ndk r29"; FAIL=1; }
+
+if [ "$IS_DEV" = "1" ]; then
+    echo "== android/dev stack (COMPONENT_DEV=1) =="
+    need /opt/android-sdk/platforms/android-36/android.jar
+    [ -x "$ROOTFS/opt/android-sdk/build-tools/36.1.0/aapt2" ] || { echo "MISS aapt2 36.1.0"; FAIL=1; }
+    [ -d "$ROOTFS/opt/android-sdk/ndk/29.0.14206865" ] || { echo "MISS ndk r29"; FAIL=1; }
+fi
 
 echo "== credential scrub =="
 for p in /root/.ssh /home/flux/.ssh /root/.git-credentials /home/flux/.git-credentials /root/.npmrc /home/flux/.npmrc /home/flux/.config/gh/hosts.yml /home/flux/.config/gh/hosts.yml.bak /home/flux/.config/fluxlinux/cli-auth.env /etc/machine-id /var/lib/dbus/machine-id; do
