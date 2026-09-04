@@ -1,11 +1,10 @@
 #!/bin/sh
-# setup_alpaquita_chroot.sh — host-side chroot setup for Alpaquita glibc/AArch64 rootfs.
-# Run on rooted Android / Linux host with UID 0.
-# Contract: strictly verify SHA256, stage guest scripts, and execute phases E -> F -> GUI -> G -> H.
+# setup_alpaquita_chroot.sh — fast host-side bootstrap for the prebuilt Alpaquita rootfs.
+# Run as UID 0 on rooted Android. Guest E/F/GUI/G/H are owned by OnboardingActivity.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
-FLUX_ROOTFS_PATH="${FLUX_CHROOT:-${FLUX_ROOTFS_PATH:-/data/local/tmp/nativecode-rootfs}}"
+FLUX_ROOTFS_PATH="${FLUX_CHROOT:-${FLUX_ROOTFS_PATH:-/data/local/tmp/chrootAlpine}}"
 FLUX_ARCHIVE="${1:-}"
 
 PKG="${TERMUX_APP__PACKAGE_NAME:-com.zenithblue.nativecode}"
@@ -14,38 +13,16 @@ APP_PREFIX="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}"
 ROOTFS_NAME="alpaquita_rootfs.tar.zst"
 ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-${NATIVECODE_ROOTFS_SHA256:-}}"
 
-progress() { printf "\033[1;36m[+] %s\033[0m\n" "$1"; }
-success()  { printf "\033[1;32m[✓] %s\033[0m\n" "$1"; }
-error()    { printf "\033[1;31m[!] %s\033[0m\n" "$1"; }
+progress() { printf '\033[1;36m[+] %s\033[0m\n' "$1"; }
+success()  { printf '\033[1;32m[✓] %s\033[0m\n' "$1"; }
+error()    { printf '\033[1;31m[!] %s\033[0m\n' "$1" >&2; }
 
-cleanup_mounts() {
-    progress "Safety Check: Unmounting virtual filesystems..."
-    umount "$FLUX_ROOTFS_PATH/sdcard" 2>/dev/null || true
-    umount "$FLUX_ROOTFS_PATH/mnt/host-tmp" 2>/dev/null || true
-    umount "$FLUX_ROOTFS_PATH/dev/shm" 2>/dev/null || true
-    umount "$FLUX_ROOTFS_PATH/dev/pts" 2>/dev/null || true
-    umount "$FLUX_ROOTFS_PATH/proc" 2>/dev/null || true
-    umount "$FLUX_ROOTFS_PATH/sys" 2>/dev/null || true
-    umount "$FLUX_ROOTFS_PATH/run" 2>/dev/null || true
-    umount "$FLUX_ROOTFS_PATH/dev" 2>/dev/null || true
-    umount "$FLUX_ROOTFS_PATH/tmp" 2>/dev/null || true
-    return 0
-}
-
-goodbye() {
-    error "NativeCode: Setup failed!"
-    cleanup_mounts
+fatal() {
+    error "$*"
     exit 1
 }
 
-trap goodbye INT TERM
-
-if [ "$(id -u)" != "0" ]; then
-    error "This script must be run as root (UID 0). Exiting."
-    exit 1
-fi
-
-progress "Setting up Alpaquita glibc rootfs under chroot..."
+[ "$(id -u)" = "0" ] || fatal "This script must be run as root (UID 0)."
 
 resolve_rootfs_archive() {
     if [ -n "$FLUX_ARCHIVE" ] && [ -f "$FLUX_ARCHIVE" ] && [ -s "$FLUX_ARCHIVE" ]; then
@@ -68,99 +45,78 @@ resolve_rootfs_archive() {
     return 1
 }
 
-# Extraction step if rootfs not populated
-if [ ! -f "$FLUX_ROOTFS_PATH/bin/sh" ] && [ ! -f "$FLUX_ROOTFS_PATH/sbin/apk" ]; then
-    if ! resolve_rootfs_archive; then
-        error "No rootfs archive found for extraction (checked app home, downloads, /data/local/tmp)"
-        goodbye
+load_adjacent_sha() {
+    [ -n "$ROOTFS_SHA256" ] && return 0
+    [ -n "$FLUX_ARCHIVE" ] || return 1
+    _sha_file="$FLUX_ARCHIVE.sha256"
+    if [ -f "$_sha_file" ] && [ -s "$_sha_file" ]; then
+        ROOTFS_SHA256="$(awk 'NR==1 {print $1}' "$_sha_file")"
     fi
+    [ -n "$ROOTFS_SHA256" ]
+}
 
-    if [ -n "$ROOTFS_SHA256" ]; then
-        if ! command -v sha256sum >/dev/null 2>&1; then
-            error "sha256sum command not found but rootfs verification is required!"
-            goodbye
-        fi
-        progress "Verifying rootfs checksum..."
-        _got="$(sha256sum "$FLUX_ARCHIVE" | awk '{print $1}')"
-        if [ "$_got" != "$ROOTFS_SHA256" ]; then
-            error "SHA256 mismatch for $FLUX_ARCHIVE"
-            error "  expected $ROOTFS_SHA256"
-            error "  got      $_got"
-            goodbye
-        fi
-        success "SHA256 OK"
-    fi
+verify_archive() {
+    load_adjacent_sha || fatal "Final NativeCode rootfs SHA256 is missing (set FLUX_ROOTFS_SHA256 or provide $FLUX_ARCHIVE.sha256)."
+    command -v sha256sum >/dev/null 2>&1 || fatal "sha256sum is required for rootfs verification."
+    _got="$(sha256sum "$FLUX_ARCHIVE" | awk '{print $1}')"
+    [ "$_got" = "$ROOTFS_SHA256" ] || {
+        error "SHA256 mismatch for $FLUX_ARCHIVE"
+        error "expected $ROOTFS_SHA256"
+        error "got      $_got"
+        exit 1
+    }
+    success "Rootfs SHA256 OK"
+}
 
-    progress "Extracting $FLUX_ARCHIVE -> $FLUX_ROOTFS_PATH..."
+rootfs_populated() {
+    [ -e "$FLUX_ROOTFS_PATH/bin/sh" ] || [ -e "$FLUX_ROOTFS_PATH/sbin/apk" ]
+}
+
+progress "Preparing Alpaquita glibc chroot at $FLUX_ROOTFS_PATH"
+
+if ! rootfs_populated; then
+    resolve_rootfs_archive || fatal "No $ROOTFS_NAME found in app home, Downloads, or /data/local/tmp."
+    verify_archive
+    command -v zstd >/dev/null 2>&1 || fatal "zstd is required to extract canonical .tar.zst rootfs."
+
+    rm -rf "$FLUX_ROOTFS_PATH"
     mkdir -p "$FLUX_ROOTFS_PATH"
-    if ! command -v zstd >/dev/null 2>&1; then
-        error "zstd command not found! Canonical .tar.zst extraction requires zstd."
-        goodbye
-    fi
-    zstd -dc "$FLUX_ARCHIVE" | tar -xpf - -C "$FLUX_ROOTFS_PATH" --numeric-owner || goodbye
+    progress "Extracting prebuilt rootfs..."
+    zstd -dc "$FLUX_ARCHIVE" | tar -xpf - -C "$FLUX_ROOTFS_PATH" --numeric-owner
 fi
 
-if [ ! -d "$FLUX_ROOTFS_PATH" ] || [ ! -e "$FLUX_ROOTFS_PATH/bin/sh" ]; then
-    error "Rootfs directory $FLUX_ROOTFS_PATH invalid or missing /bin/sh"
-    goodbye
-fi
+rootfs_populated || fatal "Extracted rootfs is invalid: /bin/sh or /sbin/apk missing."
 
-# Prepare and mount virtual filesystems
-progress "Mounting virtual filesystems..."
-mkdir -p "$FLUX_ROOTFS_PATH/dev" "$FLUX_ROOTFS_PATH/proc" "$FLUX_ROOTFS_PATH/sys" "$FLUX_ROOTFS_PATH/run" "$FLUX_ROOTFS_PATH/dev/pts" "$FLUX_ROOTFS_PATH/dev/shm" "$FLUX_ROOTFS_PATH/tmp"
+# Runtime directories used by the shared chroot helper and onboarding stages.
+mkdir -p \
+    "$FLUX_ROOTFS_PATH/tmp" \
+    "$FLUX_ROOTFS_PATH/var/tmp" \
+    "$FLUX_ROOTFS_PATH/dev" \
+    "$FLUX_ROOTFS_PATH/dev/pts" \
+    "$FLUX_ROOTFS_PATH/dev/shm" \
+    "$FLUX_ROOTFS_PATH/proc" \
+    "$FLUX_ROOTFS_PATH/sys" \
+    "$FLUX_ROOTFS_PATH/run" \
+    "$FLUX_ROOTFS_PATH/mnt/host-tmp" \
+    "$FLUX_ROOTFS_PATH/sdcard"
+chmod 1777 "$FLUX_ROOTFS_PATH/tmp" "$FLUX_ROOTFS_PATH/var/tmp" 2>/dev/null || true
 
-mountpoint -q "$FLUX_ROOTFS_PATH/dev" || mount --bind /dev "$FLUX_ROOTFS_PATH/dev" || goodbye
-mountpoint -q "$FLUX_ROOTFS_PATH/proc" || mount -t proc proc "$FLUX_ROOTFS_PATH/proc" || goodbye
-mountpoint -q "$FLUX_ROOTFS_PATH/sys" || mount -t sysfs sysfs "$FLUX_ROOTFS_PATH/sys" || goodbye
-mountpoint -q "$FLUX_ROOTFS_PATH/run" || mount --bind /run "$FLUX_ROOTFS_PATH/run" 2>/dev/null || true
-mountpoint -q "$FLUX_ROOTFS_PATH/dev/pts" || mount --bind /dev/pts "$FLUX_ROOTFS_PATH/dev/pts" || goodbye
-mountpoint -q "$FLUX_ROOTFS_PATH/dev/shm" || mount -t tmpfs -o size=512M,mode=1777 tmpfs "$FLUX_ROOTFS_PATH/dev/shm" 2>/dev/null || true
+# Mark only the base rootfs bootstrap complete. Onboarding owns E/F/GUI/G/H.
+touch "$FLUX_ROOTFS_PATH/.flux_configured"
 
-# Stage guest setup scripts into /usr/local/lib/nativecode inside rootfs
-mkdir -p "$FLUX_ROOTFS_PATH/usr/local/lib/nativecode"
-SCRIPTS_FOUND=0
-for sdir in "$SCRIPT_DIR/.." "$APP_HOME/scripts" "$APP_HOME"; do
-    if [ -f "$sdir/setup_alpaquita_family.sh" ] && \
-       [ -f "$sdir/setup_hw_accel_debian.sh" ] && \
-       [ -f "$sdir/setup_xfce4.sh" ] && \
-       [ -f "$sdir/setup_customization_alpine.sh" ] && \
-       [ -f "$sdir/setup_cli_tools.sh" ]; then
-        cp -f "$sdir"/setup_*.sh "$FLUX_ROOTFS_PATH/usr/local/lib/nativecode/"
-        SCRIPTS_FOUND=1
+# Best-effort install of the shared chroot helper for immediate subsequent stages.
+HELPER_DST="/data/local/tmp/nativecode_chroot.sh"
+for helper_src in \
+    "$APP_HOME/nativecode_chroot.sh" \
+    "/data/data/${PKG}/files/staged_scripts/nativecode_chroot.sh" \
+    "$SCRIPT_DIR/nativecode_chroot.sh"
+do
+    if [ -f "$helper_src" ]; then
+        cp -f "$helper_src" "$HELPER_DST"
+        chmod 755 "$HELPER_DST"
         break
     fi
 done
 
-if [ "$SCRIPTS_FOUND" != "1" ]; then
-    error "CRITICAL: Required guest setup scripts could not all be found or staged into guest!"
-    goodbye
-fi
-
-# Execute guest setup stages in chroot: E -> F -> GUI -> G -> H (strictly mandatory)
-progress "Executing guest stages in chroot (E -> F -> GUI -> G -> H)..."
-export NATIVECODE_ISOLATION=chroot
-chroot "$FLUX_ROOTFS_PATH" /bin/sh -c '
-    set -eu
-    export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    SETUP_DIR="/usr/local/lib/nativecode"
-    
-    # 1. Phase E: Distro family setup
-    /bin/sh "$SETUP_DIR/setup_alpaquita_family.sh" alpaquita
-
-    # 2. Phase F: Hardware acceleration setup
-    FLUX_GPU=virgl /bin/bash "$SETUP_DIR/setup_hw_accel_debian.sh"
-
-    # 3. Phase GUI: Desktop XFCE4 setup
-    FLUX_THEME=dark /bin/bash "$SETUP_DIR/setup_xfce4.sh"
-
-    # 4. Phase G: Customization setup
-    /bin/sh "$SETUP_DIR/setup_customization_alpine.sh" alpaquita
-
-    # 5. Phase H: AI stack setup
-    /bin/bash "$SETUP_DIR/setup_cli_tools.sh"
-' || goodbye
-
-cleanup_mounts
-trap - INT TERM
-success "NativeCode: Alpaquita chroot setup complete."
+success "Alpaquita chroot base ready; onboarding will run E -> F -> GUI -> G -> H."
 exit 0
