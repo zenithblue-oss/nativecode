@@ -12,8 +12,14 @@ WORK="${WORK:-/tmp/nc-gui-build}"
 OUT="${OUT:-$SCRIPT_DIR/out}"
 PREFIX="/usr"
 DESTDIR="$WORK/destdir"
+JOBS="${JOBS:-$(nproc)}"
+GUI_ZSTD_LEVEL="${GUI_ZSTD_LEVEL:-19}"
+GUI_CACHE_REV="${GUI_CACHE_REV:-2}"
+BUNDLE_NAME="nativecode-gui-alpaquita-glibc-aarch64.tar.zst"
+BUNDLE="$OUT/$BUNDLE_NAME"
+BUNDLE_SHA="$BUNDLE.sha256"
 
-mkdir -p "$WORK" "$OUT" "$DESTDIR"
+mkdir -p "$WORK" "$OUT" "$DESTDIR" "$WORK/.stamps"
 
 log() { echo "build-gui-bundle: $*"; }
 
@@ -42,8 +48,38 @@ download_and_verify() {
     verify_sha256 "$dest" "$expected_sha"
 }
 
+stamp_path() {
+    printf '%s/.stamps/%s-%s.done\n' "$WORK" "$GUI_CACHE_REV" "$1"
+}
+
+stamp_hit() {
+    [ "${GUI_DISABLE_CACHE:-0}" != "1" ] && [ -f "$(stamp_path "$1")" ]
+}
+
+stamp_done() {
+    touch "$(stamp_path "$1")"
+}
+
+reuse_finished_bundle() {
+    [ "${REUSE_GUI_BUNDLE:-1}" = "1" ] || return 1
+    [ -s "$BUNDLE" ] && [ -s "$BUNDLE_SHA" ] || return 1
+    if (cd "$OUT" && sha256sum -c "$(basename "$BUNDLE_SHA")" >/dev/null 2>&1); then
+        log "CACHE HIT: verified GUI bundle already exists: $BUNDLE"
+        return 0
+    fi
+    log "cached GUI bundle checksum failed; rebuilding"
+    rm -f "$BUNDLE" "$BUNDLE_SHA"
+    return 1
+}
+
 # 1. Zsh
 build_zsh() {
+    local key="zsh-$ZSH_VERSION-$ZSH_SHA256"
+    if stamp_hit "$key" && [ -x "$DESTDIR/usr/bin/zsh" ]; then
+        log "CACHE HIT: zsh $ZSH_VERSION"
+        return 0
+    fi
+
     log "=== Building Zsh ($ZSH_VERSION) ==="
     local TARBALL="$WORK/zsh-$ZSH_VERSION.tar.xz"
     local SRC="$WORK/zsh-$ZSH_VERSION"
@@ -64,13 +100,20 @@ build_zsh() {
                 --enable-pcre \
                 --enable-cap \
                 --with-tcsetpgrp
-    make -j"$(nproc)"
+    make -j"$JOBS"
     make DESTDIR="$DESTDIR" install
+    stamp_done "$key"
     log "Zsh installed to $DESTDIR"
 }
 
 # 2. Fastfetch
 build_fastfetch() {
+    local key="fastfetch-$FASTFETCH_VERSION-$FASTFETCH_SHA256"
+    if stamp_hit "$key" && [ -x "$DESTDIR/usr/bin/fastfetch" ]; then
+        log "CACHE HIT: fastfetch $FASTFETCH_VERSION"
+        return 0
+    fi
+
     log "=== Building Fastfetch ($FASTFETCH_VERSION) ==="
     local TARBALL="$WORK/fastfetch-$FASTFETCH_VERSION.tar.gz"
     local SRC="$WORK/fastfetch-$FASTFETCH_VERSION"
@@ -85,13 +128,20 @@ build_fastfetch() {
     mkdir -p "$SRC/build"
     cd "$SRC/build"
     cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DBUILD_TESTS=OFF
-    cmake --build . -j"$(nproc)"
+    cmake --build . -j"$JOBS"
     DESTDIR="$DESTDIR" cmake --install .
+    stamp_done "$key"
     log "Fastfetch installed to $DESTDIR"
 }
 
 # 3. TigerVNC + Xvnc Server
 build_tigervnc() {
+    local key="tigervnc-$TIGERVNC_VERSION-$TIGERVNC_SHA256-xorg-$XORG_SERVER_VERSION-$XORG_SERVER_SHA256"
+    if stamp_hit "$key" && [ -x "$DESTDIR/usr/bin/Xvnc" ]; then
+        log "CACHE HIT: TigerVNC/Xvnc $TIGERVNC_VERSION"
+        return 0
+    fi
+
     log "=== Building TigerVNC ($TIGERVNC_VERSION) with Xvnc ==="
     local TV_TARBALL="$WORK/tigervnc-$TIGERVNC_VERSION.tar.gz"
     local TV_SRC="$WORK/tigervnc-$TIGERVNC_VERSION"
@@ -104,14 +154,12 @@ build_tigervnc() {
         tar -xf "$TV_TARBALL" -C "$WORK"
     fi
 
-    # Build TigerVNC user tools & libraries (vncpasswd, etc.)
     mkdir -p "$TV_SRC/build"
     cd "$TV_SRC/build"
     cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DENABLE_NLS=OFF -DBUILD_VIEWER=OFF
-    cmake --build . -j"$(nproc)"
+    cmake --build . -j"$JOBS"
     DESTDIR="$DESTDIR" cmake --install .
 
-    # Build Xvnc DDX server using Xorg source
     local XORG_TARBALL="$WORK/xorg-server-$XORG_SERVER_VERSION.tar.xz"
     local XORG_SRC="$WORK/xorg-server-$XORG_SERVER_VERSION"
     download_and_verify \
@@ -128,7 +176,6 @@ build_tigervnc() {
     cp -R "$XORG_SRC" "$TV_SRC/unix/xserver"
 
     cd "$TV_SRC/unix/xserver"
-    # Apply TigerVNC xserver21 patch if not already applied
     if [ -f "$TV_SRC/unix/xserver21.patch" ]; then
         patch -p1 -N < "$TV_SRC/unix/xserver21.patch" || true
     fi
@@ -144,9 +191,14 @@ build_tigervnc() {
         --with-xkb-output=/var/lib/xkb \
         --with-xkb-bin-directory=/usr/bin
 
-    make -j"$(nproc)" TIGERVNC_SRCDIR="$TV_SRC"
+    make -j"$JOBS" TIGERVNC_SRCDIR="$TV_SRC"
     cd hw/vnc
     make DESTDIR="$DESTDIR" install
+    [ -x "$DESTDIR/usr/bin/Xvnc" ] || {
+        echo "build-gui-bundle: ERROR: Xvnc missing after TigerVNC build" >&2
+        exit 1
+    }
+    stamp_done "$key"
     log "TigerVNC & Xvnc installed to $DESTDIR"
 }
 
@@ -176,6 +228,12 @@ build_xfce_core() {
         local sha="${rest2%%:*}"
         local cat="${rest2#*:}"
         local major_minor="${ver%.*}"
+        local key="xfce-$name-$ver-$sha"
+
+        if stamp_hit "$key"; then
+            log "CACHE HIT: $name $ver"
+            continue
+        fi
 
         log "Building $name $ver..."
         local TARBALL="$WORK/$name-$ver.tar.bz2"
@@ -189,15 +247,19 @@ build_xfce_core() {
 
         cd "$SRC"
         if [ -f "meson.build" ]; then
-            rm -rf build
-            meson setup build --prefix="$PREFIX" --sysconfdir=/etc
-            ninja -C build -j"$(nproc)"
+            if [ ! -d build ]; then
+                meson setup build --prefix="$PREFIX" --sysconfdir=/etc
+            else
+                meson setup build --reconfigure --prefix="$PREFIX" --sysconfdir=/etc
+            fi
+            ninja -C build -j"$JOBS"
             DESTDIR="$DESTDIR" ninja -C build install
         else
             ./configure --prefix="$PREFIX" --sysconfdir=/etc --disable-static
-            make -j"$(nproc)"
+            make -j"$JOBS"
             make DESTDIR="$DESTDIR" install
         fi
+        stamp_done "$key"
     done
 }
 
@@ -228,19 +290,19 @@ verify_contract() {
 
 archive_bundle() {
     verify_contract
-    log "=== Archiving NativeCode GUI Bundle (canonical .tar.zst) ==="
-    if ! command -v zstd >/dev/null 2>&1; then
-        echo "build-gui-bundle: ERROR: 'zstd' command is required to produce canonical .tar.zst bundle" >&2
+    log "=== Archiving NativeCode GUI Bundle (zstd level $GUI_ZSTD_LEVEL) ==="
+    command -v zstd >/dev/null 2>&1 || {
+        echo "build-gui-bundle: ERROR: 'zstd' command is required" >&2
         exit 1
-    fi
-    local TARBALL="$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst"
-    tar -C "$DESTDIR" --numeric-owner -cpf - . | zstd -19 -T0 -o "$TARBALL"
+    }
+    rm -f "$BUNDLE" "$BUNDLE_SHA"
+    tar -C "$DESTDIR" --numeric-owner -cpf - . | zstd -"$GUI_ZSTD_LEVEL" -T0 -o "$BUNDLE"
     (
         cd "$OUT"
-        sha256sum "nativecode-gui-alpaquita-glibc-aarch64.tar.zst" > "nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256"
+        sha256sum "$BUNDLE_NAME" > "$BUNDLE_NAME.sha256"
     )
-    log "Bundle created: $TARBALL"
-    cat "$TARBALL.sha256"
+    log "Bundle created: $BUNDLE"
+    cat "$BUNDLE_SHA"
 }
 
 # Main sequence
@@ -250,7 +312,11 @@ if [ "${1:-}" = "--archive-only" ]; then
     exit 0
 fi
 
-# Execute sequence — strictly fatal on failure
+if reuse_finished_bundle; then
+    exit 0
+fi
+
+# Execute sequence — completed components are cached under $WORK/.stamps.
 build_zsh
 build_fastfetch
 build_tigervnc
