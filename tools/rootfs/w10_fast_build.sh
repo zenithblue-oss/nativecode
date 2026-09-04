@@ -74,7 +74,6 @@ fatal() { printf 'w10-fast: ERROR: %s\n' "$*" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || fatal "docker is required"
 command -v sha256sum >/dev/null 2>&1 || fatal "sha256sum is required"
 command -v zstd >/dev/null 2>&1 || fatal "host zstd is required for final archive"
-
 docker info >/dev/null 2>&1 || fatal "Docker daemon is not available"
 
 if [ "$SKIP_TESTS" = "0" ]; then
@@ -87,15 +86,21 @@ if [ "$SKIP_TESTS" = "0" ]; then
     fi
     find "$REPO_ROOT/app/src/main/assets/scripts" "$SCRIPT_DIR" -type f -name '*.sh' -print0 |
         while IFS= read -r -d '' f; do
-            case "$f" in
-                *setup_hw_accel_debian.sh|*setup_cli_tools.sh|*setup_xfce4.sh|*build_*.sh|*test_*.sh|*w10_fast_build.sh)
-                    bash -n "$f" ;;
-                *)
-                    sh -n "$f" ;;
+            first="$(head -n 1 "$f" || true)"
+            case "$first" in
+                *bash*) bash -n "$f" ;;
+                *) sh -n "$f" ;;
             esac
         done
     log "preflight shell tests PASS"
 fi
+
+log "checking ARM64 execution through Docker/binfmt"
+ARM64_PROBE="$(docker run --rm --platform linux/arm64 bellsoft/alpaquita-linux-base:stream-glibc uname -m 2>/dev/null || true)"
+case "$ARM64_PROBE" in
+    aarch64|arm64) ;;
+    *) fatal "ARM64 Docker execution unavailable (got '$ARM64_PROBE'). Install/enable QEMU binfmt first." ;;
+esac
 
 GUI_BUNDLE="$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst"
 GUI_SHA="$GUI_BUNDLE.sha256"
@@ -120,7 +125,7 @@ build_gui_builder_image() {
 FROM bellsoft/alpaquita-linux-base:stream-glibc
 COPY tools/rootfs/packages-alpaquita-gui-build.txt /tmp/gui-build.pkgs
 RUN apk update && apk add \
-    bash ca-certificates curl git tar xz zstd coreutils findutils \
+    bash ca-certificates curl git tar xz zstd coreutils \
     $(grep -v '^#' /tmp/gui-build.pkgs | grep -v '^$' | tr '\n' ' ') \
     && rm -rf /var/cache/apk/*
 WORKDIR /repo
