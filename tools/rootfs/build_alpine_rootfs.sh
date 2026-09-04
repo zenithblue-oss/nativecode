@@ -89,6 +89,12 @@ chmod +x "$WORK/clean_rootfs.sh" "$WORK/verify_rootfs.sh"
 grep -v '^#' "$SCRIPT_DIR/packages-alpine-base.txt" | grep -v '^$' | tr '\n' ' ' > "$WORK/base.pkgs"
 grep -v '^#' "$SCRIPT_DIR/packages-alpine-dev.txt" | grep -v '^$' | tr '\n' ' ' > "$WORK/dev.pkgs"
 
+# Stage G desktop customization assets from app repository into $WORK/xfce-staging
+mkdir -p "$WORK/xfce-staging"
+if [ -d "$SCRIPT_DIR/../../app/src/main/assets/xfce" ]; then
+    cp -a "$SCRIPT_DIR/../../app/src/main/assets/xfce/." "$WORK/xfce-staging/"
+fi
+
 cat > "$ASSEMBLE" <<ASSEMBLE_EOF
 #!/bin/sh
 set -eu
@@ -142,6 +148,40 @@ export PULSE_SERVER=127.0.0.1
 exec startxfce4
 XEOF
 chmod +x /home/flux/.vnc/xstartup
+
+# Bake G desktop customization assets (themes, icons, cursors, wallpapers, OMZ)
+THEME_DIR="/usr/share/themes"
+ICON_DIR="/usr/share/icons"
+WALLPAPER_DIR="/home/flux/Pictures/Wallpapers"
+mkdir -p "\$THEME_DIR" "\$ICON_DIR" "\$WALLPAPER_DIR"
+
+if [ -d /xfce-staging ]; then
+    [ ! -f /xfce-staging/Space-transparency.tar.xz ] || tar -xf /xfce-staging/Space-transparency.tar.xz -C "\$THEME_DIR" 2>/dev/null || true
+    [ ! -f /xfce-staging/Space-light.tar.xz ] || tar -xf /xfce-staging/Space-light.tar.xz -C "\$THEME_DIR" 2>/dev/null || true
+    [ ! -f /xfce-staging/01-Vimix-cursors.tar.xz ] || tar -xf /xfce-staging/01-Vimix-cursors.tar.xz -C "\$ICON_DIR" 2>/dev/null || true
+    [ ! -f /xfce-staging/02-Vimix-white-cursors.tar.xz ] || tar -xf /xfce-staging/02-Vimix-white-cursors.tar.xz -C "\$ICON_DIR" 2>/dev/null || true
+    if [ -f /xfce-staging/papirus-dark-only.tar.gz ]; then
+        mkdir -p "\$ICON_DIR/Papirus-Dark"
+        tar -xzf /xfce-staging/papirus-dark-only.tar.gz -C "\$ICON_DIR/Papirus-Dark" --strip-components=1 2>/dev/null || \
+            tar -xzf /xfce-staging/papirus-dark-only.tar.gz -C "\$ICON_DIR" 2>/dev/null || true
+    fi
+    [ ! -f /xfce-staging/fluxlinux-dark.png ] || cp -f /xfce-staging/fluxlinux-dark.png "\$WALLPAPER_DIR/fluxlinux-dark.png"
+    [ ! -f /xfce-staging/fluxlinux-light.png ] || cp -f /xfce-staging/fluxlinux-light.png "\$WALLPAPER_DIR/fluxlinux-light.png"
+fi
+
+# Bake Oh My Zsh + plugins + theme as flux
+su -s /bin/sh flux -c '
+    set -e
+    git clone --depth 1 --single-branch https://github.com/ohmyzsh/ohmyzsh.git "\$HOME/.oh-my-zsh" 2>/dev/null || true
+    if [ -d "\$HOME/.oh-my-zsh" ]; then
+        ZSH_CUSTOM="\$HOME/.oh-my-zsh/custom"
+        mkdir -p "\$ZSH_CUSTOM/plugins" "\$ZSH_CUSTOM/themes"
+        git clone --depth 1 --single-branch https://github.com/zsh-users/zsh-autosuggestions.git "\$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
+        git clone --depth 1 --single-branch https://github.com/zsh-users/zsh-syntax-highlighting.git "\$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+        curl -fsSL --connect-timeout 10 --max-time 25 "https://raw.githubusercontent.com/zakaziko99/agnosterzak-ohmyzsh-theme/master/agnosterzak.zsh-theme" -o "\$ZSH_CUSTOM/themes/agnosterzak.zsh-theme" 2>/dev/null || true
+    fi
+' || true
+
 # helper + release marker placeholder (finalized by outer script)
 mkdir -p /usr/local/lib/nativecode /etc/nativecode
 cp /pkg-lists/rootfs-common.sh /usr/local/lib/nativecode/rootfs-common.sh
@@ -162,7 +202,7 @@ su -s /bin/sh flux -c '
 mkdir -p /home/flux/.config/fluxlinux
 cat > /home/flux/.config/fluxlinux/cli-tools.env <<'CLIEOF'
 # Managed by NativeCode prebuilt rootfs
-export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+export PATH="\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH"
 CLIEOF
 # Android SDK minimal (host-side download staged by outer script into /opt-staging)
 if [ -d /opt-staging/android-sdk ]; then
@@ -171,19 +211,62 @@ if [ -d /opt-staging/android-sdk ]; then
 fi
 if [ -d /opt-staging/kotlin ]; then mkdir -p /opt && cp -a /opt-staging/kotlin /opt/kotlin; fi
 if [ -d /opt-staging/gradle ]; then mkdir -p /opt && cp -a /opt-staging/gradle /opt/gradle; fi
+
+# Bake Android environment profile into DEV rootfs
+if [ -d /opt/android-sdk ] || [ -d /opt/kotlin ] || [ -d /opt/gradle ]; then
+    mkdir -p /etc/profile.d
+    cat > /etc/profile.d/nativecode-android.sh <<'ANDROID_EOF'
+export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/android-sdk}"
+export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-/opt/android-sdk/ndk/29.0.14206865}"
+case ":\$PATH:" in
+    *:/opt/android-sdk/platform-tools:*) ;;
+    *) export PATH="/opt/android-sdk/platform-tools:\$PATH" ;;
+esac
+case ":\$PATH:" in
+    *:/opt/android-sdk/build-tools/36.1.0:*) ;;
+    *) export PATH="/opt/android-sdk/build-tools/36.1.0:\$PATH" ;;
+esac
+case ":\$PATH:" in
+    *:/opt/gradle/bin:*) ;;
+    *) export PATH="/opt/gradle/bin:\$PATH" ;;
+esac
+case ":\$PATH:" in
+    *:/opt/kotlin/bin:*) ;;
+    *) export PATH="/opt/kotlin/bin:\$PATH" ;;
+esac
+ANDROID_EOF
+    chmod 644 /etc/profile.d/nativecode-android.sh
+fi
 echo "assemble-inside: done"
 ASSEMBLE_EOF
 chmod +x "$ASSEMBLE"
 
 log "guest assemble script: $ASSEMBLE"
 log "ROOTFS=$ROOTFS"
-log "next: run guest assembly inside rootfs (staging pkg-lists/opt-staging inside /rootfs before chroot):"
+log "next: run guest assembly inside rootfs (staging pkg-lists/opt-staging/xfce-staging inside /rootfs before chroot):"
 log "  docker run --rm --privileged --platform linux/arm64 \\"
 log "    -v $ROOTFS:/rootfs \\"
 log "    -v $WORK:/host-work \\"
 log "    arm64v8/alpine:$ALPINE_VERSION \\"
-log "    sh -c 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging && cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/ && ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/) && cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && chroot /rootfs /bin/sh /assemble.sh && rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging'"
-log "  (or native chroot on rooted aarch64 device after staging /pkg-lists and /opt-staging inside target rootfs)"
+log "    sh -c 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts && \\"
+log "           mount --bind /dev /rootfs/dev && \\"
+log "           mount -t proc proc /rootfs/proc && \\"
+log "           mount -t sysfs sysfs /rootfs/sys && \\"
+log "           mount --bind /run /rootfs/run && \\"
+log "           mount --bind /dev/pts /rootfs/dev/pts && \\"
+log "           cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/ && \\"
+log "           ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/) && \\"
+log "           ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/) && \\"
+log "           cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && \\"
+log "           chroot /rootfs /bin/sh /assemble.sh && \\"
+log "           umount /rootfs/dev/pts 2>/dev/null || true && \\"
+log "           umount /rootfs/run 2>/dev/null || true && \\"
+log "           umount /rootfs/sys 2>/dev/null || true && \\"
+log "           umount /rootfs/proc 2>/dev/null || true && \\"
+log "           umount /rootfs/dev 2>/dev/null || true && \\"
+log "           rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging'"
+log "  (or native chroot on rooted aarch64 device after mounting virtual filesystems and staging)"
 
 # Determine actual COMPONENT_DEV status:
 # DEV is 1 only if the full Android SDK, build-tools, NDK, Kotlin, and Gradle
@@ -193,8 +276,8 @@ if [ "$SKIP_ANDROID" = "0" ] && \
    [ -f "$WORK/opt-staging/android-sdk/platforms/android-$ANDROID_PLATFORM/android.jar" ] && \
    [ -x "$WORK/opt-staging/android-sdk/build-tools/$ANDROID_BUILD_TOOLS/aapt2" ] && \
    [ -d "$WORK/opt-staging/android-sdk/ndk/$ANDROID_NDK" ] && \
-   [ -d "$WORK/opt-staging/kotlin" ] && \
-   [ -d "$WORK/opt-staging/gradle" ]; then
+   [ -x "$WORK/opt-staging/kotlin/bin/kotlinc" ] && \
+   [ -x "$WORK/opt-staging/gradle/bin/gradle" ]; then
     HAS_DEV_STAGED=1
 fi
 
