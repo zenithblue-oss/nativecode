@@ -201,12 +201,39 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# Mock OMZ tree with plugins and theme
+mkdir -p "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions" \
+         "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting" \
+         "$T/home/flux/.oh-my-zsh/custom/themes"
+touch "$T/home/flux/.oh-my-zsh/oh-my-zsh.sh"
+touch "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+touch "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+echo "# agnosterzak theme" > "$T/home/flux/.oh-my-zsh/custom/themes/agnosterzak.zsh-theme"
+
 echo "== prebuilt positives: exit 0 + zero STUB-CALL =="
 check "E-baked"   0 "$T/guest/setup_alpine_family.sh" sh
 check "F-baked"   0 "$T/guest/setup_hw_accel_debian.sh" bash
 check "GUI-baked" 0 "$T/guest/setup_xfce4.sh" bash
 check "G-baked"   0 "$T/guest/setup_customization_alpine.sh" sh
 check "H-baked"   0 "$T/guest/setup_cli_tools.sh" bash
+
+echo "== negative control: baked G missing OMZ plugin must fail with exit 1 and zero git calls =="
+rm -f "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+rm -rf "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions"
+_m="$(mark)"
+sh "$T/guest/setup_customization_alpine.sh" alpine </dev/null >/tmp/neg_g.log 2>&1; _rc=$?
+_calls="$(log_calls_from "$((_m + 1))" | grep -c 'STUB-CALL: git' || true)"
+mkdir -p "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions"
+touch "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+
+if [ "$_rc" = "1" ] && [ "$_calls" = "0" ] && grep -q 'baked plugin zsh-autosuggestions missing' /tmp/neg_g.log; then
+    echo "PASS neg-G-missing-plugin-fails (exit=1 git_calls=0)"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL neg-G-missing-plugin-fails (want exit=1 git_calls=0, got exit=$_rc git_calls=$_calls)"
+    tail -n 10 /tmp/neg_g.log
+    FAIL=$((FAIL + 1))
+fi
 
 echo "== spot checks =="
 [ "$(tr -d '[:space:]' </etc/fluxlinux/gpu_mode 2>/dev/null)" = "virgl" ] \

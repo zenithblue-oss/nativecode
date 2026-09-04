@@ -34,28 +34,32 @@ The release flow is structured in explicit stages:
 # 1. Download base & generate guest scripts
 tools/rootfs/build_alpine_rootfs.sh --work /tmp/nc-rootfs --out out/
 
-# 2. Run guest assembly inside rootfs (mounts /dev /proc /sys /run and stages assets before chroot)
+# 2. Run guest assembly inside rootfs (preserves exit status and traps cleanup)
 docker run --rm --privileged --platform linux/arm64 \
   -v /tmp/nc-rootfs/rootfs:/rootfs \
   -v /tmp/nc-rootfs:/host-work \
   arm64v8/alpine:3.24.1 \
-  sh -c 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts && \
-         mount --bind /dev /rootfs/dev && \
-         mount -t proc proc /rootfs/proc && \
-         mount -t sysfs sysfs /rootfs/sys && \
-         mount --bind /run /rootfs/run && \
-         mount --bind /dev/pts /rootfs/dev/pts && \
-         cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/ && \
-         ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/) && \
-         ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/) && \
-         cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && \
-         chroot /rootfs /bin/sh /assemble.sh && \
-         umount /rootfs/dev/pts 2>/dev/null || true && \
-         umount /rootfs/run 2>/dev/null || true && \
-         umount /rootfs/sys 2>/dev/null || true && \
-         umount /rootfs/proc 2>/dev/null || true && \
-         umount /rootfs/dev 2>/dev/null || true && \
-         rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging'
+  sh -c 'set -eu; \
+         cleanup() { \
+           umount /rootfs/dev/pts 2>/dev/null || true; \
+           umount /rootfs/run 2>/dev/null || true; \
+           umount /rootfs/sys 2>/dev/null || true; \
+           umount /rootfs/proc 2>/dev/null || true; \
+           umount /rootfs/dev 2>/dev/null || true; \
+           rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging; \
+         }; \
+         trap cleanup EXIT INT TERM; \
+         mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts; \
+         mount --bind /dev /rootfs/dev; \
+         mount -t proc proc /rootfs/proc; \
+         mount -t sysfs sysfs /rootfs/sys; \
+         mount --bind /run /rootfs/run; \
+         mount --bind /dev/pts /rootfs/dev/pts; \
+         cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/; \
+         ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/); \
+         ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/); \
+         cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh; \
+         chroot /rootfs /bin/sh /assemble.sh'
 
 # 3 & 4. Finalize, clean, and run mandatory verification
 /tmp/nc-rootfs/finalize.sh /tmp/nc-rootfs/rootfs out/

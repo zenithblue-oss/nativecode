@@ -41,11 +41,18 @@ need /usr/bin/startxfce4
 [ -x "$ROOTFS/usr/bin/Xtigervnc" ] || [ -x "$ROOTFS/usr/bin/Xvnc" ] || { echo "MISS tigervnc server"; FAIL=1; }
 
 echo "== customization assets (COMPONENT_G=1) =="
-[ -d "$ROOTFS/usr/share/themes/Space-transparency" ] || [ -d "$ROOTFS/usr/share/themes/Space-light" ] || { echo "MISS G theme Space"; FAIL=1; }
+[ -d "$ROOTFS/usr/share/themes/Space-transparency" ] || { echo "MISS G theme Space-transparency"; FAIL=1; }
+[ -d "$ROOTFS/usr/share/themes/Space-light" ] || { echo "MISS G theme Space-light"; FAIL=1; }
 [ -d "$ROOTFS/usr/share/icons/Papirus-Dark" ] || { echo "MISS G icon Papirus-Dark"; FAIL=1; }
-[ -d "$ROOTFS/usr/share/icons/Vimix-white-cursors" ] || [ -d "$ROOTFS/usr/share/icons/Vimix-cursors" ] || { echo "MISS G cursor Vimix"; FAIL=1; }
-[ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-dark.png" ] || [ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-light.png" ] || { echo "MISS G wallpaper"; FAIL=1; }
-[ -f "$ROOTFS/home/flux/.oh-my-zsh/ohmyzsh.sh" ] || [ -f "$ROOTFS/home/flux/.oh-my-zsh/oh-my-zsh.sh" ] || { echo "MISS G oh-my-zsh"; FAIL=1; }
+[ -d "$ROOTFS/usr/share/icons/Vimix-white-cursors" ] || { echo "MISS G cursor Vimix-white"; FAIL=1; }
+[ -d "$ROOTFS/usr/share/icons/Vimix-cursors" ] || { echo "MISS G cursor Vimix"; FAIL=1; }
+[ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-dark.png" ] || { echo "MISS G wallpaper fluxlinux-dark.png"; FAIL=1; }
+[ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-light.png" ] || { echo "MISS G wallpaper fluxlinux-light.png"; FAIL=1; }
+[ -f "$ROOTFS/home/flux/.oh-my-zsh/oh-my-zsh.sh" ] || [ -f "$ROOTFS/home/flux/.oh-my-zsh/ohmyzsh.sh" ] || { echo "MISS G oh-my-zsh"; FAIL=1; }
+[ -d "$ROOTFS/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions" ] || { echo "MISS G plugin zsh-autosuggestions"; FAIL=1; }
+[ -d "$ROOTFS/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting" ] || { echo "MISS G plugin zsh-syntax-highlighting"; FAIL=1; }
+[ -f "$ROOTFS/home/flux/.oh-my-zsh/custom/themes/agnosterzak.zsh-theme" ] || { echo "MISS G theme agnosterzak"; FAIL=1; }
+[ -d "$ROOTFS/usr/share/fonts/jetbrains-mono-nerd" ] || [ -f "$ROOTFS/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf" ] || [ -f "$ROOTFS/usr/share/fonts/jetbrains-mono-nerd/JetBrainsMonoNerdFont-Regular.ttf" ] || [ -d "$ROOTFS/usr/share/fonts" ] || { echo "MISS G Nerd Font"; FAIL=1; }
 
 if [ "$IS_DEV" = "1" ]; then
     echo "== android/dev stack (COMPONENT_DEV=1) =="

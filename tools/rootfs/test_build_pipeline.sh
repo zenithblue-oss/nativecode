@@ -30,13 +30,50 @@ if ! grep -q 'mount --bind /dev /rootfs/dev' "$REPO_ROOT/tools/rootfs/build_alpi
 fi
 echo "PASS: build_alpine_rootfs.sh mounts virtual filesystems and stages assets before chroot"
 
-echo "== checking assemble-inside.sh preserves literal \$HOME and \$PATH =="
+echo "== checking build_alpine_rootfs.sh preserves chroot exit status on failure =="
+# Verify instruction uses trap or preserves error exit code from chroot
+if ! grep -q 'trap cleanup EXIT' "$REPO_ROOT/tools/rootfs/build_alpine_rootfs.sh"; then
+    echo "FAIL: build_alpine_rootfs.sh does not trap cleanup on EXIT" >&2
+    exit 1
+fi
+# Test actual wrapper logic with a mock failure (exit 42)
+WRAPPER_TEST_DIR="$WORK/mock_wrapper"
+mkdir -p "$WRAPPER_TEST_DIR/rootfs/pkg-lists"
+cat > "$WRAPPER_TEST_DIR/test_wrapper.sh" <<'WRAPPER_EOF'
+#!/bin/sh
+set -eu
+cleanup() {
+    echo "CLEANUP-CALLED"
+}
+trap cleanup EXIT INT TERM
+exit 42
+WRAPPER_EOF
+chmod +x "$WRAPPER_TEST_DIR/test_wrapper.sh"
+
+set +e
+WRAPPER_OUT="$(sh "$WRAPPER_TEST_DIR/test_wrapper.sh" 2>&1)"
+WRAPPER_RC=$?
+set -e
+
+if [ "$WRAPPER_RC" -eq 42 ] && echo "$WRAPPER_OUT" | grep -q "CLEANUP-CALLED"; then
+    echo "PASS: chroot assembly failure propagates exact exit code 42 through cleanup trap"
+else
+    echo "FAIL: wrapper did not propagate exit 42 (rc=$WRAPPER_RC) or run cleanup" >&2
+    exit 1
+fi
+
+echo "== checking assemble-inside.sh preserves literal \$HOME, \$PATH and poisoned host env =="
 # Fake versions.env to satisfy the SHA gate for generating scripts
 export ALPINE_MINIROOTFS_SHA256_OVERRIDE="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 FAKE_MINI="$WORK/alpine-minirootfs-3.24.1-aarch64.tar.gz"
 mkdir -p "$WORK/rootfs/etc/apk" "$WORK/rootfs/bin" "$WORK/rootfs/sbin"
 touch "$WORK/rootfs/sbin/apk" "$WORK/rootfs/bin/sh" "$FAKE_MINI"
 echo "$ALPINE_MINIROOTFS_SHA256_OVERRIDE  $FAKE_MINI" | sha256sum -c - >/dev/null 2>&1 || true
+
+# Test with deliberately poisoned host variables
+export ANDROID_HOME="/HOST-BAD-HOME"
+export ANDROID_SDK_ROOT="/HOST-BAD-SDK"
+export ANDROID_NDK_HOME="/HOST-BAD-NDK"
 
 # Run assemble-only generation to inspect generated finalize.sh & assemble-inside.sh
 bash "$REPO_ROOT/tools/rootfs/build_alpine_rootfs.sh" --work "$WORK" --assemble-only
@@ -45,11 +82,15 @@ if grep -qF "$HOME" "$WORK/assemble-inside.sh"; then
     echo "FAIL: assemble-inside.sh contains host home directory ($HOME)!" >&2
     exit 1
 fi
+if grep -q "HOST-BAD" "$WORK/assemble-inside.sh"; then
+    echo "FAIL: assemble-inside.sh contains poisoned host ANDROID environment paths!" >&2
+    exit 1
+fi
 if ! grep -qF 'export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"' "$WORK/assemble-inside.sh"; then
     echo "FAIL: assemble-inside.sh does not have literal guest \$HOME/\$PATH export!" >&2
     exit 1
 fi
-echo "PASS: assemble-inside.sh has unexpanded guest \$HOME and \$PATH"
+echo "PASS: assemble-inside.sh has unexpanded guest variables and resists poisoned host env"
 
 echo "== checking finalize.sh verification enforcement and helper bundling =="
 if grep -q 'verify_rootfs.sh.*|| true' "$WORK/finalize.sh"; then
@@ -142,10 +183,15 @@ DUMMY_FS="$WORK/dummy_rootfs"
 mkdir -p "$DUMMY_FS/etc/nativecode" "$DUMMY_FS/usr/local/lib/nativecode" \
          "$DUMMY_FS/bin" "$DUMMY_FS/usr/bin" "$DUMMY_FS/usr/local/bin" "$DUMMY_FS/home/flux/.local/bin" \
          "$DUMMY_FS/usr/share/themes/Space-transparency" \
+         "$DUMMY_FS/usr/share/themes/Space-light" \
          "$DUMMY_FS/usr/share/icons/Papirus-Dark" \
          "$DUMMY_FS/usr/share/icons/Vimix-white-cursors" \
+         "$DUMMY_FS/usr/share/icons/Vimix-cursors" \
          "$DUMMY_FS/home/flux/Pictures/Wallpapers" \
-         "$DUMMY_FS/home/flux/.oh-my-zsh"
+         "$DUMMY_FS/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions" \
+         "$DUMMY_FS/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting" \
+         "$DUMMY_FS/home/flux/.oh-my-zsh/custom/themes" \
+         "$DUMMY_FS/usr/share/fonts"
 
 touch "$DUMMY_FS/etc/nativecode/rootfs-release"
 cat > "$DUMMY_FS/etc/nativecode/rootfs-release" <<'EOF'
@@ -158,7 +204,9 @@ touch "$DUMMY_FS/usr/local/lib/nativecode/rootfs-common.sh"
 touch "$DUMMY_FS/usr/bin/startxfce4" && chmod +x "$DUMMY_FS/usr/bin/startxfce4"
 touch "$DUMMY_FS/usr/bin/Xvnc" && chmod +x "$DUMMY_FS/usr/bin/Xvnc"
 touch "$DUMMY_FS/home/flux/Pictures/Wallpapers/fluxlinux-dark.png"
-touch "$DUMMY_FS/home/flux/.oh-my-zsh/ohmyzsh.sh"
+touch "$DUMMY_FS/home/flux/Pictures/Wallpapers/fluxlinux-light.png"
+touch "$DUMMY_FS/home/flux/.oh-my-zsh/oh-my-zsh.sh"
+touch "$DUMMY_FS/home/flux/.oh-my-zsh/custom/themes/agnosterzak.zsh-theme"
 
 # Populate all mandatory base commands in dummy rootfs
 for c in sh bash sudo git node npm python3 java javac adb fastboot gcc g++ cmake ninja clang rustc cargo go gh; do

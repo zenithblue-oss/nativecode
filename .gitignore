@@ -27,3 +27,4 @@ termux-packages/*
 *.png
 !app/src/main/res/**/*.png
 !app/src/main/assets/images/**/*.png
+!app/src/main/assets/xfce/**/*.png

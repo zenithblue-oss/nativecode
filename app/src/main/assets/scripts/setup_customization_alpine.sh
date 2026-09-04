@@ -357,8 +357,8 @@ if [ -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
     fi
     OMZ_OK=1
 elif [ "${PREBUILT_G:-0}" = "1" ]; then
-    echo "NativeCode: WARN: baked Oh My Zsh missing (no clone in runtime)"
-    OMZ_OK=0
+    echo "NativeCode: ERROR: baked Oh My Zsh missing in prebuilt rootfs" >&2
+    exit 1
 else
     if [ -e "$USER_HOME/.oh-my-zsh" ]; then
         echo "FluxLinux: Incomplete Oh My Zsh detected — removing (bounded)…"
@@ -390,7 +390,10 @@ if [ "$OMZ_OK" = "1" ]; then
     echo "FluxLinux: Installing Zsh plugins (if missing)…"
     if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions/.git" ] \
         && [ ! -f "$ZSH_CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ]; then
-        if command -v git >/dev/null 2>&1; then
+        if [ "${PREBUILT_G:-0}" = "1" ]; then
+            echo "NativeCode: ERROR: baked plugin zsh-autosuggestions missing in prebuilt rootfs" >&2
+            exit 1
+        elif command -v git >/dev/null 2>&1; then
             _flux_git_clone "https://github.com/zsh-users/zsh-autosuggestions.git" \
                 "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 60 || true
         fi
@@ -399,7 +402,10 @@ if [ "$OMZ_OK" = "1" ]; then
     fi
     if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/.git" ] \
         && [ ! -f "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]; then
-        if command -v git >/dev/null 2>&1; then
+        if [ "${PREBUILT_G:-0}" = "1" ]; then
+            echo "NativeCode: ERROR: baked plugin zsh-syntax-highlighting missing in prebuilt rootfs" >&2
+            exit 1
+        elif command -v git >/dev/null 2>&1; then
             _flux_git_clone "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
                 "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 60 || true
         fi
@@ -408,10 +414,15 @@ if [ "$OMZ_OK" = "1" ]; then
     fi
 
     if [ ! -s "$ZSH_CUSTOM/themes/agnosterzak.zsh-theme" ]; then
-        echo "FluxLinux: Installing agnosterzak theme…"
-        _flux_run 30 curl -fsSL --connect-timeout 10 --max-time 25 \
-            "https://raw.githubusercontent.com/zakaziko99/agnosterzak-ohmyzsh-theme/master/agnosterzak.zsh-theme" \
-            -o "$ZSH_CUSTOM/themes/agnosterzak.zsh-theme" 2>/dev/null || true
+        if [ "${PREBUILT_G:-0}" = "1" ]; then
+            echo "NativeCode: ERROR: baked theme agnosterzak missing in prebuilt rootfs" >&2
+            exit 1
+        else
+            echo "FluxLinux: Installing agnosterzak theme…"
+            _flux_run 30 curl -fsSL --connect-timeout 10 --max-time 25 \
+                "https://raw.githubusercontent.com/zakaziko99/agnosterzak-ohmyzsh-theme/master/agnosterzak.zsh-theme" \
+                -o "$ZSH_CUSTOM/themes/agnosterzak.zsh-theme" 2>/dev/null || true
+        fi
     else
         echo "FluxLinux: agnosterzak theme already present — skip"
     fi

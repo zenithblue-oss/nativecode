@@ -199,6 +199,16 @@ su -s /bin/sh flux -c '
   curl -fsSL "'"${GROK_INSTALLER_URL:-https://x.ai/cli/install.sh}"'" | bash || true
   curl -fsSL "'"${KIRO_INSTALLER_URL:-https://cli.kiro.dev/install}"'" | bash || true
 '
+
+# Normalize Grok / Kiro locations into ~/.local/bin before verification
+if [ -x /home/flux/.grok/bin/grok ]; then
+    mkdir -p /home/flux/.local/bin
+    ln -sfn /home/flux/.grok/bin/grok /home/flux/.local/bin/grok
+fi
+if [ ! -x /home/flux/.local/bin/kiro-cli ] && [ -x /home/flux/.local/bin/kiro ]; then
+    ln -sfn /home/flux/.local/bin/kiro /home/flux/.local/bin/kiro-cli
+fi
+
 mkdir -p /home/flux/.config/fluxlinux
 cat > /home/flux/.config/fluxlinux/cli-tools.env <<'CLIEOF'
 # Managed by NativeCode prebuilt rootfs
@@ -216,9 +226,9 @@ if [ -d /opt-staging/gradle ]; then mkdir -p /opt && cp -a /opt-staging/gradle /
 if [ -d /opt/android-sdk ] || [ -d /opt/kotlin ] || [ -d /opt/gradle ]; then
     mkdir -p /etc/profile.d
     cat > /etc/profile.d/nativecode-android.sh <<'ANDROID_EOF'
-export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
-export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/android-sdk}"
-export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-/opt/android-sdk/ndk/29.0.14206865}"
+export ANDROID_HOME="\${ANDROID_HOME:-/opt/android-sdk}"
+export ANDROID_SDK_ROOT="\${ANDROID_SDK_ROOT:-/opt/android-sdk}"
+export ANDROID_NDK_HOME="\${ANDROID_NDK_HOME:-/opt/android-sdk/ndk/29.0.14206865}"
 case ":\$PATH:" in
     *:/opt/android-sdk/platform-tools:*) ;;
     *) export PATH="/opt/android-sdk/platform-tools:\$PATH" ;;
@@ -244,28 +254,32 @@ chmod +x "$ASSEMBLE"
 
 log "guest assemble script: $ASSEMBLE"
 log "ROOTFS=$ROOTFS"
-log "next: run guest assembly inside rootfs (staging pkg-lists/opt-staging/xfce-staging inside /rootfs before chroot):"
+log "next: run guest assembly inside rootfs (preserving chroot exit status and cleaning up):"
 log "  docker run --rm --privileged --platform linux/arm64 \\"
 log "    -v $ROOTFS:/rootfs \\"
 log "    -v $WORK:/host-work \\"
 log "    arm64v8/alpine:$ALPINE_VERSION \\"
-log "    sh -c 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts && \\"
-log "           mount --bind /dev /rootfs/dev && \\"
-log "           mount -t proc proc /rootfs/proc && \\"
-log "           mount -t sysfs sysfs /rootfs/sys && \\"
-log "           mount --bind /run /rootfs/run && \\"
-log "           mount --bind /dev/pts /rootfs/dev/pts && \\"
-log "           cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/ && \\"
-log "           ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/) && \\"
-log "           ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/) && \\"
-log "           cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && \\"
-log "           chroot /rootfs /bin/sh /assemble.sh && \\"
-log "           umount /rootfs/dev/pts 2>/dev/null || true && \\"
-log "           umount /rootfs/run 2>/dev/null || true && \\"
-log "           umount /rootfs/sys 2>/dev/null || true && \\"
-log "           umount /rootfs/proc 2>/dev/null || true && \\"
-log "           umount /rootfs/dev 2>/dev/null || true && \\"
-log "           rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging'"
+log "    sh -c 'set -eu; \\"
+log "           cleanup() { \\"
+log "             umount /rootfs/dev/pts 2>/dev/null || true; \\"
+log "             umount /rootfs/run 2>/dev/null || true; \\"
+log "             umount /rootfs/sys 2>/dev/null || true; \\"
+log "             umount /rootfs/proc 2>/dev/null || true; \\"
+log "             umount /rootfs/dev 2>/dev/null || true; \\"
+log "             rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging; \\"
+log "           }; \\"
+log "           trap cleanup EXIT INT TERM; \\"
+log "           mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts; \\"
+log "           mount --bind /dev /rootfs/dev; \\"
+log "           mount -t proc proc /rootfs/proc; \\"
+log "           mount -t sysfs sysfs /rootfs/sys; \\"
+log "           mount --bind /run /rootfs/run; \\"
+log "           mount --bind /dev/pts /rootfs/dev/pts; \\"
+log "           cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/; \\"
+log "           ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/); \\"
+log "           ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/); \\"
+log "           cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh; \\"
+log "           chroot /rootfs /bin/sh /assemble.sh'"
 log "  (or native chroot on rooted aarch64 device after mounting virtual filesystems and staging)"
 
 # Determine actual COMPONENT_DEV status:

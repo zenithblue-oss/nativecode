@@ -26,6 +26,7 @@ xfwm4
 thunar
 adwaita-icon-theme
 font-dejavu
+font-jetbrains-mono-nerd
 mesa
 mesa-dri-gallium
 mesa-gl
