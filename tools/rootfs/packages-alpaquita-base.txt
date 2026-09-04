@@ -1,6 +1,7 @@
 # Alpaquita glibc / AArch64 Base Packages Manifest
 # Sourced by build_alpaquita_rootfs.sh for NativeCode prebuilt rootfs.
 # Note: Alpaquita is glibc-based with APK package manager.
+# ONLY runtime packages belong here. Build-only packages are in packages-alpaquita-gui-build.txt
 
 # Core system
 bash
@@ -15,10 +16,11 @@ wget
 unzip
 tar
 xz
+zstd
 dbus
 dbus-x11
 
-# Libraries & GPU
+# Graphical runtime libraries & fonts (needed by XFCE / TigerVNC)
 libstdc++
 fontconfig
 font-dejavu
@@ -30,77 +32,33 @@ vulkan-loader
 glycin-image-rs
 glycin-svg
 gdk-pixbuf
-
-# Build dependencies for NativeCode GUI bundle (XFCE4 + TigerVNC)
-build-base
-gcc
-g++
-meson
-samurai
-cmake
-pkgconf
-autoconf
-automake
-libtool
-gettext
-gettext-dev
 gtk+3.0
-gtk+3.0-dev
 glib
-glib-dev
-gobject-introspection
-gobject-introspection-dev
 cairo
-cairo-dev
 pango
-pango-dev
 libx11
-libx11-dev
 libxext
-libxext-dev
 libxrandr
-libxrandr-dev
 libxinerama
-libxinerama-dev
 libxrender
-libxrender-dev
 libxtst
-libxtst-dev
 libxfixes
-libxfixes-dev
 libxdamage
-libxdamage-dev
 libxcomposite
-libxcomposite-dev
 libxcursor
-libxcursor-dev
 libxi
-libxi-dev
 libxfont2
-libxfont2-dev
 pixman
-pixman-dev
-xorgproto
-xorg-server-dev
 libxshmfence
-libxshmfence-dev
 libepoxy
-libepoxy-dev
 wayland
-wayland-dev
-wayland-protocols
 libdrm
-libdrm-dev
 libxkbcommon
-libxkbcommon-dev
 gnutls
-gnutls-dev
 libjpeg-turbo
-libjpeg-turbo-dev
 openssl
-openssl-dev
 
-# Runtimes
+# Development & scripting runtimes
 git
 python3
 nodejs

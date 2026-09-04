@@ -1,6 +1,6 @@
 #!/bin/bash
 # build_alpaquita_rootfs.sh — reproducible prebuilt Alpaquita glibc rootfs for PRoot + chroot.
-# Host: any Linux with tar, sha256sum, curl/wget, zstd (or xz fallback).
+# Host: any Linux with tar, sha256sum, curl/wget, zstd.
 # Guest assembly runs inside an Alpaquita aarch64 glibc container/chroot.
 set -euo pipefail
 
@@ -15,7 +15,6 @@ OUT="${OUT:-$SCRIPT_DIR/out}"
 ROOTFS=""
 ASSEMBLE_ONLY=0
 SKIP_ANDROID=0
-SKIP_GUI=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -24,7 +23,6 @@ while [ $# -gt 0 ]; do
         --rootfs) ROOTFS="$2"; shift 2 ;;
         --assemble-only) ASSEMBLE_ONLY=1; shift ;;
         --skip-android) SKIP_ANDROID=1; shift ;;
-        --skip-gui) SKIP_GUI=1; shift ;;
         --build-id) BUILD_ID="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
@@ -35,8 +33,7 @@ mkdir -p "$WORK" "$OUT"
 
 log() { echo "build-alpaquita-rootfs: $*"; }
 
-# BLOCKER gate: official minirootfs checksum must be pinned before any
-# download/extract/build.
+# BLOCKER gate: official minirootfs checksum must be pinned before any download/extract/build.
 if [ -z "${ALPAQUITA_MINIROOTFS_SHA256:-}" ] || [ "$ALPAQUITA_MINIROOTFS_SHA256" = "REPLACE_ME" ]; then
     echo "build-alpaquita-rootfs: ERROR: ALPAQUITA_MINIROOTFS_SHA256 is not pinned in tools/rootfs/versions.env" >&2
     echo "build-alpaquita-rootfs: download ${ALPAQUITA_MINIROOTFS_URL}" >&2
@@ -103,6 +100,8 @@ fi
 cat > "$ASSEMBLE" <<ASSEMBLE_EOF
 #!/bin/sh
 set -eu
+guest_log() { echo "assemble-inside: \$*"; }
+
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 mkdir -p /tmp /var/tmp && chmod 1777 /tmp /var/tmp
 printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > /etc/resolv.conf
@@ -142,11 +141,15 @@ exit 127
 BWRAP_EOF
 chmod 755 /usr/bin/bwrap
 
-# Install GUI bundle if present
+# Install GUI bundle from canonical .tar.zst
 if [ -f /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.zst ]; then
-    tar -xf /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.zst -C /
-elif [ -f /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.xz ]; then
-    tar -xf /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.xz -C /
+    guest_log "extracting GUI bundle .tar.zst"
+    if [ -f /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256 ]; then
+        cd /gui-staging && sha256sum -c nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256
+    fi
+    zstd -dc /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.zst | tar -xpf - -C /
+else
+    guest_log "WARN: GUI bundle not found in /gui-staging"
 fi
 
 # VNC xstartup
@@ -193,15 +196,14 @@ su -s /bin/sh flux -c '
 ' || true
 
 # Install official GitHub CLI (gh) Linux ARM64 glibc binary
-log "installing GitHub CLI release binary"
-GH_VER="2.67.0"
-curl -fsSL "https://github.com/cli/cli/releases/download/v\${GH_VER}/gh_\${GH_VER}_linux_arm64.tar.gz" -o /tmp/gh.tar.gz 2>/dev/null || true
-if [ -f /tmp/gh.tar.gz ]; then
-    tar -xzf /tmp/gh.tar.gz -C /tmp
-    cp /tmp/gh_\${GH_VER}_linux_arm64/bin/gh /usr/local/bin/gh
-    chmod 755 /usr/local/bin/gh
-    rm -rf /tmp/gh*
-fi
+guest_log "installing GitHub CLI release binary"
+GH_TAR="/tmp/gh_${GH_VERSION}_linux_arm64.tar.gz"
+curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_arm64.tar.gz" -o "\$GH_TAR"
+echo "${GH_SHA256}  \$GH_TAR" | sha256sum -c -
+tar -xzf "\$GH_TAR" -C /tmp
+cp "/tmp/gh_${GH_VERSION}_linux_arm64/bin/gh" /usr/local/bin/gh
+chmod 755 /usr/local/bin/gh
+rm -rf /tmp/gh*
 
 # helper + release marker placeholder
 mkdir -p /usr/local/lib/nativecode /etc/nativecode
@@ -244,6 +246,16 @@ fi
 if [ -d /opt-staging/kotlin ]; then mkdir -p /opt && cp -a /opt-staging/kotlin /opt/kotlin; fi
 if [ -d /opt-staging/gradle ]; then mkdir -p /opt && cp -a /opt-staging/gradle /opt/gradle; fi
 
+# Create symlinks for adb and fastboot into standard PATH if present
+if [ -x /opt/android-sdk/platform-tools/adb ]; then
+    mkdir -p /usr/local/bin
+    ln -sfn /opt/android-sdk/platform-tools/adb /usr/local/bin/adb
+fi
+if [ -x /opt/android-sdk/platform-tools/fastboot ]; then
+    mkdir -p /usr/local/bin
+    ln -sfn /opt/android-sdk/platform-tools/fastboot /usr/local/bin/fastboot
+fi
+
 # Bake Android environment profile into DEV rootfs
 if [ -d /opt/android-sdk ] || [ -d /opt/kotlin ] || [ -d /opt/gradle ]; then
     mkdir -p /etc/profile.d
@@ -270,7 +282,7 @@ esac
 ANDROID_EOF
     chmod 644 /etc/profile.d/nativecode-android.sh
 fi
-echo "assemble-inside: done"
+guest_log "guest assembly finished"
 ASSEMBLE_EOF
 chmod +x "$ASSEMBLE"
 
@@ -323,11 +335,6 @@ else
     log "Android dev stack incomplete or skipped -> COMPONENT_DEV=0"
 fi
 
-COMPONENT_GUI_VAL=1
-if [ "$SKIP_GUI" = "1" ]; then
-    COMPONENT_GUI_VAL=0
-fi
-
 # Write release marker
 GIT_SHA="$(git -C "$SCRIPT_DIR/../.." rev-parse HEAD 2>/dev/null || echo unknown)"
 cat > "$WORK/rootfs-release" <<RELEASE_EOF
@@ -346,7 +353,7 @@ KOTLIN=$KOTLIN_VERSION
 GRADLE=$GRADLE_VERSION
 COMPONENT_E=1
 COMPONENT_F=1
-COMPONENT_GUI=$COMPONENT_GUI_VAL
+COMPONENT_GUI=1
 COMPONENT_G=1
 COMPONENT_H=1
 COMPONENT_GH=1

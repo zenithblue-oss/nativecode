@@ -1,0 +1,59 @@
+# Alpaquita glibc / AArch64 GUI Build Dependencies Manifest
+# Used exclusively by tools/rootfs/build_gui_bundle.sh to compile
+# XFCE 4.20 core components, TigerVNC (Xvnc), zsh, and fastfetch.
+# NOT included in the final base rootfs.
+
+build-base
+gcc
+g++
+meson
+samurai
+cmake
+pkgconf
+autoconf
+automake
+libtool
+gettext
+gettext-dev
+patch
+bison
+flex
+
+# GTK / GLib / Introspection headers
+gtk+3.0-dev
+glib-dev
+gobject-introspection-dev
+cairo-dev
+pango-dev
+
+# X11 & Xorg server headers
+libx11-dev
+libxext-dev
+libxrandr-dev
+libxinerama-dev
+libxrender-dev
+libxtst-dev
+libxfixes-dev
+libxdamage-dev
+libxcomposite-dev
+libxcursor-dev
+libxi-dev
+libxfont2-dev
+pixman-dev
+xorgproto
+xorg-server-dev
+libxshmfence-dev
+libepoxy-dev
+
+# Wayland / DRM / Audio / Compression headers
+wayland-dev
+wayland-protocols
+libdrm-dev
+libxkbcommon-dev
+gnutls-dev
+libjpeg-turbo-dev
+openssl-dev
+pcre-dev
+libcap-dev
+zlib-dev
+zstd-dev

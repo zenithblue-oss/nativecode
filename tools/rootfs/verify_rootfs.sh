@@ -42,7 +42,7 @@ if grep -q '^COMPONENT_DEV=1' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/nul
 fi
 
 echo "== base cmds =="
-for c in sh bash sudo git node npm python3 java javac adb fastboot gcc g++ cmake ninja clang rustc cargo go gh; do
+for c in sh bash sudo git node npm python3 java javac gcc g++ cmake ninja clang rustc cargo go gh; do
     have "$c" || FAIL=1
 done
 for c in opencode codex qwen agy claude grok kiro-cli; do
@@ -78,6 +78,8 @@ fi
 
 if [ "$IS_DEV" = "1" ]; then
     echo "== android/dev stack (COMPONENT_DEV=1) =="
+    have adb || [ -x "$ROOTFS/opt/android-sdk/platform-tools/adb" ] || { echo "MISS adb"; FAIL=1; }
+    have fastboot || [ -x "$ROOTFS/opt/android-sdk/platform-tools/fastboot" ] || { echo "MISS fastboot"; FAIL=1; }
     need /opt/android-sdk/platforms/android-36/android.jar
     [ -x "$ROOTFS/opt/android-sdk/build-tools/36.1.0/aapt2" ] || { echo "MISS aapt2 36.1.0"; FAIL=1; }
     [ -d "$ROOTFS/opt/android-sdk/ndk/29.0.14206865" ] || { echo "MISS ndk r29"; FAIL=1; }

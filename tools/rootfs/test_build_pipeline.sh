@@ -339,4 +339,90 @@ else
     exit 1
 fi
 
+# ---------------------------------------------------------
+# ALPAQUITA GLIBC BUILD PIPELINE TESTS
+# ---------------------------------------------------------
+echo "== checking build_alpaquita_rootfs.sh docker command =="
+if ! grep -q 'chroot /rootfs /bin/sh' "$REPO_ROOT/tools/rootfs/build_alpaquita_rootfs.sh"; then
+    echo "FAIL: build_alpaquita_rootfs.sh does not specify chrooting into /rootfs" >&2
+    exit 1
+fi
+echo "PASS: build_alpaquita_rootfs.sh invokes chroot into /rootfs"
+
+echo "== checking build_alpaquita_rootfs.sh chroot namespace staging and virtual fs mounts =="
+if ! grep -q 'mount --bind /dev /rootfs/dev' "$REPO_ROOT/tools/rootfs/build_alpaquita_rootfs.sh" || \
+   ! grep -q 'mount -t proc proc /rootfs/proc' "$REPO_ROOT/tools/rootfs/build_alpaquita_rootfs.sh" || \
+   ! grep -q 'mount -t sysfs sysfs /rootfs/sys' "$REPO_ROOT/tools/rootfs/build_alpaquita_rootfs.sh" || \
+   ! grep -q 'mount --bind /run /rootfs/run' "$REPO_ROOT/tools/rootfs/build_alpaquita_rootfs.sh" || \
+   ! grep -q 'mount --bind /dev/pts /rootfs/dev/pts' "$REPO_ROOT/tools/rootfs/build_alpaquita_rootfs.sh" || \
+   ! grep -q 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging' "$REPO_ROOT/tools/rootfs/build_alpaquita_rootfs.sh"; then
+    echo "FAIL: build_alpaquita_rootfs.sh does not mount virtual filesystems or stage assets before chroot" >&2
+    exit 1
+fi
+echo "PASS: build_alpaquita_rootfs.sh mounts virtual filesystems and stages assets before chroot"
+
+echo "== checking assemble-inside.sh for alpaquita preserves literal \$HOME, \$PATH and guest logger =="
+export ALPAQUITA_MINIROOTFS_SHA256_OVERRIDE="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+FAKE_ALPAQUITA_MINI="$WORK/alpaquita-minirootfs-stream-glibc-aarch64.tar.gz"
+touch "$FAKE_ALPAQUITA_MINI"
+bash "$REPO_ROOT/tools/rootfs/build_alpaquita_rootfs.sh" --work "$WORK" --assemble-only
+
+if grep -qF "$HOME" "$WORK/assemble-inside.sh"; then
+    echo "FAIL: Alpaquita assemble-inside.sh contains host home directory ($HOME)!" >&2
+    exit 1
+fi
+if ! grep -qF 'guest_log()' "$WORK/assemble-inside.sh"; then
+    echo "FAIL: Alpaquita assemble-inside.sh missing guest_log definition!" >&2
+    exit 1
+fi
+if grep -E '^\s*log\s+' "$WORK/assemble-inside.sh"; then
+    echo "FAIL: Alpaquita assemble-inside.sh contains undefined log calls!" >&2
+    exit 1
+fi
+echo "PASS: Alpaquita assemble-inside.sh has guest_log defined and no undefined log calls"
+
+echo "== test Alpaquita glibc loader requirement in verify_rootfs.sh =="
+cat > "$DUMMY_FS/etc/nativecode/rootfs-release" <<'EOF'
+FORMAT_VERSION=1
+DISTRO=alpaquita
+DISTRO_VERSION=stream
+LIBC=glibc
+ARCH=aarch64
+COMPONENT_E=1
+COMPONENT_F=1
+COMPONENT_GUI=1
+COMPONENT_G=1
+COMPONENT_H=1
+COMPONENT_GH=1
+COMPONENT_DEV=0
+EOF
+mkdir -p "$DUMMY_FS/lib" "$DUMMY_FS/usr/lib"
+rm -f "$DUMMY_FS/lib/ld-linux-aarch64.so.1" "$DUMMY_FS/usr/lib/ld-linux-aarch64.so.1"
+
+set +e
+VERIFY_NOGLIBC_OUT="$(bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$DUMMY_FS" 2>&1)"
+VERIFY_NOGLIBC_RC=$?
+set -e
+
+if [ "$VERIFY_NOGLIBC_RC" -ne 0 ] && echo "$VERIFY_NOGLIBC_OUT" | grep -q 'MISS glibc:ld-linux-aarch64.so.1'; then
+    echo "PASS: missing ld-linux-aarch64.so.1 causes verifier failure on LIBC=glibc"
+else
+    echo "FAIL: missing glibc loader did not fail verifier!" >&2
+    echo "$VERIFY_NOGLIBC_OUT"
+    exit 1
+fi
+
+touch "$DUMMY_FS/lib/ld-linux-aarch64.so.1"
+set +e
+VERIFY_GLIBC_OUT="$(bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$DUMMY_FS" 2>&1)"
+VERIFY_GLIBC_RC=$?
+set -e
+if [ "$VERIFY_GLIBC_RC" -eq 0 ]; then
+    echo "PASS: verify_rootfs.sh succeeded with ld-linux-aarch64.so.1 present"
+else
+    echo "FAIL: verify_rootfs.sh failed unexpectedly with glibc loader present!" >&2
+    echo "$VERIFY_GLIBC_OUT"
+    exit 1
+fi
+
 echo "BUILD-PIPELINE: ALL PASS"

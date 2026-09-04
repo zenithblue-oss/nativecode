@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# build_gui_bundle.sh — compile and package XFCE 4.20 core + TigerVNC + zsh + fastfetch
+# build_gui_bundle.sh — compile and package XFCE 4.20 core + TigerVNC (with Xvnc) + zsh + fastfetch
 # for Alpaquita glibc/AArch64 inside a container or native builder.
 # Output: $OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/versions.env"
+
 WORK="${WORK:-/tmp/nc-gui-build}"
 OUT="${OUT:-$SCRIPT_DIR/out}"
 PREFIX="/usr"
@@ -14,18 +17,43 @@ mkdir -p "$WORK" "$OUT" "$DESTDIR"
 
 log() { echo "build-gui-bundle: $*"; }
 
-log "NativeCode GUI bundle build started"
-log "Target PREFIX: $PREFIX"
-log "Staging DESTDIR: $DESTDIR"
+verify_sha256() {
+    local file="$1"
+    local expected="$2"
+    local actual
+    actual=$(sha256sum "$file" | awk '{print $1}')
+    if [ "$actual" != "$expected" ]; then
+        echo "build-gui-bundle: ERROR: Checksum mismatch for $file" >&2
+        echo "  Expected: $expected" >&2
+        echo "  Actual:   $actual" >&2
+        exit 1
+    fi
+}
 
-# 1. Zsh (5.9)
+download_and_verify() {
+    local url="$1"
+    local dest="$2"
+    local expected_sha="$3"
+
+    if [ ! -f "$dest" ]; then
+        log "Downloading $url -> $dest"
+        curl -fsSL -o "$dest" "$url"
+    fi
+    verify_sha256 "$dest" "$expected_sha"
+}
+
+# 1. Zsh
 build_zsh() {
-    log "=== Building Zsh ==="
-    local ZSH_VER="5.9"
-    local SRC="$WORK/zsh-$ZSH_VER"
+    log "=== Building Zsh ($ZSH_VERSION) ==="
+    local TARBALL="$WORK/zsh-$ZSH_VERSION.tar.xz"
+    local SRC="$WORK/zsh-$ZSH_VERSION"
+    download_and_verify \
+        "https://sourceforge.net/projects/zsh/files/zsh/$ZSH_VERSION/zsh-$ZSH_VERSION.tar.xz/download" \
+        "$TARBALL" \
+        "$ZSH_SHA256"
+
     if [ ! -d "$SRC" ]; then
-        curl -fsSL "https://sourceforge.net/projects/zsh/files/zsh/$ZSH_VER/zsh-$ZSH_VER.tar.xz/download" -o "$WORK/zsh-$ZSH_VER.tar.xz"
-        tar -xf "$WORK/zsh-$ZSH_VER.tar.xz" -C "$WORK"
+        tar -xf "$TARBALL" -C "$WORK"
     fi
     cd "$SRC"
     ./configure --prefix="$PREFIX" \
@@ -43,12 +71,16 @@ build_zsh() {
 
 # 2. Fastfetch
 build_fastfetch() {
-    log "=== Building Fastfetch ==="
-    local FF_VER="2.38.0"
-    local SRC="$WORK/fastfetch-$FF_VER"
+    log "=== Building Fastfetch ($FASTFETCH_VERSION) ==="
+    local TARBALL="$WORK/fastfetch-$FASTFETCH_VERSION.tar.gz"
+    local SRC="$WORK/fastfetch-$FASTFETCH_VERSION"
+    download_and_verify \
+        "https://github.com/fastfetch-cli/fastfetch/archive/refs/tags/$FASTFETCH_VERSION.tar.gz" \
+        "$TARBALL" \
+        "$FASTFETCH_SHA256"
+
     if [ ! -d "$SRC" ]; then
-        curl -fsSL "https://github.com/fastfetch-cli/fastfetch/archive/refs/tags/$FF_VER.tar.gz" -o "$WORK/fastfetch-$FF_VER.tar.gz"
-        tar -xf "$WORK/fastfetch-$FF_VER.tar.gz" -C "$WORK"
+        tar -xf "$TARBALL" -C "$WORK"
     fi
     mkdir -p "$SRC/build"
     cd "$SRC/build"
@@ -58,59 +90,106 @@ build_fastfetch() {
     log "Fastfetch installed to $DESTDIR"
 }
 
-# 3. TigerVNC (Xvnc server & vncpasswd)
+# 3. TigerVNC + Xvnc Server
 build_tigervnc() {
-    log "=== Building TigerVNC ==="
-    local TV_VER="1.14.1"
-    local SRC="$WORK/tigervnc-$TV_VER"
-    if [ ! -d "$SRC" ]; then
-        curl -fsSL "https://github.com/TigerVNC/tigervnc/archive/refs/tags/v$TV_VER.tar.gz" -o "$WORK/tigervnc-$TV_VER.tar.gz"
-        tar -xf "$WORK/tigervnc-$TV_VER.tar.gz" -C "$WORK"
+    log "=== Building TigerVNC ($TIGERVNC_VERSION) with Xvnc ==="
+    local TV_TARBALL="$WORK/tigervnc-$TIGERVNC_VERSION.tar.gz"
+    local TV_SRC="$WORK/tigervnc-$TIGERVNC_VERSION"
+    download_and_verify \
+        "https://github.com/TigerVNC/tigervnc/archive/refs/tags/v$TIGERVNC_VERSION.tar.gz" \
+        "$TV_TARBALL" \
+        "$TIGERVNC_SHA256"
+
+    if [ ! -d "$TV_SRC" ]; then
+        tar -xf "$TV_TARBALL" -C "$WORK"
     fi
-    mkdir -p "$SRC/build"
-    cd "$SRC/build"
+
+    # Build TigerVNC user tools & libraries (vncpasswd, etc.)
+    mkdir -p "$TV_SRC/build"
+    cd "$TV_SRC/build"
     cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DENABLE_NLS=OFF -DBUILD_VIEWER=OFF
     cmake --build . -j"$(nproc)"
     DESTDIR="$DESTDIR" cmake --install .
-    log "TigerVNC tools installed to $DESTDIR"
+
+    # Build Xvnc DDX server using Xorg source
+    local XORG_TARBALL="$WORK/xorg-server-$XORG_SERVER_VERSION.tar.xz"
+    local XORG_SRC="$WORK/xorg-server-$XORG_SERVER_VERSION"
+    download_and_verify \
+        "https://www.x.org/releases/individual/xserver/xorg-server-$XORG_SERVER_VERSION.tar.xz" \
+        "$XORG_TARBALL" \
+        "$XORG_SERVER_SHA256"
+
+    if [ ! -d "$XORG_SRC" ]; then
+        tar -xf "$XORG_TARBALL" -C "$WORK"
+    fi
+
+    log "Preparing Xorg server tree for Xvnc..."
+    rm -rf "$TV_SRC/unix/xserver"
+    cp -R "$XORG_SRC" "$TV_SRC/unix/xserver"
+
+    cd "$TV_SRC/unix/xserver"
+    # Apply TigerVNC xserver21 patch if not already applied
+    if [ -f "$TV_SRC/unix/xserver21.patch" ]; then
+        patch -p1 -N < "$TV_SRC/unix/xserver21.patch" || true
+    fi
+
+    autoreconf -fiv
+    ./configure --prefix="$PREFIX" \
+        --with-pic --without-dtrace --disable-static --disable-dri \
+        --disable-xinerama --disable-xvfb --disable-xnest --disable-xorg \
+        --disable-dmx --disable-xwin --disable-xephyr --disable-kdrive \
+        --disable-config-hal --disable-config-udev --disable-dri2 --enable-glx \
+        --with-default-font-path="catalogue:/etc/X11/fontpath.d,built-ins" \
+        --with-xkb-path=/usr/share/X11/xkb \
+        --with-xkb-output=/var/lib/xkb \
+        --with-xkb-bin-directory=/usr/bin
+
+    make -j"$(nproc)" TIGERVNC_SRCDIR="$TV_SRC"
+    cd hw/vnc
+    make DESTDIR="$DESTDIR" install
+    log "TigerVNC & Xvnc installed to $DESTDIR"
 }
 
 # 4. XFCE 4.20 core components
 build_xfce_core() {
     log "=== Building XFCE Core ==="
-    # Components order per Xfce documentation:
-    # libxfce4util -> xfconf -> libxfce4ui -> garcon -> exo -> xfce4-panel -> xfce4-session -> xfwm4 -> xfdesktop -> thunar -> xfce4-terminal
     local XFCE_COMPONENTS=(
-        "libxfce4util:4.20.0"
-        "xfconf:4.20.0"
-        "libxfce4ui:4.20.0"
-        "garcon:4.20.0"
-        "exo:4.20.0"
-        "xfce4-panel:4.20.0"
-        "xfce4-session:4.20.0"
-        "xfwm4:4.20.0"
-        "xfdesktop:4.20.0"
-        "thunar:4.20.0"
-        "xfce4-terminal:1.1.4"
-        "xfce4-settings:4.20.0"
+        "libxfce4util:4.20.0:$XFCE_LIBXFCE4UTIL_SHA256:xfce"
+        "xfconf:4.20.0:$XFCE_XFCONF_SHA256:xfce"
+        "libxfce4ui:4.20.0:$XFCE_LIBXFCE4UI_SHA256:xfce"
+        "garcon:4.20.0:$XFCE_GARCON_SHA256:xfce"
+        "exo:4.20.0:$XFCE_EXO_SHA256:xfce"
+        "xfce4-panel:4.20.0:$XFCE_XFCE4_PANEL_SHA256:xfce"
+        "xfce4-session:4.20.0:$XFCE_XFCE4_SESSION_SHA256:xfce"
+        "xfwm4:4.20.0:$XFCE_XFWM4_SHA256:xfce"
+        "xfdesktop:4.20.0:$XFCE_XFDESKTOP_SHA256:xfce"
+        "thunar:4.20.0:$XFCE_THUNAR_SHA256:xfce"
+        "xfce4-terminal:1.1.4:$XFCE_XFCE4_TERMINAL_SHA256:apps"
+        "xfce4-settings:4.20.0:$XFCE_XFCE4_SETTINGS_SHA256:xfce"
     )
 
     for comp in "${XFCE_COMPONENTS[@]}"; do
         local name="${comp%%:*}"
-        local ver="${comp#*:}"
+        local rest="${comp#*:}"
+        local ver="${rest%%:*}"
+        local rest2="${rest#*:}"
+        local sha="${rest2%%:*}"
+        local cat="${rest2#*:}"
         local major_minor="${ver%.*}"
+
         log "Building $name $ver..."
+        local TARBALL="$WORK/$name-$ver.tar.bz2"
         local SRC="$WORK/$name-$ver"
+        local url="https://archive.xfce.org/src/$cat/$name/$major_minor/$name-$ver.tar.bz2"
+
+        download_and_verify "$url" "$TARBALL" "$sha"
         if [ ! -d "$SRC" ]; then
-            local url="https://archive.xfce.org/src/xfce/$name/$major_minor/$name-$ver.tar.bz2"
-            if ! curl -fsSL -o "$WORK/$name-$ver.tar.bz2" "$url" 2>/dev/null; then
-                url="https://archive.xfce.org/src/apps/$name/$major_minor/$name-$ver.tar.bz2"
-                curl -fsSL -o "$WORK/$name-$ver.tar.bz2" "$url"
-            fi
-            tar -xf "$WORK/$name-$ver.tar.bz2" -C "$WORK"
+            tar -xf "$TARBALL" -C "$WORK"
         fi
+
         cd "$SRC"
         if [ -f "meson.build" ]; then
+            rm -rf build
             meson setup build --prefix="$PREFIX" --sysconfdir=/etc
             ninja -C build -j"$(nproc)"
             DESTDIR="$DESTDIR" ninja -C build install
@@ -122,15 +201,40 @@ build_xfce_core() {
     done
 }
 
-archive_bundle() {
-    log "=== Archiving NativeCode GUI Bundle ==="
-    local TARBALL="$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst"
-    if command -v zstd >/dev/null 2>&1; then
-        tar -C "$DESTDIR" --numeric-owner -cpf - . | zstd -19 -T0 -o "$TARBALL"
-    else
-        tar -C "$DESTDIR" --numeric-owner -cJpf "$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.xz" .
-        TARBALL="$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.xz"
+verify_contract() {
+    log "=== Verifying Built Artifact Contract ==="
+    local missing=0
+    for bin in \
+        "$DESTDIR/usr/bin/zsh" \
+        "$DESTDIR/usr/bin/fastfetch" \
+        "$DESTDIR/usr/bin/startxfce4" \
+        "$DESTDIR/usr/bin/xfwm4" \
+        "$DESTDIR/usr/bin/thunar" \
+        "$DESTDIR/usr/bin/Xvnc"
+    do
+        if [ ! -x "$bin" ]; then
+            echo "build-gui-bundle: CONTRACT FAILURE: Missing executable binary: $bin" >&2
+            missing=1
+        else
+            log "OK: $bin exists and is executable"
+        fi
+    done
+
+    if [ "$missing" != "0" ]; then
+        echo "build-gui-bundle: FATAL: One or more required GUI bundle binaries failed to build!" >&2
+        exit 1
     fi
+}
+
+archive_bundle() {
+    verify_contract
+    log "=== Archiving NativeCode GUI Bundle (canonical .tar.zst) ==="
+    if ! command -v zstd >/dev/null 2>&1; then
+        echo "build-gui-bundle: ERROR: 'zstd' command is required to produce canonical .tar.zst bundle" >&2
+        exit 1
+    fi
+    local TARBALL="$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst"
+    tar -C "$DESTDIR" --numeric-owner -cpf - . | zstd -19 -T0 -o "$TARBALL"
     sha256sum "$TARBALL" | tee "$TARBALL.sha256"
     log "Bundle created: $TARBALL"
 }
@@ -142,10 +246,10 @@ if [ "${1:-}" = "--archive-only" ]; then
     exit 0
 fi
 
-# Execute sequence
-build_zsh || log "WARN: zsh build step"
-build_fastfetch || log "WARN: fastfetch build step"
-build_tigervnc || log "WARN: tigervnc build step"
-build_xfce_core || log "WARN: xfce build step"
+# Execute sequence — strictly fatal on failure
+build_zsh
+build_fastfetch
+build_tigervnc
+build_xfce_core
 archive_bundle
 log "GUI bundle build completed successfully."

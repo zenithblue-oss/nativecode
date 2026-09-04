@@ -6,18 +6,38 @@
 
 set -u
 
-DISTRO="${1:-alpine}"
+DISTRO="${1:-alpaquita}"
 SETUP_B64="${2:-}"
 
 # Pinned rootfs (packaged as assets/rootfs/, deployed to $HOME)
-ROOTFS_NAME="alpine_rootfs.tar.gz"
-ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/zenithblue-oss/fluxlinux/releases/download/rootfs/alpine_3.24_rootfs.tar.gz}"
-ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-}"
+case "$DISTRO" in
+    alpaquita)
+        ROOTFS_NAME="alpaquita_rootfs.tar.zst"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/zenithblue-oss/fluxlinux/releases/download/rootfs/alpaquita_glibc_rootfs.tar.zst}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-ec5c81cb32bd6454a778aaec449ef269806d7f17b52432abe00280684136af50}"
+        ;;
+    alpine)
+        ROOTFS_NAME="alpine_rootfs.tar.gz"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/zenithblue-oss/fluxlinux/releases/download/rootfs/alpine_3.24_rootfs.tar.gz}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-}"
+        ;;
+    *)
+        ROOTFS_NAME="${DISTRO}_rootfs.tar.gz"
+        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-}"
+        ;;
+esac
 
 # Resolve script directory (deployed to $HOME or $HOME/scripts)
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
 DEFAULT_SETUP=""
 for candidate in \
+    "${SCRIPT_DIR}/setup_${DISTRO}_family.sh" \
+    "${HOME:-}/setup_${DISTRO}_family.sh" \
+    "${HOME:-}/scripts/setup_${DISTRO}_family.sh" \
+    "${SCRIPT_DIR}/setup_alpaquita_family.sh" \
+    "${HOME:-}/setup_alpaquita_family.sh" \
+    "${HOME:-}/scripts/setup_alpaquita_family.sh" \
     "${SCRIPT_DIR}/setup_alpine_family.sh" \
     "${HOME:-}/setup_alpine_family.sh" \
     "${HOME:-}/scripts/setup_alpine_family.sh" \
@@ -101,16 +121,20 @@ resolve_rootfs_archive() {
     fi
 
     # Prefer absolute paths under HOME/PREFIX (app-deployed asset).
-    # Accept both .tar.gz and plain .tar (AGP may gunzip .gz assets unless 'gz' is in noCompress).
+    # Accept .tar.zst, .tar.gz and plain .tar (AGP may gunzip .gz assets unless 'gz' is in noCompress).
     for candidate in \
         "$HOME/$ROOTFS_NAME" \
+        "$HOME/${ROOTFS_NAME%.zst}" \
         "$HOME/${ROOTFS_NAME%.gz}" \
         "$HOME/rootfs/$ROOTFS_NAME" \
+        "$HOME/rootfs/${ROOTFS_NAME%.zst}" \
         "$HOME/rootfs/${ROOTFS_NAME%.gz}" \
         "$PREFIX/var/lib/proot-distro/cache/rootfs/$ROOTFS_NAME" \
         "/sdcard/Download/$ROOTFS_NAME" \
+        "/sdcard/Download/rootfs.tar.zst" \
         "/sdcard/Download/rootfs.tar.xz" \
         "/storage/emulated/0/Download/$ROOTFS_NAME" \
+        "/storage/emulated/0/Download/rootfs.tar.zst" \
         "/storage/emulated/0/Download/rootfs.tar.xz"
     do
         if [ -f "$candidate" ] && [ -s "$candidate" ]; then
@@ -233,7 +257,7 @@ if [ -n "$SETUP_MODE" ]; then
         # setup_alpine_family.sh is #!/bin/sh-clean, so `sh` is correct here.
         GUEST_SH="bash"
         case "$DISTRO" in
-            alpine) GUEST_SH="sh" ;;
+            alpine|alpaquita) GUEST_SH="sh" ;;
         esac
         "$PYTHON" "$PROOT_DISTRO" login "$DISTRO" --shared-tmp -- \
             "$GUEST_SH" -c "$GUEST_SH /tmp/flux_setup_temp.sh $DISTRO"

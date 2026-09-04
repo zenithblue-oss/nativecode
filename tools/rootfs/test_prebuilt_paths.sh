@@ -30,6 +30,7 @@ mkdir -p "$T/guest" "$T/etc/nativecode" "$T/etc/apk" "$T/etc/sudoers.d" \
     "$T/var/tmp" "$T/var/log" "$T/var/lib/dbus" "$T/var/cache/apk" "$T/var/lib/apk/db"
 
 cp "$GUEST_DIR/setup_alpine_family.sh" \
+   "$GUEST_DIR/setup_alpaquita_family.sh" \
    "$GUEST_DIR/setup_hw_accel_debian.sh" \
    "$GUEST_DIR/setup_xfce4.sh" \
    "$GUEST_DIR/setup_customization_alpine.sh" \
@@ -209,13 +210,24 @@ echo "== negative control: baked E missing gh must fail with exit 1 =="
 mv /usr/local/sbin/gh /usr/local/sbin/gh.bak
 _m="$(mark)"
 sh "$T/guest/setup_alpine_family.sh" alpine </dev/null >/tmp/neg_gh.log 2>&1; _rc=$?
-mv /usr/local/sbin/gh.bak /usr/local/sbin/gh
 if [ "$_rc" = "1" ] && grep -qE 'gh missing in prebuilt rootfs' /tmp/neg_gh.log; then
-    echo "PASS neg-E-missing-gh-fails (exit=1)"
+    echo "PASS neg-alpine-E-missing-gh-fails (exit=1)"
     PASS=$((PASS + 1))
 else
-    echo "FAIL neg-E-missing-gh-fails (want exit=1, got exit=$_rc)"
+    echo "FAIL neg-alpine-E-missing-gh-fails (want exit=1, got exit=$_rc)"
     tail -n 10 /tmp/neg_gh.log
+    FAIL=$((FAIL + 1))
+fi
+
+_m="$(mark)"
+sh "$T/guest/setup_alpaquita_family.sh" alpaquita </dev/null >/tmp/neg_alpa_gh.log 2>&1; _rc=$?
+mv /usr/local/sbin/gh.bak /usr/local/sbin/gh
+if [ "$_rc" = "1" ] && grep -qE 'gh missing in prebuilt rootfs' /tmp/neg_alpa_gh.log; then
+    echo "PASS neg-alpaquita-E-missing-gh-fails (exit=1)"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL neg-alpaquita-E-missing-gh-fails (want exit=1, got exit=$_rc)"
+    tail -n 10 /tmp/neg_alpa_gh.log
     FAIL=$((FAIL + 1))
 fi
 
@@ -229,11 +241,12 @@ touch "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax
 echo "# agnosterzak theme" > "$T/home/flux/.oh-my-zsh/custom/themes/agnosterzak.zsh-theme"
 
 echo "== prebuilt positives: exit 0 + zero STUB-CALL =="
-check "E-baked"   0 "$T/guest/setup_alpine_family.sh" sh
-check "F-baked"   0 "$T/guest/setup_hw_accel_debian.sh" bash
-check "GUI-baked" 0 "$T/guest/setup_xfce4.sh" bash
-check "G-baked"   0 "$T/guest/setup_customization_alpine.sh" sh
-check "H-baked"   0 "$T/guest/setup_cli_tools.sh" bash
+check "E-baked-alpine"    0 "$T/guest/setup_alpine_family.sh" sh
+check "E-baked-alpaquita" 0 "$T/guest/setup_alpaquita_family.sh" sh
+check "F-baked"           0 "$T/guest/setup_hw_accel_debian.sh" bash
+check "GUI-baked"         0 "$T/guest/setup_xfce4.sh" bash
+check "G-baked"           0 "$T/guest/setup_customization_alpine.sh" sh
+check "H-baked"           0 "$T/guest/setup_cli_tools.sh" bash
 
 echo "== negative control: baked G missing OMZ plugin must fail with exit 1 and zero git calls =="
 rm -f "$T/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
