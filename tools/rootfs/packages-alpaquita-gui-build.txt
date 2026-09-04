@@ -27,6 +27,11 @@ cairo-dev
 pango-dev
 
 # X11 & Xorg server headers
+util-macros
+font-util-dev
+bdftopcf
+xkbcomp
+libxcvt-dev
 libx11-dev
 libxext-dev
 libxrandr-dev
