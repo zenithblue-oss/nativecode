@@ -1,0 +1,22 @@
+# General + web development stack (no Flutter, no gtk+3.0-dev).
+zip
+file
+pkgconf
+cmake
+clang22
+gdb
+lldb
+valgrind
+python3-dev
+py3-pip
+py3-virtualenv
+rust
+cargo
+nginx
+xz-dev
+ninja-build
+ninja-is-really-ninja
+go
+android-tools-adb
+android-tools-fastboot
+openjdk21-jdk

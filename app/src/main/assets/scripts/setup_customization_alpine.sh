@@ -32,6 +32,34 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # NOTE: never append inherited $PATH here — under proot-distro login it carries
 # host $PREFIX/bin, and host tools (xz/tar) leak into the guest and fail to link.
 
+# Prebuilt-rootfs helper. G runtime = select theme/wallpaper/zsh, no network.
+NC_COMMON="/usr/local/lib/nativecode/rootfs-common.sh"
+if [ -f "$NC_COMMON" ]; then
+    # shellcheck source=/dev/null
+    . "$NC_COMMON"
+else
+    NC_RELEASE_FILE="${NC_RELEASE_FILE:-/etc/nativecode/rootfs-release}"
+    nc_component_baked() { [ -n "${1:-}" ] && [ -f "$NC_RELEASE_FILE" ] && grep -q "^COMPONENT_$1=1" "$NC_RELEASE_FILE" 2>/dev/null; }
+    nc_is_proot() { [ "${NATIVECODE_ISOLATION:-}" = "proot" ] && return 0; [ -n "${PROOT_TMP_DIR:-}" ] && return 0; return 1; }
+    nc_runtime_home_repair() {
+        _u="${1:-flux}"; _h="/home/$_u"; [ -d "$_h" ] || return 0
+        mkdir -p "$_h/.config" "$_h/.cache" "$_h/.local/share" 2>/dev/null || true
+        if nc_is_proot; then chmod 755 "$_h" 2>/dev/null || true; chmod -R u+rwX "$_h/.config" "$_h/.cache" "$_h/.local" 2>/dev/null || true
+        else chown -R "$_u:$_u" "$_h" 2>/dev/null || chown -R "$_u" "$_h" 2>/dev/null || true; fi
+    }
+    nc_runtime_dns_repair() {
+        if [ ! -s /etc/resolv.conf ] || ! grep -q nameserver /etc/resolv.conf 2>/dev/null; then
+            printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > /etc/resolv.conf 2>/dev/null || true
+        fi
+    }
+fi
+if nc_component_baked G 2>/dev/null; then
+    echo "NativeCode: G already baked — runtime configuration only (no apk, no download)"
+    PREBUILT_G=1
+else
+    PREBUILT_G=0
+fi
+
 _flux_chown() { chown "$@" 2>/dev/null || true; }
 _flux_chown_r() { chown -R "$@" 2>/dev/null || true; }
 
@@ -41,10 +69,14 @@ if id -gn "$CUSTOM_USER" >/dev/null 2>&1; then
 fi
 
 # DNS
+nc_runtime_dns_repair 2>/dev/null || true
 if [ ! -s /etc/resolv.conf ]; then
     printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > /etc/resolv.conf
 fi
 
+if [ "${PREBUILT_G:-0}" = "1" ]; then
+    echo "NativeCode: G packages/assets baked — skipping apk install"
+else
 echo "FluxLinux: Installing customization packages..."
 apk update || handle_error "apk update"
 apk add --no-cache \
@@ -54,6 +86,7 @@ apk add --no-cache \
 
 # Optional niceties (do not fail install)
 apk add --no-cache fastfetch neofetch 2>/dev/null || true
+fi
 
 export LANG="${LANG:-C.UTF-8}"
 export LC_ALL="${LC_ALL:-C.UTF-8}"
@@ -153,7 +186,12 @@ fi
 
 mkdir -p "$THEME_DIR" "$ICON_DIR"
 
-if [ "${FLUX_SKIP_THEME_ICONS:-0}" = "1" ]; then
+if [ "${PREBUILT_G:-0}" = "1" ]; then
+    echo "NativeCode: validating baked theme/icon/cursor assets (no download)"
+    theme_is_installed "$SEL_THEME" || echo "NativeCode: WARN: baked theme $SEL_THEME missing"
+    icon_is_installed "$SEL_ICON" || echo "NativeCode: WARN: baked icons $SEL_ICON missing"
+    cursor_is_installed "$SEL_CURSOR" || echo "NativeCode: WARN: baked cursor $SEL_CURSOR missing"
+elif [ "${FLUX_SKIP_THEME_ICONS:-0}" = "1" ]; then
     echo "FluxLinux: Themes/icons pre-installed on host — skip guest extract"
 elif theme_is_installed "$SEL_THEME" && icon_is_installed "$SEL_ICON" && cursor_is_installed "$SEL_CURSOR"; then
     echo "FluxLinux: Theme+icons+cursor already installed — skip extract"
@@ -194,6 +232,9 @@ mkdir -p "$WALLPAPER_DIR"
 _flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/Pictures" 2>/dev/null || true
 
 if [ ! -f "$WALLPAPER_DIR/$SEL_WALLPAPER" ]; then
+    if [ "${PREBUILT_G:-0}" = "1" ]; then
+        echo "NativeCode: WARN: baked wallpaper $SEL_WALLPAPER missing (no download)"
+    else
     WFILE="$(find_asset "$SEL_WALLPAPER" || true)"
     if [ -n "$WFILE" ]; then
         cp -f "$WFILE" "$WALLPAPER_DIR/$SEL_WALLPAPER"
@@ -205,12 +246,16 @@ if [ ! -f "$WALLPAPER_DIR/$SEL_WALLPAPER" ]; then
             [ -f "$WALLPAPER_DIR/light.png" ] && mv -f "$WALLPAPER_DIR/light.png" "$WALLPAPER_DIR/fluxlinux-light.png"
         fi
     fi
+    fi
 fi
 _flux_chown "$CUSTOM_USER:$CUSTOM_GROUP" "$WALLPAPER_DIR"/* 2>/dev/null || true
 
 # Font (best-effort)
 FONT_DIR="/usr/share/fonts/jetbrains-mono-nerd"
 if ! fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd"; then
+    if [ "${PREBUILT_G:-0}" = "1" ]; then
+        echo "NativeCode: WARN: baked Nerd Font missing (no download)"
+    else
     echo "FluxLinux: Installing JetBrains Mono Nerd Font..."
     mkdir -p "$FONT_DIR"
     TEMP_ZIP="/tmp/JetBrainsMono.zip"
@@ -220,6 +265,7 @@ if ! fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd"; then
         fc-cache -f "$FONT_DIR" 2>/dev/null || true
     fi
     rm -f "$TEMP_ZIP"
+    fi
 fi
 
 # XFCE settings XML
@@ -310,6 +356,9 @@ if [ -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
         echo "FluxLinux: Oh My Zsh already valid — skip install"
     fi
     OMZ_OK=1
+elif [ "${PREBUILT_G:-0}" = "1" ]; then
+    echo "NativeCode: WARN: baked Oh My Zsh missing (no clone in runtime)"
+    OMZ_OK=0
 else
     if [ -e "$USER_HOME/.oh-my-zsh" ]; then
         echo "FluxLinux: Incomplete Oh My Zsh detected — removing (bounded)…"
@@ -444,9 +493,13 @@ if [ ! -f "$ZPROFILE" ]; then
 fi
 
 mkdir -p "$USER_HOME/.local/share/fastfetch/presets"
+if [ "${PREBUILT_G:-0}" = "1" ]; then
+    echo "NativeCode: fastfetch preset baked — skipping download"
+else
 _flux_run 20 curl -fsSL --connect-timeout 8 --max-time 15 \
     https://raw.githubusercontent.com/zenithblue-oss/Linux_Setup/dev/config/termux.jsonc \
     -o "$USER_HOME/.local/share/fastfetch/presets/termux.jsonc" 2>/dev/null || true
+fi
 
 if command -v zsh >/dev/null 2>&1; then
     ZSH_PATH="$(command -v zsh)"
@@ -461,7 +514,11 @@ if [ -f "$USER_HOME/.oh-my-zsh/oh-my-zsh.sh" ]; then
 fi
 _flux_chown "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.zshrc"
 _flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.local"
-_flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME" 2>/dev/null || true
+if nc_is_proot 2>/dev/null; then
+    echo "NativeCode: PRoot — preserving host ownership (no recursive home chown)"
+else
+    _flux_chown_r "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME" 2>/dev/null || true
+fi
 
 echo "FluxLinux: Terminal configuration complete!"
 
@@ -473,9 +530,9 @@ if [ -n "$_ref_u" ]; then
         chown -R "$_ref_u:$_ref_g" "$p" 2>/dev/null || true
     done
 fi
-mkdir -p /lib/apk/db /var/cache/apk /var/log
+mkdir -p /lib/apk/db /var/cache/apk /var/log 2>/dev/null || true
 rm -f /lib/apk/db/lock 2>/dev/null || true
-: > /lib/apk/db/lock 2>/dev/null || true
+touch /lib/apk/db/lock 2>/dev/null || true
 chmod 666 /lib/apk/db/lock 2>/dev/null || true
 touch /var/log/apk.log 2>/dev/null || true
 chmod 666 /var/log/apk.log 2>/dev/null || true

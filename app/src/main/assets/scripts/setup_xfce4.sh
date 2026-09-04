@@ -16,7 +16,31 @@ handle_error() {
 
 echo "FluxLinux: Starting XFCE4 Desktop Setup..."
 
-if command -v apk >/dev/null 2>&1; then
+# Prebuilt-rootfs helper. GUI phase is configuration-only when baked.
+NC_COMMON="/usr/local/lib/nativecode/rootfs-common.sh"
+if [ -f "$NC_COMMON" ]; then
+    # shellcheck source=/dev/null
+    . "$NC_COMMON"
+else
+    NC_RELEASE_FILE="${NC_RELEASE_FILE:-/etc/nativecode/rootfs-release}"
+    nc_component_baked() { [ -n "${1:-}" ] && [ -f "$NC_RELEASE_FILE" ] && grep -q "^COMPONENT_$1=1" "$NC_RELEASE_FILE" 2>/dev/null; }
+    nc_is_proot() { [ "${NATIVECODE_ISOLATION:-}" = "proot" ] && return 0; [ -n "${PROOT_TMP_DIR:-}" ] && return 0; return 1; }
+    nc_runtime_home_repair() {
+        _u="${1:-flux}"; _h="/home/$_u"; [ -d "$_h" ] || return 0
+        if nc_is_proot; then chmod 755 "$_h" 2>/dev/null || true; chmod -R u+rwX "$_h/.config" 2>/dev/null || true
+        else chown -R "$_u:$_u" "$_h" 2>/dev/null || chown -R "$_u" "$_h" 2>/dev/null || true; fi
+    }
+fi
+if nc_component_baked GUI 2>/dev/null; then
+    echo "NativeCode: GUI already baked — configuration only (no apk, no download)"
+    PREBUILT_GUI=1
+else
+    PREBUILT_GUI=0
+fi
+
+if [ "${PREBUILT_GUI:-0}" = "1" ]; then
+    command -v startxfce4 >/dev/null 2>&1 || handle_error "startxfce4 missing in prebuilt rootfs"
+elif command -v apk >/dev/null 2>&1; then
     echo "FluxLinux: Installing XFCE4 packages via apk..."
     apk update || handle_error "APK Update"
     apk add --no-cache xfce4 xfce4-terminal dbus tigervnc font-dejavu wget unzip curl || handle_error "Package Installation"
@@ -38,7 +62,11 @@ xrdb $HOME/.Xresources 2>/dev/null
 startxfce4
 EOF
 chmod +x "$USER_HOME/.vnc/xstartup"
-chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.vnc"
+if [ "${PREBUILT_GUI:-0}" = "1" ]; then
+    nc_runtime_home_repair "$CUSTOM_USER" 2>/dev/null || chmod 755 "$USER_HOME" 2>/dev/null || true
+else
+    chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.vnc"
+fi
 
 # 3. Deploy FluxLinux Themes
 ASSET_REPO="zenithblue-oss/fluxlinux"
@@ -64,7 +92,13 @@ extract_all_assets() {
 
 echo "FluxLinux: Downloading XFCE themes..."
 mkdir -p "$THEME_DIR"
+if [ "${PREBUILT_GUI:-0}" = "1" ]; then
+    echo "NativeCode: themes baked — skipping network download (validating)"
+    [ -d "$THEME_DIR/Space-transparency" ] || [ -d "$THEME_DIR/Space-light" ] || \
+        echo "NativeCode: WARN: baked theme missing, keeping XML-only config"
+else
 extract_all_assets "$BASE_URL/theme.zip" "$THEME_DIR"
+fi
 
 SEL_THEME="Space-transparency"
 if [ "$FLUX_THEME" = "light" ]; then
@@ -232,7 +266,11 @@ BackgroundMode=TERMINAL_BACKGROUND_TRANSPARENT
 BackgroundDarkness=0.7
 EOF
 
-chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config"
+if [ "${PREBUILT_GUI:-0}" = "1" ]; then
+    nc_runtime_home_repair "$CUSTOM_USER" 2>/dev/null || true
+else
+    chown -R "$CUSTOM_USER:$CUSTOM_GROUP" "$USER_HOME/.config"
+fi
 
 # 8. Reload XFCE Daemons if active
 if pgrep -x xfce4-session >/dev/null 2>&1; then

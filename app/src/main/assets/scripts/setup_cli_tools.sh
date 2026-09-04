@@ -6,7 +6,7 @@ set -euo pipefail
 
 DISTRO_ID="alpine-musl-apk"
 FLUX_USER="${FLUX_USER:-flux}"
-NODE_MAJOR="${NODE_MAJOR:-26}"
+NODE_MAJOR="${NODE_MAJOR:-24}"
 NVM_VERSION="${NVM_VERSION:-v0.40.5}"
 MARKER="flux-cli-tools"
 BENCHMARK_FILE="${BENCHMARK_FILE:-/tmp/nativecode-ai-cli-benchmark.tsv}"
@@ -64,7 +64,7 @@ if [ "$(id -u)" != "0" ]; then
         echo ">>> Re-launching through sudo from Flux terminal..."
         exec sudo -E \
             FLUX_USER="${FLUX_USER:-$(id -un)}" \
-            NODE_MAJOR="${NODE_MAJOR:-26}" \
+            NODE_MAJOR="${NODE_MAJOR:-24}" \
             NVM_VERSION="${NVM_VERSION:-v0.40.5}" \
             BENCHMARK_FILE="${BENCHMARK_FILE:-/tmp/nativecode-ai-cli-benchmark.tsv}" \
             NC_SKIP_AI_CLI="${NC_SKIP_AI_CLI:-0}" \
@@ -114,10 +114,26 @@ as_flux() {
     su -s /bin/bash - "$FLUX_USER" -c "$1"
 }
 
+# Prebuilt fast path: binaries baked — verify + PATH repair only, seconds.
+NC_COMMON="/usr/local/lib/nativecode/rootfs-common.sh"
+if [ -f "$NC_COMMON" ]; then
+    # shellcheck source=/dev/null
+    . "$NC_COMMON" 2>/dev/null || true
+else
+    NC_RELEASE_FILE="${NC_RELEASE_FILE:-/etc/nativecode/rootfs-release}"
+    nc_component_baked() { [ -n "${1:-}" ] && [ -f "$NC_RELEASE_FILE" ] && grep -q "^COMPONENT_$1=1" "$NC_RELEASE_FILE" 2>/dev/null; }
+fi
+if nc_component_baked H 2>/dev/null; then
+    echo "NativeCode: H already baked — verification/PATH repair only (no installs)"
+    PREBUILT_H=1
+else
+    PREBUILT_H=0
+fi
+
 flux_has() {
     local cmd="$1"
     as_flux "
-        export PATH=\"\$HOME/.local/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH\"
+        export PATH=\"\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH\"
         export NVM_DIR=\"\$HOME/.nvm\"
         if [ -s \"\$NVM_DIR/nvm.sh\" ]; then
             . \"\$NVM_DIR/nvm.sh\" >/dev/null 2>&1 || true
@@ -140,13 +156,21 @@ record_ok()   { OK_LIST+=("$1"); }
 record_skip() { SKIP_LIST+=("$1"); }
 record_fail() { FAIL_LIST+=("$1"); }
 
-# System dependencies
+# System dependencies.
+# PREBUILT_H placement note: detection runs after the benchmark EXIT trap,
+# root/sudo normalization, and flux/home discovery above, and managed PATH
+# repair below always runs. Only the apk/package phase is skipped when baked.
 _phase="$(date +%s)"
 if ! command -v apk >/dev/null 2>&1; then
     echo "ERROR: apk not found; this is not a configured Alpine guest."
     exit 1
 fi
 
+if [ "${PREBUILT_H:-0}" = "1" ]; then
+    echo ">>> NativeCode: system packages baked — skipping apk package phase"
+    echo ">>> Alpine node mode: system (baked)"
+    PKG_SECONDS=0
+else
 ensure_pkgs bash curl wget git ca-certificates python3 build-base unzip xz coreutils gcompat libstdc++
 
 ALPINE_NODE_MODE="${ALPINE_NODE_MODE:-system}"
@@ -164,6 +188,7 @@ case "$ALPINE_NODE_MODE" in
 esac
 echo ">>> Alpine node mode: $ALPINE_NODE_MODE"
 PKG_SECONDS=$(( $(date +%s) - _phase ))
+fi
 
 # PATH wiring
 ENV_DIR="$FLUX_HOME/.config/fluxlinux"
@@ -171,8 +196,8 @@ ENV_FILE="$ENV_DIR/cli-tools.env"
 mkdir -p "$ENV_DIR"
 
 cat > "$ENV_FILE" <<'ENVEOF'
-# Managed by NativeCode setup_cli_tools distro benchmark
-export PATH="$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+# Managed by NativeCode setup_cli_tools (prebuilt rootfs: Node 24 system)
+export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 
 if [ -d "$NVM_DIR/versions/node" ]; then
@@ -244,9 +269,18 @@ fi
 PROFILE
 chmod 644 /etc/profile.d/flux-cli-tools.sh
 
-# Node setup
+# Node setup (Alpine production policy: system Node 24 via apk; nvm-source legacy opt-in only)
 _phase="$(date +%s)"
-if [ "$ALPINE_NODE_MODE" = "system" ]; then
+if [ "${PREBUILT_H:-0}" = "1" ]; then
+    echo ">>> NativeCode: Node baked — verifying system node"
+    if as_flux 'command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1'; then
+        ACTIVE_NODE="$(as_flux 'node -v 2>/dev/null' || true)"
+        record_ok "node@${ACTIVE_NODE:-system}"
+    else
+        echo "WARN: baked Node missing"
+        record_fail "node@system"
+    fi
+elif [ "$ALPINE_NODE_MODE" = "system" ]; then
     if as_flux '
         set -e
         export PATH="$HOME/.local/bin:$PATH"
@@ -262,6 +296,7 @@ if [ "$ALPINE_NODE_MODE" = "system" ]; then
         record_fail "node@system"
     fi
 else
+    echo "WARN: ALPINE_NODE_MODE=nvm-source is legacy (slow source build, not used in prebuilt rootfs)"
     if as_flux "
         set -e
         export NVM_DIR=\"\$HOME/.nvm\"
@@ -329,8 +364,8 @@ npm_global_install() {
         else
             npm config set prefix \"\$HOME/.local\"
         fi
-        npm install -g '$pkg' --unsafe-perm 2>&1 || \
-            npm install -g '$pkg' --unsafe-perm --ignore-scripts 2>&1
+        npm install -g '$pkg' 2>&1 || \
+            npm install -g '$pkg' --ignore-scripts 2>&1
     "; then
         if flux_has "$bin"; then
             record_ok "$bin"
@@ -346,7 +381,15 @@ npm_global_install() {
 
 _phase="$(date +%s)"
 
-if flux_has node && flux_has npm; then
+# Grok repair: installer may place binary at $HOME/.grok/bin/grok without PATH.
+as_flux 'if [ -x "$HOME/.grok/bin/grok" ] && ! command -v grok >/dev/null 2>&1; then mkdir -p "$HOME/.local/bin"; ln -sfn "$HOME/.grok/bin/grok" "$HOME/.local/bin/grok" 2>/dev/null || true; fi' || true
+
+if [ "${PREBUILT_H:-0}" = "1" ]; then
+    echo ">>> NativeCode: baked AI CLIs — verifying only (no npm/curl installs, no self-update)"
+    for _b in opencode codex qwen agy claude grok kiro-cli; do
+        if flux_has "$_b"; then record_ok "$_b"; else echo "WARN: baked $_b missing"; record_fail "$_b"; fi
+    done
+elif flux_has node && flux_has npm; then
     npm_global_install "opencode-ai" "opencode"
     npm_global_install "@openai/codex" "codex"
     npm_global_install "@qwen-code/qwen-code" "qwen"
@@ -357,6 +400,9 @@ else
     record_fail "qwen"
 fi
 
+if [ "${PREBUILT_H:-0}" = "1" ]; then
+    echo ">>> NativeCode: baked image — skipping curl-install fallback (verify-only)"
+else
 if ! flux_has opencode; then
     echo ">>> fallback: opencode.ai native installer..."
     if as_flux 'curl -fsSL https://opencode.ai/install | bash 2>&1'; then
@@ -364,6 +410,7 @@ if ! flux_has opencode; then
     else
         record_fail "opencode"
     fi
+fi
 fi
 
 curl_install() {
@@ -391,10 +438,14 @@ curl_install() {
     fi
 }
 
+if [ "${PREBUILT_H:-0}" = "1" ]; then
+    echo ">>> NativeCode: baked image — skipping curl installs (verify-only)"
+else
 curl_install "agy (Antigravity)" "agy" "https://antigravity.google/cli/install.sh"
 curl_install "claude-code" "claude" "https://claude.ai/install.sh"
 curl_install "grok CLI" "grok" "https://x.ai/cli/install.sh"
 curl_install "kiro CLI" "kiro-cli" "https://cli.kiro.dev/install"
+fi
 
 if ! flux_has kiro-cli && flux_has kiro; then
     as_flux 'mkdir -p "$HOME/.local/bin"; ln -sfn "$(command -v kiro)" "$HOME/.local/bin/kiro-cli" 2>/dev/null || true'
@@ -414,7 +465,7 @@ ensure_source_line "$FLUX_HOME/.profile" "profile"
 echo ""
 echo ">>> Verification (as $FLUX_USER):"
 as_flux '
-    export PATH="$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+    export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 || true
     if [ -d "$NVM_DIR/versions/node" ]; then
@@ -435,6 +486,14 @@ echo ""
 echo ">>> Summary: ok=[${OK_LIST[*]-}] skip=[${SKIP_LIST[*]-}] fail=[${FAIL_LIST[*]-}]"
 echo ">>> Shell env: $ENV_FILE"
 echo ">>> AI CLI Tools Provisioning Complete"
+
+# Corrupt-bake gate: a baked image missing tools is damaged — never silently
+# fall through to runtime installation. Ship a new rootfs revision instead.
+if [ "${PREBUILT_H:-0}" = "1" ] && [ "${#FAIL_LIST[@]}" -gt 0 ]; then
+    echo "ERROR: NativeCode prebuilt image damaged/incompatible — missing: ${FAIL_LIST[*]}"
+    echo "ERROR: refusing runtime install; ship a new rootfs revision."
+    exit 1
+fi
 
 if ! flux_has node; then
     exit 1

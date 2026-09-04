@@ -13,6 +13,22 @@
 
 set -euo pipefail
 
+# Prebuilt-rootfs helper (baked). Fallback: legacy = not baked.
+NC_COMMON="/usr/local/lib/nativecode/rootfs-common.sh"
+if [ -f "$NC_COMMON" ]; then
+    # shellcheck source=/dev/null
+    . "$NC_COMMON"
+else
+    NC_RELEASE_FILE="${NC_RELEASE_FILE:-/etc/nativecode/rootfs-release}"
+    nc_component_baked() { [ -n "${1:-}" ] && [ -f "$NC_RELEASE_FILE" ] && grep -q "^COMPONENT_$1=1" "$NC_RELEASE_FILE" 2>/dev/null; }
+fi
+if nc_component_baked F 2>/dev/null; then
+    echo "NativeCode: F already baked — runtime configuration only (no apk)"
+    PREBUILT_F=1
+else
+    PREBUILT_F=0
+fi
+
 if [ "$(id -u)" != "0" ]; then
     echo "This script must be run as root."
     exit 1
@@ -114,7 +130,21 @@ auto_detect_mode() {
 
 echo "FluxLinux: Detecting Package Manager..."
 
-if command -v pacman >/dev/null 2>&1; then
+# apk first: this rootfs family is Alpine-native; host proot leakage
+# (pacman/apt visible inside the guest) must never shadow the guest PM.
+if command -v apk >/dev/null 2>&1; then
+    echo "Alpine Linux detected (apk)."
+    if [ "${PREBUILT_F:-0}" = "1" ]; then
+        echo "NativeCode: F packages baked — skipping apk install"
+        command -v vulkaninfo >/dev/null 2>&1 || true
+    else
+        echo "FluxLinux: Installing Vulkan/Mesa dependencies..."
+        apk add --no-cache \
+            mesa mesa-dri-gallium mesa-vulkan-freedreno vulkan-loader \
+            curl unzip
+        echo "FluxLinux: Alpine Setup Complete (VirGL default)."
+    fi
+elif command -v pacman >/dev/null 2>&1; then
     echo "Arch Linux detected (pacman). Running System Update..."
     pacman -Syu --noconfirm
     echo "FluxLinux: Installing Arch Dependencies..."
@@ -129,15 +159,8 @@ elif command -v apt-get >/dev/null 2>&1; then
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         mesa-utils libgl1-mesa-dri mesa-vulkan-drivers vulkan-tools \
         curl unzip libvulkan1 libgl1 libglx0 xdg-desktop-portal
-elif command -v apk >/dev/null 2>&1; then
-    echo "Alpine Linux detected (apk)."
-    echo "FluxLinux: Installing Vulkan/Mesa dependencies..."
-    apk add --no-cache \
-        mesa mesa-dri-gallium mesa-vulkan-freedreno vulkan-loader \
-        curl unzip
-    echo "FluxLinux: Alpine Setup Complete (VirGL default)."
 else
-    echo "Error: Neither apt nor pacman found. Cannot install dependencies."
+    echo "Error: Neither apk, pacman nor apt found. Cannot install dependencies."
     exit 1
 fi
 
@@ -227,7 +250,11 @@ if [ "$MODE" = "turnip" ]; then
 
     if command -v apk >/dev/null 2>&1; then
         echo "Alpine Linux detected (apk)."
-        apk add --no-cache mesa mesa-dri-gallium mesa-vulkan-freedreno vulkan-loader curl unzip || true
+        if [ "${PREBUILT_F:-0}" = "1" ]; then
+            echo "NativeCode: Alpine Turnip stays VirGL (baked Mesa; no tarball install)"
+        else
+            apk add --no-cache mesa mesa-dri-gallium mesa-vulkan-freedreno vulkan-loader curl unzip || true
+        fi
         MODE="virgl"
         VENDOR_HINT="alpine-apk-virgl"
     elif [ -f /etc/debian_version ]; then

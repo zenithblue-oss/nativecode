@@ -381,10 +381,10 @@ object GitHubCliService {
             return
         }
 
-        // INSTALL if needed
+        // INSTALL if needed (prebuilt rootfs bakes github-cli; fallback is distro-aware)
         if (!status.ghInstalled) {
             phase(GhAuthPhase.INSTALL_GH, "Installing gh…")
-            log("\$ apt-get install -y gh")
+            log("\$ apk add github-cli  # or: apt-get install -y gh")
             val installOk = runInstall(ctx, method, session, listener)
             if (session.cancelled) {
                 mainHandler.post { listener.onCancelled() }

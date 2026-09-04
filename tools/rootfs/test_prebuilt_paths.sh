@@ -1,0 +1,211 @@
+#!/bin/bash
+# test_prebuilt_paths.sh — prove baked E/F/GUI/G/H never reach network/package tools.
+#
+# Runs each guest setup script inside `unshare -rm` with:
+#   - /etc, /home, /usr/local, /var bound to prepared fakes (host untouched)
+#   - /tmp as private tmpfs, /usr/bin/bwrap + /usr/bin/sudo shadowed by fakes
+#   - fail-fast stubs (exit 99) for apk/curl/wget/git/npm early on sanitized PATH
+#   - /etc/nativecode/rootfs-release with every COMPONENT_*=1
+#
+# Asserts per script: exit 0 AND zero STUB-CALL. A legacy negative control
+# (marker removed) must DO call the apk stub, proving interception works.
+# Requires: unshare (util-linux), bash, coreutils. No root needed.
+# Usage: tools/rootfs/test_prebuilt_paths.sh
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+GUEST_DIR="$REPO_ROOT/app/src/main/assets/scripts"
+
+command -v unshare >/dev/null 2>&1 || { echo "SKIP: unshare not found"; exit 2; }
+unshare -rm true 2>/dev/null || { echo "SKIP: unshare -rm not permitted in this environment"; exit 2; }
+
+T="$(mktemp -d /dev/shm/nc-pt-XXXXXX)"
+trap 'rm -rf "$T"' EXIT
+
+mkdir -p "$T/guest" "$T/etc/nativecode" "$T/etc/apk" "$T/etc/sudoers.d" \
+    "$T/etc/profile.d" "$T/etc/fluxlinux" \
+    "$T/home/flux/.local/bin" "$T/home/flux/.grok/bin" \
+    "$T/home/flux/.config/fluxlinux" \
+    "$T/usrlocal/sbin" "$T/usrlocal/bin" "$T/usrlocal/lib/nativecode" \
+    "$T/var/tmp" "$T/var/log" "$T/var/lib/dbus" "$T/var/cache/apk" "$T/var/lib/apk/db"
+
+cp "$GUEST_DIR/setup_alpine_family.sh" \
+   "$GUEST_DIR/setup_hw_accel_debian.sh" \
+   "$GUEST_DIR/setup_xfce4.sh" \
+   "$GUEST_DIR/setup_customization_alpine.sh" \
+   "$GUEST_DIR/setup_cli_tools.sh" "$T/guest/"
+cp "$REPO_ROOT/tools/rootfs/rootfs-common.sh" "$T/usrlocal/lib/nativecode/rootfs-common.sh"
+
+cat > "$T/etc/nativecode/rootfs-release" <<'EOF'
+FORMAT_VERSION=1
+DISTRO=alpine
+ALPINE_BRANCH=3.24
+ARCH=aarch64
+BUILD_ID=test
+BUILD_GIT_SHA=test
+NODE_MAJOR=24
+ANDROID_PLATFORM=36
+ANDROID_BUILD_TOOLS=36.1.0
+ANDROID_NDK=29.0.14206865
+KOTLIN=2.1.0
+GRADLE=9.2.1
+COMPONENT_E=1
+COMPONENT_F=1
+COMPONENT_GUI=1
+COMPONENT_G=1
+COMPONENT_H=1
+COMPONENT_GH=1
+COMPONENT_DEV=1
+EOF
+
+cat > "$T/etc/passwd" <<'EOF'
+root:x:0:0:root:/root:/bin/bash
+flux:x:1000:1000:flux:/home/flux:/bin/bash
+EOF
+cat > "$T/etc/group" <<'EOF'
+root:x:0:
+flux:x:1000:
+EOF
+printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > "$T/etc/resolv.conf"
+printf '/bin/sh\n/bin/bash\n' > "$T/etc/shells"
+: > "$T/etc/machine-id"
+: > "$T/etc/apk/repositories"
+[ -f /etc/nsswitch.conf ] && cp /etc/nsswitch.conf "$T/etc/nsswitch.conf" || true
+[ -f /etc/ld.so.cache ] && cp /etc/ld.so.cache "$T/etc/ld.so.cache" || true
+
+# Fake baked userland binaries (as flux).
+fake_bin() { printf '#!/bin/sh\necho "%s"\n' "$2" > "$1"; chmod +x "$1"; }
+fake_bin "$T/home/flux/.local/bin/node" "v24.11.0"
+fake_bin "$T/home/flux/.local/bin/npm" "11.0.0"
+for b in opencode codex qwen agy claude grok kiro-cli kiro; do
+    fake_bin "$T/home/flux/.local/bin/$b" "$b test-1.0"
+done
+fake_bin "$T/home/flux/.grok/bin/grok" "grok test-1.0"
+fake_bin "$T/usrlocal/sbin/startxfce4" "startxfce4 test"
+
+# Fail-fast network/package stubs (early on guest-sanitized PATH).
+for s in apk curl wget git npm; do
+    cat > "$T/usrlocal/sbin/$s" <<'EOF'
+#!/bin/sh
+echo "STUB-CALL: $(basename "$0") $*" >> "$NC_TEST_CALL_LOG"
+exit 99
+EOF
+    chmod +x "$T/usrlocal/sbin/$s"
+done
+
+# su stub: emulate root `su -s SH - USER -c CMD` for CliToolsInstaller path.
+cat > "$T/usrlocal/sbin/su" <<'EOF'
+#!/bin/sh
+user=""; cmd=""; want_c=0; skip_next=0
+for a in "$@"; do
+    if [ "$skip_next" = 1 ]; then skip_next=0; continue; fi
+    case "$a" in
+        -s) skip_next=1 ;;
+        -c) want_c=1 ;;
+        -|-l|--*) ;;
+        -*) ;;
+        *) if [ "$want_c" = 1 ]; then cmd="$a"; want_c=0; else user="$a"; fi ;;
+    esac
+done
+echo "NEUTRAL-CALL: su $user" >> "$NC_TEST_CALL_LOG"
+HOME=/home/flux PATH=/home/flux/.local/bin:/home/flux/.grok/bin:/home/flux/bin:/home/flux/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    /bin/sh -c "$cmd"
+EOF
+chmod +x "$T/usrlocal/sbin/su"
+
+# bwrap fake WITH NativeCode shim signature (repair must be a no-op).
+cat > "$T/bwrap-fake" <<'EOF'
+#!/bin/sh
+# NativeCode proot: skip sandbox; run glycin loader (regular file only — not /).
+while [ $# -gt 0 ]; do
+  case "$1" in
+    /*) if [ -f "$1" ] && [ -x "$1" ]; then exec "$@"; fi ;;
+  esac
+  shift
+done
+exit 127
+EOF
+: > "$T/sudo-fake"
+
+cat > "$T/inner.sh" <<'INNER_EOF'
+#!/bin/bash
+# Runs INSIDE unshare -rm: private mounts, mapped root. No host mutation.
+set -u
+T="${NC_TEST_T:?}"
+export NC_TEST_CALL_LOG="$T/calls.log"
+: > "$NC_TEST_CALL_LOG"
+
+mount --bind "$T/etc" /etc
+mount --bind "$T/home" /home
+mount --bind "$T/usrlocal" /usr/local
+mount --bind "$T/var" /var
+mount -t tmpfs tmpfs /tmp
+chmod 1777 /tmp
+mount --bind "$T/bwrap-fake" /usr/bin/bwrap
+mount --bind "$T/sudo-fake" /usr/bin/sudo
+
+export NATIVECODE_ISOLATION=proot FLUX_GPU=virgl FLUX_THEME=dark
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+PASS=0; FAIL=0
+log_calls_from() { sed -n "$1,\$p" "$NC_TEST_CALL_LOG"; }
+mark() { wc -l < "$NC_TEST_CALL_LOG"; }
+
+check() { # name expected_exit script shell...
+    _name="$1"; _want="$2"; _script="$3"; _sh="$4"
+    _m="$(mark)"
+    _out="$("$_sh" "$_script" alpine </dev/null 2>&1)"; _rc=$?
+    _calls="$(log_calls_from "$((_m + 1))" | grep -c STUB-CALL || true)"
+    if [ "$_rc" = "$_want" ] && { [ "$_want" != "0" ] || [ "$_calls" = "0" ]; }; then
+        echo "PASS $_name (exit=$_rc stub_calls=$_calls)"
+        PASS=$((PASS + 1))
+    else
+        echo "FAIL $_name (want exit=$_want, got exit=$_rc stub_calls=$_calls)"
+        echo "----- output -----"; printf '%s\n' "$_out" | tail -n 20; echo "--------------------"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+echo "== negative control: E without marker must reach apk stub =="
+mv /etc/nativecode/rootfs-release /etc/nativecode/release.bak
+_m="$(mark)"
+sh "$T/guest/setup_alpine_family.sh" alpine </dev/null >/tmp/neg.log 2>&1; _rc=$?
+if [ "$_rc" != "0" ] && log_calls_from "$((_m + 1))" | grep -q 'STUB-CALL: apk'; then
+    echo "PASS neg-E-legacy-reaches-apk (exit=$_rc)"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL neg-E-legacy-reaches-apk (exit=$_rc) — stubs may not intercept!"
+    tail -n 10 /tmp/neg.log
+    FAIL=$((FAIL + 1))
+fi
+mv /etc/nativecode/release.bak /etc/nativecode/rootfs-release
+
+echo "== prebuilt positives: exit 0 + zero STUB-CALL =="
+check "E-baked"   0 "$T/guest/setup_alpine_family.sh" sh
+check "F-baked"   0 "$T/guest/setup_hw_accel_debian.sh" bash
+check "GUI-baked" 0 "$T/guest/setup_xfce4.sh" bash
+check "G-baked"   0 "$T/guest/setup_customization_alpine.sh" sh
+check "H-baked"   0 "$T/guest/setup_cli_tools.sh" bash
+
+echo "== spot checks =="
+[ "$(tr -d '[:space:]' </etc/fluxlinux/gpu_mode 2>/dev/null)" = "virgl" ] \
+    && { echo "PASS gpu_mode=virgl"; PASS=$((PASS + 1)); } \
+    || { echo "FAIL gpu_mode"; FAIL=$((FAIL + 1)); }
+[ -x /home/flux/.vnc/xstartup ] \
+    && { echo "PASS vnc-xstartup"; PASS=$((PASS + 1)); } \
+    || { echo "FAIL vnc-xstartup"; FAIL=$((FAIL + 1)); }
+grep -q 'grok/bin' /home/flux/.config/fluxlinux/cli-tools.env 2>/dev/null \
+    && { echo "PASS grok-path"; PASS=$((PASS + 1)); } \
+    || { echo "FAIL grok-path"; FAIL=$((FAIL + 1)); }
+
+echo "RESULT pass=$PASS fail=$FAIL"
+[ "$FAIL" = "0" ]
+INNER_EOF
+
+echo "running prebuilt-path sandbox (unshare -rm)…"
+if NC_TEST_T="$T" unshare -rm --propagation private bash "$T/inner.sh"; then
+    echo "PREBUILT-PATHS: ALL PASS"
+else
+    echo "PREBUILT-PATHS: FAIL" >&2
+    exit 1
+fi
