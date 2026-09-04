@@ -1,16 +1,20 @@
 #!/bin/bash
 # measure_rootfs.sh — size report + archive (zstd preferred, xz fallback).
 # Usage: tools/rootfs/measure_rootfs.sh /path/to/rootfs out/name
+# ZSTD_LEVEL=3 is recommended for fast engineering builds; release default is 19.
 set -euo pipefail
 ROOTFS="${1:?usage: measure_rootfs.sh <rootfs-dir> <out-prefix>}"
 OUT="${2:?usage: measure_rootfs.sh <rootfs-dir> <out-prefix>}"
+ZSTD_LEVEL="${ZSTD_LEVEL:-19}"
+
 du -sh "$ROOTFS"
 du -sx --block-size=1 "$ROOTFS"
 du -sh "$ROOTFS/usr" "$ROOTFS/opt" "$ROOTFS/home" "$ROOTFS/usr/lib" \
     "$ROOTFS/opt/android-sdk" "$ROOTFS/opt/android-sdk/ndk" \
     "$ROOTFS/opt/gradle" "$ROOTFS/opt/kotlin" 2>/dev/null || true
 if command -v zstd >/dev/null 2>&1; then
-    tar --numeric-owner -cpf - -C "$ROOTFS" . | zstd -19 -T0 -o "$OUT.tar.zst"
+    echo "measure_rootfs: creating zstd archive at level $ZSTD_LEVEL"
+    tar --numeric-owner -cpf - -C "$ROOTFS" . | zstd -"$ZSTD_LEVEL" -T0 -o "$OUT.tar.zst"
     stat -c '%s' "$OUT.tar.zst"
     sha256sum "$OUT.tar.zst" | tee "$OUT.tar.zst.sha256"
 else
