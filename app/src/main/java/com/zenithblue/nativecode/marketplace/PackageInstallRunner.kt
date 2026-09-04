@@ -444,7 +444,7 @@ object PackageInstallRunner {
         val escaped = guestCmd.replace("'", "'\\''")
         val args = arrayOf(
             shell, "-c",
-            "exec python $prootDistro login debian --shared-tmp --user root -- /bin/bash -lc '$escaped'"
+            "exec python $prootDistro login alpine --shared-tmp --user root -- /bin/bash -lc '$escaped'"
         )
         val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)
         return args to envMap

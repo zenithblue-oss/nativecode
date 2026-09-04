@@ -5180,7 +5180,7 @@ class MainActivity : AppCompatActivity() {
                 // setup only — start/stop GUI live elsewhere (home / tools)
                 val hostScripts = arrayOf(
                     "setup_termux.sh" to "Setup basic environment and directories on host.",
-                    "flux_install.sh" to "One-click: install Debian proot + setup_debian_family (user/xfce/vnc)."
+                    "flux_install.sh" to "One-click: install Alpine proot + setup_alpine_family (user/xfce/vnc)."
                 )
                 for ((name, desc) in hostScripts) {
                     list.addView(
@@ -5197,7 +5197,7 @@ class MainActivity : AppCompatActivity() {
             "guest" -> {
                 val rootOk = repairsRootOk == true
                 val hint = TextView(this).apply {
-                    text = "// DEBIAN GUEST ENVIRONMENT"
+                    text = "// ALPINE GUEST ENVIRONMENT"
                     textSize = 10f
                     setTextColor(NC.ON_SURF_VAR)
                     typeface = Typeface.MONOSPACE
@@ -5205,9 +5205,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 list.addView(hint)
                 val guestScripts = arrayOf(
-                    "setup_debian_family.sh" to "Create users and core configurations in guest.",
+                    "setup_alpine_family.sh" to "Create users and core configurations in guest.",
                     "setup_xfce4.sh" to "Install XFCE4 graphical desktop and themes in guest.",
-                    "setup_customization_debian.sh" to "Apply font, locales, and terminal enhancements in guest.",
+                    "setup_customization_alpine.sh" to "Apply font, locales, and terminal enhancements in guest.",
                     "setup_hw_accel_debian.sh" to "Configure GPU accel: Turnip (Snapdragon/Adreno) or VirGL (others).",
                     "setup_cli_tools.sh" to "Install Node.js/NVM and AI CLI tools (Aider, Claude, Cline) in guest."
                 )
@@ -5237,11 +5237,11 @@ class MainActivity : AppCompatActivity() {
                 // install only — uninstall stays on Chroot Settings
                 list.addView(
                     buildScriptCard(
-                        name = "setup_debian13_chroot.sh",
-                        desc = "Install Debian 13 (Trixie) Chroot environment (Requires Root).",
+                        name = "setup_alpine_chroot.sh",
+                        desc = "Install Alpine Linux 3.24 Chroot environment (Requires Root).",
                         badge = "ROOT",
                         runLabel = "RUN",
-                        onRun = { runScriptInTerminal("setup_debian13_chroot.sh", "chroot_host") }
+                        onRun = { runScriptInTerminal("setup_alpine_chroot.sh", "chroot_host") }
                     )
                 )
             }
@@ -5575,11 +5575,11 @@ class MainActivity : AppCompatActivity() {
     /** Top-bar label for script runner page — never always "Script Installation". */
     private fun scriptRunnerTitle(scriptName: String, runMode: String): String {
         return when (scriptName) {
-            "uninstall_debian13_chroot.sh" -> "Chroot Uninstall"
-            "setup_debian13_chroot.sh" -> "Chroot Installation"
-            "setup_debian_family.sh" -> "Debian Family Setup"
+            "uninstall_debian13_chroot.sh", "uninstall_alpine_chroot.sh" -> "Chroot Uninstall"
+            "setup_debian13_chroot.sh", "setup_alpine_chroot.sh" -> "Chroot Installation"
+            "setup_debian_family.sh", "setup_alpine_family.sh" -> "Distro Family Setup"
             "setup_xfce4.sh" -> "XFCE4 Desktop Setup"
-            "setup_customization_debian.sh" -> "Debian Customization"
+            "setup_customization_debian.sh", "setup_customization_alpine.sh" -> "Distro Customization"
             "setup_hw_accel_debian.sh" -> "Hardware Acceleration Setup"
             "setup_cli_tools.sh" -> "CLI Tools Setup"
             "setup_termux.sh" -> "Host Environment Setup"
@@ -12858,14 +12858,20 @@ class MainActivity : AppCompatActivity() {
                 "stop_gui.sh",
                 "start_gui_chroot.sh",
                 "stop_gui_chroot.sh",
+                "start_alpine_gui.sh",
+                "stop_alpine_gui.sh",
                 "start_debian13_gui.sh",
                 "stop_debian13_gui.sh",
+                "setup_alpine_family.sh",
                 "setup_debian_family.sh",
                 "setup_xfce4.sh",
+                "setup_customization_alpine.sh",
                 "setup_customization_debian.sh",
                 "setup_hw_accel_debian.sh",
                 "setup_cli_tools.sh",
+                "setup_alpine_chroot.sh",
                 "setup_debian13_chroot.sh",
+                "uninstall_alpine_chroot.sh",
                 "uninstall_debian13_chroot.sh",
                 "chroot_processes.sh",
                 "chroot_size.sh",
@@ -12874,6 +12880,7 @@ class MainActivity : AppCompatActivity() {
             for (script in scripts) {
                 val assetPath = when {
                     script.contains("chroot") ||
+                        script.contains("alpine_gui") ||
                         script == "start_debian13_gui.sh" ||
                         script == "stop_debian13_gui.sh" ||
                         script == "nativecode_chroot.sh" -> "scripts/chroot/$script"
@@ -12891,23 +12898,23 @@ class MainActivity : AppCompatActivity() {
             val termuxDir = File(homeDir, ".termux").also { it.mkdirs() }
             val fontOut = File(termuxDir, "font.ttf")
             assets.open("fonts/font.ttf").use { input -> FileOutputStream(fontOut).use { input.copyTo(it) } }
-            // Pinned Debian 13 rootfs for proot-distro install ./file --name debian
+            // Pinned Alpine rootfs for proot-distro install ./file --name alpine
             deployRootfsArchive(homeDir)
         } catch (e: Exception) {
             Log.e("Setup", "Failed to deploy scripts", e)
         }
     }
 
-    /** Copy assets/rootfs/debian_13_rootfs.tar.xz → $HOME (skip if already present & large). */
+    /** Copy assets/rootfs/alpine_rootfs.tar.gz → $HOME (skip if already present & large). */
     private fun deployRootfsArchive(homeDir: File) {
-        val out = File(homeDir, "debian_13_rootfs.tar.xz")
-        // Skip re-copy of ~82MiB archive once deployed
-        if (out.isFile && out.length() > 50L * 1024L * 1024L) {
+        val out = File(homeDir, "alpine_rootfs.tar.gz")
+        // Skip re-copy once deployed
+        if (out.isFile && out.length() > 2L * 1024L * 1024L) {
             Log.i("Setup", "Rootfs already deployed: ${out.absolutePath} (${out.length()} bytes)")
             return
         }
         try {
-            assets.open("rootfs/debian_13_rootfs.tar.xz").use { input ->
+            assets.open("rootfs/alpine_rootfs.tar.gz").use { input ->
                 FileOutputStream(out).use { input.copyTo(it) }
             }
             Log.i("Setup", "Deployed rootfs: ${out.absolutePath} (${out.length()} bytes)")
@@ -12953,10 +12960,12 @@ class MainActivity : AppCompatActivity() {
     private fun isXfceInstalled(): Boolean {
         val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
         return if (method == "chroot") {
-            File("/data/local/tmp/chrootDebian13/usr/bin/startxfce4").exists()
+            File("/data/local/tmp/chrootAlpine/usr/bin/startxfce4").exists() ||
+                File("/data/local/tmp/chrootDebian13/usr/bin/startxfce4").exists()
         } else {
-            val rootfs = File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/debian/rootfs")
-            File(rootfs, "usr/bin/startxfce4").exists()
+            val alpineRootfs = File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpine/rootfs")
+            val debianRootfs = File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/debian/rootfs")
+            File(alpineRootfs, "usr/bin/startxfce4").exists() || File(debianRootfs, "usr/bin/startxfce4").exists()
         }
     }
 
@@ -13044,7 +13053,7 @@ class MainActivity : AppCompatActivity() {
     private fun guiHostScriptArgs(scriptName: String): Array<String> {
         val bash = TermuxHostPaths.libBash(this).absolutePath
         val script = File(TermuxHostPaths.HOME, scriptName)
-        return arrayOf(bash, script.absolutePath, "debian")
+        return arrayOf(bash, script.absolutePath, "alpine")
     }
 
     /** Start XFCE: proot → start_gui.sh; chroot → start_gui_chroot.sh (host X11 + root DE). */

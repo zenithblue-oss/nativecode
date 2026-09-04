@@ -9,7 +9,7 @@ import java.io.File
 object ProjectPathResolver {
 
     /** Relative path under [Context.getFilesDir] for Debian proot rootfs (SSOT). */
-    const val PROOT_ROOTFS_REL = "usr/var/lib/proot-distro/containers/debian/rootfs"
+    const val PROOT_ROOTFS_REL = "usr/var/lib/proot-distro/containers/alpine/rootfs"
 
     /** Debian proot rootfs under app private storage. */
     fun prootRootfsDir(ctx: Context): File =

@@ -6,18 +6,21 @@
 
 set -u
 
-DISTRO="${1:-debian}"
+DISTRO="${1:-alpine}"
 SETUP_B64="${2:-}"
 
 # Pinned rootfs (packaged as assets/rootfs/, deployed to $HOME)
-ROOTFS_NAME="debian_13_rootfs.tar.xz"
-ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/zenithblue-oss/fluxlinux/releases/download/rootfs/debian_13_rootfs.tar.xz}"
-ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-13e29f6099c3b805e84694507ede460c03886ffb364c03317272691cf84e6803}"
+ROOTFS_NAME="alpine_rootfs.tar.gz"
+ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/zenithblue-oss/fluxlinux/releases/download/rootfs/alpine_3.24_rootfs.tar.gz}"
+ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-}"
 
 # Resolve script directory (deployed to $HOME or $HOME/scripts)
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
 DEFAULT_SETUP=""
 for candidate in \
+    "${SCRIPT_DIR}/setup_alpine_family.sh" \
+    "${HOME:-}/setup_alpine_family.sh" \
+    "${HOME:-}/scripts/setup_alpine_family.sh" \
     "${SCRIPT_DIR}/setup_debian_family.sh" \
     "${HOME:-}/setup_debian_family.sh" \
     "${HOME:-}/scripts/setup_debian_family.sh"
@@ -97,10 +100,13 @@ resolve_rootfs_archive() {
         return 0
     fi
 
-    # Prefer absolute paths under HOME/PREFIX (app-deployed asset)
+    # Prefer absolute paths under HOME/PREFIX (app-deployed asset).
+    # Accept both .tar.gz and plain .tar (AGP may gunzip .gz assets unless 'gz' is in noCompress).
     for candidate in \
         "$HOME/$ROOTFS_NAME" \
+        "$HOME/${ROOTFS_NAME%.gz}" \
         "$HOME/rootfs/$ROOTFS_NAME" \
+        "$HOME/rootfs/${ROOTFS_NAME%.gz}" \
         "$PREFIX/var/lib/proot-distro/cache/rootfs/$ROOTFS_NAME" \
         "/sdcard/Download/$ROOTFS_NAME" \
         "/sdcard/Download/rootfs.tar.xz" \
@@ -114,33 +120,8 @@ resolve_rootfs_archive() {
         fi
     done
 
-    # Optional download into cache (escape hatch if asset not deployed)
-    if [ "${FLUX_PD_INSTALL_MODE:-file}" = "registry" ]; then
-        return 1
-    fi
-
-    CACHE_DIR="$PREFIX/var/lib/proot-distro/cache/rootfs"
-    mkdir -p "$CACHE_DIR" 2>/dev/null || true
-    DEST="$CACHE_DIR/$ROOTFS_NAME"
-    echo "FluxLinux: rootfs not in app paths — downloading $ROOTFS_URL"
-    if command -v curl >/dev/null 2>&1; then
-        if curl -fL --retry 3 --retry-delay 2 -o "$DEST.partial" "$ROOTFS_URL" \
-            && mv -f "$DEST.partial" "$DEST"; then
-            ROOTFS_ARCHIVE="$DEST"
-            echo "FluxLinux: rootfs downloaded: $ROOTFS_ARCHIVE"
-            return 0
-        fi
-        rm -f "$DEST.partial" 2>/dev/null || true
-    elif command -v wget >/dev/null 2>&1; then
-        if wget -O "$DEST.partial" "$ROOTFS_URL" && mv -f "$DEST.partial" "$DEST"; then
-            ROOTFS_ARCHIVE="$DEST"
-            echo "FluxLinux: rootfs downloaded: $ROOTFS_ARCHIVE"
-            return 0
-        fi
-        rm -f "$DEST.partial" 2>/dev/null || true
-    fi
-
-    echo "FluxLinux: no rootfs archive found (expected $HOME/$ROOTFS_NAME from app assets)"
+    # Do not download from web — rootfs must always be bundled in app assets
+    echo "FluxLinux: ERROR: rootfs archive not found in app paths (expected $HOME/$ROOTFS_NAME)"
     return 1
 }
 
@@ -168,7 +149,11 @@ if [ "$DISTRO" = "termux" ]; then
 else
     DISTRO_ROOTFS="$PREFIX/var/lib/proot-distro/containers/$DISTRO/rootfs"
 
-    if [ -d "$DISTRO_ROOTFS" ] && [ -e "$DISTRO_ROOTFS/bin/sh" ]; then
+    has_valid_rootfs() {
+        [ -d "$DISTRO_ROOTFS" ] && { [ -L "$DISTRO_ROOTFS/bin/sh" ] || [ -e "$DISTRO_ROOTFS/bin/sh" ] || [ -e "$DISTRO_ROOTFS/bin/busybox" ]; }
+    }
+
+    if has_valid_rootfs; then
         echo "FluxLinux: $DISTRO already installed with valid rootfs. Skipping base installation."
         EXIT_CODE=0
     else
@@ -196,7 +181,7 @@ else
             rm -rf "$PREFIX/var/lib/proot-distro/containers/$DISTRO"
             "$PYTHON" "$PROOT_DISTRO" install "$ROOTFS_ARCHIVE" --name "$DISTRO"
             EXIT_CODE=$?
-            if [ "$EXIT_CODE" -eq 0 ] && [ ! -e "$DISTRO_ROOTFS/bin/sh" ]; then
+            if [ "$EXIT_CODE" -eq 0 ] && ! has_valid_rootfs; then
                 echo "FluxLinux: install reported OK but $DISTRO_ROOTFS/bin/sh missing"
                 EXIT_CODE=1
             fi
@@ -242,8 +227,16 @@ if [ -n "$SETUP_MODE" ]; then
         SETUP_EXIT=$?
     else
         # --shared-tmp: host $PREFIX/tmp → guest /tmp
+        # Guest login shell: minirootfs images (e.g. Alpine) ship only /bin/sh
+        # (busybox). Using guest `bash` before it is installed resolves to the
+        # host bash under a scrubbed env → libandroid-support.so link failure.
+        # setup_alpine_family.sh is #!/bin/sh-clean, so `sh` is correct here.
+        GUEST_SH="bash"
+        case "$DISTRO" in
+            alpine) GUEST_SH="sh" ;;
+        esac
         "$PYTHON" "$PROOT_DISTRO" login "$DISTRO" --shared-tmp -- \
-            bash -c "bash /tmp/flux_setup_temp.sh $DISTRO"
+            "$GUEST_SH" -c "$GUEST_SH /tmp/flux_setup_temp.sh $DISTRO"
         SETUP_EXIT=$?
     fi
 

@@ -16,12 +16,18 @@ handle_error() {
 
 echo "FluxLinux: Starting XFCE4 Desktop Setup..."
 
-export DEBIAN_FRONTEND=noninteractive
-apt update -y || handle_error "APT Update"
+if command -v apk >/dev/null 2>&1; then
+    echo "FluxLinux: Installing XFCE4 packages via apk..."
+    apk update || handle_error "APK Update"
+    apk add --no-cache xfce4 xfce4-terminal dbus tigervnc font-dejavu wget unzip curl || handle_error "Package Installation"
+else
+    export DEBIAN_FRONTEND=noninteractive
+    apt update -y || handle_error "APT Update"
 
-# 1. Install XFCE4 and Desktop Packages
-echo "FluxLinux: Installing XFCE4 packages..."
-apt install -y xfce4 xfce4-goodies xfce4-terminal dbus-x11 tigervnc-standalone-server wget unzip curl || handle_error "Package Installation"
+    # 1. Install XFCE4 and Desktop Packages
+    echo "FluxLinux: Installing XFCE4 packages..."
+    apt install -y xfce4 xfce4-goodies xfce4-terminal dbus-x11 tigervnc-standalone-server wget unzip curl || handle_error "Package Installation"
+fi
 
 # 2. Configure VNC xstartup
 mkdir -p "$USER_HOME/.vnc"

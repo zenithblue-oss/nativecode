@@ -32,7 +32,7 @@ object ProotCommandBuilder {
         // Escape embedded single quotes: ' → '\''.
         val escaped = shellCmd.replace("'", "'\\''")
         val command =
-            "exec python $prootDistro login debian $sharedTmpFlag --user $user -- " +
+            "exec python $prootDistro login alpine $sharedTmpFlag --user $user -- " +
                 "/bin/bash --noprofile --norc -c '$escaped'"
         val args = arrayOf(shell, "-c", command)
 
@@ -62,7 +62,7 @@ object ProotCommandBuilder {
         val workDirArg = workDir?.takeIf { it.isNotBlank() }?.let(ShellQuoting::singleQuote).orEmpty()
         val positional = if (workDirArg.isEmpty()) "" else " nativecode-interactive $workDirArg"
         val command =
-            "exec python $prootDistro login debian $sharedTmpFlag --user $guestUser -- " +
+            "exec python $prootDistro login alpine $sharedTmpFlag --user $guestUser -- " +
                 "/bin/bash --noprofile --norc -c '$escapedPayload'$positional"
         val args = arrayOf(shell, "-c", command)
         val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)

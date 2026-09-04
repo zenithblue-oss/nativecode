@@ -12,21 +12,21 @@ object InstallPlanCatalog {
         if (method == "chroot") {
             listOf(
                 InventoryLine("Root access", "KernelSU / Magisk"),
-                InventoryLine("Debian 13 chroot base", "setup_debian13_chroot.sh"),
-                InventoryLine("Guest packages / users", "setup_debian_family.sh"),
+                InventoryLine("Alpine Linux chroot base", "setup_alpine_chroot.sh"),
+                InventoryLine("Guest packages / users", "setup_alpine_family.sh"),
                 InventoryLine("Hardware acceleration", "setup_hw_accel_debian.sh")
             )
         } else {
             listOf(
                 InventoryLine("Host bootstrap", "bootstrap.tar + host configs"),
-                InventoryLine("Debian Linux guest", "flux_install / debian"),
-                InventoryLine("Guest packages / users", "setup_debian_family.sh"),
+                InventoryLine("Alpine Linux guest", "flux_install / alpine"),
+                InventoryLine("Guest packages / users", "setup_alpine_family.sh"),
                 InventoryLine("Hardware acceleration", "setup_hw_accel_debian.sh")
             )
         }
 
     fun customizationInventory(): List<InventoryLine> = listOf(
-        InventoryLine("Fonts & terminal polish", "setup_customization_debian.sh")
+        InventoryLine("Fonts & terminal polish", "setup_customization_alpine.sh")
     )
 
     fun guiInventory(): List<InventoryLine> = listOf(

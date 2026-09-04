@@ -32,6 +32,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.setPadding
 import android.system.Os
 import com.zenithblue.nativecode.cliauth.AiCliProvisionState
+import com.zenithblue.nativecode.onboarding.OnboardingIo
+import com.zenithblue.nativecode.onboarding.OnboardingUiKit
+import com.zenithblue.nativecode.onboarding.OnboardingUiKit.CustomBrutalistToggle
 import com.zenithblue.nativecode.cliauth.CliToolsInstaller
 import com.zenithblue.nativecode.cliauth.InstallPlanCatalog
 import com.zenithblue.nativecode.terminal.GpuAccelDetector
@@ -2437,11 +2440,11 @@ class OnboardingActivity : AppCompatActivity() {
                     failSetupProgress("Root not available — grant superuser, then retry")
                     return@execute
                 }
-                enterSetupPhase("R1", "Running setup_debian13_chroot.sh…")
-                updateBaseStatus("[CHROOT] Root confirmed. Running setup_debian13_chroot.sh...")
+                enterSetupPhase("R1", "Running setup_alpine_chroot.sh…")
+                updateBaseStatus("[CHROOT] Root confirmed. Running setup_alpine_chroot.sh...")
                 RootShell.executeScriptAsset(
                     context = this,
-                    assetName = "scripts/chroot/setup_debian13_chroot.sh",
+                    assetName = "scripts/chroot/setup_alpine_chroot.sh",
                     onLine = { line -> appendSetupLog(line) },
                     onDone = { code ->
                         // Proceed if exit 0 OR base marker present (false exit 1 from am start, etc.)
@@ -2454,17 +2457,17 @@ class OnboardingActivity : AppCompatActivity() {
                         if (code == 0 || installed) {
                             setSetupPhaseFraction(1f, "Base chroot installed")
                             updateBaseStatus("[CHROOT] Base complete — starting guest chain (E→H)...")
-                            // Step E: Provision Debian packages (runs inside chroot as root)
+                            // Step E: Provision Alpine packages (runs inside chroot as root)
                             enterSetupPhase("E", "Installing guest packages…")
-                            updateBaseStatus("[CHROOT] E. Provisioning Debian packages...")
+                            updateBaseStatus("[CHROOT] E. Provisioning Alpine packages...")
                             copyAndRunInChroot(
-                                assetName = "scripts/setup_debian_family.sh",
-                                scriptName = "setup_debian_family.sh",
-                                cmd = "bash /tmp/setup_debian_family.sh"
+                                assetName = "scripts/setup_alpine_family.sh",
+                                scriptName = "setup_alpine_family.sh",
+                                cmd = "sh /tmp/setup_alpine_family.sh"
                             ) { codeE ->
                                 if (codeE != 0) {
-                                    updateBaseStatus("[CHROOT] Debian family setup failed (exit $codeE).")
-                                    failSetupProgress("Debian package setup failed (exit $codeE)")
+                                    updateBaseStatus("[CHROOT] Alpine family setup failed (exit $codeE).")
+                                    failSetupProgress("Alpine package setup failed (exit $codeE)")
                                     return@copyAndRunInChroot
                                 }
                                 setSetupPhaseFraction(1f)
@@ -2499,9 +2502,9 @@ class OnboardingActivity : AppCompatActivity() {
                                             enterSetupPhase("G", "Applying shell polish…")
                                             updateBaseStatus("[CHROOT] G. Customizing Guest Environment...")
                                             copyAndRunInChroot(
-                                                assetName = "scripts/setup_customization_debian.sh",
-                                                scriptName = "setup_customization_debian.sh",
-                                                cmd = "bash /tmp/setup_customization_debian.sh"
+                                                assetName = "scripts/setup_customization_alpine.sh",
+                                                scriptName = "setup_customization_alpine.sh",
+                                                cmd = "sh /tmp/setup_customization_alpine.sh"
                                             ) { codeG ->
                                                 if (codeG != 0) {
                                                     updateBaseStatus("[CHROOT] Customization failed (exit $codeG). Continuing...")
@@ -2570,11 +2573,24 @@ class OnboardingActivity : AppCompatActivity() {
                     setSetupPhaseFraction(0.5f, "bootstrap.tar ready")
                 }
 
-                val tarProcess = Runtime.getRuntime().exec(
-                    arrayOf("tar", "-xf", tarFile.absolutePath, "-C", filesDir.absolutePath)
-                )
-                if (tarProcess.waitFor() != 0) {
+                val tarBin = if (File("/system/bin/tar").canExecute()) "/system/bin/tar" else "tar"
+                var tarExit = -1
+                try {
+                    val tarProcess = Runtime.getRuntime().exec(
+                        arrayOf(tarBin, "-xf", tarFile.absolutePath, "-C", filesDir.absolutePath)
+                    )
+                    val err = try { tarProcess.errorStream.bufferedReader().readText() } catch (_: Exception) { "" }
+                    try { tarProcess.inputStream.close() } catch (_: Exception) {}
+                    tarExit = tarProcess.waitFor()
+                    if (err.isNotBlank()) appendSetupLog(">>> tar stderr: ${err.take(2000)}\n")
+                    appendSetupLog(">>> tar exit=$tarExit\n")
+                } catch (e: Exception) {
+                    appendSetupLog(">>> tar exec failed: ${e.message}\n")
+                }
+                val bashProbe = File(filesDir, "usr/bin/bash")
+                if (tarExit != 0 || !bashProbe.isFile) {
                     // Fallback to stream extraction if shell tar command fails
+                    appendSetupLog(">>> fallback extractTarStream (tarExit=$tarExit bash=${bashProbe.exists()})\n")
                     assets.open("bootstrap.tar").use { input ->
                         extractTarStream(input, filesDir)
                     }
@@ -2622,11 +2638,22 @@ class OnboardingActivity : AppCompatActivity() {
                 ) { "Host setup failed" }
                 setSetupPhaseFraction(1f)
 
-                enterSetupPhase("E", "Debian rootfs + packages…")
-                updateBaseStatus("E. Provisioning Debian Guest Container...")
-                val debBytes = assets.open("scripts/setup_debian_family.sh").use { it.readBytes() }
+                enterSetupPhase("E", "Alpine rootfs + packages…")
+                updateBaseStatus("E. Provisioning Alpine Guest Container...")
+                val out = File(homeDir, "alpine_rootfs.tar.gz")
+                val outTar = File(homeDir, "alpine_rootfs.tar")
+                val hasRootfs = (out.isFile && out.length() > 2L * 1024L * 1024L) ||
+                    (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)
+                if (!hasRootfs) {
+                    val bytes = openRootfsAsset().use { it.readBytes() }
+                    val isGz = bytes.size > 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()
+                    val target = if (isGz) out else outTar
+                    FileOutputStream(target).use { it.write(bytes) }
+                    Log.i("Onboarding", "Explicitly deployed rootfs before flux_install: ${target.absolutePath} (${target.length()} bytes)")
+                }
+                val debBytes = assets.open("scripts/setup_alpine_family.sh").use { it.readBytes() }
                 val debPayload = Base64.encodeToString(debBytes, Base64.NO_WRAP)
-                check(runShellCommand(arrayOf(bash, File(homeDir, "flux_install.sh").absolutePath, "debian", debPayload)) == 0) { "Debian guest install failed" }
+                check(runShellCommand(arrayOf(bash, File(homeDir, "flux_install.sh").absolutePath, "alpine", debPayload)) == 0) { "Alpine guest install failed" }
                 setSetupPhaseFraction(1f)
 
                 val gpuDetect = GpuAccelDetector.detect()
@@ -2645,7 +2672,7 @@ class OnboardingActivity : AppCompatActivity() {
                 check(runShellCommand(arrayOf(
                     TermuxHostPaths.BIN + "/python",
                     TermuxHostPaths.PROOT_DISTRO,
-                    "login", "debian", "--shared-tmp", "--",
+                    "login", "alpine", "--shared-tmp", "--",
                     "env", "FLUX_GPU=${gpuDetect.mode}", "bash", "/tmp/setup_hw_accel_debian.sh"
                 )) == 0) { "GPU setup failed" }
                 setSetupPhaseFraction(1f)
@@ -2659,7 +2686,7 @@ class OnboardingActivity : AppCompatActivity() {
                     check(runShellCommand(arrayOf(
                         TermuxHostPaths.BIN + "/python",
                         TermuxHostPaths.PROOT_DISTRO,
-                        "login", "debian", "--shared-tmp", "--",
+                        "login", "alpine", "--shared-tmp", "--",
                         "env", "FLUX_THEME=dark", "bash", "/tmp/setup_xfce4.sh"
                     )) == 0) { "XFCE4 setup failed" }
                     setSetupPhaseFraction(1f)
@@ -2670,14 +2697,14 @@ class OnboardingActivity : AppCompatActivity() {
                 if (enableDebianCustomization) {
                     enterSetupPhase("G", "Applying shell polish…")
                     updateBaseStatus("G. Customizing Guest Environment...")
-                    val customScript = File(File(usrDir, "tmp"), "setup_customization_debian.sh")
-                    assets.open("scripts/setup_customization_debian.sh").use { input -> FileOutputStream(customScript).use { input.copyTo(it) } }
+                    val customScript = File(File(usrDir, "tmp"), "setup_customization_alpine.sh")
+                    assets.open("scripts/setup_customization_alpine.sh").use { input -> FileOutputStream(customScript).use { input.copyTo(it) } }
                     customScript.setExecutable(true)
                     check(runShellCommand(arrayOf(
                         TermuxHostPaths.BIN + "/python",
                         TermuxHostPaths.PROOT_DISTRO,
-                        "login", "debian", "--shared-tmp", "--",
-                        "bash", "/tmp/setup_customization_debian.sh"
+                        "login", "alpine", "--shared-tmp", "--",
+                        "sh", "/tmp/setup_customization_alpine.sh"
                     )) == 0) { "Customization failed" }
                     setSetupPhaseFraction(1f)
                 } else {
@@ -2705,161 +2732,18 @@ class OnboardingActivity : AppCompatActivity() {
         assetName: String,
         dest: File,
         onProgress: (fraction: Float, detail: String) -> Unit
-    ) {
-        val total = try {
-            assets.openFd(assetName).use { it.length }
-        } catch (_: Exception) {
-            -1L
-        }
-        assets.open(assetName).use { input ->
-            FileOutputStream(dest).use { output ->
-                val buf = ByteArray(64 * 1024)
-                var readTotal = 0L
-                var lastUi = 0L
-                while (true) {
-                    val n = input.read(buf)
-                    if (n < 0) break
-                    output.write(buf, 0, n)
-                    readTotal += n
-                    val now = System.currentTimeMillis()
-                    if (now - lastUi < 100) continue
-                    lastUi = now
-                    if (total > 0) {
-                        val frac = (readTotal.toFloat() / total).coerceIn(0f, 1f)
-                        onProgress(
-                            frac,
-                            "Copied ${formatBytes(readTotal)} / ${formatBytes(total)}"
-                        )
-                    } else {
-                        onProgress(0.3f, "Copied ${formatBytes(readTotal)}…")
-                    }
-                }
-            }
-        }
-        if (total > 0) onProgress(1f, "Copied ${formatBytes(total)}")
-    }
+    ) = OnboardingIo.copyAssetWithProgress(assets, assetName, dest, onProgress)
 
-    private fun formatBytes(bytes: Long): String {
-        if (bytes < 1024) return "$bytes B"
-        val kb = bytes / 1024.0
-        if (kb < 1024) return String.format("%.1f KB", kb)
-        val mb = kb / 1024.0
-        if (mb < 1024) return String.format("%.1f MB", mb)
-        return String.format("%.2f GB", mb / 1024.0)
-    }
+    private fun formatBytes(bytes: Long): String = OnboardingIo.formatBytes(bytes)
 
-    private fun moveDirectoryContents(source: File, destination: File) {
-        if (!source.exists()) return
-        destination.mkdirs()
-        val files = source.listFiles() ?: return
-        for (file in files) {
-            val destFile = File(destination, file.name)
-            if (file.isDirectory) {
-                moveDirectoryContents(file, destFile)
-                file.delete()
-            } else {
-                file.renameTo(destFile)
-            }
-        }
-        source.delete()
-    }
+    private fun moveDirectoryContents(source: File, destination: File) =
+        OnboardingIo.moveDirectoryContents(source, destination)
 
-    private fun extractTarStream(inputStream: InputStream, targetDir: File) {
-        val buffer = ByteArray(512)
-        while (true) {
-            var bytesRead = 0
-            while (bytesRead < 512) {
-                val r = inputStream.read(buffer, bytesRead, 512 - bytesRead)
-                if (r == -1) break
-                bytesRead += r
-            }
-            if (bytesRead < 512) break
+    private fun extractTarStream(inputStream: InputStream, targetDir: File) =
+        OnboardingIo.extractTarStream(inputStream, targetDir, ::appendSetupLog)
 
-            var allZero = true
-            for (b in buffer) {
-                if (b != 0.toByte()) { allZero = false; break }
-            }
-            if (allZero) break
-
-            fun parseString(offset: Int, length: Int): String {
-                var len = 0
-                while (len < length && buffer[offset + len] != 0.toByte()) { len++ }
-                return String(buffer, offset, len, Charsets.UTF_8)
-            }
-
-            var name = parseString(0, 100)
-            val prefix = parseString(345, 155)
-            if (prefix.isNotEmpty()) name = "$prefix/$name"
-
-            val sizeStr = parseString(124, 12).trim()
-            val size = try { sizeStr.toLong(8) } catch (e: Exception) { 0L }
-            val type = buffer[156].toInt().toChar()
-            val linkName = parseString(157, 100)
-
-            val relPath = name.replace("^data/data/com.zenithblue.nativecode/files/".toRegex(), "").trimStart('/')
-            if (relPath.isEmpty()) {
-                val dataBlocks = Math.ceil(size.toDouble() / 512.0).toLong()
-                skipBytes(inputStream, dataBlocks * 512L)
-                continue
-            }
-
-            val outFile = File(targetDir, relPath)
-
-            if (type == '5') {
-                outFile.mkdirs()
-            } else if (type == '2') {
-                outFile.parentFile?.mkdirs()
-                try {
-                    Os.symlink(linkName, outFile.absolutePath)
-                } catch (e: Exception) {
-                    try {
-                        val linkTarget = File(outFile.parentFile, linkName)
-                        if (linkTarget.exists() && linkTarget.isFile) {
-                            linkTarget.copyTo(outFile, overwrite = true)
-                        }
-                    } catch (_: Exception) {}
-                }
-            } else if (type == '0' || type == '\u0000') {
-                outFile.parentFile?.mkdirs()
-                FileOutputStream(outFile).use { fos ->
-                    var remaining = size
-                    val copyBuf = ByteArray(8192)
-                    while (remaining > 0) {
-                        val toRead = Math.min(copyBuf.size.toLong(), remaining).toInt()
-                        val r = inputStream.read(copyBuf, 0, toRead)
-                        if (r == -1) break
-                        fos.write(copyBuf, 0, r)
-                        remaining -= r
-                    }
-                }
-                val padding = ((512 - (size % 512)) % 512).toInt()
-                if (padding > 0) {
-                    skipBytes(inputStream, padding.toLong())
-                }
-                val modeStr = parseString(100, 8).trim()
-                try {
-                    val mode = modeStr.toInt(8)
-                    if ((mode and 73) != 0) {
-                        outFile.setExecutable(true, false)
-                    }
-                } catch (_: Exception) {}
-            } else {
-                val dataBlocks = Math.ceil(size.toDouble() / 512.0).toLong()
-                skipBytes(inputStream, dataBlocks * 512L)
-            }
-        }
-    }
-
-    private fun skipBytes(inputStream: InputStream, count: Long) {
-        var remaining = count
-        val buf = ByteArray(8192)
-        while (remaining > 0) {
-            val toRead = Math.min(buf.size.toLong(), remaining).toInt()
-            val r = inputStream.read(buf, 0, toRead)
-            if (r == -1) break
-            remaining -= r
-        }
-    }
+    private fun skipBytes(inputStream: InputStream, count: Long) =
+        OnboardingIo.skipBytes(inputStream, count)
 
     private fun updateBaseStatus(msg: String) {
         // Phase title stays under enterSetupPhase / failSetupProgress.
@@ -3146,7 +3030,7 @@ class OnboardingActivity : AppCompatActivity() {
             }
 
             // 2. As root: mkdir chroot/tmp, cp staged script in, chmod +x, then run
-            val chrootTmpPath = "/data/local/tmp/chrootDebian13/tmp"
+            val chrootTmpPath = "/data/local/tmp/chrootAlpine/tmp"
             val copyCmd = "mkdir -p $chrootTmpPath && cp ${staged.absolutePath} $chrootTmpPath/$scriptName && chmod +x $chrootTmpPath/$scriptName"
             val copyCode = RootShell.executeSync(copyCmd)
             if (copyCode != 0) {
@@ -3178,16 +3062,21 @@ class OnboardingActivity : AppCompatActivity() {
                 "stop_gui.sh",
                 "start_gui_chroot.sh",
                 "stop_gui_chroot.sh",
+                "start_alpine_gui.sh",
+                "stop_alpine_gui.sh",
                 "start_debian13_gui.sh",
                 "stop_debian13_gui.sh",
                 "setup_cli_tools.sh",
+                "setup_alpine_chroot.sh",
                 "setup_debian13_chroot.sh",
+                "uninstall_alpine_chroot.sh",
                 "uninstall_debian13_chroot.sh",
                 "nativecode_chroot.sh"
             )
             for (script in scripts) {
                 val assetPath = when {
                     script.contains("chroot") ||
+                        script.contains("alpine_gui") ||
                         script == "start_debian13_gui.sh" ||
                         script == "stop_debian13_gui.sh" ||
                         script == "nativecode_chroot.sh" -> "scripts/chroot/$script"
@@ -3205,25 +3094,81 @@ class OnboardingActivity : AppCompatActivity() {
             val termuxDir = File(homeDir, ".termux").also { it.mkdirs() }
             val fontOut = File(termuxDir, "font.ttf")
             assets.open("fonts/font.ttf").use { input -> FileOutputStream(fontOut).use { input.copyTo(it) } }
-            // Pinned Debian 13 rootfs for proot-distro install ./file --name debian
+            // Pinned Alpine rootfs for proot-distro install ./file --name alpine
             deployRootfsArchive(homeDir)
+            // Bundled XFCE theme/icon/cursor/wallpaper archives → shared tmp
+            // (guest sees them at /tmp/flux_xfce_assets via --shared-tmp).
+            deployXfceAssets()
         } catch (e: Exception) {
             Log.e("Onboarding", "Failed to deploy scripts", e)
         }
     }
 
-    /** Copy assets/rootfs/debian_13_rootfs.tar.xz → $HOME (skip if already present & large). */
+    /** Asset name → filename the guest scripts look up in /tmp/flux_xfce_assets. */
+    private val xfceBundledAssets = mapOf(
+        "Space-transparency.tar.xz" to "Space-transparency.tar.xz",
+        "Space-light.tar.xz" to "Space-light.tar.xz",
+        "01-Vimix-cursors.tar.xz" to "01-Vimix-cursors.tar.xz",
+        "02-Vimix-white-cursors.tar.xz" to "02-Vimix-white-cursors.tar.xz",
+        "papirus-dark-only.tar" to "papirus-dark-only.tar",
+        "fluxlinux-dark.png" to "fluxlinux-dark.png",
+        "fluxlinux-light.png" to "fluxlinux-light.png"
+    )
+
+    private fun openXfceAsset(name: String): InputStream {
+        return try {
+            assets.open("xfce/$name")
+        } catch (_: Exception) {
+            // AGP may store .tar.gz assets gunzipped as .tar
+            assets.open("xfce/${name.removeSuffix(".gz")}")
+        }
+    }
+
+    private fun deployXfceAssets() {
+        val destDir = File(File(filesDir, "usr/tmp"), "flux_xfce_assets").also { it.mkdirs() }
+        for ((assetName, guestName) in xfceBundledAssets) {
+            try {
+                val out = File(destDir, guestName)
+                if (out.isFile && out.length() > 0) continue
+                openXfceAsset(assetName).use { input ->
+                    FileOutputStream(out).use { input.copyTo(it) }
+                }
+                Log.i("Onboarding", "Deployed xfce asset: ${out.absolutePath} (${out.length()} bytes)")
+            } catch (e: Exception) {
+                Log.e("Onboarding", "Failed to deploy xfce asset $assetName", e)
+            }
+        }
+    }
+
+    /** Copy assets/rootfs/alpine_rootfs.tar.gz → $HOME (skip if already present & large).
+     * Falls back to assets/rootfs/alpine_rootfs.tar (AGP may gunzip .gz unless 'gz' is in noCompress). */
+    private fun openRootfsAsset(): InputStream {
+        return try {
+            assets.open("rootfs/alpine_rootfs.tar.gz")
+        } catch (_: Exception) {
+            assets.open("rootfs/alpine_rootfs.tar")
+        }
+    }
+
+    /** Copy assets/rootfs/alpine_rootfs.tar.gz → $HOME (skip if already present & large). */
     private fun deployRootfsArchive(homeDir: File) {
-        val out = File(homeDir, "debian_13_rootfs.tar.xz")
-        if (out.isFile && out.length() > 50L * 1024L * 1024L) {
-            Log.i("Onboarding", "Rootfs already deployed: ${out.absolutePath} (${out.length()} bytes)")
+        val out = File(homeDir, "alpine_rootfs.tar.gz")
+        val outTar = File(homeDir, "alpine_rootfs.tar")
+        if ((out.isFile && out.length() > 2L * 1024L * 1024L) ||
+            (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)) {
+            Log.i("Onboarding", "Rootfs already deployed")
             return
         }
         try {
-            assets.open("rootfs/debian_13_rootfs.tar.xz").use { input ->
-                FileOutputStream(out).use { input.copyTo(it) }
+            openRootfsAsset().use { input ->
+                // Preserve .tar.gz name when source is gzipped; else write .tar
+                // Heuristic: gzip magic 1f 8b
+                val peek = input.readBytes()
+                val isGz = peek.size > 2 && peek[0] == 0x1f.toByte() && peek[1] == 0x8b.toByte()
+                val target = if (isGz) out else outTar
+                FileOutputStream(target).use { it.write(peek) }
+                Log.i("Onboarding", "Deployed rootfs: ${target.absolutePath} (${target.length()} bytes)")
             }
-            Log.i("Onboarding", "Deployed rootfs: ${out.absolutePath} (${out.length()} bytes)")
         } catch (e: Exception) {
             Log.e("Onboarding", "Failed to deploy rootfs archive from assets", e)
         }
@@ -3252,142 +3197,17 @@ class OnboardingActivity : AppCompatActivity() {
 
     // ── Helper UI components ──────────────────────────────────────────────────
 
-    private fun smallHeader(title: String, iconRes: Int = R.drawable.ic_terminal): LinearLayout {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(16))
-        }
-        val icon = ImageView(this).apply {
-            setImageResource(iconRes)
-            setColorFilter(NC.PRIMARY)
-            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { rightMargin = dp(10) }
-        }
-        val text = TextView(this).apply {
-            this.text = title
-            textSize = 20f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        root.addView(icon); root.addView(text)
-        return root
-    }
+    private fun smallHeader(title: String, iconRes: Int = R.drawable.ic_terminal): LinearLayout =
+        OnboardingUiKit.smallHeader(this, title, iconRes)
 
-    private fun primaryButton(label: String, iconRes: Int? = null, onClick: () -> Unit): LinearLayout {
-        val btn = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            background = cyberBrutalistBg(
-                fillColor = NC.PRIMARY_CON,
-                strokeColor = NC.OUTLINE_VAR,
-                shadowColor = NC.SURFACE_BRIGHT,
-                offsetDp = 6,
-                cornerRadiusDp = 0,
-                rightFaceColor = NC.OUTLINE_VAR
-            )
-            setPadding(dp(20), dp(16), dp(20), dp(16))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { onClick() }
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.translationX = dp(4).toFloat()
-                        v.translationY = dp(4).toFloat()
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.translationX = 0f
-                        v.translationY = 0f
-                    }
-                }
-                false
-            }
-        }
-        val tv = TextView(this).apply {
-            text = label
-            textSize = 16f
-            setTextColor(NC.ON_PRIMARY)
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-        }
-        btn.addView(tv)
-        if (iconRes != null) {
-            val iv = ImageView(this).apply {
-                setImageResource(iconRes)
-                setColorFilter(NC.ON_PRIMARY)
-                layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply {
-                    leftMargin = dp(8)
-                }
-            }
-            btn.addView(iv)
-        }
-        return btn
-    }
+    private fun primaryButton(label: String, iconRes: Int? = null, onClick: () -> Unit): LinearLayout =
+        OnboardingUiKit.primaryButton(this, label, iconRes, onClick)
 
-    private fun secondaryButton(label: String, onClick: () -> Unit): LinearLayout {
-        val btn = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_CONTAINER,
-                strokeColor = NC.BORDER,
-                shadowColor = NC.SURFACE_BRIGHT,
-                offsetDp = 6,
-                cornerRadiusDp = 0,
-                rightFaceColor = NC.OUTLINE_VAR
-            )
-            setPadding(dp(20), dp(16), dp(20), dp(16))
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { onClick() }
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.translationX = dp(4).toFloat()
-                        v.translationY = dp(4).toFloat()
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.translationX = 0f
-                        v.translationY = 0f
-                    }
-                }
-                false
-            }
-        }
-        val tv = TextView(this).apply {
-            text = label
-            textSize = 14f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-        }
-        btn.addView(tv)
-        return btn
-    }
+    private fun secondaryButton(label: String, onClick: () -> Unit): LinearLayout =
+        OnboardingUiKit.secondaryButton(this, label, onClick)
 
-    private fun featureBadge(iconRes: Int, textStr: String): LinearLayout {
-        val badge = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = roundedBg(NC.SURFACE_CONTAINER, NC.BORDER, 0)
-            setPadding(dp(10), dp(7), dp(10), dp(7))
-        }
-        val icon = ImageView(this).apply {
-            setImageResource(iconRes)
-            setColorFilter(NC.PRIMARY)
-            layoutParams = LinearLayout.LayoutParams(dp(14), dp(14)).apply { rightMargin = dp(6) }
-        }
-        val tv = TextView(this).apply {
-            text = textStr
-            textSize = 11f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.MONOSPACE
-        }
-        badge.addView(icon)
-        badge.addView(tv)
-        return badge
-    }
+    private fun featureBadge(iconRes: Int, textStr: String): LinearLayout =
+        OnboardingUiKit.featureBadge(this, iconRes, textStr)
 
     private fun cyberBrutalistBg(
         fillColor: Int,
@@ -3396,143 +3216,15 @@ class OnboardingActivity : AppCompatActivity() {
         offsetDp: Int = 6,
         cornerRadiusDp: Int = 0,
         rightFaceColor: Int = NC.OUTLINE_VAR
-    ): LayerDrawable {
-        val bottomShadow = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(shadowColor)
-            if (cornerRadiusDp > 0) cornerRadius = dp(cornerRadiusDp).toFloat()
-        }
-        val rightShadow = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(rightFaceColor)
-            if (cornerRadiusDp > 0) cornerRadius = dp(cornerRadiusDp).toFloat()
-        }
-        val frontDrawable = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(fillColor)
-            setStroke(dp(1), strokeColor)
-            if (cornerRadiusDp > 0) cornerRadius = dp(cornerRadiusDp).toFloat()
-        }
-        val layers = arrayOf<Drawable>(bottomShadow, rightShadow, frontDrawable)
-        val off = dp(offsetDp)
-        return LayerDrawable(layers).apply {
-            setLayerInset(0, off, off, 0, 0)
-            setLayerInset(1, off, 0, 0, off)
-            setLayerInset(2, 0, 0, off, off)
-        }
-    }
+    ): LayerDrawable = OnboardingUiKit.cyberBrutalistBg(
+        this, fillColor, strokeColor, shadowColor, offsetDp, cornerRadiusDp, rightFaceColor
+    )
 
-    private fun dp(v: Int) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
-    private fun roundedBg(fill: Int, stroke: Int, r: Int) = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; setColor(fill); setStroke(dp(1), stroke); cornerRadius = r.toFloat() }
-    private fun textBadge(text: String, bg: Int, fg: Int) = TextView(this).apply { this.text = text; textSize = 10f; setTextColor(fg); typeface = Typeface.MONOSPACE; background = roundedBg(bg, fg, dp(4)); setPadding(dp(8), dp(3), dp(8), dp(3)) }
+    private fun dp(v: Int) = OnboardingUiKit.dp(this, v)
+    private fun roundedBg(fill: Int, stroke: Int, r: Int) = OnboardingUiKit.roundedBg(this, fill, stroke, r)
+    private fun textBadge(text: String, bg: Int, fg: Int) = OnboardingUiKit.textBadge(this, text, bg, fg)
 
-    private fun pulseView(v: View) {
-        val anim = ObjectAnimator.ofFloat(v, "alpha", 0.45f, 1f).apply {
-            duration = 1500
-            repeatMode = ValueAnimator.REVERSE
-            repeatCount = ValueAnimator.INFINITE
-        }
-        anim.start()
-    }
-
-    private class CustomBrutalistToggle(
-        context: Context,
-        initialChecked: Boolean = false,
-        private val onCheckedChange: ((Boolean) -> Unit)? = null
-    ) : LinearLayout(context) {
-
-        var isChecked: Boolean = initialChecked
-            set(value) {
-                field = value
-                updateState(animate = false)
-            }
-
-        private val trackView = FrameLayout(context)
-        private val thumbView = View(context)
-
-        init {
-            orientation = HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            isClickable = true
-            isFocusable = true
-
-            val trackWidth = dp(46)
-            val trackHeight = dp(24)
-            val thumbSize = dp(18)
-            val margin = dp(3)
-
-            trackView.layoutParams = LayoutParams(trackWidth, trackHeight)
-            
-            val thumbParams = FrameLayout.LayoutParams(thumbSize, thumbSize).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                leftMargin = margin
-            }
-            thumbView.layoutParams = thumbParams
-
-            trackView.addView(thumbView)
-            addView(trackView)
-
-            updateState(animate = false)
-
-            setOnClickListener {
-                if (!isEnabled) return@setOnClickListener
-                isChecked = !isChecked
-                updateState(animate = true)
-                onCheckedChange?.invoke(isChecked)
-            }
-        }
-
-        private fun updateState(animate: Boolean) {
-            val trackWidth = dp(46)
-            val thumbSize = dp(18)
-            val margin = dp(3)
-
-            val trackColor = if (isChecked) Color.parseColor("#3DDC84") else Color.parseColor("#1E1E1E")
-            val trackBorder = if (isChecked) Color.parseColor("#3DDC84") else Color.parseColor("#333333")
-            val thumbColor = if (isChecked) Color.parseColor("#0A0A0A") else Color.parseColor("#A0A0A0")
-
-            trackView.background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(trackColor)
-                setStroke(dp(2), trackBorder)
-                cornerRadius = 0f
-            }
-
-            thumbView.background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(thumbColor)
-                cornerRadius = 0f
-            }
-
-            val targetMargin = if (isChecked) {
-                trackWidth - thumbSize - margin
-            } else {
-                margin
-            }
-
-            val params = thumbView.layoutParams as FrameLayout.LayoutParams
-            if (animate) {
-                val anim = ValueAnimator.ofInt(params.leftMargin, targetMargin)
-                anim.duration = 150
-                anim.addUpdateListener { va ->
-                    params.leftMargin = va.animatedValue as Int
-                    thumbView.layoutParams = params
-                }
-                anim.start()
-            } else {
-                params.leftMargin = targetMargin
-                thumbView.layoutParams = params
-            }
-        }
-
-        private fun dp(dpValue: Int): Int {
-            return TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP,
-                dpValue.toFloat(),
-                resources.displayMetrics
-            ).toInt()
-        }
-    }
+    private fun pulseView(v: View) = OnboardingUiKit.pulseView(v)
 
     private val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
     private val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT

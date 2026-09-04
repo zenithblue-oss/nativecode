@@ -61,7 +61,7 @@ object ProotFastCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         val prootBinFile = TermuxHostPaths.libProot(ctx)
         val prootBin = if (prootBinFile.exists()) prootBinFile.absolutePath else "${TermuxHostPaths.BIN}/proot"
-        val rootfs = "${TermuxHostPaths.PREFIX}/var/lib/proot-distro/containers/debian/rootfs"
+        val rootfs = "${TermuxHostPaths.PREFIX}/var/lib/proot-distro/containers/alpine/rootfs"
         val guestUser = if (user == "root") "root" else "flux"
         val guestHome = if (guestUser == "root") "/root" else "/home/flux"
         val guestPath = buildGuestPath(rootfs, guestHome)
@@ -139,7 +139,7 @@ object ProotFastCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         val guestUser = if (user == "root") "root" else "flux"
         val guestHome = if (guestUser == "root") "/root" else "/home/flux"
-        val rootfs = "${TermuxHostPaths.PREFIX}/var/lib/proot-distro/containers/debian/rootfs"
+        val rootfs = "${TermuxHostPaths.PREFIX}/var/lib/proot-distro/containers/alpine/rootfs"
         val targetCwd = workDir?.takeIf { it.isNotBlank() } ?: guestHome
         val shellBin = resolveInteractiveShell(rootfs, guestUser)
         return buildInternal(ctx, guestUser, useSharedTmp, targetCwd, arrayOf(shellBin, "-l"))

@@ -24,12 +24,18 @@ object GhGuestCommands {
         "if command -v gh >/dev/null 2>&1; then echo GH_OK; gh --version 2>&1 | head -1; else echo GH_MISSING; fi"
 
     fun installPrimary(): String =
-        "export DEBIAN_FRONTEND=noninteractive; " +
-            "apt-get update -y && apt-get install -y gh"
+        "if command -v apk >/dev/null 2>&1; then " +
+            "apk update && apk add --no-cache github-cli; " +
+            "else " +
+            "export DEBIAN_FRONTEND=noninteractive; apt-get update -y && apt-get install -y gh; " +
+            "fi"
 
-    /** Official GitHub CLI apt source then install (arm64 Debian). */
+    /** Official GitHub CLI fallback (Alpine edge community or Debian keyring). */
     fun installFallback(): String =
-        "export DEBIAN_FRONTEND=noninteractive; " +
+        "if command -v apk >/dev/null 2>&1; then " +
+            "apk add --no-cache github-cli --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community; " +
+            "else " +
+            "export DEBIAN_FRONTEND=noninteractive; " +
             "set -e; " +
             "apt-get update -y; " +
             "apt-get install -y curl ca-certificates gnupg; " +
@@ -40,7 +46,8 @@ object GhGuestCommands {
             "echo 'deb [arch=arm64 signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] " +
             "https://cli.github.com/packages stable main' " +
             "> /etc/apt/sources.list.d/github-cli.list; " +
-            "apt-get update -y && apt-get install -y gh"
+            "apt-get update -y && apt-get install -y gh; " +
+            "fi"
 
     fun authStatusJson(): String =
         "gh auth status --hostname $HOST --json hosts 2>&1 || true"

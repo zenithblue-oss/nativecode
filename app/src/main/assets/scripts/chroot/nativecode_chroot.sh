@@ -19,7 +19,7 @@ set -u
 
 VERSION_STR="nativecode-chroot v2.3"
 NC_PACKAGE="${NC_PACKAGE:-com.zenithblue.nativecode}"
-NC_CHROOT="${NC_CHROOT:-/data/local/tmp/chrootDebian13}"
+NC_CHROOT="${NC_CHROOT:-/data/local/tmp/chrootAlpine}"
 NC_HOST_TMP="${NC_HOST_TMP:-/data/data/${NC_PACKAGE}/files/usr/tmp}"
 NC_PREFIX="${NC_PREFIX:-/data/data/${NC_PACKAGE}/files/usr}"
 LOGIN_SHELL="${NC_SHELL:-auto}"

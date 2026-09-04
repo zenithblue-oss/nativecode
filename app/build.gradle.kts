@@ -66,8 +66,9 @@ android {
     }
 
     // Keep large rootfs/bootstrap archives stored uncompressed in the APK
+    // NOTE: 'gz' must be listed or AGP/aapt2 gunzips *.tar.gz assets to *.tar at package time.
     androidResources {
-        noCompress += listOf("xz", "tar")
+        noCompress += listOf("xz", "tar", "gz")
     }
 
     lint {

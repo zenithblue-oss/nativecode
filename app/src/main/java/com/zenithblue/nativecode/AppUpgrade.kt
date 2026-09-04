@@ -95,7 +95,7 @@ object AppUpgrade {
     private fun migrateProotFluxRuntimeShell() {
         val rootfs = File(
             TermuxHostPaths.PREFIX,
-            "var/lib/proot-distro/containers/debian/rootfs"
+            "var/lib/proot-distro/containers/alpine/rootfs"
         )
         val passwd = File(rootfs, "etc/passwd")
         if (!passwd.isFile || !passwd.canRead() || !passwd.canWrite()) return

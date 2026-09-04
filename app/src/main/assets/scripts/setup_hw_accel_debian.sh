@@ -129,6 +129,13 @@ elif command -v apt-get >/dev/null 2>&1; then
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         mesa-utils libgl1-mesa-dri mesa-vulkan-drivers vulkan-tools \
         curl unzip libvulkan1 libgl1 libglx0 xdg-desktop-portal
+elif command -v apk >/dev/null 2>&1; then
+    echo "Alpine Linux detected (apk)."
+    echo "FluxLinux: Installing Vulkan/Mesa dependencies..."
+    apk add --no-cache \
+        mesa mesa-dri-gallium mesa-vulkan-freedreno vulkan-loader \
+        curl unzip
+    echo "FluxLinux: Alpine Setup Complete (VirGL default)."
 else
     echo "Error: Neither apt nor pacman found. Cannot install dependencies."
     exit 1
@@ -218,7 +225,12 @@ if [ "$MODE" = "turnip" ]; then
     TURNIP_VERSION="26.2.0-devel-20260709"
     MESA_VERSION="26.2.0-devel-20260709"
 
-    if [ -f /etc/debian_version ]; then
+    if command -v apk >/dev/null 2>&1; then
+        echo "Alpine Linux detected (apk)."
+        apk add --no-cache mesa mesa-dri-gallium mesa-vulkan-freedreno vulkan-loader curl unzip || true
+        MODE="virgl"
+        VENDOR_HINT="alpine-apk-virgl"
+    elif [ -f /etc/debian_version ]; then
         DISTRO="debian_trixie"
     elif [ -f /etc/lsb-release ] && grep -qi "Ubuntu" /etc/lsb-release; then
         DISTRO="ubuntu_noble"
@@ -228,7 +240,8 @@ if [ "$MODE" = "turnip" ]; then
         DISTRO="debian_trixie"
     fi
 
-    URL="https://github.com/lfdevs/mesa-for-android-container/releases/download/turnip-${TURNIP_VERSION}/turnip_${TURNIP_VERSION}_${DISTRO}_arm64.tar.gz"
+    if [ "$MODE" = "turnip" ]; then
+        URL="https://github.com/lfdevs/mesa-for-android-container/releases/download/turnip-${TURNIP_VERSION}/turnip_${TURNIP_VERSION}_${DISTRO}_arm64.tar.gz"
 
     echo "FluxLinux: Downloading Turnip drivers v${TURNIP_VERSION} for ${DISTRO}..."
     if ! curl -L --fail -o /tmp/turnip.tar.gz "$URL"; then
@@ -308,6 +321,7 @@ PINEOF
             rm -f /tmp/mesa-upgrade.tar.gz
             echo "[WARN] Mesa upgrade download failed — stock Mesa remains."
         fi
+    fi
     fi
 fi
 

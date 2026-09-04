@@ -11,7 +11,7 @@ object ChrootCommandBuilder {
 
     private const val TAG = "ChrootCommandBuilder"
 
-    const val CHROOT_PATH = "/data/local/tmp/chrootDebian13"
+    const val CHROOT_PATH = "/data/local/tmp/chrootAlpine"
 
     /** On-device SSOT helper (assets/scripts/chroot/nativecode_chroot.sh). */
     const val CHROOT_HELPER = "/data/local/tmp/nativecode_chroot.sh"

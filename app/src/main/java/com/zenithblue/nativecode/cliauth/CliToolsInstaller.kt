@@ -30,11 +30,11 @@ object CliToolsInstaller {
                 FileOutputStream(cliScript).use { input.copyTo(it) }
             }
             cliScript.setExecutable(true)
-            onLine("Deployed $SCRIPT — running in proot debian guest…\n")
+            onLine("Deployed $SCRIPT — running in proot alpine guest…\n")
             val cmd = arrayOf(
                 TermuxHostPaths.BIN + "/python",
                 TermuxHostPaths.PROOT_DISTRO,
-                "login", "debian", "--shared-tmp", "--",
+                "login", "alpine", "--shared-tmp", "--",
                 "bash", "/tmp/$SCRIPT"
             )
             runProcess(ctx, cmd, onLine)
@@ -63,7 +63,7 @@ object CliToolsInstaller {
                 staged.setReadable(true, false)
                 onLine("Staged $SCRIPT for chroot…\n")
 
-                val chrootTmp = "/data/local/tmp/chrootDebian13/tmp"
+                val chrootTmp = "/data/local/tmp/chrootAlpine/tmp"
                 val copyCmd =
                     "mkdir -p $chrootTmp && cp ${staged.absolutePath} $chrootTmp/$SCRIPT && chmod +x $chrootTmp/$SCRIPT"
                 val copyCode = RootShell.executeSync(copyCmd)

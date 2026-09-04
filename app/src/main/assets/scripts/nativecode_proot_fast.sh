@@ -16,7 +16,7 @@ set -eu
 NC_PACKAGE="${NC_PACKAGE:-com.zenithblue.nativecode}"
 PREFIX="${PREFIX:-/data/data/${NC_PACKAGE}/files/usr}"
 TERMUX__HOME="${TERMUX__HOME:-/data/data/${NC_PACKAGE}/files/home}"
-ROOTFS="${ROOTFS:-${PREFIX}/var/lib/proot-distro/containers/debian/rootfs}"
+ROOTFS="${ROOTFS:-${PREFIX}/var/lib/proot-distro/containers/alpine/rootfs}"
 PROOT_BIN="${PROOT_BIN:-${PREFIX}/bin/proot}"
 PROFILE="${NC_PROOT_PROFILE:-cli}"
 LOGIN_SHELL="${NC_SHELL:-auto}"
