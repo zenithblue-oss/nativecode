@@ -16,11 +16,37 @@ as **runtime repair only** — no package downloads for baked components.
 - `clean_rootfs.sh` — credential scrub gate (fails on leak)
 - `measure_rootfs.sh` — `du` report + `tar.zst` + 1.45 GiB gate
 
+## Release Pipeline Sequence
+
+The release flow is structured in explicit stages:
+
+1. **build/extract (`build_alpine_rootfs.sh`)** — downloads and extracts verified base minirootfs into `$ROOTFS`.
+2. **ARM64 guest assembly** — runs inside the target rootfs via `chroot /rootfs /bin/sh /assemble.sh` under an ARM64 container or on a rooted device.
+3. **finalize + clean (`finalize.sh`)** — places the `/etc/nativecode/rootfs-release` marker and executes credential scrub (`clean_rootfs.sh`).
+4. **verify — mandatory (`verify_rootfs.sh`)** — runs offline checks against the target tree. Any failure stops the release pipeline.
+5. **measure + archive (`measure_rootfs.sh`)** — generates `.tar.zst` archive and outputs `du` breakdown.
+6. **SHA256 generation** — creates checksum file alongside the archive.
+7. **size gate** — enforces strict 1.45 GiB compressed archive ceiling.
+
 ## Build
 
 ```sh
+# 1. Download base & generate guest scripts
 tools/rootfs/build_alpine_rootfs.sh --work /tmp/nc-rootfs --out out/
-# then run guest assembly inside rootfs (see script output), then finalize
+
+# 2. Run guest assembly inside rootfs (Docker ARM64 or native chroot)
+docker run --rm --privileged --platform linux/arm64 \
+  -v /tmp/nc-rootfs/rootfs:/rootfs \
+  -v /tmp/nc-rootfs:/pkg-lists \
+  -v /tmp/nc-rootfs/opt-staging:/opt-staging \
+  arm64v8/alpine:3.24.1 \
+  sh -c 'cp /pkg-lists/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && chroot /rootfs /bin/sh /assemble.sh && rm -f /rootfs/assemble.sh'
+
+# 3 & 4. Finalize, clean, and run mandatory verification
+/tmp/nc-rootfs/finalize.sh /tmp/nc-rootfs/rootfs out/
+
+# 5, 6 & 7. Measure, archive, sha256, and verify size gate
+tools/rootfs/measure_rootfs.sh /tmp/nc-rootfs/rootfs out/
 ```
 
 Never archive an interactively used phone rootfs. Pin SHA256 in

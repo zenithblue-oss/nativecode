@@ -165,9 +165,9 @@ fi # end legacy install (PREBUILT_E=0)
 
 if [ "$PREBUILT_E" = "1" ]; then
     # Prebuilt fast path: validate baked binaries, no package manager.
-    command -v startxfce4 >/dev/null 2>&1 || { echo "NativeCode: ERROR: startxfce4 missing in prebuilt rootfs"; exit 1; }
-    command -v bash >/dev/null 2>&1 || { echo "NativeCode: ERROR: bash missing in prebuilt rootfs"; exit 1; }
-    command -v gh >/dev/null 2>&1 || echo "NativeCode: WARN: gh missing in prebuilt rootfs (COMPONENT_GH=1 expected)"
+    command -v startxfce4 >/dev/null 2>&1 || { echo "NativeCode: ERROR: startxfce4 missing in prebuilt rootfs" >&2; exit 1; }
+    command -v bash >/dev/null 2>&1 || { echo "NativeCode: ERROR: bash missing in prebuilt rootfs" >&2; exit 1; }
+    command -v gh >/dev/null 2>&1 || { echo "NativeCode: ERROR: gh missing in prebuilt rootfs (COMPONENT_GH=1 expected)" >&2; exit 1; }
     # bwrap: an executable alone is NOT enough — the real bubblewrap binary is
     # exactly what crashes glycin/GTK under PRoot (exit 134). Require the
     # NativeCode shim signature; repair offline from the baked template
@@ -277,7 +277,8 @@ _flux_fix_apk_writable
 # GitHub CLI: mandatory in prebuilt rootfs (apk github-cli); legacy fallback installs.
 if ! command -v gh >/dev/null 2>&1; then
     if [ "$PREBUILT_E" = "1" ]; then
-        echo "NativeCode: WARN: gh missing despite COMPONENT_GH=1"
+        echo "NativeCode: ERROR: gh missing in prebuilt rootfs despite COMPONENT_GH=1" >&2
+        exit 1
     else
         echo "FluxLinux: Installing github-cli (legacy rootfs)..."
         apk add --no-cache github-cli 2>/dev/null || echo "FluxLinux: WARN: github-cli install failed"

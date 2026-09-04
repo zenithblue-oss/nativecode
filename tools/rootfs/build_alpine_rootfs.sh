@@ -11,6 +11,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/versions.env"
 
+# Allow environment override for testing/validation prior to pinning in versions.env
+ALPINE_MINIROOTFS_SHA256="${ALPINE_MINIROOTFS_SHA256_OVERRIDE:-$ALPINE_MINIROOTFS_SHA256}"
+
 WORK="${WORK:-/tmp/nc-rootfs}"
 OUT="${OUT:-$SCRIPT_DIR/out}"
 ROOTFS=""
@@ -140,12 +143,12 @@ chmod +x /home/flux/.vnc/xstartup
 mkdir -p /usr/local/lib/nativecode /etc/nativecode
 cp /pkg-lists/rootfs-common.sh /usr/local/lib/nativecode/rootfs-common.sh
 chmod 644 /usr/local/lib/nativecode/rootfs-common.sh
-# AI CLIs as flux (system node 24)
+# AI CLIs as flux (system node 24) — pinned npm packages for reproducible build
 su -s /bin/sh flux -c '
   set -e
   export PATH="\$HOME/.local/bin:\$PATH"
   npm config set prefix "\$HOME/.local"
-  npm install -g opencode-ai @openai/codex @qwen-code/qwen-code
+  npm install -g opencode-ai@'"${OPENCODE_VERSION:-1.18.27}"' @openai/codex@'"${CODEX_VERSION:-0.153.2}"' @qwen-code/qwen-code@'"${QWEN_VERSION:-0.23.0}"'
   curl -fsSL https://antigravity.google/cli/install.sh | bash || true
   # agy retry once during build (not user onboarding)
   command -v agy >/dev/null 2>&1 || (sleep 5; curl -fsSL https://antigravity.google/cli/install.sh | bash || true)
@@ -171,9 +174,14 @@ chmod +x "$ASSEMBLE"
 
 log "guest assemble script: $ASSEMBLE"
 log "ROOTFS=$ROOTFS"
-log "next: run guest assembly inside rootfs, e.g.:"
-log "  docker run --rm --platform linux/arm64 -v $ROOTFS:/rootfs -v $WORK:/pkg-lists -v $ASSEMBLE:/assemble.sh arm64v8/alpine:$ALPINE_VERSION sh /assemble.sh"
-log "  (or chroot on rooted aarch64 device after bind-mounting /dev /proc /sys)"
+log "next: run guest assembly inside rootfs (targeting \$ROOTFS via chroot):"
+log "  docker run --rm --privileged --platform linux/arm64 \\"
+log "    -v $ROOTFS:/rootfs \\"
+log "    -v $WORK:/pkg-lists \\"
+log "    -v $WORK/opt-staging:/opt-staging \\"
+log "    arm64v8/alpine:$ALPINE_VERSION \\"
+log "    sh -c 'cp /pkg-lists/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh && chroot /rootfs /bin/sh /assemble.sh && rm -f /rootfs/assemble.sh'"
+log "  (or chroot /path/to/rootfs /bin/sh /assemble-inside.sh on rooted aarch64 device after bind-mounting /dev /proc /sys)"
 
 if [ "$SKIP_ANDROID" = "0" ]; then
     log "Android staging not run in this step — download cmdline-tools $ANDROID_CMDLINE_TOOLS_VERSION + platform $ANDROID_PLATFORM + build-tools $ANDROID_BUILD_TOOLS + NDK $ANDROID_NDK + Kotlin $KOTLIN_VERSION + Gradle $GRADLE_VERSION into $WORK/opt-staging (verify checksums, ARM64/musl only)."
@@ -204,17 +212,45 @@ COMPONENT_DEV=1
 RELEASE_EOF
 log "release marker staged at $WORK/rootfs-release (installed to /etc/nativecode/rootfs-release by finalize step)"
 
-# Finalize helper: install marker + scrub + archive (run after guest assembly)
+# Finalize helper: install marker + scrub + verify (mandatory, no || true)
 cat > "$WORK/finalize.sh" <<'FINALIZE_EOF'
 #!/bin/bash
 # finalize.sh ROOTFS OUT
+# Sequence:
+#   1. install rootfs-release marker
+#   2. clean/scrub rootfs
+#   3. verify_rootfs (mandatory gate; non-zero stops release)
+#   4. (measure + archive via measure_rootfs.sh)
 set -euo pipefail
-ROOTFS="$1"; OUT="$2"
-mkdir -p "$OUT" "$ROOTFS/etc/nativecode"
+ROOTFS="$1"; OUT="${2:-}"
+[ -n "$ROOTFS" ] || { echo "usage: finalize.sh ROOTFS [OUT]" >&2; exit 2; }
+mkdir -p "$ROOTFS/etc/nativecode"
+[ -z "$OUT" ] || mkdir -p "$OUT"
 cp "$(dirname "$0")/rootfs-release" "$ROOTFS/etc/nativecode/rootfs-release"
 chmod 644 "$ROOTFS/etc/nativecode/rootfs-release"
-bash "$(dirname "$0")/../rootfs/clean_rootfs.sh" "$ROOTFS" || bash "tools/rootfs/clean_rootfs.sh" "$ROOTFS"
-bash tools/rootfs/verify_rootfs.sh "$ROOTFS" || true
+
+SCRIPT_DIR_LOC="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR_LOC/../.." 2>/dev/null && pwd || true)"
+
+if [ -f "$SCRIPT_DIR_LOC/clean_rootfs.sh" ]; then
+    bash "$SCRIPT_DIR_LOC/clean_rootfs.sh" "$ROOTFS"
+elif [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/tools/rootfs/clean_rootfs.sh" ]; then
+    bash "$REPO_ROOT/tools/rootfs/clean_rootfs.sh" "$ROOTFS"
+else
+    echo "finalize.sh: clean_rootfs.sh not found" >&2
+    exit 1
+fi
+
+echo "finalize.sh: running mandatory verification..."
+if [ -f "$SCRIPT_DIR_LOC/verify_rootfs.sh" ]; then
+    bash "$SCRIPT_DIR_LOC/verify_rootfs.sh" "$ROOTFS"
+elif [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" ]; then
+    bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$ROOTFS"
+else
+    echo "finalize.sh: verify_rootfs.sh not found" >&2
+    exit 1
+fi
+echo "finalize.sh: verification passed"
 FINALIZE_EOF
 chmod +x "$WORK/finalize.sh"
 log "wrote $WORK/finalize.sh + $WORK/assemble-inside.sh"

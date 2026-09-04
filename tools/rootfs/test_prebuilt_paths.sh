@@ -82,6 +82,7 @@ for b in opencode codex qwen agy claude grok kiro-cli kiro; do
 done
 fake_bin "$T/home/flux/.grok/bin/grok" "grok test-1.0"
 fake_bin "$T/usrlocal/sbin/startxfce4" "startxfce4 test"
+fake_bin "$T/usrlocal/sbin/gh" "gh version 2.67.0"
 
 # Fail-fast network/package stubs (early on guest-sanitized PATH).
 for s in apk curl wget git npm; do
@@ -144,6 +145,11 @@ chmod 1777 /tmp
 mount --bind "$T/bwrap-fake" /usr/bin/bwrap
 mount --bind "$T/sudo-fake" /usr/bin/sudo
 
+# shadow host gh if present so test controls its presence via /usr/local/sbin/gh
+if [ -e /usr/bin/gh ]; then
+    mount --bind "$T/sudo-fake" /usr/bin/gh
+fi
+
 export NATIVECODE_ISOLATION=proot FLUX_GPU=virgl FLUX_THEME=dark
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -179,6 +185,21 @@ else
     FAIL=$((FAIL + 1))
 fi
 mv /etc/nativecode/release.bak /etc/nativecode/rootfs-release
+
+echo "== negative control: baked E missing gh must fail with exit 1 =="
+# Temporarily shadow or remove gh stub
+mv /usr/local/sbin/gh /usr/local/sbin/gh.bak
+_m="$(mark)"
+sh "$T/guest/setup_alpine_family.sh" alpine </dev/null >/tmp/neg_gh.log 2>&1; _rc=$?
+mv /usr/local/sbin/gh.bak /usr/local/sbin/gh
+if [ "$_rc" = "1" ] && grep -qE 'gh missing in prebuilt rootfs' /tmp/neg_gh.log; then
+    echo "PASS neg-E-missing-gh-fails (exit=1)"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL neg-E-missing-gh-fails (want exit=1, got exit=$_rc)"
+    tail -n 10 /tmp/neg_gh.log
+    FAIL=$((FAIL + 1))
+fi
 
 echo "== prebuilt positives: exit 0 + zero STUB-CALL =="
 check "E-baked"   0 "$T/guest/setup_alpine_family.sh" sh

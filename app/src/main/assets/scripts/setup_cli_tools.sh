@@ -220,14 +220,25 @@ if [ -f "$HOME/.config/fluxlinux/cli-auth.env" ]; then
 fi
 ENVEOF
 
-chown -R "$FLUX_USER:$FLUX_USER" "$ENV_DIR" 2>/dev/null || chown -R "$FLUX_USER" "$ENV_DIR" 2>/dev/null || true
+# PRoot vs chroot safe ownership handling
+if command -v nc_runtime_home_repair >/dev/null 2>&1; then
+    nc_runtime_home_repair "$FLUX_USER"
+elif [ -f "/usr/local/lib/nativecode/rootfs-common.sh" ]; then
+    # shellcheck source=/dev/null
+    . /usr/local/lib/nativecode/rootfs-common.sh 2>/dev/null || true
+    nc_runtime_home_repair "$FLUX_USER"
+elif [ "${NATIVECODE_ISOLATION:-}" != "proot" ] && [ -z "${PROOT_TMP_DIR:-}" ] && [ -z "${PROOT:-}" ]; then
+    chown -R "$FLUX_USER:$FLUX_USER" "$ENV_DIR" 2>/dev/null || chown -R "$FLUX_USER" "$ENV_DIR" 2>/dev/null || true
+fi
 chmod 644 "$ENV_FILE"
 
 ensure_source_line() {
     local rc="$1"
     local label="$2"
     touch "$rc"
-    chown "$FLUX_USER:$FLUX_USER" "$rc" 2>/dev/null || chown "$FLUX_USER" "$rc" 2>/dev/null || true
+    if [ "${NATIVECODE_ISOLATION:-}" != "proot" ] && [ -z "${PROOT_TMP_DIR:-}" ] && [ -z "${PROOT:-}" ]; then
+        chown "$FLUX_USER:$FLUX_USER" "$rc" 2>/dev/null || chown "$FLUX_USER" "$rc" 2>/dev/null || true
+    fi
 
     if grep -qF "# $MARKER" "$rc" 2>/dev/null; then
         local tmp
@@ -249,7 +260,9 @@ if [ -f "\$HOME/.config/fluxlinux/cli-tools.env" ]; then
 fi
 # $MARKER-end
 RCEOF
-    chown "$FLUX_USER:$FLUX_USER" "$rc" 2>/dev/null || chown "$FLUX_USER" "$rc" 2>/dev/null || true
+    if [ "${NATIVECODE_ISOLATION:-}" != "proot" ] && [ -z "${PROOT_TMP_DIR:-}" ] && [ -z "${PROOT:-}" ]; then
+        chown "$FLUX_USER:$FLUX_USER" "$rc" 2>/dev/null || chown "$FLUX_USER" "$rc" 2>/dev/null || true
+    fi
 }
 
 echo ">>> wiring PATH into shell startup files..."
