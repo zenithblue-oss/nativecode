@@ -55,13 +55,10 @@ jobs:
         run: |
           set -euo pipefail
           while IFS= read -r -d '' f; do
-            case "$f" in
-              *setup_hw_accel_debian.sh|*setup_cli_tools.sh|*setup_xfce4.sh|*build_*.sh|*test_*.sh|*w10_fast_build.sh)
-                bash -n "$f"
-                ;;
-              *)
-                sh -n "$f"
-                ;;
+            first="$(head -n 1 "$f" || true)"
+            case "$first" in
+              *bash*) bash -n "$f" ;;
+              *) sh -n "$f" ;;
             esac
           done < <(find app/src/main/assets/scripts tools/rootfs -type f -name '*.sh' -print0)
 
