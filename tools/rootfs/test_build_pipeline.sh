@@ -197,7 +197,11 @@ touch "$DUMMY_FS/etc/nativecode/rootfs-release"
 cat > "$DUMMY_FS/etc/nativecode/rootfs-release" <<'EOF'
 FORMAT_VERSION=1
 COMPONENT_E=1
+COMPONENT_F=1
+COMPONENT_GUI=1
+COMPONENT_G=1
 COMPONENT_H=1
+COMPONENT_GH=1
 COMPONENT_DEV=0
 EOF
 touch "$DUMMY_FS/usr/local/lib/nativecode/rootfs-common.sh"
@@ -206,7 +210,11 @@ touch "$DUMMY_FS/usr/bin/Xvnc" && chmod +x "$DUMMY_FS/usr/bin/Xvnc"
 touch "$DUMMY_FS/home/flux/Pictures/Wallpapers/fluxlinux-dark.png"
 touch "$DUMMY_FS/home/flux/Pictures/Wallpapers/fluxlinux-light.png"
 touch "$DUMMY_FS/home/flux/.oh-my-zsh/oh-my-zsh.sh"
+touch "$DUMMY_FS/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+touch "$DUMMY_FS/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 touch "$DUMMY_FS/home/flux/.oh-my-zsh/custom/themes/agnosterzak.zsh-theme"
+mkdir -p "$DUMMY_FS/usr/share/fonts/dejavu"
+touch "$DUMMY_FS/usr/share/fonts/dejavu/DejaVuSans.ttf"
 
 # Populate all mandatory base commands in dummy rootfs
 for c in sh bash sudo git node npm python3 java javac adb fastboot gcc g++ cmake ninja clang rustc cargo go gh; do
@@ -266,7 +274,11 @@ echo "== test DEV=1 verifier passes with full dev stack =="
 cat > "$DUMMY_FS/etc/nativecode/rootfs-release" <<'EOF'
 FORMAT_VERSION=1
 COMPONENT_E=1
+COMPONENT_F=1
+COMPONENT_GUI=1
+COMPONENT_G=1
 COMPONENT_H=1
+COMPONENT_GH=1
 COMPONENT_DEV=1
 EOF
 mkdir -p "$DUMMY_FS/opt/android-sdk/platforms/android-36" \
@@ -291,6 +303,39 @@ if [ "$VERIFY_DEV1_RC" -eq 0 ]; then
 else
     echo "FAIL: verify_rootfs.sh failed on COMPONENT_DEV=1 rootfs (rc=$VERIFY_DEV1_RC)" >&2
     echo "$VERIFY_DEV1_OUT"
+    exit 1
+fi
+
+echo "== test negative verify_rootfs.sh on missing component marker (COMPONENT_G) =="
+sed -i '/^COMPONENT_G=1/d' "$DUMMY_FS/etc/nativecode/rootfs-release"
+set +e
+VERIFY_NOG_OUT="$(bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$DUMMY_FS" 2>&1)"
+VERIFY_NOG_RC=$?
+set -e
+echo "COMPONENT_G=1" >> "$DUMMY_FS/etc/nativecode/rootfs-release"
+
+if [ "$VERIFY_NOG_RC" -ne 0 ] && echo "$VERIFY_NOG_OUT" | grep -q 'MISS COMPONENT_G'; then
+    echo "PASS: missing COMPONENT_G causes verifier failure (exit=$VERIFY_NOG_RC)"
+else
+    echo "FAIL: missing COMPONENT_G did not fail verifier!" >&2
+    echo "$VERIFY_NOG_OUT"
+    exit 1
+fi
+
+echo "== test negative verify_rootfs.sh on missing font =="
+rm -rf "$DUMMY_FS/usr/share/fonts/dejavu"
+set +e
+VERIFY_NOFONT_OUT="$(bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$DUMMY_FS" 2>&1)"
+VERIFY_NOFONT_RC=$?
+set -e
+mkdir -p "$DUMMY_FS/usr/share/fonts/dejavu"
+touch "$DUMMY_FS/usr/share/fonts/dejavu/DejaVuSans.ttf"
+
+if [ "$VERIFY_NOFONT_RC" -ne 0 ] && echo "$VERIFY_NOFONT_OUT" | grep -q 'MISS G font'; then
+    echo "PASS: missing fonts causes verifier failure (exit=$VERIFY_NOFONT_RC)"
+else
+    echo "FAIL: missing fonts did not fail verifier!" >&2
+    echo "$VERIFY_NOFONT_OUT"
     exit 1
 fi
 

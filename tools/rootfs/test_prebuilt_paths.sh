@@ -136,6 +136,24 @@ T="${NC_TEST_T:?}"
 export NC_TEST_CALL_LOG="$T/calls.log"
 : > "$NC_TEST_CALL_LOG"
 
+# Spy on real chown calls targeting /home/flux
+mkdir -p "$T/bin"
+cp /bin/chown "$T/bin/real-chown" 2>/dev/null || true
+cat > "$T/chown-spy" <<SPY_EOF
+#!/bin/sh
+for a in "\$@"; do
+    if [ "\$a" = "/home/flux" ] || [ "\$a" = "/home/flux/" ]; then
+        echo "FORBIDDEN-HOME-CHOWN: chown \$*" >> "$NC_TEST_CALL_LOG"
+    fi
+done
+exec "$T/bin/real-chown" "\$@"
+SPY_EOF
+chmod +x "$T/chown-spy"
+mount --bind "$T/chown-spy" /bin/chown 2>/dev/null || true
+if [ -e /usr/bin/chown ]; then
+    mount --bind "$T/chown-spy" /usr/bin/chown 2>/dev/null || true
+fi
+
 mount --bind "$T/etc" /etc
 mount --bind "$T/home" /home
 mount --bind "$T/usrlocal" /usr/local
@@ -232,6 +250,19 @@ if [ "$_rc" = "1" ] && [ "$_calls" = "0" ] && grep -q 'baked plugin zsh-autosugg
 else
     echo "FAIL neg-G-missing-plugin-fails (want exit=1 git_calls=0, got exit=$_rc git_calls=$_calls)"
     tail -n 10 /tmp/neg_g.log
+    FAIL=$((FAIL + 1))
+fi
+
+echo "== test negative control: G with FLUX_SKIP_POKEMON=0 in baked mode must NOT clone git =="
+_m="$(mark)"
+FLUX_SKIP_POKEMON=0 sh "$T/guest/setup_customization_alpine.sh" alpine </dev/null >/tmp/poke.log 2>&1; _rc=$?
+_calls="$(log_calls_from "$((_m + 1))" | grep -c 'STUB-CALL: git' || true)"
+if [ "$_rc" = "0" ] && [ "$_calls" = "0" ]; then
+    echo "PASS neg-G-pokemon-baked-zero-network (exit=0 git_calls=0)"
+    PASS=$((PASS + 1))
+else
+    echo "FAIL neg-G-pokemon-baked-zero-network (exit=$_rc git_calls=$_calls)"
+    tail -n 10 /tmp/poke.log
     FAIL=$((FAIL + 1))
 fi
 

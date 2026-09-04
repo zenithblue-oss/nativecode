@@ -60,8 +60,14 @@ else
     PREBUILT_G=0
 fi
 
-_flux_chown() { chown "$@" 2>/dev/null || true; }
-_flux_chown_r() { chown -R "$@" 2>/dev/null || true; }
+_flux_chown() {
+    nc_is_proot 2>/dev/null && return 0
+    chown "$@" 2>/dev/null || true
+}
+_flux_chown_r() {
+    nc_is_proot 2>/dev/null && return 0
+    chown -R "$@" 2>/dev/null || true
+}
 
 # Resolve group for flux (Alpine useradd often creates matching group)
 if id -gn "$CUSTOM_USER" >/dev/null 2>&1; then
@@ -431,7 +437,9 @@ else
     echo "FluxLinux: Skipping Zsh plugins (Oh My Zsh not installed)"
 fi
 
-if [ "${FLUX_SKIP_POKEMON:-1}" = "1" ]; then
+if [ "${PREBUILT_G:-0}" = "1" ]; then
+    echo "NativeCode: prebuilt G — pokemon-colorscripts runtime install disabled"
+elif [ "${FLUX_SKIP_POKEMON:-1}" = "1" ]; then
     echo "FluxLinux: pokemon-colorscripts skip (disabled by default)"
 elif command -v pokemon-colorscripts >/dev/null 2>&1; then
     echo "FluxLinux: pokemon-colorscripts already present — skip"

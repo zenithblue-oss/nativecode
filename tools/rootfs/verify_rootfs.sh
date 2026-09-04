@@ -19,9 +19,22 @@ have() {
 
 echo "== manifest =="
 need /etc/nativecode/rootfs-release
-grep -q '^COMPONENT_E=1' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null || { echo "MISS COMPONENT_E"; FAIL=1; }
-grep -q '^COMPONENT_H=1' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null || { echo "MISS COMPONENT_H"; FAIL=1; }
+for c in E F GUI G H GH; do
+    grep -q "^COMPONENT_${c}=1$" "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null || \
+        { echo "MISS COMPONENT_$c"; FAIL=1; }
+done
 need /usr/local/lib/nativecode/rootfs-common.sh
+
+# Verify glibc loader if LIBC=glibc
+if grep -q '^LIBC=glibc' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null; then
+    echo "== glibc loader =="
+    if [ -e "$ROOTFS/lib/ld-linux-aarch64.so.1" ] || [ -e "$ROOTFS/usr/lib/ld-linux-aarch64.so.1" ]; then
+        echo "OK   glibc:ld-linux-aarch64.so.1"
+    else
+        echo "MISS glibc:ld-linux-aarch64.so.1"
+        FAIL=1
+    fi
+fi
 
 IS_DEV=0
 if grep -q '^COMPONENT_DEV=1' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null; then
@@ -49,10 +62,19 @@ echo "== customization assets (COMPONENT_G=1) =="
 [ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-dark.png" ] || { echo "MISS G wallpaper fluxlinux-dark.png"; FAIL=1; }
 [ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-light.png" ] || { echo "MISS G wallpaper fluxlinux-light.png"; FAIL=1; }
 [ -f "$ROOTFS/home/flux/.oh-my-zsh/oh-my-zsh.sh" ] || [ -f "$ROOTFS/home/flux/.oh-my-zsh/ohmyzsh.sh" ] || { echo "MISS G oh-my-zsh"; FAIL=1; }
-[ -d "$ROOTFS/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions" ] || { echo "MISS G plugin zsh-autosuggestions"; FAIL=1; }
-[ -d "$ROOTFS/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting" ] || { echo "MISS G plugin zsh-syntax-highlighting"; FAIL=1; }
+[ -f "$ROOTFS/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ] || { echo "MISS G plugin file zsh-autosuggestions.zsh"; FAIL=1; }
+[ -f "$ROOTFS/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ] || { echo "MISS G plugin file zsh-syntax-highlighting.zsh"; FAIL=1; }
 [ -f "$ROOTFS/home/flux/.oh-my-zsh/custom/themes/agnosterzak.zsh-theme" ] || { echo "MISS G theme agnosterzak"; FAIL=1; }
-[ -d "$ROOTFS/usr/share/fonts/jetbrains-mono-nerd" ] || [ -f "$ROOTFS/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf" ] || [ -f "$ROOTFS/usr/share/fonts/jetbrains-mono-nerd/JetBrainsMonoNerdFont-Regular.ttf" ] || [ -d "$ROOTFS/usr/share/fonts" ] || { echo "MISS G Nerd Font"; FAIL=1; }
+if [ -f "$ROOTFS/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf" ] || \
+   [ -f "$ROOTFS/usr/share/fonts/jetbrains-mono-nerd/JetBrainsMonoNerdFont-Regular.ttf" ] || \
+   [ -f "$ROOTFS/usr/share/fonts/JetBrainsMonoNerdFont-Regular.ttf" ] || \
+   [ -f "$ROOTFS/usr/share/fonts/dejavu/DejaVuSans.ttf" ] || \
+   [ -f "$ROOTFS/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" ]; then
+    echo "OK   G fonts"
+else
+    echo "MISS G font (JetBrains / DejaVu)"
+    FAIL=1
+fi
 
 if [ "$IS_DEV" = "1" ]; then
     echo "== android/dev stack (COMPONENT_DEV=1) =="

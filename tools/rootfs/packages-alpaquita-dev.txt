@@ -1,0 +1,12 @@
+# Alpaquita glibc / AArch64 General & Web Development Packages
+# Sourced by build_alpaquita_rootfs.sh for NativeCode prebuilt rootfs.
+
+# Toolchains
+clang22
+rust
+cargo
+go
+
+# Runtimes & Languages
+liberica21-jdk
+python3-dev
