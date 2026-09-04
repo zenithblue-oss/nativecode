@@ -14,7 +14,7 @@ case "$DISTRO" in
     alpaquita)
         ROOTFS_NAME="alpaquita_rootfs.tar.zst"
         ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/zenithblue-oss/fluxlinux/releases/download/rootfs/alpaquita_glibc_rootfs.tar.zst}"
-        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-ec5c81cb32bd6454a778aaec449ef269806d7f17b52432abe00280684136af50}"
+        ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-${NATIVECODE_ROOTFS_SHA256:-}}"
         ;;
     alpine)
         ROOTFS_NAME="alpine_rootfs.tar.gz"
@@ -152,16 +152,18 @@ resolve_rootfs_archive() {
 verify_rootfs_sha() {
     _file="$1"
     [ -z "$ROOTFS_SHA256" ] && return 0
-    if command -v sha256sum >/dev/null 2>&1; then
-        _got="$(sha256sum "$_file" | awk '{print $1}')"
-        if [ "$_got" != "$ROOTFS_SHA256" ]; then
-            echo "FluxLinux: SHA256 mismatch for $_file"
-            echo "  expected $ROOTFS_SHA256"
-            echo "  got      $_got"
-            return 1
-        fi
-        echo "FluxLinux: SHA256 OK"
+    if ! command -v sha256sum >/dev/null 2>&1; then
+        echo "FluxLinux: ERROR: sha256sum command not found but rootfs verification is required!"
+        return 1
     fi
+    _got="$(sha256sum "$_file" | awk '{print $1}')"
+    if [ "$_got" != "$ROOTFS_SHA256" ]; then
+        echo "FluxLinux: SHA256 mismatch for $_file"
+        echo "  expected $ROOTFS_SHA256"
+        echo "  got      $_got"
+        return 1
+    fi
+    echo "FluxLinux: SHA256 OK"
     return 0
 }
 

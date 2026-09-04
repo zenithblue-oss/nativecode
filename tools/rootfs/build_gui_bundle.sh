@@ -235,8 +235,12 @@ archive_bundle() {
     fi
     local TARBALL="$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst"
     tar -C "$DESTDIR" --numeric-owner -cpf - . | zstd -19 -T0 -o "$TARBALL"
-    sha256sum "$TARBALL" | tee "$TARBALL.sha256"
+    (
+        cd "$OUT"
+        sha256sum "nativecode-gui-alpaquita-glibc-aarch64.tar.zst" > "nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256"
+    )
     log "Bundle created: $TARBALL"
+    cat "$TARBALL.sha256"
 }
 
 # Main sequence

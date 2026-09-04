@@ -30,9 +30,11 @@ object ProotCommandBuilder {
 
         // Single-quote guest payload so host bash never expands $HOME/$PATH/etc.
         // Escape embedded single quotes: ' → '\''.
+        val distro = if (File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpine").isDirectory &&
+            !File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpaquita").isDirectory) "alpine" else "alpaquita"
         val escaped = shellCmd.replace("'", "'\\''")
         val command =
-            "exec python $prootDistro login alpine $sharedTmpFlag --user $user -- " +
+            "exec python $prootDistro login $distro $sharedTmpFlag --user $user -- " +
                 "/bin/bash --noprofile --norc -c '$escaped'"
         val args = arrayOf(shell, "-c", command)
 
@@ -61,8 +63,10 @@ object ProotCommandBuilder {
         val escapedPayload = payload.replace("'", "'\\''")
         val workDirArg = workDir?.takeIf { it.isNotBlank() }?.let(ShellQuoting::singleQuote).orEmpty()
         val positional = if (workDirArg.isEmpty()) "" else " nativecode-interactive $workDirArg"
+        val distro = if (File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpine").isDirectory &&
+            !File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpaquita").isDirectory) "alpine" else "alpaquita"
         val command =
-            "exec python $prootDistro login alpine $sharedTmpFlag --user $guestUser -- " +
+            "exec python $prootDistro login $distro $sharedTmpFlag --user $guestUser -- " +
                 "/bin/bash --noprofile --norc -c '$escapedPayload'$positional"
         val args = arrayOf(shell, "-c", command)
         val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)

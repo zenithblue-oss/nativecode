@@ -8,12 +8,25 @@ import java.io.File
  *  Works for both proot (Termux-style) and chroot (KernelSU/Magisk) installations. */
 object ProjectPathResolver {
 
-    /** Relative path under [Context.getFilesDir] for Debian proot rootfs (SSOT). */
-    const val PROOT_ROOTFS_REL = "usr/var/lib/proot-distro/containers/alpine/rootfs"
+    /** Default guest distribution name (SSOT). Can be overridden by app config. */
+    const val DEFAULT_DISTRO = "alpaquita"
 
-    /** Debian proot rootfs under app private storage. */
-    fun prootRootfsDir(ctx: Context): File =
-        File(ctx.filesDir, PROOT_ROOTFS_REL)
+    /** Relative path under [Context.getFilesDir] for guest proot rootfs (SSOT). */
+    const val PROOT_ROOTFS_REL = "usr/var/lib/proot-distro/containers/$DEFAULT_DISTRO/rootfs"
+    const val PROOT_ALPINE_ROOTFS_REL = "usr/var/lib/proot-distro/containers/alpine/rootfs"
+
+    /** Guest proot rootfs under app private storage. */
+    fun prootRootfsDir(ctx: Context): File {
+        val primary = File(ctx.filesDir, PROOT_ROOTFS_REL)
+        if (primary.isDirectory && (File(primary, "etc").exists() || File(primary, "bin").exists())) {
+            return primary
+        }
+        val alpineFallback = File(ctx.filesDir, PROOT_ALPINE_ROOTFS_REL)
+        if (alpineFallback.isDirectory && (File(alpineFallback, "etc").exists() || File(alpineFallback, "bin").exists())) {
+            return alpineFallback
+        }
+        return primary
+    }
 
     /** True if proot rootfs looks present (has etc or bin). */
     fun isProotRootfsPresent(ctx: Context): Boolean =

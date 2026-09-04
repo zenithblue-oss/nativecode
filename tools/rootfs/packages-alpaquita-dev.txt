@@ -1,6 +1,13 @@
 # Alpaquita glibc / AArch64 General & Web Development Packages
 # Sourced by build_alpaquita_rootfs.sh for NativeCode prebuilt rootfs.
 
+# Core compilation & build tools (required by final developer rootfs)
+build-base
+gcc
+g++
+cmake
+samurai
+
 # Toolchains
 clang22
 rust

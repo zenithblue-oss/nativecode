@@ -95,6 +95,9 @@ fi
 mkdir -p "$WORK/gui-staging"
 if [ -f "$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst" ]; then
     cp "$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst" "$WORK/gui-staging/"
+    if [ -f "$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256" ]; then
+        cp "$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256" "$WORK/gui-staging/"
+    fi
 fi
 
 cat > "$ASSEMBLE" <<ASSEMBLE_EOF
@@ -143,10 +146,12 @@ chmod 755 /usr/bin/bwrap
 
 # Install GUI bundle from canonical .tar.zst
 if [ -f /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.zst ]; then
-    guest_log "extracting GUI bundle .tar.zst"
-    if [ -f /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256 ]; then
-        cd /gui-staging && sha256sum -c nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256
+    guest_log "verifying and extracting GUI bundle .tar.zst"
+    if [ ! -f /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256 ]; then
+        echo "assemble-inside: FATAL: Missing GUI bundle SHA256 checksum file!" >&2
+        exit 1
     fi
+    cd /gui-staging && sha256sum -c nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256
     zstd -dc /gui-staging/nativecode-gui-alpaquita-glibc-aarch64.tar.zst | tar -xpf - -C /
 else
     guest_log "WARN: GUI bundle not found in /gui-staging"

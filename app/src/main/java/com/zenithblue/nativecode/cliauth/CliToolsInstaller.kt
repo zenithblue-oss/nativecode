@@ -30,11 +30,13 @@ object CliToolsInstaller {
                 FileOutputStream(cliScript).use { input.copyTo(it) }
             }
             cliScript.setExecutable(true)
-            onLine("Deployed $SCRIPT — running in proot alpine guest…\n")
+            val distro = if (File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpine").isDirectory &&
+                !File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpaquita").isDirectory) "alpine" else "alpaquita"
+            onLine("Deployed $SCRIPT — running in proot $distro guest…\n")
             val cmd = arrayOf(
                 TermuxHostPaths.BIN + "/python",
                 TermuxHostPaths.PROOT_DISTRO,
-                "login", "alpine", "--shared-tmp", "--",
+                "login", distro, "--shared-tmp", "--",
                 "bash", "/tmp/$SCRIPT"
             )
             runProcess(ctx, cmd, onLine)

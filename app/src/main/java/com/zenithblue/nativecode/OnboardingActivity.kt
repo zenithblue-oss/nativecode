@@ -2440,11 +2440,11 @@ class OnboardingActivity : AppCompatActivity() {
                     failSetupProgress("Root not available — grant superuser, then retry")
                     return@execute
                 }
-                enterSetupPhase("R1", "Running setup_alpine_chroot.sh…")
-                updateBaseStatus("[CHROOT] Root confirmed. Running setup_alpine_chroot.sh...")
+                enterSetupPhase("R1", "Running setup_alpaquita_chroot.sh…")
+                updateBaseStatus("[CHROOT] Root confirmed. Running setup_alpaquita_chroot.sh...")
                 RootShell.executeScriptAsset(
                     context = this,
-                    assetName = "scripts/chroot/setup_alpine_chroot.sh",
+                    assetName = "scripts/chroot/setup_alpaquita_chroot.sh",
                     onLine = { line -> appendSetupLog(line) },
                     onDone = { code ->
                         // Proceed if exit 0 OR base marker present (false exit 1 from am start, etc.)
@@ -2457,17 +2457,19 @@ class OnboardingActivity : AppCompatActivity() {
                         if (code == 0 || installed) {
                             setSetupPhaseFraction(1f, "Base chroot installed")
                             updateBaseStatus("[CHROOT] Base complete — starting guest chain (E→H)...")
-                            // Step E: Provision Alpine packages (runs inside chroot as root)
+                            // Step E: Provision Alpaquita packages (runs inside chroot as root)
                             enterSetupPhase("E", "Installing guest packages…")
-                            updateBaseStatus("[CHROOT] E. Provisioning Alpine packages...")
+                            updateBaseStatus("[CHROOT] E. Provisioning Alpaquita packages...")
+                            val familyScript = if (assets.list("scripts")?.contains("setup_alpaquita_family.sh") == true)
+                                "setup_alpaquita_family.sh" else "setup_alpine_family.sh"
                             copyAndRunInChroot(
-                                assetName = "scripts/setup_alpine_family.sh",
-                                scriptName = "setup_alpine_family.sh",
-                                cmd = "sh /tmp/setup_alpine_family.sh"
+                                assetName = "scripts/$familyScript",
+                                scriptName = familyScript,
+                                cmd = "sh /tmp/$familyScript"
                             ) { codeE ->
                                 if (codeE != 0) {
-                                    updateBaseStatus("[CHROOT] Alpine family setup failed (exit $codeE).")
-                                    failSetupProgress("Alpine package setup failed (exit $codeE)")
+                                    updateBaseStatus("[CHROOT] Distro family setup failed (exit $codeE).")
+                                    failSetupProgress("Distro package setup failed (exit $codeE)")
                                     return@copyAndRunInChroot
                                 }
                                 setSetupPhaseFraction(1f)
@@ -2638,22 +2640,29 @@ class OnboardingActivity : AppCompatActivity() {
                 ) { "Host setup failed" }
                 setSetupPhaseFraction(1f)
 
-                enterSetupPhase("E", "Alpine rootfs + packages…")
-                updateBaseStatus("E. Provisioning Alpine Guest Container...")
-                val out = File(homeDir, "alpine_rootfs.tar.gz")
+                enterSetupPhase("E", "Alpaquita rootfs + packages…")
+                updateBaseStatus("E. Provisioning Alpaquita Guest Container...")
+                val outZst = File(homeDir, "alpaquita_rootfs.tar.zst")
+                val outGz = File(homeDir, "alpine_rootfs.tar.gz")
                 val outTar = File(homeDir, "alpine_rootfs.tar")
-                val hasRootfs = (out.isFile && out.length() > 2L * 1024L * 1024L) ||
+                val hasRootfs = (outZst.isFile && outZst.length() > 2L * 1024L * 1024L) ||
+                    (outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
                     (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)
                 if (!hasRootfs) {
                     val bytes = openRootfsAsset().use { it.readBytes() }
-                    val isGz = bytes.size > 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()
-                    val target = if (isGz) out else outTar
+                    val target = if (assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true) outZst else {
+                        val isGz = bytes.size > 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()
+                        if (isGz) outGz else outTar
+                    }
                     FileOutputStream(target).use { it.write(bytes) }
                     Log.i("Onboarding", "Explicitly deployed rootfs before flux_install: ${target.absolutePath} (${target.length()} bytes)")
                 }
-                val debBytes = assets.open("scripts/setup_alpine_family.sh").use { it.readBytes() }
+                val distroCandidate = if (outZst.exists() || assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true) "alpaquita" else "alpine"
+                val familyScript = if (distroCandidate == "alpaquita" && assets.list("scripts")?.contains("setup_alpaquita_family.sh") == true)
+                    "setup_alpaquita_family.sh" else "setup_alpine_family.sh"
+                val debBytes = assets.open("scripts/$familyScript").use { it.readBytes() }
                 val debPayload = Base64.encodeToString(debBytes, Base64.NO_WRAP)
-                check(runShellCommand(arrayOf(bash, File(homeDir, "flux_install.sh").absolutePath, "alpine", debPayload)) == 0) { "Alpine guest install failed" }
+                check(runShellCommand(arrayOf(bash, File(homeDir, "flux_install.sh").absolutePath, distroCandidate, debPayload)) == 0) { "Guest install failed for $distroCandidate" }
                 setSetupPhaseFraction(1f)
 
                 val gpuDetect = GpuAccelDetector.detect()
@@ -2672,7 +2681,7 @@ class OnboardingActivity : AppCompatActivity() {
                 check(runShellCommand(arrayOf(
                     TermuxHostPaths.BIN + "/python",
                     TermuxHostPaths.PROOT_DISTRO,
-                    "login", "alpine", "--shared-tmp", "--",
+                    "login", distroCandidate, "--shared-tmp", "--",
                     "env", "FLUX_GPU=${gpuDetect.mode}", "bash", "/tmp/setup_hw_accel_debian.sh"
                 )) == 0) { "GPU setup failed" }
                 setSetupPhaseFraction(1f)
@@ -2686,7 +2695,7 @@ class OnboardingActivity : AppCompatActivity() {
                     check(runShellCommand(arrayOf(
                         TermuxHostPaths.BIN + "/python",
                         TermuxHostPaths.PROOT_DISTRO,
-                        "login", "alpine", "--shared-tmp", "--",
+                        "login", distroCandidate, "--shared-tmp", "--",
                         "env", "FLUX_THEME=dark", "bash", "/tmp/setup_xfce4.sh"
                     )) == 0) { "XFCE4 setup failed" }
                     setSetupPhaseFraction(1f)
@@ -2703,7 +2712,7 @@ class OnboardingActivity : AppCompatActivity() {
                     check(runShellCommand(arrayOf(
                         TermuxHostPaths.BIN + "/python",
                         TermuxHostPaths.PROOT_DISTRO,
-                        "login", "alpine", "--shared-tmp", "--",
+                        "login", distroCandidate, "--shared-tmp", "--",
                         "sh", "/tmp/setup_customization_alpine.sh"
                     )) == 0) { "Customization failed" }
                     setSetupPhaseFraction(1f)
@@ -3067,6 +3076,12 @@ class OnboardingActivity : AppCompatActivity() {
                 "start_debian13_gui.sh",
                 "stop_debian13_gui.sh",
                 "setup_cli_tools.sh",
+                "setup_alpaquita_family.sh",
+                "setup_alpine_family.sh",
+                "setup_hw_accel_debian.sh",
+                "setup_xfce4.sh",
+                "setup_customization_alpine.sh",
+                "setup_alpaquita_chroot.sh",
                 "setup_alpine_chroot.sh",
                 "setup_debian13_chroot.sh",
                 "uninstall_alpine_chroot.sh",
@@ -3075,7 +3090,8 @@ class OnboardingActivity : AppCompatActivity() {
             )
             for (script in scripts) {
                 val assetPath = when {
-                    script.contains("chroot") ||
+                    script == "setup_alpaquita_chroot.sh" ||
+                        script.contains("chroot") ||
                         script.contains("alpine_gui") ||
                         script == "start_debian13_gui.sh" ||
                         script == "stop_debian13_gui.sh" ||
@@ -3140,32 +3156,38 @@ class OnboardingActivity : AppCompatActivity() {
         }
     }
 
-    /** Copy assets/rootfs/alpine_rootfs.tar.gz → $HOME (skip if already present & large).
-     * Falls back to assets/rootfs/alpine_rootfs.tar (AGP may gunzip .gz unless 'gz' is in noCompress). */
+    /** Copy assets/rootfs/alpaquita_rootfs.tar.zst → $HOME (skip if already present & large).
+     * Falls back to alpine_rootfs.tar.gz / alpine_rootfs.tar. */
     private fun openRootfsAsset(): InputStream {
         return try {
-            assets.open("rootfs/alpine_rootfs.tar.gz")
+            assets.open("rootfs/alpaquita_rootfs.tar.zst")
         } catch (_: Exception) {
-            assets.open("rootfs/alpine_rootfs.tar")
+            try {
+                assets.open("rootfs/alpine_rootfs.tar.gz")
+            } catch (_: Exception) {
+                assets.open("rootfs/alpine_rootfs.tar")
+            }
         }
     }
 
-    /** Copy assets/rootfs/alpine_rootfs.tar.gz → $HOME (skip if already present & large). */
+    /** Copy assets/rootfs/alpaquita_rootfs.tar.zst → $HOME (skip if already present & large). */
     private fun deployRootfsArchive(homeDir: File) {
-        val out = File(homeDir, "alpine_rootfs.tar.gz")
+        val outZst = File(homeDir, "alpaquita_rootfs.tar.zst")
+        val outGz = File(homeDir, "alpine_rootfs.tar.gz")
         val outTar = File(homeDir, "alpine_rootfs.tar")
-        if ((out.isFile && out.length() > 2L * 1024L * 1024L) ||
+        if ((outZst.isFile && outZst.length() > 2L * 1024L * 1024L) ||
+            (outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
             (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)) {
             Log.i("Onboarding", "Rootfs already deployed")
             return
         }
         try {
             openRootfsAsset().use { input ->
-                // Preserve .tar.gz name when source is gzipped; else write .tar
-                // Heuristic: gzip magic 1f 8b
                 val peek = input.readBytes()
-                val isGz = peek.size > 2 && peek[0] == 0x1f.toByte() && peek[1] == 0x8b.toByte()
-                val target = if (isGz) out else outTar
+                val target = if (assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true) outZst else {
+                    val isGz = peek.size > 2 && peek[0] == 0x1f.toByte() && peek[1] == 0x8b.toByte()
+                    if (isGz) outGz else outTar
+                }
                 FileOutputStream(target).use { it.write(peek) }
                 Log.i("Onboarding", "Deployed rootfs: ${target.absolutePath} (${target.length()} bytes)")
             }

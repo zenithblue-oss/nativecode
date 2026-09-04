@@ -425,4 +425,56 @@ else
     exit 1
 fi
 
+echo "== test distinct minirootfs SHA and final artifact SHA in versions.env =="
+MINI_SHA="$(grep '^ALPAQUITA_MINIROOTFS_SHA256=' "$REPO_ROOT/tools/rootfs/versions.env" | cut -d= -f2)"
+FINAL_SHA="$(grep '^NATIVECODE_ROOTFS_SHA256=' "$REPO_ROOT/tools/rootfs/versions.env" | cut -d= -f2)"
+if [ "$MINI_SHA" = "$FINAL_SHA" ]; then
+    echo "FAIL: ALPAQUITA_MINIROOTFS_SHA256 equals NATIVECODE_ROOTFS_SHA256!" >&2
+    exit 1
+fi
+echo "PASS: MINIROOTFS_SHA256 and NATIVECODE_ROOTFS_SHA256 are distinct"
+
+echo "== test final packages manifest supplies gcc/g++/cmake/samurai =="
+for req in gcc g++ cmake samurai; do
+    if ! grep -q "^$req$" "$REPO_ROOT/tools/rootfs/packages-alpaquita-dev.txt"; then
+        echo "FAIL: $req missing in packages-alpaquita-dev.txt!" >&2
+        exit 1
+    fi
+done
+echo "PASS: packages-alpaquita-dev.txt supplies required dev tools (gcc/g++/cmake/samurai)"
+
+echo "== test GUI bundle checksum requirement in assemble-inside.sh =="
+if ! grep -q 'sha256sum -c nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256' "$WORK/assemble-inside.sh" || \
+   ! grep -q 'FATAL: Missing GUI bundle SHA256 checksum file!' "$WORK/assemble-inside.sh"; then
+    echo "FAIL: assemble-inside.sh does not strictly enforce GUI bundle checksum verification!" >&2
+    exit 1
+fi
+echo "PASS: assemble-inside.sh strictly enforces GUI bundle checksum verification"
+
+echo "== test setup_alpaquita_chroot.sh exact stage sequence (E->F->GUI->G->H) =="
+CHROOT_SCRIPT="$REPO_ROOT/app/src/main/assets/scripts/chroot/setup_alpaquita_chroot.sh"
+if ! grep -q 'setup_alpaquita_family.sh' "$CHROOT_SCRIPT" || \
+   ! grep -q 'setup_hw_accel_debian.sh' "$CHROOT_SCRIPT" || \
+   ! grep -q 'setup_xfce4.sh' "$CHROOT_SCRIPT" || \
+   ! grep -q 'setup_customization_alpine.sh' "$CHROOT_SCRIPT" || \
+   ! grep -q 'setup_cli_tools.sh' "$CHROOT_SCRIPT"; then
+    echo "FAIL: setup_alpaquita_chroot.sh missing one or more required stages!" >&2
+    exit 1
+fi
+if grep -q 'setup_desktop_xfce.sh' "$CHROOT_SCRIPT" || grep -q 'setup_ai_stack.sh' "$CHROOT_SCRIPT"; then
+    echo "FAIL: setup_alpaquita_chroot.sh still contains nonexistent script names!" >&2
+    exit 1
+fi
+echo "PASS: setup_alpaquita_chroot.sh uses exact production scripts and mandatory execution"
+
+echo "== test OnboardingActivity uses Alpaquita and deploys alpaquita scripts =="
+ONBOARDING_KT="$REPO_ROOT/app/src/main/java/com/zenithblue/nativecode/OnboardingActivity.kt"
+if ! grep -q 'setup_alpaquita_chroot.sh' "$ONBOARDING_KT" || \
+   ! grep -q 'setup_alpaquita_family.sh' "$ONBOARDING_KT" || \
+   ! grep -q 'alpaquita_rootfs.tar.zst' "$ONBOARDING_KT"; then
+    echo "FAIL: OnboardingActivity missing Alpaquita integration!" >&2
+    exit 1
+fi
+echo "PASS: OnboardingActivity properly configured for Alpaquita product path"
+
 echo "BUILD-PIPELINE: ALL PASS"

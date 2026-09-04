@@ -12,7 +12,7 @@ PKG="${TERMUX_APP__PACKAGE_NAME:-com.zenithblue.nativecode}"
 APP_HOME="${TERMUX__HOME:-/data/data/${PKG}/files/home}"
 APP_PREFIX="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}"
 ROOTFS_NAME="alpaquita_rootfs.tar.zst"
-ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-ec5c81cb32bd6454a778aaec449ef269806d7f17b52432abe00280684136af50}"
+ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-${NATIVECODE_ROOTFS_SHA256:-}}"
 
 progress() { printf "\033[1;36m[+] %s\033[0m\n" "$1"; }
 success()  { printf "\033[1;32m[✓] %s\033[0m\n" "$1"; }
@@ -75,7 +75,11 @@ if [ ! -f "$FLUX_ROOTFS_PATH/bin/sh" ] && [ ! -f "$FLUX_ROOTFS_PATH/sbin/apk" ];
         goodbye
     fi
 
-    if [ -n "$ROOTFS_SHA256" ] && command -v sha256sum >/dev/null 2>&1; then
+    if [ -n "$ROOTFS_SHA256" ]; then
+        if ! command -v sha256sum >/dev/null 2>&1; then
+            error "sha256sum command not found but rootfs verification is required!"
+            goodbye
+        fi
         progress "Verifying rootfs checksum..."
         _got="$(sha256sum "$FLUX_ARCHIVE" | awk '{print $1}')"
         if [ "$_got" != "$ROOTFS_SHA256" ]; then
@@ -89,11 +93,11 @@ if [ ! -f "$FLUX_ROOTFS_PATH/bin/sh" ] && [ ! -f "$FLUX_ROOTFS_PATH/sbin/apk" ];
 
     progress "Extracting $FLUX_ARCHIVE -> $FLUX_ROOTFS_PATH..."
     mkdir -p "$FLUX_ROOTFS_PATH"
-    if command -v zstd >/dev/null 2>&1; then
-        zstd -dc "$FLUX_ARCHIVE" | tar -xpf - -C "$FLUX_ROOTFS_PATH" --numeric-owner || goodbye
-    else
-        tar -xzf "$FLUX_ARCHIVE" -C "$FLUX_ROOTFS_PATH" --numeric-owner || goodbye
+    if ! command -v zstd >/dev/null 2>&1; then
+        error "zstd command not found! Canonical .tar.zst extraction requires zstd."
+        goodbye
     fi
+    zstd -dc "$FLUX_ARCHIVE" | tar -xpf - -C "$FLUX_ROOTFS_PATH" --numeric-owner || goodbye
 fi
 
 if [ ! -d "$FLUX_ROOTFS_PATH" ] || [ ! -e "$FLUX_ROOTFS_PATH/bin/sh" ]; then
@@ -116,19 +120,23 @@ mountpoint -q "$FLUX_ROOTFS_PATH/dev/shm" || mount -t tmpfs -o size=512M,mode=17
 mkdir -p "$FLUX_ROOTFS_PATH/usr/local/lib/nativecode"
 SCRIPTS_FOUND=0
 for sdir in "$SCRIPT_DIR/.." "$APP_HOME/scripts" "$APP_HOME"; do
-    if [ -f "$sdir/setup_alpaquita_family.sh" ]; then
-        cp -f "$sdir"/setup_*.sh "$FLUX_ROOTFS_PATH/usr/local/lib/nativecode/" 2>/dev/null || cp -f "$sdir/setup_alpaquita_family.sh" "$FLUX_ROOTFS_PATH/usr/local/lib/nativecode/"
+    if [ -f "$sdir/setup_alpaquita_family.sh" ] && \
+       [ -f "$sdir/setup_hw_accel_debian.sh" ] && \
+       [ -f "$sdir/setup_xfce4.sh" ] && \
+       [ -f "$sdir/setup_customization_alpine.sh" ] && \
+       [ -f "$sdir/setup_cli_tools.sh" ]; then
+        cp -f "$sdir"/setup_*.sh "$FLUX_ROOTFS_PATH/usr/local/lib/nativecode/"
         SCRIPTS_FOUND=1
         break
     fi
 done
 
-if [ ! -f "$FLUX_ROOTFS_PATH/usr/local/lib/nativecode/setup_alpaquita_family.sh" ]; then
-    error "CRITICAL: setup_alpaquita_family.sh could not be found or staged into guest!"
+if [ "$SCRIPTS_FOUND" != "1" ]; then
+    error "CRITICAL: Required guest setup scripts could not all be found or staged into guest!"
     goodbye
 fi
 
-# Execute guest setup stages in chroot: E -> F -> GUI -> G -> H
+# Execute guest setup stages in chroot: E -> F -> GUI -> G -> H (strictly mandatory)
 progress "Executing guest stages in chroot (E -> F -> GUI -> G -> H)..."
 export NATIVECODE_ISOLATION=chroot
 chroot "$FLUX_ROOTFS_PATH" /bin/sh -c '
@@ -137,26 +145,19 @@ chroot "$FLUX_ROOTFS_PATH" /bin/sh -c '
     SETUP_DIR="/usr/local/lib/nativecode"
     
     # 1. Phase E: Distro family setup
-    if [ -f "$SETUP_DIR/setup_alpaquita_family.sh" ]; then
-        /bin/sh "$SETUP_DIR/setup_alpaquita_family.sh" alpaquita
-    else
-        echo "Missing setup_alpaquita_family.sh" >&2; exit 1
-    fi
+    /bin/sh "$SETUP_DIR/setup_alpaquita_family.sh" alpaquita
 
-    # 2. Phase F: Desktop XFCE core setup
-    if [ -f "$SETUP_DIR/setup_desktop_xfce.sh" ]; then
-        /bin/sh "$SETUP_DIR/setup_desktop_xfce.sh" alpaquita
-    fi
+    # 2. Phase F: Hardware acceleration setup
+    FLUX_GPU=virgl /bin/bash "$SETUP_DIR/setup_hw_accel_debian.sh"
 
-    # 3. Phase G: Customization setup
-    if [ -f "$SETUP_DIR/setup_customization_alpine.sh" ]; then
-        /bin/sh "$SETUP_DIR/setup_customization_alpine.sh" alpaquita
-    fi
+    # 3. Phase GUI: Desktop XFCE4 setup
+    FLUX_THEME=dark /bin/bash "$SETUP_DIR/setup_xfce4.sh"
 
-    # 4. Phase H: AI stack setup
-    if [ -f "$SETUP_DIR/setup_ai_stack.sh" ]; then
-        /bin/sh "$SETUP_DIR/setup_ai_stack.sh" alpaquita
-    fi
+    # 4. Phase G: Customization setup
+    /bin/sh "$SETUP_DIR/setup_customization_alpine.sh" alpaquita
+
+    # 5. Phase H: AI stack setup
+    /bin/bash "$SETUP_DIR/setup_cli_tools.sh"
 ' || goodbye
 
 cleanup_mounts
