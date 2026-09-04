@@ -95,14 +95,64 @@ else
     exit 1
 fi
 
-echo "== test COMPONENT_DEV flag conditioned on staging =="
+echo "== test COMPONENT_DEV flag conditioned on complete staging =="
+# 1. Without staging
 grep -q '^COMPONENT_DEV=0' "$WORK/rootfs-release" || { echo "FAIL: expected COMPONENT_DEV=0 without android staging"; exit 1; }
 echo "PASS: COMPONENT_DEV=0 when staging absent"
 
-# With opt-staging/android-sdk present
+# 2. Incomplete staging: empty directory only
 mkdir -p "$WORK/opt-staging/android-sdk"
 bash "$REPO_ROOT/tools/rootfs/build_alpine_rootfs.sh" --work "$WORK" --assemble-only
-grep -q '^COMPONENT_DEV=1' "$WORK/rootfs-release" || { echo "FAIL: expected COMPONENT_DEV=1 with android staging"; exit 1; }
-echo "PASS: COMPONENT_DEV=1 when staging present"
+grep -q '^COMPONENT_DEV=0' "$WORK/rootfs-release" || { echo "FAIL: expected COMPONENT_DEV=0 with empty android-sdk dir"; exit 1; }
+echo "PASS: COMPONENT_DEV=0 with incomplete staging directory"
+
+# 3. Complete staging: all required artifacts present
+mkdir -p "$WORK/opt-staging/android-sdk/platforms/android-36" \
+         "$WORK/opt-staging/android-sdk/build-tools/36.1.0" \
+         "$WORK/opt-staging/android-sdk/ndk/29.0.14206865" \
+         "$WORK/opt-staging/kotlin/bin" \
+         "$WORK/opt-staging/gradle/bin"
+touch "$WORK/opt-staging/android-sdk/platforms/android-36/android.jar"
+touch "$WORK/opt-staging/android-sdk/build-tools/36.1.0/aapt2"
+chmod +x "$WORK/opt-staging/android-sdk/build-tools/36.1.0/aapt2"
+touch "$WORK/opt-staging/kotlin/bin/kotlinc" && chmod +x "$WORK/opt-staging/kotlin/bin/kotlinc"
+touch "$WORK/opt-staging/gradle/bin/gradle" && chmod +x "$WORK/opt-staging/gradle/bin/gradle"
+
+bash "$REPO_ROOT/tools/rootfs/build_alpine_rootfs.sh" --work "$WORK" --assemble-only
+grep -q '^COMPONENT_DEV=1' "$WORK/rootfs-release" || { echo "FAIL: expected COMPONENT_DEV=1 with full android staging"; exit 1; }
+echo "PASS: COMPONENT_DEV=1 when full staging is present"
+
+echo "== test verify_rootfs.sh passes without kotlinc/gradle when COMPONENT_DEV=0 =="
+# Create a dummy rootfs that satisfies non-dev requirements
+DUMMY_FS="$WORK/dummy_rootfs"
+mkdir -p "$DUMMY_FS/etc/nativecode" "$DUMMY_FS/usr/local/lib/nativecode" \
+         "$DUMMY_FS/bin" "$DUMMY_FS/usr/bin" "$DUMMY_FS/usr/local/bin" "$DUMMY_FS/home/flux/.local/bin"
+touch "$DUMMY_FS/etc/nativecode/rootfs-release"
+cat > "$DUMMY_FS/etc/nativecode/rootfs-release" <<'EOF'
+FORMAT_VERSION=1
+COMPONENT_E=1
+COMPONENT_H=1
+COMPONENT_DEV=0
+EOF
+touch "$DUMMY_FS/usr/local/lib/nativecode/rootfs-common.sh"
+touch "$DUMMY_FS/usr/bin/startxfce4" && chmod +x "$DUMMY_FS/usr/bin/startxfce4"
+touch "$DUMMY_FS/usr/bin/Xvnc" && chmod +x "$DUMMY_FS/usr/bin/Xvnc"
+
+for c in opencode codex qwen agy claude grok kiro-cli; do
+    touch "$DUMMY_FS/home/flux/.local/bin/$c" && chmod +x "$DUMMY_FS/home/flux/.local/bin/$c"
+done
+
+set +e
+VERIFY_DEV0_OUT="$(bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$DUMMY_FS" 2>&1)"
+VERIFY_DEV0_RC=$?
+set -e
+
+if [ "$VERIFY_DEV0_RC" -eq 0 ]; then
+    echo "PASS: verify_rootfs.sh succeeded on COMPONENT_DEV=0 rootfs without kotlin/gradle"
+else
+    echo "FAIL: verify_rootfs.sh failed on COMPONENT_DEV=0 rootfs (rc=$VERIFY_DEV0_RC)" >&2
+    echo "$VERIFY_DEV0_OUT"
+    exit 1
+fi
 
 echo "BUILD-PIPELINE: ALL PASS"

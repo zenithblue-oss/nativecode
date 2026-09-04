@@ -186,18 +186,24 @@ log "    sh -c 'mkdir -p /rootfs/pkg-lists /rootfs/opt-staging && cp /host-work/
 log "  (or native chroot on rooted aarch64 device after staging /pkg-lists and /opt-staging inside target rootfs)"
 
 # Determine actual COMPONENT_DEV status:
-# DEV is 1 only if Android SDK & build-tools are staged/present and not skipped.
+# DEV is 1 only if the full Android SDK, build-tools, NDK, Kotlin, and Gradle
+# stack is staged and complete (not merely an empty directory or partial set).
 HAS_DEV_STAGED=0
-if [ "$SKIP_ANDROID" = "0" ] && [ -d "$WORK/opt-staging/android-sdk" ]; then
+if [ "$SKIP_ANDROID" = "0" ] && \
+   [ -f "$WORK/opt-staging/android-sdk/platforms/android-$ANDROID_PLATFORM/android.jar" ] && \
+   [ -x "$WORK/opt-staging/android-sdk/build-tools/$ANDROID_BUILD_TOOLS/aapt2" ] && \
+   [ -d "$WORK/opt-staging/android-sdk/ndk/$ANDROID_NDK" ] && \
+   [ -d "$WORK/opt-staging/kotlin" ] && \
+   [ -d "$WORK/opt-staging/gradle" ]; then
     HAS_DEV_STAGED=1
 fi
 
 if [ "$HAS_DEV_STAGED" = "1" ]; then
     COMPONENT_DEV=1
-    log "Android dev stack staged -> COMPONENT_DEV=1"
+    log "Android dev stack fully staged -> COMPONENT_DEV=1"
 else
     COMPONENT_DEV=0
-    log "Android dev stack not staged (or --skip-android set) -> COMPONENT_DEV=0"
+    log "Android dev stack incomplete or skipped -> COMPONENT_DEV=0"
 fi
 
 # Write release marker (outer/host side; build script finalizes after assembly)

@@ -44,8 +44,8 @@ docker run --rm --privileged --platform linux/arm64 \
 # 3 & 4. Finalize, clean, and run mandatory verification
 /tmp/nc-rootfs/finalize.sh /tmp/nc-rootfs/rootfs out/
 
-# 5, 6 & 7. Measure, archive, sha256, and verify size gate
-tools/rootfs/measure_rootfs.sh /tmp/nc-rootfs/rootfs out/
+# 5, 6 & 7. Measure, archive, sha256, and verify size gate (with artifact prefix)
+tools/rootfs/measure_rootfs.sh /tmp/nc-rootfs/rootfs out/nativecode-alpine-aarch64
 ```
 
 Never archive an interactively used phone rootfs. Pin SHA256 in

@@ -5,7 +5,17 @@ set -u
 ROOTFS="${1:?usage: verify_rootfs.sh <rootfs-dir>}"
 FAIL=0
 need() { if [ -e "$ROOTFS$1" ]; then echo "OK   $1"; else echo "MISS $1"; FAIL=1; fi; }
-have() { if chroot "$ROOTFS" /bin/sh -c "command -v $1 >/dev/null 2>&1" 2>/dev/null || [ -x "$ROOTFS/usr/bin/$1" ] || [ -x "$ROOTFS/usr/local/bin/$1" ]; then echo "OK   cmd:$1"; else echo "MISS cmd:$1"; FAIL=1; fi; }
+have() {
+    if chroot "$ROOTFS" /bin/sh -c "command -v $1 >/dev/null 2>&1" 2>/dev/null || \
+       [ -x "$ROOTFS/usr/bin/$1" ] || [ -x "$ROOTFS/usr/local/bin/$1" ] || \
+       [ -x "$ROOTFS/bin/$1" ] || [ -x "$ROOTFS/sbin/$1" ] || [ -x "$ROOTFS/usr/sbin/$1" ]; then
+        echo "OK   cmd:$1"
+        return 0
+    else
+        echo "MISS cmd:$1"
+        return 1
+    fi
+}
 
 echo "== manifest =="
 need /etc/nativecode/rootfs-release
@@ -19,7 +29,7 @@ if grep -q '^COMPONENT_DEV=1' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/nul
 fi
 
 echo "== base cmds =="
-for c in sh bash sudo git node npm python3 java javac adb fastboot kotlinc gradle gcc g++ cmake ninja clang rustc cargo go gh; do
+for c in sh bash sudo git node npm python3 java javac adb fastboot gcc g++ cmake ninja clang rustc cargo go gh; do
     have "$c" || true
 done
 for c in opencode codex qwen agy claude grok kiro-cli; do
@@ -32,9 +42,13 @@ need /usr/bin/startxfce4
 
 if [ "$IS_DEV" = "1" ]; then
     echo "== android/dev stack (COMPONENT_DEV=1) =="
+    have kotlinc || FAIL=1
+    have gradle || FAIL=1
     need /opt/android-sdk/platforms/android-36/android.jar
     [ -x "$ROOTFS/opt/android-sdk/build-tools/36.1.0/aapt2" ] || { echo "MISS aapt2 36.1.0"; FAIL=1; }
     [ -d "$ROOTFS/opt/android-sdk/ndk/29.0.14206865" ] || { echo "MISS ndk r29"; FAIL=1; }
+    [ -x "$ROOTFS/opt/kotlin/bin/kotlinc" ] || [ -x "$ROOTFS/usr/bin/kotlinc" ] || { echo "MISS kotlinc"; FAIL=1; }
+    [ -x "$ROOTFS/opt/gradle/bin/gradle" ] || [ -x "$ROOTFS/usr/bin/gradle" ] || { echo "MISS gradle"; FAIL=1; }
 fi
 
 echo "== credential scrub =="
