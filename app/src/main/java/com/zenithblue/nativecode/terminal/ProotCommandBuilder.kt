@@ -1,6 +1,7 @@
 package com.zenithblue.nativecode.terminal
 
 import android.content.Context
+import java.io.File
 
 /** Builds shell arguments and environment map for proot Debian sessions. */
 object ProotCommandBuilder {
