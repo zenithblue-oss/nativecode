@@ -57,6 +57,7 @@ libxkbcommon
 gnutls
 libjpeg-turbo
 openssl
+linux-pam
 
 # Development & scripting runtimes
 git

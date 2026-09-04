@@ -53,6 +53,7 @@ libxkbcommon-dev
 gnutls-dev
 libjpeg-turbo-dev
 openssl-dev
+linux-pam-dev
 pcre-dev
 libcap-dev
 zlib-dev
