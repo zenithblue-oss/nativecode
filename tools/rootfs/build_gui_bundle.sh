@@ -179,8 +179,21 @@ build_tigervnc() {
     fi
 
     log "Preparing Xorg server tree for Xvnc..."
+    # TigerVNC repo already contains unix/xserver/hw/vnc.
+    # Preserve unix/xserver/hw/vnc when overlaying Xorg source onto unix/xserver.
+    mkdir -p "$WORK/tv_hw_vnc_backup"
+    rm -rf "$WORK/tv_hw_vnc_backup"/*
+    if [ -d "$TV_SRC/unix/xserver/hw/vnc" ]; then
+        cp -R "$TV_SRC/unix/xserver/hw/vnc" "$WORK/tv_hw_vnc_backup/vnc"
+    fi
+
     rm -rf "$TV_SRC/unix/xserver"
     cp -R "$XORG_SRC" "$TV_SRC/unix/xserver"
+
+    if [ -d "$WORK/tv_hw_vnc_backup/vnc" ]; then
+        mkdir -p "$TV_SRC/unix/xserver/hw"
+        cp -R "$WORK/tv_hw_vnc_backup/vnc" "$TV_SRC/unix/xserver/hw/vnc"
+    fi
 
     cd "$TV_SRC/unix/xserver"
     if [ -f "$TV_SRC/unix/xserver21.patch" ]; then
