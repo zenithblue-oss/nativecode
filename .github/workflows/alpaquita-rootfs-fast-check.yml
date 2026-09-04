@@ -1,0 +1,73 @@
+name: Alpaquita RootFS Fast Check
+
+on:
+  push:
+    branches:
+      - feature/prebuilt-alpine-rootfs-w1-w6
+    paths:
+      - 'tools/rootfs/**'
+      - 'app/src/main/assets/scripts/**'
+      - 'app/src/main/java/com/zenithblue/nativecode/**'
+      - '.github/workflows/alpaquita-rootfs-fast-check.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: alpaquita-rootfs-fast-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-and-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: RootFS build contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/rootfs/test_build_pipeline.sh
+
+      - name: Prebuilt offline-path tests
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          bash tools/rootfs/test_prebuilt_paths.sh
+          rc=$?
+          set -e
+          if [ "$rc" -eq 2 ]; then
+            echo '::warning::unshare -rm unavailable on this runner; offline-path test skipped'
+            exit 0
+          fi
+          exit "$rc"
+
+      - name: Shell syntax gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              *setup_hw_accel_debian.sh|*setup_cli_tools.sh|*setup_xfce4.sh|*build_*.sh|*test_*.sh|*w10_fast_build.sh)
+                bash -n "$f"
+                ;;
+              *)
+                sh -n "$f"
+                ;;
+            esac
+          done < <(find app/src/main/assets/scripts tools/rootfs -type f -name '*.sh' -print0)
+
+      - name: Android compile and unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew assembleDebug test --no-daemon --stacktrace
