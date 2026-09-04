@@ -314,13 +314,13 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(card)
 
         val policyLink = TextView(this).apply {
-            text = "Full policy on GitHub ↗"
+            text = "Full policy on zenithblue.dev ↗"
             textSize = 13f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
             setPadding(0, 0, 0, dp(20))
             setOnClickListener {
-                val url = "https://github.com/zenithblue-oss/nativecode-ai/blob/master/docs/privacy-policy.md"
+                val url = "https://zenith-blue.web.app/nativecode/privacy"
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
                 } catch (_: Exception) {
@@ -525,9 +525,33 @@ class OnboardingActivity : AppCompatActivity() {
 
         fun renderSlideCard(slideIdx: Int): View {
             val slide = slides[slideIdx]
-            // Single stacked card: hero image full-bleed on top, fixed-height meta band below.
-            val card = LinearLayout(this).apply {
+            val container = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
+                layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+                clipChildren = false
+                clipToPadding = false
+            }
+
+            // Dedicated centered hero card sized to SVG aspect ratio (1132 / 1657)
+            val heroCard = object : FrameLayout(this@OnboardingActivity) {
+                override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                    super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+                    val h = measuredHeight
+                    val maxW = MeasureSpec.getSize(widthMeasureSpec)
+                    val shadowPx = dp(shadowOff)
+                    val contentH = (h - shadowPx).coerceAtLeast(1)
+                    val contentW = (contentH * (1132f / 1657f)).toInt()
+                    val targetW = minOf(maxW, contentW + shadowPx)
+                    setMeasuredDimension(targetW, h)
+                    val childWSpec = MeasureSpec.makeMeasureSpec(targetW - shadowPx, MeasureSpec.EXACTLY)
+                    val childHSpec = MeasureSpec.makeMeasureSpec(contentH, MeasureSpec.EXACTLY)
+                    measureChildren(childWSpec, childHSpec)
+                }
+            }.apply {
+                layoutParams = LinearLayout.LayoutParams(WRAP, 0, 1f).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    bottomMargin = dp(10)
+                }
                 background = cyberBrutalistBg(
                     fillColor = Color.parseColor("#121212"),
                     strokeColor = NC.BORDER,
@@ -536,41 +560,33 @@ class OnboardingActivity : AppCompatActivity() {
                     cornerRadiusDp = 0,
                     rightFaceColor = NC.OUTLINE_VAR
                 )
-                // Flush top/left so the hero image sits edge-to-edge on the card's front face
-                // (no inset gutter); right/bottom keep the shadow-extrusion reserve.
                 setPadding(0, 0, dp(shadowOff), dp(shadowOff))
-                layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
-                clipChildren = true
-                clipToPadding = true
-            }
-
-            // Hero image zone — width-first: MATCH width, takes all leftover height.
-            // No border here: a stroke on both this frame AND the outer card produced the
-            // "double frame / floating mock" look. The outer card supplies the single frame.
-            val imageFrame = FrameLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
-                setBackgroundColor(NC.SURFACE_LOWEST) // residual letterbox only, not a border
                 clipChildren = true
                 clipToPadding = true
             }
 
             val iv = ImageView(this).apply {
                 setImageResource(slideImageRes(slide.type))
-                // FIT_CENTER: preserves the mock's real aspect ratio. Never crops the window
-                // chrome (traffic lights / PREVIEW pill / tree root) and never stretches it.
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 adjustViewBounds = false
                 layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             }
-            imageFrame.addView(iv)
-            card.addView(imageFrame)
+            heroCard.addView(iv)
+            container.addView(heroCard)
 
-            // Meta band — WRAP (no weight) so it never starves the hero; type sized to
-            // design system label-sm / headline / body-md scale.
+            // Meta card below hero
             val meta = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-                setPadding(dp(14), dp(12), dp(14), dp(2))
+                background = cyberBrutalistBg(
+                    fillColor = NC.SURFACE_CONTAINER,
+                    strokeColor = NC.BORDER,
+                    shadowColor = NC.SURFACE_BRIGHT,
+                    offsetDp = shadowOff,
+                    cornerRadiusDp = 0,
+                    rightFaceColor = NC.OUTLINE_VAR
+                )
+                setPadding(dp(14), dp(10), dp(14 + shadowOff), dp(10 + shadowOff))
             }
 
             val tagTv = TextView(this).apply {
@@ -578,25 +594,25 @@ class OnboardingActivity : AppCompatActivity() {
                 textSize = 13f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.MONOSPACE
-                setPadding(0, 0, 0, dp(8))
+                setPadding(0, 0, 0, dp(6))
             }
             meta.addView(tagTv)
 
             val headerRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, 0, 0, dp(8))
+                setPadding(0, 0, 0, dp(6))
             }
             val iconIv = ImageView(this).apply {
                 setImageResource(slide.iconResId)
                 setColorFilter(NC.PRIMARY)
-                layoutParams = LinearLayout.LayoutParams(dp(26), dp(26)).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply {
                     rightMargin = dp(10)
                 }
             }
             val titleTv = TextView(this).apply {
                 text = slide.title
-                textSize = 22f
+                textSize = 20f
                 setTextColor(NC.ON_SURFACE)
                 typeface = Typeface.DEFAULT_BOLD
             }
@@ -606,14 +622,14 @@ class OnboardingActivity : AppCompatActivity() {
 
             val descTv = TextView(this).apply {
                 text = slide.desc
-                textSize = 16f
+                textSize = 15f
                 setTextColor(NC.ON_SURF_VAR)
-                setLineSpacing(0f, 1.4f)
+                setLineSpacing(0f, 1.35f)
             }
             meta.addView(descTv)
 
-            card.addView(meta)
-            return card
+            container.addView(meta)
+            return container
         }
 
         contentFrame.addView(renderSlideCard(0))

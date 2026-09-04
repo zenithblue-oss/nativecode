@@ -162,6 +162,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var aiSafetyScrollView: ScrollView
     private var aiSafetyVendorList: LinearLayout? = null
     private var aiSafetyMethodBadge: TextView? = null
+    /** Settings → Privacy Policy & Open Source Licenses. */
+    private lateinit var privacyPolicyScrollView: ScrollView
     /** Repairs page: host | guest | chroot */
     private var repairsSelectedTab: String = "host"
     private var repairsRootOk: Boolean? = null
@@ -382,6 +384,7 @@ class MainActivity : AppCompatActivity() {
     private val ID_CLI_AUTH = 19
     private val ID_AI_SAFETY = 20
     private val ID_APPS = 21
+    private val ID_PRIVACY_POLICY = 22
 
     private var fileViewerBackPage = ID_FILES
     private var diffViewerBackPage = ID_GIT
@@ -948,6 +951,9 @@ class MainActivity : AppCompatActivity() {
         if (::aiSafetyScrollView.isInitialized) {
             aiSafetyScrollView.visibility = View.GONE
         }
+        if (::privacyPolicyScrollView.isInitialized) {
+            privacyPolicyScrollView.visibility = View.GONE
+        }
         if (::prootSettingsScrollView.isInitialized) {
             prootSettingsScrollView.visibility = View.GONE
         }
@@ -1124,6 +1130,12 @@ class MainActivity : AppCompatActivity() {
                     refreshAiSafetyPage()
                 }
             }
+            ID_PRIVACY_POLICY -> {
+                if (::privacyPolicyScrollView.isInitialized) {
+                    privacyPolicyScrollView.visibility = View.VISIBLE
+                    privacyPolicyScrollView.scrollTo(0, 0)
+                }
+            }
             ID_SCRIPT_INSTALL -> {
                 if (::scriptInstallLayout.isInitialized) {
                     scriptInstallLayout.visibility = View.VISIBLE
@@ -1219,6 +1231,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
+        android.util.Log.e("NativeCodeNav", "onBackPressed called! currentPageId=$currentPageId, stack=$pageStack, privacyPolicyScrollVis=${if (::privacyPolicyScrollView.isInitialized) privacyPolicyScrollView.visibility else -1}")
+        
+        // Priority 1: Settings subpages (MUST check before any project/workspace checks)
+        if (::privacyPolicyScrollView.isInitialized && privacyPolicyScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_PRIVACY_POLICY, fallback = ID_SETTINGS)
+            return
+        }
+        if (::aiSafetyScrollView.isInitialized && aiSafetyScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_AI_SAFETY, fallback = ID_SETTINGS)
+            return
+        }
+        if (::cliAuthScrollView.isInitialized && cliAuthScrollView.visibility == View.VISIBLE) {
+            dismissCliAuthOverlay()
+            navigateBackFromSubpage(ID_CLI_AUTH, fallback = ID_SETTINGS)
+            return
+        }
+        if (::scriptsScrollView.isInitialized && scriptsScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_SCRIPTS, fallback = ID_SETTINGS)
+            return
+        }
+        if (::prootSettingsScrollView.isInitialized && prootSettingsScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_PROOT_SETTINGS, fallback = ID_SETTINGS)
+            return
+        }
+        if (::chrootSettingsScrollView.isInitialized && chrootSettingsScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_CHROOT_SETTINGS, fallback = ID_SETTINGS)
+            return
+        }
+        if (::softwareManagerScrollView.isInitialized && softwareManagerScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_SOFTWARE_MANAGER, fallback = ID_SETTINGS)
+            return
+        }
+        if (::marketplaceScrollView.isInitialized && marketplaceScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_MARKETPLACE, fallback = ID_SETTINGS)
+            return
+        }
+        if (::appsScrollView.isInitialized && appsScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_APPS, fallback = ID_SETTINGS)
+            return
+        }
+
         // File / diff overlays first — never fall through to workspace → projects list
         if (::fileViewerRootContainer.isInitialized && fileViewerRootContainer.visibility == View.VISIBLE) {
             dismissFileViewer()
@@ -1277,47 +1330,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (::prootSettingsScrollView.isInitialized && prootSettingsScrollView.visibility == View.VISIBLE) {
-            navigateBackFromSubpage(ID_PROOT_SETTINGS)
-            return
-        }
-
-        if (::chrootSettingsScrollView.isInitialized && chrootSettingsScrollView.visibility == View.VISIBLE) {
-            navigateBackFromSubpage(ID_CHROOT_SETTINGS)
-            return
-        }
-
-        if (::softwareManagerScrollView.isInitialized && softwareManagerScrollView.visibility == View.VISIBLE) {
-            navigateBackFromSubpage(ID_SOFTWARE_MANAGER)
-            return
-        }
-
-        if (::marketplaceScrollView.isInitialized && marketplaceScrollView.visibility == View.VISIBLE) {
-            navigateBackFromSubpage(ID_MARKETPLACE)
-            return
-        }
-
-        if (::appsScrollView.isInitialized && appsScrollView.visibility == View.VISIBLE) {
-            navigateBackFromSubpage(ID_APPS)
-            return
-        }
-
-        if (::scriptsScrollView.isInitialized && scriptsScrollView.visibility == View.VISIBLE) {
-            navigateBackFromSubpage(ID_SCRIPTS)
-            return
-        }
-
-        if (::cliAuthScrollView.isInitialized && cliAuthScrollView.visibility == View.VISIBLE) {
-            dismissCliAuthOverlay()
-            navigateBackFromSubpage(ID_CLI_AUTH)
-            return
-        }
-
-        if (::aiSafetyScrollView.isInitialized && aiSafetyScrollView.visibility == View.VISIBLE) {
-            navigateBackFromSubpage(ID_AI_SAFETY)
-            return
-        }
-
         if (pageStack.size > 1) {
             pageStack.pop() // remove current
             val prev = pageStack.peek()
@@ -1357,7 +1369,7 @@ class MainActivity : AppCompatActivity() {
         if (id == ID_SCRIPTS || id == ID_SCRIPT_INSTALL || id == ID_PROJECT_CREATE ||
             id == ID_CHROOT_SETTINGS || id == ID_PROOT_SETTINGS ||
             id == ID_SOFTWARE_MANAGER || id == ID_MARKETPLACE || id == ID_APPS || id == ID_MP_INSTALLER ||
-            id == ID_CLI_AUTH || id == ID_AI_SAFETY
+            id == ID_CLI_AUTH || id == ID_AI_SAFETY || id == ID_PRIVACY_POLICY
         ) {
             showGlobalNav = false
             showProjectNav = false
@@ -1436,10 +1448,19 @@ class MainActivity : AppCompatActivity() {
      * Keeps stack aligned with visible UI so bottom nav / insets stay correct.
      */
     private fun navigateBackFromSubpage(pageId: Int, fallback: Int = ID_SETTINGS) {
+        android.util.Log.d("NativeCodeNav", "navigateBackFromSubpage called: pageId=$pageId, fallback=$fallback, currentStack=$pageStack")
         while (pageStack.isNotEmpty() && pageStack.peek() == pageId) {
             pageStack.pop()
         }
-        val target = if (pageStack.isNotEmpty()) pageStack.peek() else fallback
+        val target = if (pageStack.isNotEmpty()) {
+            pageStack.peek()
+        } else {
+            fallback
+        }
+        android.util.Log.d("NativeCodeNav", "navigateBackFromSubpage resolved target=$target, stackAfter=$pageStack")
+        if (pageStack.isEmpty() || pageStack.peek() != target) {
+            pageStack.push(target)
+        }
         navigateToPage(target, false)
     }
 
@@ -1835,6 +1856,7 @@ class MainActivity : AppCompatActivity() {
         buildScriptsLayout()
         buildCliAuthPage()
         buildAiSafetyPage()
+        buildPrivacyPolicyPage()
         buildProotSettingsPage()
         buildChrootSettingsPage()
         buildSoftwareManagerPage()
@@ -1860,6 +1882,7 @@ class MainActivity : AppCompatActivity() {
         contentFrame.addView(scriptsScrollView)
         contentFrame.addView(cliAuthScrollView)
         contentFrame.addView(aiSafetyScrollView)
+        contentFrame.addView(privacyPolicyScrollView)
         contentFrame.addView(prootSettingsScrollView)
         contentFrame.addView(chrootSettingsScrollView)
         contentFrame.addView(softwareManagerScrollView)
@@ -4253,7 +4276,7 @@ class MainActivity : AppCompatActivity() {
         return settingsHubNavRow(
             iconRes = R.drawable.ic_extension,
             title = "SOFTWARE MANAGER",
-            subtitle = "Installed apt packages by category",
+            subtitle = "Installed packages by category",
             pageId = ID_SOFTWARE_MANAGER
         )
     }
@@ -4886,7 +4909,10 @@ class MainActivity : AppCompatActivity() {
             )
             setPadding(dp(16), dp(16), dp(16), dp(16))
             setOnClickListener {
-                openPrivacyPolicyUrl()
+                if (pageStack.isEmpty() || pageStack.peek() != ID_PRIVACY_POLICY) {
+                    pageStack.push(ID_PRIVACY_POLICY)
+                }
+                navigateToPage(ID_PRIVACY_POLICY)
             }
             setOnTouchListener { v, event ->
                 when (event.action) {
@@ -4926,13 +4952,13 @@ class MainActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
             val name = TextView(this@MainActivity).apply {
-                text = "PRIVACY POLICY"
+                text = "PRIVACY & LICENSES"
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
             }
             val sub = TextView(this@MainActivity).apply {
-                text = "Data practices · opens on GitHub"
+                text = "Data policy · open source licenses"
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -8071,7 +8097,7 @@ class MainActivity : AppCompatActivity() {
         val softwareCard = buildHomePackageModuleCard(
             accentFill = false,
             iconRes = R.drawable.ic_extension,
-            kicker = "APT SCAN",
+            kicker = "PACKAGE SCAN",
             title = "SOFTWARE MANAGER",
             subtitle = "Installed pkgs by category & size",
             footer = "BROWSE · REMOVE",
@@ -10475,9 +10501,10 @@ class MainActivity : AppCompatActivity() {
     // ── Software Manager + Marketplace ───────────────────────────────────────
 
     private fun currentLinuxEnv(): String =
-        if (LinuxCommandBuilder.currentMethod == "chroot") "chroot" else "proot"
+        if (LinuxCommandBuilder.currentMethod == "chroot") "chroot" else "qemu"
 
-    private fun envBadgeLabel(): String = currentLinuxEnv().uppercase(Locale.US)
+    private fun envBadgeLabel(): String =
+        if (LinuxCommandBuilder.currentMethod == "chroot") "CHROOT" else "QEMU"
 
     private fun buildSoftwareManagerPage() {
         softwareManagerScrollView = ScrollView(this).apply {
@@ -10495,7 +10522,7 @@ class MainActivity : AppCompatActivity() {
 
         softwareManagerBody.addView(buildSubPageHeader(
             title = "SOFTWARE MANAGER",
-            subtitle = "// INSTALLED APT PACKAGES",
+            subtitle = "// INSTALLED PACKAGES",
             iconRes = R.drawable.ic_extension,
             pageId = ID_SOFTWARE_MANAGER
         ) { smEnvBadge = it })
@@ -11279,11 +11306,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
         smScanning = true
-        smStatusTv?.text = "Scanning dpkg ($env)…"
+        smStatusTv?.text = "Scanning packages ($env)…"
         smRefreshBtn?.isEnabled = false
         smRefreshBtn?.alpha = 0.45f
         smListContainer?.removeAllViews()
-        smListContainer?.addView(buildListLoadingView("SCANNING APT…", skeletonRows = 8))
+        smListContainer?.addView(buildListLoadingView("SCANNING PACKAGES…", skeletonRows = 8))
         executor.execute {
             val result = AptInventoryService.scan(this, env)
             mainHandler.post {
@@ -11392,7 +11419,7 @@ class MainActivity : AppCompatActivity() {
         val container = smListContainer ?: return
         if (smScanning) {
             container.removeAllViews()
-            container.addView(buildListLoadingView("SCANNING APT…", skeletonRows = 8))
+            container.addView(buildListLoadingView("SCANNING PACKAGES…", skeletonRows = 8))
             return
         }
         container.removeAllViews()
@@ -15820,8 +15847,11 @@ class MainActivity : AppCompatActivity() {
                 }
             )
             addView(
-                secondaryButton("PRIVACY POLICY") {
-                    openPrivacyPolicyUrl()
+                secondaryButton("PRIVACY & LICENSES") {
+                    if (pageStack.isEmpty() || pageStack.peek() != ID_PRIVACY_POLICY) {
+                        pageStack.push(ID_PRIVACY_POLICY)
+                    }
+                    navigateToPage(ID_PRIVACY_POLICY)
                 }.apply {
                     layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
                     textSize = 12f
@@ -15955,12 +15985,210 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openPrivacyPolicyUrl() {
-        val url = "https://github.com/zenithblue-oss/nativecode-ai/blob/master/docs/privacy-policy.md"
+        val url = "https://zenith-blue.web.app/nativecode/privacy"
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (_: Exception) {
-            Toast.makeText(this, "No browser available to open privacy policy", Toast.LENGTH_SHORT)
-                .show()
+            val fallbackUrl = "https://zenith-blue.web.app/nativecode-privacy.html"
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)))
+            } catch (_: Exception) {
+                Toast.makeText(this, "No browser available to open privacy policy", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ── Privacy Policy & Open-Source Licenses Page ────────────────────────────
+
+    private fun buildPrivacyPolicyPage() {
+        privacyPolicyScrollView = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            visibility = View.GONE
+            clipToPadding = false
+            setPadding(0, 0, 0, dp(80))
+            setBackgroundColor(NC.BG)
+            isVerticalScrollBarEnabled = true
+        }
+        val pageLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        privacyPolicyScrollView.addView(pageLayout)
+
+        // Header with Back Button
+        val headerTitleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val pageBackBtn = ImageView(this).apply {
+            setImageResource(R.drawable.ic_arrow_back)
+            setColorFilter(NC.PRIMARY)
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(8) }
+            contentDescription = "Back"
+            setOnClickListener {
+                navigateBackFromSubpage(ID_PRIVACY_POLICY, fallback = ID_SETTINGS)
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(NC.SURFACE_CONTAINER)
+                setStroke(dp(1), NC.OUTLINE_VAR)
+            }
+        }
+        val titleTv = TextView(this).apply {
+            text = "PRIVACY & LICENSES"
+            textSize = 20f
+            setTextColor(NC.PRIMARY)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        }
+        val fossBadge = textBadge("GPL-3.0 · FOSS", NC.SURFACE_HIGHEST, NC.PRIMARY)
+        headerTitleRow.addView(pageBackBtn)
+        headerTitleRow.addView(titleTv)
+        headerTitleRow.addView(fossBadge)
+        pageLayout.addView(headerTitleRow)
+
+        pageLayout.addView(TextView(this).apply {
+            text = "// ZERO TELEMETRY · LOCAL CONTAINERS · AUDITABLE LICENSES"
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, dp(4), 0, dp(12))
+        })
+
+        // Web Link Action Card
+        pageLayout.addView(glassCard().apply {
+            addView(TextView(this@MainActivity).apply {
+                text = "OFFICIAL WEB PORTAL"
+                textSize = 14f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, 0, 0, dp(4))
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "https://zenith-blue.web.app/nativecode/privacy"
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, 0, 0, dp(10))
+            })
+            addView(
+                primaryButton("OPEN IN BROWSER") {
+                    openPrivacyPolicyUrl()
+                }.apply {
+                    layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+                    textSize = 12f
+                }
+            )
+        })
+        pageLayout.addView(spacer(12))
+
+        // Privacy Summary Card
+        pageLayout.addView(glassCard().apply {
+            addView(TextView(this@MainActivity).apply {
+                text = "PRIVACY POLICY OVERVIEW"
+                textSize = 14f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, 0, 0, dp(6))
+            })
+            val bullets = listOf(
+                "• Local-First & Zero Tracking: NativeCode collects no personal data, device identifiers, or analytics.",
+                "• Isolated Guest Environments: Debian Linux, terminal sessions, projects, and editor caches run on-device inside isolated PRoot / Chroot containers.",
+                "• On-Demand Network Only: Internet permission is invoked exclusively when you trigger package installs, git sync, or external repository downloads.",
+                "• Third-Party Tool Disclaimers: AI CLIs (Codex, Claude, Grok, aider) communicate directly with vendor endpoints you authenticate; governed by their respective vendor policies.",
+                "• Data Erasure: Deleting projects, clearing app storage, or uninstalling completely removes all guest rootfs data from this device."
+            )
+            bullets.forEach { b ->
+                addView(TextView(this@MainActivity).apply {
+                    text = b
+                    textSize = 11f
+                    setTextColor(NC.ON_SURF_VAR)
+                    typeface = Typeface.MONOSPACE
+                    setLineSpacing(dp(2).toFloat(), 1.25f)
+                    setPadding(0, 0, 0, dp(6))
+                })
+            }
+            addView(TextView(this@MainActivity).apply {
+                text = "Privacy contact: zenithblue.dev@gmail.com"
+                textSize = 10f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(4), 0, 0)
+            })
+        })
+        pageLayout.addView(spacer(12))
+
+        // Open Source Header
+        pageLayout.addView(TextView(this).apply {
+            text = "OPEN SOURCE LICENSES"
+            textSize = 14f
+            setTextColor(NC.PRIMARY)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, dp(6), 0, dp(6))
+        })
+        pageLayout.addView(TextView(this).apply {
+            text = "NativeCode is built on free and open-source software under GPL-3.0, Apache-2.0, and MIT licenses."
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, 0, 0, dp(8))
+        })
+
+        // Render Licenses
+        com.zenithblue.nativecode.legal.OpenSourceLicenses.ITEMS.forEach { item ->
+            pageLayout.addView(glassCard().apply {
+                val titleRow = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                val nameTv = TextView(this@MainActivity).apply {
+                    text = item.name
+                    textSize = 13f
+                    setTextColor(Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                    layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+                }
+                val licBadge = textBadge(item.licenseType, NC.SURFACE_HIGHEST, NC.PRIMARY)
+                titleRow.addView(nameTv)
+                titleRow.addView(licBadge)
+                addView(titleRow)
+
+                addView(TextView(this@MainActivity).apply {
+                    text = item.component
+                    textSize = 11f
+                    setTextColor(NC.PRIMARY_CON)
+                    typeface = Typeface.MONOSPACE
+                    setPadding(0, dp(4), 0, dp(2))
+                })
+
+                addView(TextView(this@MainActivity).apply {
+                    text = item.copyright
+                    textSize = 10f
+                    setTextColor(NC.OUTLINE)
+                    typeface = Typeface.MONOSPACE
+                    setPadding(0, 0, 0, dp(6))
+                })
+
+                addView(TextView(this@MainActivity).apply {
+                    text = item.licenseSummary
+                    textSize = 11f
+                    setTextColor(NC.ON_SURF_VAR)
+                    typeface = Typeface.MONOSPACE
+                    setLineSpacing(dp(2).toFloat(), 1.2f)
+                    setPadding(0, 0, 0, dp(8))
+                })
+
+                addView(
+                    secondaryButton("VIEW SOURCE REPOSITORY") {
+                        openExternalUrl(item.url, "No browser available to open ${item.name}")
+                    }.apply {
+                        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+                        textSize = 11f
+                    }
+                )
+            })
+            pageLayout.addView(spacer(10))
         }
     }
 

@@ -22,5 +22,13 @@
 -dontwarn android.content.IIntentReceiver
 -dontwarn android.content.IIntentSender
 -dontwarn android.content.pm.IPackageManager
--dontwarn com.termux.x11.CmdEntryPoint
+# Keep Preference classes parsed from XML
+-keep class androidx.preference.** { *; }
+-keepclassmembers class * extends androidx.preference.Preference {
+    public <init>(android.content.Context, android.util.AttributeSet, int, int);
+    public <init>(android.content.Context, android.util.AttributeSet, int);
+    public <init>(android.content.Context, android.util.AttributeSet);
+    public <init>(android.content.Context);
+}
+-keep class com.termux.x11.NcSwitchPreference { *; }
 
