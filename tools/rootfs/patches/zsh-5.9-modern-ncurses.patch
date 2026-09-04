@@ -1,0 +1,121 @@
+--- a/configure	2022-05-15 00:32:47.000000000 +0530
++++ b/configure	2026-09-05 00:07:36.107400709 +0530
+@@ -11055,7 +11055,7 @@
+ int
+ main (void)
+ {
+-char **test = boolcodes; puts(*test);
++char **test = (char **)boolcodes; puts(*test);
+   ;
+   return 0;
+ }
+@@ -11080,7 +11080,7 @@
+ int
+ main (void)
+ {
+-char **test = numcodes; puts(*test);
++char **test = (char **)numcodes; puts(*test);
+   ;
+   return 0;
+ }
+@@ -11105,7 +11105,7 @@
+ int
+ main (void)
+ {
+-char **test = strcodes; puts(*test);
++char **test = (char **)strcodes; puts(*test);
+   ;
+   return 0;
+ }
+@@ -11130,7 +11130,7 @@
+ int
+ main (void)
+ {
+-char **test = boolnames; puts(*test);
++char **test = (char **)boolnames; puts(*test);
+   ;
+   return 0;
+ }
+@@ -11155,7 +11155,7 @@
+ int
+ main (void)
+ {
+-char **test = numnames; puts(*test);
++char **test = (char **)numnames; puts(*test);
+   ;
+   return 0;
+ }
+@@ -11180,7 +11180,7 @@
+ int
+ main (void)
+ {
+-char **test = strnames; puts(*test);
++char **test = (char **)strnames; puts(*test);
+   ;
+   return 0;
+ }
+--- a/Src/Modules/termcap.c	2018-12-16 07:09:51.000000000 +0530
++++ b/Src/Modules/termcap.c	2026-09-05 00:07:36.108631639 +0530
+@@ -42,7 +42,7 @@
+ #ifdef HAVE_TGETENT
+ 
+ #ifndef HAVE_BOOLCODES
+-static char *boolcodes[] = {
++static char *zboolcodes[] = {
+     "bw", "am", "ut", "cc", "xs", "YA", "YF", "YB", "xt", "xn", "eo",
+     "gn", "hc", "HC", "km", "YC", "hs", "hl", "in", "YG", "da", "db",
+     "mi", "ms", "nx", "xb", "NP", "ND", "NR", "os", "5i", "YD", "YE",
+@@ -63,7 +63,13 @@
+     case -1:
+ 	break;
+     case 0:
+-	for (b = (char **)boolcodes; *b; ++b)
++	for (b = (char **)
++#ifdef HAVE_BOOLCODES
++	         boolcodes
++#else
++	         zboolcodes
++#endif
++	         ; *b; ++b)
+ 	    if (s[0] == (*b)[0] && s[1] == (*b)[1])
+ 		return 0;
+ 	break;
+@@ -204,7 +210,7 @@
+     char **capcode, *tcstr, buf[2048], *u;
+ 
+ #ifndef HAVE_NUMCODES
+-    static char *numcodes[] = {
++    static char *znumcodes[] = {
+ 	"co", "it", "lh", "lw", "li", "lm", "sg", "ma", "Co", "pa", "MW",
+ 	"NC", "Nl", "pb", "vt", "ws", "Yo", "Yp", "Ya", "BT", "Yc", "Yb",
+ 	"Yd", "Ye", "Yf", "Yg", "Yh", "Yi", "Yk", "Yj", "Yl", "Ym", "Yn",
+@@ -257,7 +263,13 @@
+     pm->node.flags = PM_READONLY | PM_SCALAR;
+     pm->gsu.s = &nullsetscalar_gsu;
+ 
+-    for (capcode = (char **)boolcodes; *capcode; capcode++) {
++    for (capcode = (char **)
++#ifdef HAVE_BOOLCODES
++	     boolcodes
++#else
++	     zboolcodes
++#endif
++	     ; *capcode; capcode++) {
+ 	if ((num = ztgetflag(*capcode)) != -1) {
+ 	    pm->u.str = num ? dupstring("yes") : dupstring("no");
+ 	    pm->node.nam = dupstring(*capcode);
+@@ -268,7 +280,13 @@
+     pm->node.flags = PM_READONLY | PM_INTEGER;
+     pm->gsu.i = &nullsetinteger_gsu;
+ 
+-    for (capcode = (char **)numcodes; *capcode; capcode++) {
++    for (capcode = (char **)
++#ifdef HAVE_NUMCODES
++	     numcodes
++#else
++	     znumcodes
++#endif
++	     ; *capcode; capcode++) {
+ 	if ((num = tgetnum(*capcode)) != -1) {
+ 	    pm->u.val = num;
+ 	    pm->node.nam = dupstring(*capcode);

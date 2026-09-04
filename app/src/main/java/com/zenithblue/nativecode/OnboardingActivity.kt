@@ -2657,6 +2657,14 @@ class OnboardingActivity : AppCompatActivity() {
                         }
                         Log.i("Onboarding", "Explicitly deployed alpaquita rootfs: ${outZst.absolutePath} (${outZst.length()} bytes)")
                     }
+                    val outZstSha = File(homeDir, "alpaquita_rootfs.tar.zst.sha256")
+                    if (assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst.sha256") == true) {
+                        assets.open("rootfs/alpaquita_rootfs.tar.zst.sha256").use { input ->
+                            FileOutputStream(outZstSha).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
                 } else {
                     val hasAlpineRootfs = (outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
                         (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)
@@ -3179,6 +3187,18 @@ class OnboardingActivity : AppCompatActivity() {
         val hasAlpaquitaAsset = assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true
 
         if (hasAlpaquitaAsset) {
+            val outZstSha = File(homeDir, "alpaquita_rootfs.tar.zst.sha256")
+            if (assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst.sha256") == true) {
+                try {
+                    assets.open("rootfs/alpaquita_rootfs.tar.zst.sha256").use { input ->
+                        FileOutputStream(outZstSha).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("Onboarding", "Failed to deploy Alpaquita sha256", e)
+                }
+            }
             if (outZst.isFile && outZst.length() > 2L * 1024L * 1024L) {
                 Log.i("Onboarding", "Alpaquita rootfs already deployed: ${outZst.absolutePath}")
                 return

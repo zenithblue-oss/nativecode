@@ -486,4 +486,25 @@ if ! grep -q 'import java.io.File' "$PCB_KT"; then
 fi
 echo "PASS: ProotCommandBuilder.kt imports java.io.File"
 
+echo "== test Zsh 5.9 ncurses patch applies cleanly =="
+ZSH_TAR="$HOME/.cache/nativecode-rootfs/zsh-5.9.tar.xz"
+[ -f "$ZSH_TAR" ] || ZSH_TAR="/tmp/zsh-5.9.tar.xz"
+if [ -f "$ZSH_TAR" ]; then
+    TEST_ZSH_DIR="$WORK/test_zsh_patch"
+    mkdir -p "$TEST_ZSH_DIR"
+    tar -xf "$ZSH_TAR" -C "$TEST_ZSH_DIR"
+    if ! patch -p1 --batch -d "$TEST_ZSH_DIR/zsh-5.9" < "$REPO_ROOT/tools/rootfs/patches/zsh-5.9-modern-ncurses.patch" >/dev/null 2>&1; then
+        echo "FAIL: zsh-5.9-modern-ncurses.patch failed to apply cleanly to zsh 5.9 tarball!" >&2
+        exit 1
+    fi
+    echo "PASS: zsh-5.9-modern-ncurses.patch applies cleanly"
+fi
+
+echo "== test adjacent sha256 deployment in OnboardingActivity =="
+if ! grep -q 'alpaquita_rootfs.tar.zst.sha256' "$ONBOARDING_KT"; then
+    echo "FAIL: OnboardingActivity does not deploy alpaquita_rootfs.tar.zst.sha256!" >&2
+    exit 1
+fi
+echo "PASS: OnboardingActivity deploys alpaquita_rootfs.tar.zst.sha256 adjacent checksum"
+
 echo "BUILD-PIPELINE: ALL PASS"

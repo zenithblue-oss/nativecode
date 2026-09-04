@@ -74,7 +74,9 @@ reuse_finished_bundle() {
 
 # 1. Zsh
 build_zsh() {
-    local key="zsh-$ZSH_VERSION-$ZSH_SHA256"
+    local patch_sha
+    patch_sha="$(sha256sum "$SCRIPT_DIR/patches/zsh-5.9-modern-ncurses.patch" | awk '{print substr($1,1,16)}')"
+    local key="zsh-$ZSH_VERSION-$ZSH_SHA256-$patch_sha"
     if stamp_hit "$key" && [ -x "$DESTDIR/usr/bin/zsh" ]; then
         log "CACHE HIT: zsh $ZSH_VERSION"
         return 0
@@ -88,9 +90,12 @@ build_zsh() {
         "$TARBALL" \
         "$ZSH_SHA256"
 
-    if [ ! -d "$SRC" ]; then
-        tar -xf "$TARBALL" -C "$WORK"
-    fi
+    rm -rf "$SRC"
+    tar -xf "$TARBALL" -C "$WORK"
+    
+    log "Applying Zsh modern ncurses compatibility patch..."
+    patch -p1 --batch -d "$SRC" < "$SCRIPT_DIR/patches/zsh-5.9-modern-ncurses.patch"
+
     cd "$SRC"
     ./configure --prefix="$PREFIX" \
                 --bindir="$PREFIX/bin" \

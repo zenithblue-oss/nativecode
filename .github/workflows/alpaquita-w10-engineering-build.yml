@@ -33,15 +33,16 @@ jobs:
           sudo apt-get install -y zstd
 
       - name: Restore NativeCode rootfs build cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
+        id: rootfs-cache
         with:
           path: |
             ~/.cache/nativecode-rootfs
             tools/rootfs/out/nativecode-gui-alpaquita-glibc-aarch64.tar.zst
             tools/rootfs/out/nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256
-          key: alpaquita-gui-v2-${{ hashFiles('tools/rootfs/build_gui_bundle.sh', 'tools/rootfs/packages-alpaquita-gui-build.txt', 'tools/rootfs/versions.env') }}
+          key: alpaquita-gui-v3-${{ hashFiles('tools/rootfs/build_gui_bundle.sh', 'tools/rootfs/packages-alpaquita-gui-build.txt', 'tools/rootfs/versions.env', 'tools/rootfs/patches/**') }}
           restore-keys: |
-            alpaquita-gui-v2-
+            alpaquita-gui-v3-
 
       - name: Build and verify ARM64 engineering rootfs
         shell: bash
@@ -49,6 +50,16 @@ jobs:
           set -euo pipefail
           chmod +x tools/rootfs/*.sh
           tools/rootfs/w10_fast_build.sh --skip-tests --skip-android
+
+      - name: Save NativeCode rootfs build cache (always)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/nativecode-rootfs
+            tools/rootfs/out/nativecode-gui-alpaquita-glibc-aarch64.tar.zst
+            tools/rootfs/out/nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256
+          key: alpaquita-gui-v3-${{ hashFiles('tools/rootfs/build_gui_bundle.sh', 'tools/rootfs/packages-alpaquita-gui-build.txt', 'tools/rootfs/versions.env', 'tools/rootfs/patches/**') }}-${{ github.run_id }}
 
       - name: Upload engineering rootfs
         if: success()
