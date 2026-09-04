@@ -1,6 +1,12 @@
 #!/bin/sh
 # setup_alpaquita_chroot.sh — fast host-side bootstrap for the prebuilt Alpaquita rootfs.
 # Run as UID 0 on rooted Android. Guest E/F/GUI/G/H are owned by OnboardingActivity.
+# Mandatory onboarding stage contract after this bootstrap:
+#   E   setup_alpaquita_family.sh
+#   F   setup_hw_accel_debian.sh
+#   GUI setup_xfce4.sh
+#   G   setup_customization_alpine.sh
+#   H   setup_cli_tools.sh
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
