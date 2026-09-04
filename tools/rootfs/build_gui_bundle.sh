@@ -159,6 +159,8 @@ build_tigervnc() {
         tar -xf "$TV_TARBALL" -C "$WORK"
     fi
 
+    # Clean existing build directory to ensure CMake doesn't reuse failed/stale cache
+    rm -rf "$TV_SRC/build"
     mkdir -p "$TV_SRC/build"
     cd "$TV_SRC/build"
     cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DENABLE_NLS=OFF -DBUILD_VIEWER=OFF
