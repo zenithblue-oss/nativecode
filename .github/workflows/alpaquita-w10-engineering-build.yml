@@ -1,0 +1,63 @@
+name: Alpaquita W10 ARM64 Engineering Build
+
+on:
+  push:
+    branches:
+      - feature/prebuilt-alpine-rootfs-w1-w6
+    paths:
+      - 'tools/rootfs/**'
+      - '.github/workflows/alpaquita-w10-engineering-build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: alpaquita-w10-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  w10-engineering:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable ARM64 emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Host build tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zstd
+
+      - name: Restore NativeCode rootfs build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/nativecode-rootfs
+            tools/rootfs/out/nativecode-gui-alpaquita-glibc-aarch64.tar.zst
+            tools/rootfs/out/nativecode-gui-alpaquita-glibc-aarch64.tar.zst.sha256
+          key: alpaquita-gui-v2-${{ hashFiles('tools/rootfs/build_gui_bundle.sh', 'tools/rootfs/packages-alpaquita-gui-build.txt', 'tools/rootfs/versions.env') }}
+          restore-keys: |
+            alpaquita-gui-v2-
+
+      - name: Build and verify ARM64 engineering rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x tools/rootfs/*.sh
+          tools/rootfs/w10_fast_build.sh --skip-tests --skip-android
+
+      - name: Upload engineering rootfs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpaquita-rootfs-arm64-engineering
+          path: |
+            tools/rootfs/out/alpaquita_rootfs.tar.zst
+            tools/rootfs/out/alpaquita_rootfs.tar.zst.sha256
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
