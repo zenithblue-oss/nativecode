@@ -273,15 +273,15 @@ build_xfce_core() {
 
         cd "$SRC"
         if [ -x "configure" ]; then
-            ./configure --prefix="$PREFIX" --sysconfdir=/etc --disable-static
+            ./configure --prefix="$PREFIX" --libdir="$PREFIX/lib" --sysconfdir=/etc --disable-static
             make -j"$JOBS"
             DESTDIR="$DESTDIR" make install
             make install 2>/dev/null || true
         elif [ -f "meson.build" ]; then
             if [ ! -d build ]; then
-                meson setup build --prefix="$PREFIX" --sysconfdir=/etc
+                meson setup build --prefix="$PREFIX" --libdir="$PREFIX/lib" --sysconfdir=/etc
             else
-                meson setup build --reconfigure --prefix="$PREFIX" --sysconfdir=/etc
+                meson setup build --reconfigure --prefix="$PREFIX" --libdir="$PREFIX/lib" --sysconfdir=/etc
             fi
             ninja -C build -j"$JOBS"
             DESTDIR="$DESTDIR" ninja -C build install
