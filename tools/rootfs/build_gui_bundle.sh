@@ -203,9 +203,9 @@ build_tigervnc() {
         --with-xkb-output=/var/lib/xkb \
         --with-xkb-bin-directory=/usr/bin
 
-    make -j"$JOBS" TIGERVNC_SRCDIR="$TV_SRC"
+    make -j"$JOBS" TIGERVNC_SRCDIR="$TV_SRC" TIGERVNC_BUILDDIR="$TV_SRC/build"
     cd hw/vnc
-    make DESTDIR="$DESTDIR" install
+    make DESTDIR="$DESTDIR" TIGERVNC_SRCDIR="$TV_SRC" TIGERVNC_BUILDDIR="$TV_SRC/build" install
     [ -x "$DESTDIR/usr/bin/Xvnc" ] || {
         echo "build-gui-bundle: ERROR: Xvnc missing after TigerVNC build" >&2
         exit 1
