@@ -189,6 +189,8 @@ build_tigervnc() {
 
     cd "$TV_SRC/unix/xserver"
     if [ -f "$TV_SRC/unix/xserver21.patch" ]; then
+        # Modern binutils with --no-copy-dt-needed-entries requires explicit direct dependency DSO linking for TigerVNC crypto/pam/jpeg
+        sed -i 's/AC_SUBST(\[XVNC_SYS_LIBS\], \["\$GLX_SYS_LIBS"\])/AC_SUBST([XVNC_SYS_LIBS], ["$GLX_SYS_LIBS -lhogweed -lnettle -lgmp -lgnutls -lpam -ljpeg"])/' "$TV_SRC/unix/xserver21.patch"
         patch -p1 -N < "$TV_SRC/unix/xserver21.patch" || true
     fi
 
