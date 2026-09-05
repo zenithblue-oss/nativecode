@@ -261,7 +261,12 @@ build_xfce_core() {
         fi
 
         cd "$SRC"
-        if [ -f "meson.build" ]; then
+        if [ -x "configure" ]; then
+            ./configure --prefix="$PREFIX" --sysconfdir=/etc --disable-static
+            make -j"$JOBS"
+            DESTDIR="$DESTDIR" make install
+            make install 2>/dev/null || true
+        elif [ -f "meson.build" ]; then
             if [ ! -d build ]; then
                 meson setup build --prefix="$PREFIX" --sysconfdir=/etc
             else
@@ -271,10 +276,8 @@ build_xfce_core() {
             DESTDIR="$DESTDIR" ninja -C build install
             ninja -C build install 2>/dev/null || true
         else
-            ./configure --prefix="$PREFIX" --sysconfdir=/etc --disable-static
-            make -j"$JOBS"
-            make DESTDIR="$DESTDIR" install
-            make install 2>/dev/null || true
+            echo "build-gui-bundle: ERROR: No recognized build system in $SRC" >&2
+            exit 1
         fi
         stamp_done "$key"
     done
