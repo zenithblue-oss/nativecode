@@ -220,6 +220,7 @@ build_tigervnc() {
 build_xfce_core() {
     log "=== Building XFCE Core ==="
     local XFCE_COMPONENTS=(
+        "xfce4-dev-tools:4.20.0:$XFCE_XFCE4_DEV_TOOLS_SHA256:xfce"
         "libxfce4util:4.20.0:$XFCE_LIBXFCE4UTIL_SHA256:xfce"
         "xfconf:4.20.0:$XFCE_XFCONF_SHA256:xfce"
         "libxfce4ui:4.20.0:$XFCE_LIBXFCE4UI_SHA256:xfce"
@@ -268,10 +269,12 @@ build_xfce_core() {
             fi
             ninja -C build -j"$JOBS"
             DESTDIR="$DESTDIR" ninja -C build install
+            ninja -C build install 2>/dev/null || true
         else
             ./configure --prefix="$PREFIX" --sysconfdir=/etc --disable-static
             make -j"$JOBS"
             make DESTDIR="$DESTDIR" install
+            make install 2>/dev/null || true
         fi
         stamp_done "$key"
     done
