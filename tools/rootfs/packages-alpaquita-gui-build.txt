@@ -45,6 +45,8 @@ libxcomposite-dev
 libxcursor-dev
 libxi-dev
 libxfont2-dev
+libsm-dev
+libice-dev
 pixman-dev
 xorgproto
 xorg-server-dev
