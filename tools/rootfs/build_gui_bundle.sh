@@ -221,6 +221,7 @@ build_xfce_core() {
     log "=== Building XFCE Core ==="
     local XFCE_COMPONENTS=(
         "xfce4-dev-tools:4.20.0:$XFCE_XFCE4_DEV_TOOLS_SHA256:xfce"
+        "libxfce4windowing:4.20.0:$XFCE_LIBXFCE4WINDOWING_SHA256:xfce"
         "libxfce4util:4.20.0:$XFCE_LIBXFCE4UTIL_SHA256:xfce"
         "xfconf:4.20.0:$XFCE_XFCONF_SHA256:xfce"
         "libxfce4ui:4.20.0:$XFCE_LIBXFCE4UI_SHA256:xfce"
