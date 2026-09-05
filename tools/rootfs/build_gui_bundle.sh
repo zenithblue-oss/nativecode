@@ -222,6 +222,7 @@ build_xfce_core() {
     local XFCE_COMPONENTS=(
         "xfce4-dev-tools:4.20.0:$XFCE_XFCE4_DEV_TOOLS_SHA256:xfce"
         "libxfce4windowing:4.20.0:$XFCE_LIBXFCE4WINDOWING_SHA256:xfce"
+        "libwnck:43.3:$LIBWNCK_SHA256:gnome"
         "libxfce4util:4.20.0:$XFCE_LIBXFCE4UTIL_SHA256:xfce"
         "xfconf:4.20.0:$XFCE_XFCONF_SHA256:xfce"
         "libxfce4ui:4.20.0:$XFCE_LIBXFCE4UI_SHA256:xfce"
@@ -254,7 +255,16 @@ build_xfce_core() {
         log "Building $name $ver..."
         local TARBALL="$WORK/$name-$ver.tar.bz2"
         local SRC="$WORK/$name-$ver"
-        local url="https://archive.xfce.org/src/$cat/$name/$major_minor/$name-$ver.tar.bz2"
+        local url
+        case "$cat" in
+            gnome)
+                TARBALL="$WORK/$name-$ver.tar.xz"
+                url="https://download.gnome.org/sources/$name/$major_minor/$name-$ver.tar.xz"
+                ;;
+            *)
+                url="https://archive.xfce.org/src/$cat/$name/$major_minor/$name-$ver.tar.bz2"
+                ;;
+        esac
 
         download_and_verify "$url" "$TARBALL" "$sha"
         if [ ! -d "$SRC" ]; then

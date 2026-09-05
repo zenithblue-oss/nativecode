@@ -47,6 +47,7 @@ libxi-dev
 libxfont2-dev
 libsm-dev
 libice-dev
+yaml-dev
 pixman-dev
 xorgproto
 xorg-server-dev
