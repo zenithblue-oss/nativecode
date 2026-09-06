@@ -3,6 +3,8 @@
 # Idempotent. Run as root inside guest. POSIX sh. No bashisms.
 set -eu
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
 DISTRO_NAME="${1:-alpaquita}"
 
 echo "FluxLinux: Configuring ${DISTRO_NAME} (Alpaquita glibc Family)..."

@@ -221,6 +221,7 @@ su -s /bin/sh flux -c '
   export PATH="\$HOME/.local/bin:\$PATH"
   npm config set prefix "\$HOME/.local"
   npm install -g opencode-ai@'"${OPENCODE_VERSION:-1.18.27}"' @openai/codex@'"${CODEX_VERSION:-0.153.2}"' @qwen-code/qwen-code@'"${QWEN_VERSION:-0.23.0}"'
+  (cd "\$HOME/.local/lib/node_modules/opencode-ai" && node postinstall.mjs 2>/dev/null || true)
   rm -f "\$HOME/.npmrc"
   curl -fsSL "'"${AGY_INSTALLER_URL:-https://antigravity.google/cli/install.sh}"'" | bash || true
   command -v agy >/dev/null 2>&1 || (sleep 5; curl -fsSL "'"${AGY_INSTALLER_URL:-https://antigravity.google/cli/install.sh}"'" | bash || true)

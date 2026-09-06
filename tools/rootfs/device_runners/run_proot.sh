@@ -1,0 +1,12 @@
+#!/system/bin/sh
+export TERMUX_VERSION="flux-host"
+export TERMUX_APP__PACKAGE_NAME="com.zenithblue.nativecode"
+export TERMUX__PREFIX="/data/data/com.zenithblue.nativecode/files/usr"
+export TERMUX__HOME="/data/data/com.zenithblue.nativecode/files/home"
+export HOME="$TERMUX__HOME"
+export PREFIX="$TERMUX__PREFIX"
+export TMPDIR="$PREFIX/tmp"
+export PROOT_TMP_DIR="$TMPDIR"
+export LD_LIBRARY_PATH="$PREFIX/lib"
+export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin:$PATH"
+exec "$PREFIX/bin/python" "$PREFIX/bin/proot-distro" "$@"

@@ -396,6 +396,8 @@ _phase="$(date +%s)"
 
 # Grok repair: installer may place binary at $HOME/.grok/bin/grok without PATH.
 as_flux 'if [ -x "$HOME/.grok/bin/grok" ] && ! command -v grok >/dev/null 2>&1; then mkdir -p "$HOME/.local/bin"; ln -sfn "$HOME/.grok/bin/grok" "$HOME/.local/bin/grok" 2>/dev/null || true; fi' || true
+# OpenCode repair: ensure bundled native binary is linked if postinstall was skipped
+as_flux 'if [ -f "$HOME/.local/lib/node_modules/opencode-ai/postinstall.mjs" ] && ! opencode --version >/dev/null 2>&1; then (cd "$HOME/.local/lib/node_modules/opencode-ai" && node postinstall.mjs >/dev/null 2>&1 || true); fi' || true
 
 if [ "${PREBUILT_H:-0}" = "1" ]; then
     echo ">>> NativeCode: baked AI CLIs — verifying only (no npm/curl installs, no self-update)"

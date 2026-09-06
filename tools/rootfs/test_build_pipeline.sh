@@ -196,6 +196,7 @@ mkdir -p "$DUMMY_FS/etc/nativecode" "$DUMMY_FS/usr/local/lib/nativecode" \
 touch "$DUMMY_FS/etc/nativecode/rootfs-release"
 cat > "$DUMMY_FS/etc/nativecode/rootfs-release" <<'EOF'
 FORMAT_VERSION=1
+DISTRO=alpine
 COMPONENT_E=1
 COMPONENT_F=1
 COMPONENT_GUI=1
@@ -273,6 +274,7 @@ fi
 echo "== test DEV=1 verifier passes with full dev stack =="
 cat > "$DUMMY_FS/etc/nativecode/rootfs-release" <<'EOF'
 FORMAT_VERSION=1
+DISTRO=alpine
 COMPONENT_E=1
 COMPONENT_F=1
 COMPONENT_GUI=1
@@ -413,6 +415,7 @@ else
 fi
 
 touch "$DUMMY_FS/lib/ld-linux-aarch64.so.1"
+touch "$DUMMY_FS/usr/lib/libICE.so.6" "$DUMMY_FS/usr/lib/libSM.so.6" "$DUMMY_FS/usr/lib/libxcvt.so.0" "$DUMMY_FS/usr/lib/libvte-2.91.so.0" "$DUMMY_FS/usr/lib/libdisplay-info.so.3"
 set +e
 VERIFY_GLIBC_OUT="$(bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$DUMMY_FS" 2>&1)"
 VERIFY_GLIBC_RC=$?
@@ -506,5 +509,57 @@ if ! grep -q 'alpaquita_rootfs.tar.zst.sha256' "$ONBOARDING_KT"; then
     exit 1
 fi
 echo "PASS: OnboardingActivity deploys alpaquita_rootfs.tar.zst.sha256 adjacent checksum"
+
+echo "== test flux_install.sh SHA verification (missing, wrong, correct) =="
+FLUX_INSTALL_SH="$REPO_ROOT/app/src/main/assets/scripts/flux_install.sh"
+TEST_FI_WORK="$WORK/test_flux_sha"
+mkdir -p "$TEST_FI_WORK"
+echo "dummy rootfs payload" > "$TEST_FI_WORK/alpaquita_rootfs.tar.zst"
+DUMMY_SHA="$(sha256sum "$TEST_FI_WORK/alpaquita_rootfs.tar.zst" | awk '{print $1}')"
+
+# Test 1: missing SHA must fail closed for alpaquita
+if bash -c "
+    DISTRO=alpaquita
+    ROOTFS_SHA256=''
+    ROOTFS_ARCHIVE='$TEST_FI_WORK/alpaquita_rootfs.tar.zst'
+    rm -f '$TEST_FI_WORK/alpaquita_rootfs.tar.zst.sha256'
+    eval \"\$(sed -n '/^load_adjacent_sha()/,/^}/p' '$FLUX_INSTALL_SH')\"
+    eval \"\$(sed -n '/^verify_rootfs_sha()/,/^}/p' '$FLUX_INSTALL_SH')\"
+    verify_rootfs_sha \"\$ROOTFS_ARCHIVE\"
+" >/dev/null 2>&1; then
+    echo "FAIL: flux_install.sh passed when alpaquita SHA256 was missing!" >&2
+    exit 1
+fi
+echo "PASS: flux_install.sh fails closed when SHA256 is missing"
+
+# Test 2: wrong SHA must fail
+echo "0000000000000000000000000000000000000000000000000000000000000000  alpaquita_rootfs.tar.zst" > "$TEST_FI_WORK/alpaquita_rootfs.tar.zst.sha256"
+if bash -c "
+    DISTRO=alpaquita
+    ROOTFS_SHA256=''
+    ROOTFS_ARCHIVE='$TEST_FI_WORK/alpaquita_rootfs.tar.zst'
+    eval \"\$(sed -n '/^load_adjacent_sha()/,/^}/p' '$FLUX_INSTALL_SH')\"
+    eval \"\$(sed -n '/^verify_rootfs_sha()/,/^}/p' '$FLUX_INSTALL_SH')\"
+    verify_rootfs_sha \"\$ROOTFS_ARCHIVE\"
+" >/dev/null 2>&1; then
+    echo "FAIL: flux_install.sh passed when SHA256 was incorrect!" >&2
+    exit 1
+fi
+echo "PASS: flux_install.sh fails when SHA256 is wrong"
+
+# Test 3: correct adjacent SHA must succeed
+echo "$DUMMY_SHA  alpaquita_rootfs.tar.zst" > "$TEST_FI_WORK/alpaquita_rootfs.tar.zst.sha256"
+if ! bash -c "
+    DISTRO=alpaquita
+    ROOTFS_SHA256=''
+    ROOTFS_ARCHIVE='$TEST_FI_WORK/alpaquita_rootfs.tar.zst'
+    eval \"\$(sed -n '/^load_adjacent_sha()/,/^}/p' '$FLUX_INSTALL_SH')\"
+    eval \"\$(sed -n '/^verify_rootfs_sha()/,/^}/p' '$FLUX_INSTALL_SH')\"
+    verify_rootfs_sha \"\$ROOTFS_ARCHIVE\"
+" >/dev/null 2>&1; then
+    echo "FAIL: flux_install.sh failed when adjacent SHA256 was valid!" >&2
+    exit 1
+fi
+echo "PASS: flux_install.sh succeeds when adjacent SHA256 matches"
 
 echo "BUILD-PIPELINE: ALL PASS"

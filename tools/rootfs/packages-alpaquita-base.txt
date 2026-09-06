@@ -51,6 +51,16 @@ libxfont2
 pixman
 libxshmfence
 libepoxy
+libice
+libsm
+libxcvt
+libdisplay-info
+vte3
+yaml
+xkbcomp
+xrdb
+libxkbfile
+xkeyboard-config
 wayland
 libdrm
 libxkbcommon

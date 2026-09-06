@@ -135,7 +135,8 @@ resolve_rootfs_archive() {
         "/sdcard/Download/rootfs.tar.xz" \
         "/storage/emulated/0/Download/$ROOTFS_NAME" \
         "/storage/emulated/0/Download/rootfs.tar.zst" \
-        "/storage/emulated/0/Download/rootfs.tar.xz"
+        "/storage/emulated/0/Download/rootfs.tar.xz" \
+        "/data/local/tmp/$ROOTFS_NAME"
     do
         if [ -f "$candidate" ] && [ -s "$candidate" ]; then
             ROOTFS_ARCHIVE="$candidate"
@@ -149,9 +150,26 @@ resolve_rootfs_archive() {
     return 1
 }
 
+load_adjacent_sha() {
+    [ -n "$ROOTFS_SHA256" ] && return 0
+    [ -n "$ROOTFS_ARCHIVE" ] || return 1
+    _sha_file="$ROOTFS_ARCHIVE.sha256"
+    if [ -f "$_sha_file" ] && [ -s "$_sha_file" ]; then
+        ROOTFS_SHA256="$(awk 'NR==1 {print $1}' "$_sha_file")"
+    fi
+    [ -n "$ROOTFS_SHA256" ]
+}
+
 verify_rootfs_sha() {
     _file="$1"
-    [ -z "$ROOTFS_SHA256" ] && return 0
+    if [ "$DISTRO" = "alpaquita" ]; then
+        load_adjacent_sha || {
+            echo "FluxLinux: ERROR: Alpaquita rootfs SHA256 missing (set FLUX_ROOTFS_SHA256 or provide $_file.sha256)!"
+            return 1
+        }
+    elif [ -z "$ROOTFS_SHA256" ]; then
+        return 0
+    fi
     if ! command -v sha256sum >/dev/null 2>&1; then
         echo "FluxLinux: ERROR: sha256sum command not found but rootfs verification is required!"
         return 1

@@ -4,6 +4,11 @@
 set -u
 ROOTFS="${1:?usage: verify_rootfs.sh <rootfs-dir>}"
 FAIL=0
+DISTRO="${ROOTFS_DISTRO:-}"
+if [ -z "$DISTRO" ] && [ -f "$ROOTFS/etc/nativecode/rootfs-release" ]; then
+    DISTRO="$(grep '^DISTRO=' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null | cut -d= -f2 || true)"
+fi
+[ -n "$DISTRO" ] || DISTRO="alpaquita"
 need() { if [ -e "$ROOTFS$1" ]; then echo "OK   $1"; else echo "MISS $1"; FAIL=1; fi; }
 have() {
     local target
@@ -80,6 +85,13 @@ done
 echo "== desktop/gpu =="
 need /usr/bin/startxfce4
 [ -x "$ROOTFS/usr/bin/Xtigervnc" ] || [ -x "$ROOTFS/usr/bin/Xvnc" ] || { echo "MISS tigervnc server"; FAIL=1; }
+if [ "$DISTRO" = "alpaquita" ]; then
+    need /usr/lib/libICE.so.6
+    need /usr/lib/libSM.so.6
+    need /usr/lib/libxcvt.so.0
+    need /usr/lib/libvte-2.91.so.0
+    need /usr/lib/libdisplay-info.so.3
+fi
 
 echo "== customization assets (COMPONENT_G=1) =="
 [ -d "$ROOTFS/usr/share/themes/Space-transparency" ] || { echo "MISS G theme Space-transparency"; FAIL=1; }

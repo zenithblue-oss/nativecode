@@ -18,6 +18,7 @@ APP_HOME="${TERMUX__HOME:-/data/data/${PKG}/files/home}"
 APP_PREFIX="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}"
 ROOTFS_NAME="alpaquita_rootfs.tar.zst"
 ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-${NATIVECODE_ROOTFS_SHA256:-}}"
+export PATH="/system_ext/bin:/system/bin:/system/xbin:${APP_PREFIX}/bin:${PATH:-}"
 
 progress() { printf '\033[1;36m[+] %s\033[0m\n' "$1"; }
 success()  { printf '\033[1;32m[✓] %s\033[0m\n' "$1"; }
