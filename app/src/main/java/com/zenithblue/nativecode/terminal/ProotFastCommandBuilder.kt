@@ -3,7 +3,11 @@ package com.zenithblue.nativecode.terminal
 import android.content.Context
 import java.io.File
 
-/** Builds direct native PRoot arguments and environment for Debian guest sessions. */
+/**
+ * Experimental direct-PROot backend.
+ * NOT the application runtime SSOT.
+ * Normal product features use ProotCommandBuilder/proot-distro.
+ */
 object ProotFastCommandBuilder {
 
     private fun parseToolExec(shellCmd: String): Pair<String?, String>? {

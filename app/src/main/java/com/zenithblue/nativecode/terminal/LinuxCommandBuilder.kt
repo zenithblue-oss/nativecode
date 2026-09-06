@@ -22,7 +22,7 @@ object LinuxCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         return when (method) {
             "chroot" -> ChrootCommandBuilder.build(ctx, shellCmd, user)
-            else -> ProotFastCommandBuilder.build(ctx, shellCmd, user, useSharedTmp)
+            else -> ProotCommandBuilder.build(ctx, shellCmd, user, useSharedTmp)
         }
     }
 
@@ -35,7 +35,7 @@ object LinuxCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         return when (method) {
             "chroot" -> ChrootCommandBuilder.buildInteractive(ctx, user, workDir)
-            else -> ProotFastCommandBuilder.buildInteractive(ctx, user, workDir, useSharedTmp)
+            else -> ProotCommandBuilder.buildInteractive(ctx, user, workDir, useSharedTmp)
         }
     }
 

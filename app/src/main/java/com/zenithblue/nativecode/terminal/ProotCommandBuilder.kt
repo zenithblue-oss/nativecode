@@ -19,6 +19,41 @@ object ProotCommandBuilder {
     private const val ROOT_INTERACTIVE_WORKDIR =
         "mkdir -p -- \"\$1\" && cd -- \"\$1\" && " + GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
 
+    private fun resolveDistro(ctx: Context): String {
+        val alpaquita = File(
+            ctx.filesDir,
+            "usr/var/lib/proot-distro/containers/alpaquita/rootfs"
+        )
+        if (alpaquita.isDirectory) return "alpaquita"
+
+        val alpine = File(
+            ctx.filesDir,
+            "usr/var/lib/proot-distro/containers/alpine/rootfs"
+        )
+        if (alpine.isDirectory) return "alpine"
+
+        return ProjectPathResolver.DEFAULT_DISTRO
+    }
+
+    private fun prootHostEnv(ctx: Context): HashMap<String, String> =
+        HostCommandBuilder.envMap(
+            ctx,
+            forceHostSetup = false,
+            includeTerm = true
+        ).apply {
+            // Never inject libtermux-exec into proot-distro/guest execution.
+            remove("LD_PRELOAD")
+        }
+
+    private fun pythonCmd(ctx: Context): String {
+        val pythonBin = "${TermuxHostPaths.BIN}/python"
+        return if (File("/system/bin/linker64").exists()) {
+            "/system/bin/linker64 $pythonBin"
+        } else {
+            pythonBin
+        }
+    }
+
     fun build(
         ctx: Context,
         shellCmd: String,
@@ -31,16 +66,15 @@ object ProotCommandBuilder {
 
         // Single-quote guest payload so host bash never expands $HOME/$PATH/etc.
         // Escape embedded single quotes: ' → '\''.
-        val distro = if (File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpine").isDirectory &&
-            !File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpaquita").isDirectory) "alpine" else "alpaquita"
+        val distro = resolveDistro(ctx)
         val escaped = shellCmd.replace("'", "'\\''")
+        val py = pythonCmd(ctx)
         val command =
-            "exec python $prootDistro login $distro $sharedTmpFlag --user $user -- " +
+            "exec $py $prootDistro login $distro $sharedTmpFlag --user $user -- " +
                 "/bin/bash --noprofile --norc -c '$escaped'"
         val args = arrayOf(shell, "-c", command)
 
-        // Host package env + interactive TERM (guest login inherits package identity)
-        val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)
+        val envMap = prootHostEnv(ctx)
         return args to envMap
     }
 
@@ -64,13 +98,13 @@ object ProotCommandBuilder {
         val escapedPayload = payload.replace("'", "'\\''")
         val workDirArg = workDir?.takeIf { it.isNotBlank() }?.let(ShellQuoting::singleQuote).orEmpty()
         val positional = if (workDirArg.isEmpty()) "" else " nativecode-interactive $workDirArg"
-        val distro = if (File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpine").isDirectory &&
-            !File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpaquita").isDirectory) "alpine" else "alpaquita"
+        val distro = resolveDistro(ctx)
+        val py = pythonCmd(ctx)
         val command =
-            "exec python $prootDistro login $distro $sharedTmpFlag --user $guestUser -- " +
+            "exec $py $prootDistro login $distro $sharedTmpFlag --user $guestUser -- " +
                 "/bin/bash --noprofile --norc -c '$escapedPayload'$positional"
         val args = arrayOf(shell, "-c", command)
-        val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)
+        val envMap = prootHostEnv(ctx)
         return args to envMap
     }
 }
