@@ -61,7 +61,8 @@ object ProotFastCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         val prootBinFile = TermuxHostPaths.libProot(ctx)
         val prootBin = if (prootBinFile.exists()) prootBinFile.absolutePath else "${TermuxHostPaths.BIN}/proot"
-        val rootfs = "${TermuxHostPaths.PREFIX}/var/lib/proot-distro/containers/alpine/rootfs"
+        val rootfsDir = ProjectPathResolver.prootRootfsDir(ctx)
+        val rootfs = rootfsDir.absolutePath
         val guestUser = if (user == "root") "root" else "flux"
         val guestHome = if (guestUser == "root") "/root" else "/home/flux"
         val guestPath = buildGuestPath(rootfs, guestHome)
@@ -69,8 +70,8 @@ object ProotFastCommandBuilder {
         val flags = mutableListOf(
             "--kill-on-exit",
             "--link2symlink",
-            "-0",
             "--sysvipc",
+            "-L",
             "--change-id=${if (guestUser == "root") "0:0" else "1000:1000"}",
             "--rootfs=$rootfs",
             "--cwd=$targetCwd"
@@ -81,11 +82,20 @@ object ProotFastCommandBuilder {
             "--bind=/sys",
             "--bind=/dev/urandom:/dev/random"
         )
+        val fdDir = File("/proc/self/fd")
+        if (fdDir.exists()) binds.add("--bind=/proc/self/fd:/dev/fd")
         if (useSharedTmp) binds.add("--bind=${TermuxHostPaths.PREFIX}/tmp:/tmp")
-        binds.add("--bind=$rootfs/tmp:/dev/shm")
+        val shmDir = File(rootfsDir, "tmp")
+        shmDir.mkdirs()
+        binds.add("--bind=${shmDir.absolutePath}:/dev/shm")
 
-        val sysEmpty = File("${TermuxHostPaths.PREFIX}/var/lib/proot-distro/sysdata/sys_empty")
-        if (sysEmpty.exists()) binds.add("--bind=${sysEmpty.absolutePath}:/sys/fs/selinux")
+        val sysEmpty = File(rootfsDir.parentFile, "sysdata/sys_empty")
+        if (sysEmpty.exists()) {
+            binds.add("--bind=${sysEmpty.absolutePath}:/sys/fs/selinux")
+        } else {
+            val fallback = File("${TermuxHostPaths.PREFIX}/var/lib/proot-distro/sysdata/sys_empty")
+            if (fallback.exists()) binds.add("--bind=${fallback.absolutePath}:/sys/fs/selinux")
+        }
         val sdcard = File("/storage/emulated/0")
         if (sdcard.exists() && sdcard.canRead()) binds.add("--bind=/storage/emulated/0:/sdcard")
 
@@ -108,6 +118,14 @@ object ProotFastCommandBuilder {
         val command = arrayOf("/usr/bin/env", "-i", *guestEnv, *guestCommand)
         val args = arrayOf(prootBin, *flags.toTypedArray(), *binds.toTypedArray(), *command)
         val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)
+        envMap.remove("LD_PRELOAD")
+        val l2sDir = File(rootfsDir, ".l2s")
+        l2sDir.mkdirs()
+        envMap["PROOT_L2S_DIR"] = l2sDir.absolutePath
+        envMap["PROOT_LOADER"] = TermuxHostPaths.libLoader(ctx).absolutePath
+        val hostTmp = File(TermuxHostPaths.TMPDIR)
+        hostTmp.mkdirs()
+        envMap["PROOT_TMP_DIR"] = hostTmp.absolutePath
         return args to envMap
     }
 
@@ -122,9 +140,12 @@ object ProotFastCommandBuilder {
         val guestHome = if (guestUser == "root") "/root" else "/home/flux"
         val targetCwd = toolExec?.first?.takeIf { !it.isNullOrBlank() } ?: guestHome
         val guestCommand = if (toolExec != null) {
-            toolExec.second.split(Regex("\\s+"))
-                .filter { it.isNotBlank() }
-                .toTypedArray()
+            val parts = toolExec.second.split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (parts.isNotEmpty() && parts[0].endsWith(".sh")) {
+                arrayOf("/bin/bash", *parts.toTypedArray())
+            } else {
+                parts.toTypedArray()
+            }
         } else {
             arrayOf("/bin/bash", "--noprofile", "--norc", "-c", shellCmd)
         }
@@ -139,7 +160,7 @@ object ProotFastCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         val guestUser = if (user == "root") "root" else "flux"
         val guestHome = if (guestUser == "root") "/root" else "/home/flux"
-        val rootfs = "${TermuxHostPaths.PREFIX}/var/lib/proot-distro/containers/alpine/rootfs"
+        val rootfs = ProjectPathResolver.prootRootfsDir(ctx).absolutePath
         val targetCwd = workDir?.takeIf { it.isNotBlank() } ?: guestHome
         val shellBin = resolveInteractiveShell(rootfs, guestUser)
         return buildInternal(ctx, guestUser, useSharedTmp, targetCwd, arrayOf(shellBin, "-l"))

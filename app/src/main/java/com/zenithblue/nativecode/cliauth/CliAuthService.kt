@@ -670,7 +670,8 @@ object CliAuthService {
         for (d in dirs) {
             for (n in names) {
                 val f = File(d, n)
-                if (f.isFile && (f.canExecute() || f.length() > 0L)) return true
+                if ((f.isFile && (f.canExecute() || f.length() > 0L)) ||
+                    java.nio.file.Files.isSymbolicLink(f.toPath())) return true
             }
         }
         return false

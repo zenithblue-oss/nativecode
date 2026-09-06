@@ -22,7 +22,7 @@ object LinuxCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         return when (method) {
             "chroot" -> ChrootCommandBuilder.build(ctx, shellCmd, user)
-            else -> ProotCommandBuilder.build(ctx, shellCmd, user, useSharedTmp)
+            else -> ProotFastCommandBuilder.build(ctx, shellCmd, user, useSharedTmp)
         }
     }
 
@@ -35,7 +35,7 @@ object LinuxCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         return when (method) {
             "chroot" -> ChrootCommandBuilder.buildInteractive(ctx, user, workDir)
-            else -> ProotCommandBuilder.buildInteractive(ctx, user, workDir, useSharedTmp)
+            else -> ProotFastCommandBuilder.buildInteractive(ctx, user, workDir, useSharedTmp)
         }
     }
 
@@ -58,7 +58,26 @@ object LinuxCommandBuilder {
         return if (method == "chroot") {
             ChrootCommandBuilder.SESSION_EXEC
         } else {
-            args.firstOrNull() ?: TermuxHostPaths.libProot(ctx).absolutePath
+            val exe = args.firstOrNull() ?: TermuxHostPaths.libProot(ctx).absolutePath
+            if (exe.startsWith("/data/app/") || exe.startsWith("/data/data/") || exe.startsWith("/data/user/")) {
+                "/system/bin/linker64"
+            } else {
+                exe
+            }
         }
+    }
+
+    /** Returns the adjusted argv for TerminalSession (linker-wrapped on host under SDK 36/37). */
+    fun sessionArgs(
+        ctx: Context,
+        args: Array<String>,
+        method: String = currentMethod
+    ): Array<String> {
+        if (method == "chroot") return args
+        val exe = args.firstOrNull() ?: ""
+        if (exe.startsWith("/data/app/") || exe.startsWith("/data/data/") || exe.startsWith("/data/user/")) {
+            return arrayOf("/system/bin/linker64") + args
+        }
+        return args
     }
 }

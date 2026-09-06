@@ -11,3 +11,4 @@ rootProject.name = "termux-lib"
 include(":app")
 include(":stub")
 include(":termux-x11")
+include(":nativecode_runtime")

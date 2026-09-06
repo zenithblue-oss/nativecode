@@ -62,11 +62,14 @@ if [ -r "$PREFIX/etc/profile" ]; then
     export PROOT_TMP_DIR="$TMPDIR"
     export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin${PATH:+:$PATH}"
     export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export LD_PRELOAD="${LD_PRELOAD:-}"
+    export PD_PROOT_BIN="${PD_PROOT_BIN:-}"
+    export PROOT_LOADER="${PROOT_LOADER:-}"
 fi
 
 MARKER_DIR="$HOME/.fluxlinux"
 MARKER_FILE="$MARKER_DIR/setup_termux.done"
-mkdir -p "$MARKER_DIR" "$TMPDIR"
+mkdir -p "$MARKER_DIR" "$TMPDIR" 2>/dev/null || /system/bin/mkdir -p "$MARKER_DIR" "$TMPDIR" 2>/dev/null || true
 
 if [ "${FLUX_SETUP_FORCE:-0}" = "1" ]; then
     rm -f "$MARKER_FILE"

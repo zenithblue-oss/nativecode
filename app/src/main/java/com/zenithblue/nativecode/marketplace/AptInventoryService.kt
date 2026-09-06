@@ -57,7 +57,11 @@ object AptInventoryService {
             return Result.failure(IllegalStateException("Guest rootfs not ready for $method"))
         }
         val query =
-            "dpkg-query -W -f='\${db:Status-Abbrev}\\t\${Package}\\t\${Version}\\t\${Installed-Size}\\t\${Section}\\n' 2>/dev/null"
+            "if command -v dpkg-query >/dev/null 2>&1; then " +
+            "dpkg-query -W -f='\${db:Status-Abbrev}\\t\${Package}\\t\${Version}\\t\${Installed-Size}\\t\${Section}\\n' 2>/dev/null; " +
+            "elif command -v apk >/dev/null 2>&1; then " +
+            "apk info -v 2>/dev/null; " +
+            "fi"
         return try {
             val (cmd, env) = LinuxCommandBuilder.build(ctx, query, user = "root", method = method)
             val out = ShellCommandRunner.runCapture(ctx, cmd, env)
@@ -118,26 +122,43 @@ object AptInventoryService {
         text.lineSequence().forEach { line ->
             if (line.isBlank()) return@forEach
             val parts = line.split('\t')
-            if (parts.size < 4) return@forEach
-            val status = parts[0].trim()
-            // installed: ii, hi, etc.
-            if (!status.startsWith("ii") && !status.startsWith("hi")) return@forEach
-            val name = parts[1].trim()
-            if (name.isEmpty()) return@forEach
-            val version = parts.getOrElse(2) { "" }.trim()
-            val sizeKib = parts.getOrElse(3) { "0" }.trim().toLongOrNull() ?: 0L
-            val section = parts.getOrElse(4) { "other" }.trim().ifBlank { "other" }
-            // strip subsection after /
-            val sectionBase = section.substringBefore('/').ifBlank { "other" }
-            out.add(
-                AptPackage(
-                    name = name,
-                    version = version,
-                    sizeBytes = sizeKib * 1024L,
-                    section = sectionBase,
-                    status = status
+            if (parts.size >= 4) {
+                val status = parts[0].trim()
+                // installed: ii, hi, etc.
+                if (!status.startsWith("ii") && !status.startsWith("hi")) return@forEach
+                val name = parts[1].trim()
+                if (name.isEmpty()) return@forEach
+                val version = parts.getOrElse(2) { "" }.trim()
+                val sizeKib = parts.getOrElse(3) { "0" }.trim().toLongOrNull() ?: 0L
+                val section = parts.getOrElse(4) { "other" }.trim().ifBlank { "other" }
+                // strip subsection after /
+                val sectionBase = section.substringBefore('/').ifBlank { "other" }
+                out.add(
+                    AptPackage(
+                        name = name,
+                        version = version,
+                        sizeBytes = sizeKib * 1024L,
+                        section = sectionBase,
+                        status = status
+                    )
                 )
-            )
+            } else if (!line.contains('\t')) {
+                val trimmed = line.trim()
+                val match = Regex("""^(.+)-([0-9][^-]*-[^-]+)$""").matchEntire(trimmed)
+                if (match != null) {
+                    val name = match.groupValues[1]
+                    val version = match.groupValues[2]
+                    out.add(
+                        AptPackage(
+                            name = name,
+                            version = version,
+                            sizeBytes = 0L,
+                            section = "system",
+                            status = "installed"
+                        )
+                    )
+                }
+            }
         }
         return out
     }

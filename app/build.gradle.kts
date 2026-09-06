@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 fun getGitCommitHash(): String {
     return try {
         val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
@@ -29,18 +32,37 @@ android {
         buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
     }
 
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    val keystoreProperties = Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    val releaseStoreFile = System.getenv("RELEASE_KEYSTORE_PATH")
+        ?: keystoreProperties.getProperty("storeFile")
+    val releaseStorePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+        ?: keystoreProperties.getProperty("storePassword")
+    val releaseKeyAlias = System.getenv("RELEASE_KEY_ALIAS")
+        ?: keystoreProperties.getProperty("keyAlias")
+    val releaseKeyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        ?: keystoreProperties.getProperty("keyPassword")
+
     signingConfigs {
-        create("release") {
-            storeFile = file("/home/user/repos/keys/nativecode-release.jks")
-            storePassword = "REDACTED"
-            keyAlias = "nativecode"
-            keyPassword = "REDACTED"
+        if (!releaseStoreFile.isNullOrEmpty() && file(releaseStoreFile).exists()) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = releaseStorePassword ?: ""
+                keyAlias = releaseKeyAlias ?: ""
+                keyPassword = releaseKeyPassword ?: ""
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfigs.findByName("release")?.let {
+                signingConfig = it
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -68,8 +90,10 @@ android {
     // Keep large rootfs/bootstrap archives stored uncompressed in the APK
     // NOTE: 'gz' must be listed or AGP/aapt2 gunzips *.tar.gz assets to *.tar at package time.
     androidResources {
-        noCompress += listOf("xz", "tar", "gz")
+        noCompress += listOf("xz", "tar", "gz", "zst")
     }
+
+    assetPacks += listOf(":nativecode_runtime")
 
     lint {
         abortOnError = false
@@ -101,4 +125,7 @@ dependencies {
 
     // Termux X11 module
     implementation(project(":termux-x11"))
+
+    // Play Asset Delivery
+    implementation("com.google.android.play:asset-delivery-ktx:2.3.0")
 }

@@ -33,6 +33,9 @@ import androidx.core.view.setPadding
 import android.system.Os
 import com.zenithblue.nativecode.cliauth.AiCliProvisionState
 import com.zenithblue.nativecode.onboarding.OnboardingIo
+import com.zenithblue.nativecode.onboarding.RootfsSource
+import com.zenithblue.nativecode.onboarding.RootfsSourceResolver
+import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
 import com.zenithblue.nativecode.onboarding.OnboardingUiKit
 import com.zenithblue.nativecode.onboarding.OnboardingUiKit.CustomBrutalistToggle
 import com.zenithblue.nativecode.cliauth.CliToolsInstaller
@@ -299,7 +302,7 @@ class OnboardingActivity : AppCompatActivity() {
         card.addView(
             bullet(
                 "02 · YOUR DATA STAYS LOCAL",
-                "Files, projects, packages, and credentials live on this device inside your Debian proot or chroot distro — not on our servers."
+                "Files, projects, packages, and credentials live on this device inside your Linux proot or chroot distro — not on our servers."
             )
         )
         card.addView(
@@ -417,7 +420,7 @@ class OnboardingActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, dp(48))
         }
-        tagRow.addView(featureBadge(R.drawable.ic_terminal, "Debian Trixie"))
+        tagRow.addView(featureBadge(R.drawable.ic_terminal, "Linux Glibc"))
         tagRow.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(8), 1) })
         tagRow.addView(featureBadge(R.drawable.ic_smart_toy, "AI & LLMs"))
         tagRow.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(8), 1) })
@@ -499,10 +502,10 @@ class OnboardingActivity : AppCompatActivity() {
                 type = PreviewType.XFCE_GUI
             ),
             SlideData(
-                category = "DEBIAN",
-                title = "Debian 13 Linux",
+                category = "LINUX",
+                title = "Alpaquita Linux",
                 iconResId = R.drawable.ic_terminal,
-                desc = "Native glibc Debian 13 PRoot environment with apt package manager and full Linux userland.",
+                desc = "Native glibc Alpaquita Linux PRoot environment with apk package manager and full Linux userland.",
                 type = PreviewType.DEBIAN_ENV
             ),
             SlideData(
@@ -1460,7 +1463,7 @@ class OnboardingActivity : AppCompatActivity() {
         return root
     }
 
-    // ── Page 5: Install plan + consent (C6) ────────────────────────────────────
+    // ── Page 5: Linux Runtime Delivery (Play Asset Delivery / Local) ─────────
     private fun buildInstallPlanPage(): View {
         val scroll = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
@@ -1472,189 +1475,180 @@ class OnboardingActivity : AppCompatActivity() {
             setPadding(dp(16), dp(20), dp(16), dp(20))
         }
 
-        root.addView(smallHeader("Install Plan", R.drawable.ic_storage))
+        root.addView(smallHeader("Linux Runtime", R.drawable.ic_storage))
         root.addView(TextView(this).apply {
-            text = "// GUEST DEBIAN ONLY · NOT A HOST APK UPDATE · REVIEW BEFORE RUN"
+            text = "// PREBUILT ALPAQUITA GLIBC (AARCH64) · PLAY ASSET DELIVERY"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
             setPadding(0, 0, 0, dp(12))
         })
 
-        fun sectionCard(
-            title: String,
-            badge: String,
-            lines: List<InstallPlanCatalog.InventoryLine>,
-            bodyExtra: View? = null
-        ): LinearLayout {
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_CONTAINER,
-                    strokeColor = NC.BORDER,
-                    shadowColor = NC.SURFACE_BRIGHT,
-                    offsetDp = 6,
-                    cornerRadiusDp = 0,
-                    rightFaceColor = NC.OUTLINE_VAR
-                )
-                setPadding(dp(16), dp(14), dp(16), dp(14))
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
-            }
-            val head = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, 0, 0, dp(8))
-            }
-            head.addView(TextView(this).apply {
-                text = title
-                textSize = 14f
-                setTextColor(NC.ON_SURFACE)
-                typeface = Typeface.DEFAULT_BOLD
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            })
-            head.addView(textBadge(badge, NC.PRIMARY_CON, NC.ON_PRIMARY_CON))
-            card.addView(head)
-            lines.forEach { line ->
-                card.addView(TextView(this).apply {
-                    text = "· ${line.label}  —  ${line.detail}"
-                    textSize = 11f
-                    setTextColor(NC.ON_SURF_VAR)
-                    typeface = Typeface.MONOSPACE
-                    setPadding(0, dp(2), 0, dp(2))
-                })
-            }
-            bodyExtra?.let { card.addView(it) }
-            return card
-        }
-
-        // A — Base (required)
-        root.addView(
-            sectionCard(
-                "A · BASE ENVIRONMENT",
-                "REQUIRED",
-                InstallPlanCatalog.baseInventory(selectedIsolationMethod)
-            )
-        )
-
-        // B — Customization toggle
-        val customExtra = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, 0)
-        }
-        customExtra.addView(TextView(this).apply {
-            text = "Include shell/font customization"
-            textSize = 12f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.MONOSPACE
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        })
-        customExtra.addView(
-            CustomBrutalistToggle(this, enableDebianCustomization) { checked ->
-                enableDebianCustomization = checked
-            }
-        )
-        root.addView(
-            sectionCard(
-                "B · CUSTOMIZATION",
-                "OPTIONAL",
-                InstallPlanCatalog.customizationInventory(),
-                customExtra
-            )
-        )
-
-        // C — Graphical Desktop (XFCE4) toggle
-        val guiExtra = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, 0)
-        }
-        guiExtra.addView(TextView(this).apply {
-            text = "Install XFCE4 graphical desktop"
-            textSize = 12f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.MONOSPACE
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        })
-        guiExtra.addView(
-            CustomBrutalistToggle(this, enableXfceGui) { checked ->
-                enableXfceGui = checked
-            }
-        )
-        root.addView(
-            sectionCard(
-                "C · GRAPHICAL DESKTOP",
-                "OPTIONAL",
-                InstallPlanCatalog.guiInventory(),
-                guiExtra
-            )
-        )
-
-        // D — AI CLI tools (default OFF)
-        val aiTableHost = LinearLayout(this).apply {
+        // 1. Prebuilt Specifications Card
+        val specCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = if (enableAiCliInstall) View.VISIBLE else View.GONE
-            setPadding(0, dp(6), 0, 0)
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_CONTAINER,
+                strokeColor = NC.BORDER,
+                shadowColor = NC.SURFACE_BRIGHT,
+                offsetDp = 6,
+                cornerRadiusDp = 0,
+                rightFaceColor = NC.OUTLINE_VAR
+            )
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
         }
-        InstallPlanCatalog.aiCliInventory().forEach { line ->
-            aiTableHost.addView(TextView(this).apply {
-                text = "· ${line.label}  —  ${line.detail}"
+        val specHead = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(8))
+        }
+        specHead.addView(TextView(this).apply {
+            text = "PRE-BAKED LINUX USERLAND"
+            textSize = 14f
+            setTextColor(NC.ON_SURFACE)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        })
+        specHead.addView(textBadge("ALL-IN-ONE", NC.PRIMARY_CON, NC.ON_PRIMARY_CON))
+        specCard.addView(specHead)
+
+        val specLines = listOf(
+            "· Base Distro" to "Alpaquita Linux (glibc AArch64)",
+            "· Dev Toolchain" to "Python 3.14 · Node.js 24 · Git · GitHub CLI",
+            "· Desktop & Display" to "XFCE4 GUI · TigerVNC Server · Mesa 3D",
+            "· AI CLI Suite" to "OpenCode · Kiro · Claude · Codex · Grok · Qwen"
+        )
+        specLines.forEach { (k, v) ->
+            specCard.addView(TextView(this).apply {
+                text = "$k — $v"
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
                 setPadding(0, dp(2), 0, dp(2))
             })
         }
-        val aiExtra = LinearLayout(this).apply {
+        root.addView(specCard)
+
+        // 2. Play Asset Delivery / Rootfs Source Card
+        var currentSource = RootfsSourceResolver.resolve(this, File(filesDir, "home"))
+
+        val padCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(8), 0, 0)
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_CONTAINER,
+                strokeColor = NC.BORDER,
+                shadowColor = NC.SURFACE_BRIGHT,
+                offsetDp = 6,
+                cornerRadiusDp = 0,
+                rightFaceColor = NC.OUTLINE_VAR
+            )
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
         }
-        val aiToggleRow = LinearLayout(this).apply {
+        val padHead = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(8))
         }
-        aiToggleRow.addView(TextView(this).apply {
-            text = "Install AI CLI tools"
-            textSize = 12f
+        padHead.addView(TextView(this).apply {
+            text = "RUNTIME DELIVERY"
+            textSize = 14f
             setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.MONOSPACE
+            typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
-        aiToggleRow.addView(
-            CustomBrutalistToggle(this, enableAiCliInstall) { checked ->
-                enableAiCliInstall = checked
-                aiTableHost.visibility = if (checked) View.VISIBLE else View.GONE
-            }
+        val statusBadgeTv = textBadge(
+            if (currentSource != null) "READY" else "DOWNLOAD REQUIRED",
+            if (currentSource != null) NC.PRIMARY_CON else NC.SEC_CON,
+            if (currentSource != null) NC.ON_PRIMARY_CON else NC.ON_SEC_CON
         )
-        aiExtra.addView(aiToggleRow)
-        aiExtra.addView(TextView(this).apply {
-            text = "Default OFF. Third-party curl/npm installers run inside guest only. Skip = Debian shells only; install later in Settings → AI CLI tools."
-            textSize = 11f
-            setTextColor(NC.OUTLINE)
-            typeface = Typeface.MONOSPACE
-            setPadding(0, dp(8), 0, 0)
-            setLineSpacing(dp(2).toFloat(), 1.2f)
-        })
-        aiExtra.addView(TextView(this).apply {
-            text = "AI outputs are from third-party vendors. Report: Settings → AI Safety after setup."
-            textSize = 11f
-            setTextColor(NC.OUTLINE)
-            typeface = Typeface.MONOSPACE
-            setPadding(0, dp(6), 0, 0)
-            setLineSpacing(dp(2).toFloat(), 1.2f)
-        })
-        aiExtra.addView(aiTableHost)
-        root.addView(
-            sectionCard(
-                "D · AI CLI TOOLS",
-                "DEFAULT OFF",
-                emptyList(),
-                aiExtra
-            )
-        )
+        padHead.addView(statusBadgeTv)
+        padCard.addView(padHead)
 
-        // Consent checkbox
+        val detailTv = TextView(this).apply {
+            text = if (currentSource != null) {
+                val sizeStr = currentSource?.archiveFile?.length()?.let { " (${OnboardingIo.formatBytes(it)})" } ?: ""
+                "Runtime artifact detected: ${currentSource?.archiveFile?.name ?: "Bundled"}$sizeStr\nSHA256: ${currentSource?.expectedSha256?.take(16)}… [VERIFIED]"
+            } else {
+                "Play Asset Pack: nativecode_runtime (1.25 GB on-demand download)\nPack delivers prebuilt Alpaquita rootfs directly to device."
+            }
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, dp(4), 0, dp(6))
+        }
+        padCard.addView(detailTv)
+
+        val padProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = false
+            max = 100
+            progress = if (currentSource != null) 100 else 0
+            visibility = if (currentSource != null) View.GONE else View.VISIBLE
+            layoutParams = LinearLayout.LayoutParams(MATCH, dp(12)).apply { topMargin = dp(6); bottomMargin = dp(6) }
+        }
+        padCard.addView(padProgressBar)
+
         var planAccepted = false
+        var startBtnRef: View? = null
+
+        fun updateStartBtnState() {
+            val enabled = planAccepted && currentSource != null
+            startBtnRef?.isEnabled = enabled
+            startBtnRef?.alpha = if (enabled) 1f else 0.45f
+        }
+
+        val downloadBtn = primaryButton("Download via Google Play", R.drawable.ic_download) {
+            padProgressBar.visibility = View.VISIBLE
+            detailTv.text = "Requesting nativecode_runtime from Google Play…"
+            PlayAssetDeliveryManager.requestDownload(this, PlayAssetDeliveryManager.PACK_RUNTIME) { state ->
+                when (state) {
+                    is PlayAssetDeliveryManager.DownloadState.Pending -> {
+                        detailTv.text = "Download pending in Google Play queue…"
+                        padProgressBar.isIndeterminate = true
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Downloading -> {
+                        padProgressBar.isIndeterminate = false
+                        padProgressBar.progress = state.percentage
+                        detailTv.text = "Downloading: ${OnboardingIo.formatBytes(state.bytesDownloaded)} / ${OnboardingIo.formatBytes(state.totalBytes)} (${state.percentage}%)"
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Transferring -> {
+                        padProgressBar.isIndeterminate = false
+                        padProgressBar.progress = state.percentage
+                        detailTv.text = "Transferring asset pack (${state.percentage}%)…"
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Completed -> {
+                        padProgressBar.isIndeterminate = false
+                        padProgressBar.progress = 100
+                        padProgressBar.visibility = View.GONE
+                        currentSource = RootfsSourceResolver.resolve(this, File(filesDir, "home"))
+                        detailTv.text = "Runtime pack downloaded and verified: ${state.archiveFile.name} (${OnboardingIo.formatBytes(state.archiveFile.length())})"
+                        statusBadgeTv.text = "READY"
+                        statusBadgeTv.setBackgroundColor(NC.PRIMARY_CON)
+                        statusBadgeTv.setTextColor(NC.ON_PRIMARY_CON)
+                        updateStartBtnState()
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.WaitingForWifi -> {
+                        detailTv.text = "Waiting for Wi-Fi (large download). Cellular prompt shown."
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Failed -> {
+                        padProgressBar.visibility = View.GONE
+                        detailTv.text = "Download failed (code ${state.errorCode}): ${state.message}"
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Canceled -> {
+                        detailTv.text = "Download canceled"
+                    }
+                    else -> {}
+                }
+            }
+        }
+        if (currentSource != null) {
+            downloadBtn.visibility = View.GONE
+        }
+        padCard.addView(downloadBtn)
+        root.addView(padCard)
+
+        // Consent Checkbox
         val consentRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -1673,7 +1667,7 @@ class OnboardingActivity : AppCompatActivity() {
             buttonTintList = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
         }
         val consentTv = TextView(this).apply {
-            text = "I reviewed this plan. Guest install may use network and third-party scripts when AI is enabled."
+            text = "I reviewed this plan. NativeCode will install this prebuilt Linux environment on this device."
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -1684,21 +1678,17 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(consentRow)
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val prevBtn = secondaryButton("Back") { showPage(4) } // notifications permission
+        val prevBtn = secondaryButton("Back") { showPage(4) }
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
-        val startBtn = primaryButton("I understand — start install", R.drawable.ic_arrow_right) {
+        val startBtn = primaryButton("Install Linux Environment", R.drawable.ic_arrow_right) {
             if (!planAccepted) {
                 Toast.makeText(this, "Check the consent box to continue", Toast.LENGTH_SHORT).show()
                 return@primaryButton
             }
             AiCliProvisionState.setPlanAccepted(this, true)
-            AiCliProvisionState.setEnableAiCliInstall(this, enableAiCliInstall)
-            AiCliProvisionState.setEnableCustomization(this, enableDebianCustomization)
-            AiCliProvisionState.setEnableGui(this, enableXfceGui)
-            if (!enableAiCliInstall) {
-                AiCliProvisionState.markAiCliProvisioned(this, selectedIsolationMethod, false)
-                aiCliSetupOutcome = "SKIPPED"
-            }
+            AiCliProvisionState.setEnableAiCliInstall(this, true)
+            AiCliProvisionState.setEnableCustomization(this, true)
+            AiCliProvisionState.setEnableGui(this, true)
             showPage(6)
             if (!isDebianBaseSetupStarted) {
                 isDebianBaseSetupStarted = true
@@ -1709,12 +1699,14 @@ class OnboardingActivity : AppCompatActivity() {
             alpha = 0.45f
         }
         startBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1.4f)
+        startBtnRef = startBtn
+
         check.setOnCheckedChangeListener { _, isChecked ->
             planAccepted = isChecked
-            startBtn.isEnabled = isChecked
-            startBtn.alpha = if (isChecked) 1f else 0.45f
+            updateStartBtnState()
         }
         consentRow.setOnClickListener { check.isChecked = !check.isChecked }
+
         btnRow.addView(prevBtn)
         btnRow.addView(startBtn)
         root.addView(btnRow)
@@ -1997,43 +1989,17 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun prootSetupPhases(): List<SetupPhase> {
-        val phases = mutableListOf(
-            SetupPhase("A", "Preparing directories…", 3),
-            SetupPhase("B", "Extracting bootstrap assets…", 12),
-            SetupPhase("C", "Deploying host configs…", 5),
-            SetupPhase("D", "Initializing host environment…", 12),
-            SetupPhase("E", "Provisioning Debian guest…", 25),
-            SetupPhase("F", "Configuring hardware acceleration…", 10)
+        return listOf(
+            SetupPhase("A", "Preparing host environment…", 15),
+            SetupPhase("B", "Installing Alpaquita Linux…", 85)
         )
-        if (enableXfceGui) {
-            phases.add(SetupPhase("GUI", "Installing XFCE4 desktop…", 20))
-        }
-        if (enableDebianCustomization) {
-            phases.add(SetupPhase("G", "Customizing guest environment…", 8))
-        }
-        if (enableAiCliInstall) {
-            phases.add(SetupPhase("H", "Installing AI CLI tools…", 15))
-        }
-        return phases
     }
 
     private fun chrootSetupPhases(): List<SetupPhase> {
-        val phases = mutableListOf(
-            SetupPhase("R0", "Checking root access…", 2),
-            SetupPhase("R1", "Installing Debian chroot base…", 30),
-            SetupPhase("E", "Provisioning Debian packages…", 15),
-            SetupPhase("F", "Configuring hardware acceleration…", 10)
+        return listOf(
+            SetupPhase("R0", "Checking root access…", 10),
+            SetupPhase("R1", "Installing Alpaquita Linux (chroot)…", 90)
         )
-        if (enableXfceGui) {
-            phases.add(SetupPhase("GUI", "Installing XFCE4 desktop…", 20))
-        }
-        if (enableDebianCustomization) {
-            phases.add(SetupPhase("G", "Customizing guest environment…", 8))
-        }
-        if (enableAiCliInstall) {
-            phases.add(SetupPhase("H", "Installing AI CLI tools…", 15))
-        }
-        return phases
     }
 
     private fun currentSetupPhase(): SetupPhase? =
@@ -2426,7 +2392,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     private fun runDebianBaseSetup() {
         startSetupFgs(
-            "Installing Debian Linux — setup scripts running"
+            "Installing Alpaquita Linux — setup scripts running"
         )
         // ── CHROOT path (KernelSU / Magisk root required) ────────────────────
         if (selectedIsolationMethod == "chroot") {
@@ -2442,106 +2408,53 @@ class OnboardingActivity : AppCompatActivity() {
                 }
                 enterSetupPhase("R1", "Running setup_alpaquita_chroot.sh…")
                 updateBaseStatus("[CHROOT] Root confirmed. Running setup_alpaquita_chroot.sh...")
+                val rootfsSource = RootfsSourceResolver.resolve(this, File(filesDir, "home"))
+                val chrootArgs = mutableListOf<String>()
+                val chrootEnv = mutableMapOf<String, String>()
+                when (rootfsSource) {
+                    is RootfsSource.LocalFile -> {
+                        chrootArgs.add(rootfsSource.archive.absolutePath)
+                        rootfsSource.expectedSha256?.let { chrootEnv["FLUX_ROOTFS_SHA256"] = it }
+                        Log.i("Onboarding", "Chroot using LocalFile rootfs: ${rootfsSource.archive.absolutePath}")
+                    }
+                    is RootfsSource.PlayAssetPack -> {
+                        chrootArgs.add(rootfsSource.archive.absolutePath)
+                        rootfsSource.expectedSha256?.let { chrootEnv["FLUX_ROOTFS_SHA256"] = it }
+                        Log.i("Onboarding", "Chroot using PlayAssetPack rootfs: ${rootfsSource.archive.absolutePath}")
+                    }
+                    is RootfsSource.BundledAsset -> {
+                        val target = File(filesDir, "home/${rootfsSource.assetPath.substringAfterLast('/')}")
+                        if (!target.isFile || target.length() < 2L * 1024L * 1024L) {
+                            assets.open(rootfsSource.assetPath).use { input ->
+                                FileOutputStream(target).use { output -> input.copyTo(output, 1024 * 1024) }
+                            }
+                        }
+                        chrootArgs.add(target.absolutePath)
+                        rootfsSource.expectedSha256?.let { chrootEnv["FLUX_ROOTFS_SHA256"] = it }
+                    }
+                    null -> {}
+                }
                 RootShell.executeScriptAsset(
                     context = this,
                     assetName = "scripts/chroot/setup_alpaquita_chroot.sh",
+                    args = chrootArgs,
+                    extraEnv = chrootEnv,
                     onLine = { line -> appendSetupLog(line) },
                     onDone = { code ->
-                        // Proceed if exit 0 OR base marker present (false exit 1 from am start, etc.)
                         val installed = ProjectPathResolver.isChrootInstalled()
-                        if (code != 0 && installed) {
-                            updateBaseStatus(
-                                "[CHROOT] Base exit $code but .flux_configured present — continuing guest setup..."
-                            )
-                        }
                         if (code == 0 || installed) {
                             setSetupPhaseFraction(1f, "Base chroot installed")
-                            updateBaseStatus("[CHROOT] Base complete — starting guest chain (E→H)...")
-                            // Step E: Provision Alpaquita packages (runs inside chroot as root)
-                            enterSetupPhase("E", "Installing guest packages…")
-                            updateBaseStatus("[CHROOT] E. Provisioning Alpaquita packages...")
-                            val familyScript = if (assets.list("scripts")?.contains("setup_alpaquita_family.sh") == true)
-                                "setup_alpaquita_family.sh" else "setup_alpine_family.sh"
-                            copyAndRunInChroot(
-                                assetName = "scripts/$familyScript",
-                                scriptName = familyScript,
-                                cmd = "sh /tmp/$familyScript"
-                            ) { codeE ->
-                                if (codeE != 0) {
-                                    updateBaseStatus("[CHROOT] Distro family setup failed (exit $codeE).")
-                                    failSetupProgress("Distro package setup failed (exit $codeE)")
-                                    return@copyAndRunInChroot
-                                }
-                                setSetupPhaseFraction(1f)
-                                // Step F: Hardware acceleration (Adreno→turnip, else virgl)
-                                val gpuDetect = GpuAccelDetector.detect()
-                                enterSetupPhase(
-                                    "F",
-                                    "${gpuDetect.mode} · ${gpuDetect.vendorHint}"
-                                )
-                                updateBaseStatus(
-                                    "[CHROOT] F. Configuring Hardware Acceleration " +
-                                        "(${gpuDetect.mode}, vendor=${gpuDetect.vendorHint})..."
-                                )
-                                getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
-                                    .putString("flux_gpu", gpuDetect.mode)
-                                    .putString("flux_gpu_vendor", gpuDetect.vendorHint)
-                                    .apply()
-                                copyAndRunInChroot(
-                                    assetName = "scripts/setup_hw_accel_debian.sh",
-                                    scriptName = "setup_hw_accel_debian.sh",
-                                    cmd = "env FLUX_GPU=${gpuDetect.mode} bash /tmp/setup_hw_accel_debian.sh"
-                                ) { codeF ->
-                                    if (codeF != 0) {
-                                        updateBaseStatus("[CHROOT] HW accel setup failed (exit $codeF). Continuing...")
-                                    }
-                                    setSetupPhaseFraction(1f)
-                                    fun afterChrootCustom() {
-                                        maybeRunCliToolsSetupChroot { finishChrootBaseSetup() }
-                                    }
-                                    fun runChrootCustomization() {
-                                        if (enableDebianCustomization) {
-                                            enterSetupPhase("G", "Applying shell polish…")
-                                            updateBaseStatus("[CHROOT] G. Customizing Guest Environment...")
-                                            copyAndRunInChroot(
-                                                assetName = "scripts/setup_customization_alpine.sh",
-                                                scriptName = "setup_customization_alpine.sh",
-                                                cmd = "sh /tmp/setup_customization_alpine.sh"
-                                            ) { codeG ->
-                                                if (codeG != 0) {
-                                                    updateBaseStatus("[CHROOT] Customization failed (exit $codeG). Continuing...")
-                                                }
-                                                setSetupPhaseFraction(1f)
-                                                afterChrootCustom()
-                                            }
-                                        } else {
-                                            updateBaseStatus("[CHROOT] G. Skipping Guest Customization (Toggle Off)...")
-                                            afterChrootCustom()
-                                        }
-                                    }
-                                    if (enableXfceGui) {
-                                        enterSetupPhase("GUI", "Installing XFCE4 desktop…")
-                                        updateBaseStatus("[CHROOT] GUI. Provisioning XFCE4 Desktop...")
-                                        copyAndRunInChroot(
-                                            assetName = "scripts/setup_xfce4.sh",
-                                            scriptName = "setup_xfce4.sh",
-                                            cmd = "env FLUX_THEME=dark bash /tmp/setup_xfce4.sh"
-                                        ) { codeGui ->
-                                            if (codeGui != 0) {
-                                                updateBaseStatus("[CHROOT] XFCE4 setup failed (exit $codeGui). Continuing...")
-                                            }
-                                            setSetupPhaseFraction(1f)
-                                            runChrootCustomization()
-                                        }
-                                    } else {
-                                        updateBaseStatus("[CHROOT] GUI. Skipping XFCE4 Desktop (Toggle Off)...")
-                                        runChrootCustomization()
-                                    }
-                                }
-                            }
+                            val gpuDetect = GpuAccelDetector.detect()
+                            getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
+                                .putString("linux_method", "chroot")
+                                .putString("flux_gpu", gpuDetect.mode)
+                                .putString("flux_gpu_vendor", gpuDetect.vendorHint)
+                                .apply()
+                            AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "chroot", true)
+                            finishChrootBaseSetup()
                         } else {
-                            updateBaseStatus("[CHROOT] Setup failed with exit code $code. Check logs above.")
-                            failSetupProgress("Chroot setup failed (exit $code)")
+                            updateBaseStatus("[CHROOT] Distro extraction failed (exit $code).")
+                            failSetupProgress("Distro extraction failed (exit $code)")
                         }
                     }
                 )
@@ -2617,138 +2530,80 @@ class OnboardingActivity : AppCompatActivity() {
                 }
 
                 // SSOT: rewrite residual com.termux paths in bootstrap text files
-                TermuxHostPaths.applyPackageToExtractedPrefix(filesDir)
+                TermuxHostPaths.applyPackageToExtractedPrefix(filesDir, this@OnboardingActivity)
 
                 File(varDir, "log/apt").mkdirs(); File(varDir, "lib/dpkg").mkdirs(); tmpDir.mkdirs()
 
-                enterSetupPhase("C", "Scripts + DNS…")
-                updateBaseStatus("C. Deploying Host Configs...")
+                enterSetupPhase("A", "Preparing host environment…")
+                updateBaseStatus("A. Preparing Host Environment...")
                 deployScripts()
                 File(etcDir, "resolv.conf").writeText("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
-                setSetupPhaseFraction(1f)
+                setSetupPhaseFraction(1f, "Host environment ready")
 
-                enterSetupPhase("D", "Running setup_termux.sh…")
-                updateBaseStatus("D. Initializing Host Environment...")
-                // Always re-validate host deps after bootstrap; clear stale marker
-                HostCommandBuilder.clearSetupMarker(this@OnboardingActivity)
-                val bash = TermuxHostPaths.libBash(this@OnboardingActivity).absolutePath
-                check(
-                    runShellCommand(
-                        arrayOf(bash, File(homeDir, "setup_termux.sh").absolutePath),
-                        forceHostSetup = true
-                    ) == 0
-                ) { "Host setup failed" }
-                setSetupPhaseFraction(1f)
+                enterSetupPhase("B", "Installing Alpaquita Linux container…")
+                updateBaseStatus("B. Installing Alpaquita Linux Container...")
 
-                enterSetupPhase("E", "Alpaquita rootfs + packages…")
-                updateBaseStatus("E. Provisioning Alpaquita Guest Container...")
-                val outZst = File(homeDir, "alpaquita_rootfs.tar.zst")
-                val outGz = File(homeDir, "alpine_rootfs.tar.gz")
-                val outTar = File(homeDir, "alpine_rootfs.tar")
-                val hasAlpaquitaAsset = assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true
-                val distroCandidate = if (hasAlpaquitaAsset || outZst.exists()) "alpaquita" else "alpine"
+                val rootfsSource = RootfsSourceResolver.resolve(this, homeDir)
+                checkNotNull(rootfsSource) { "No rootfs source resolved" }
 
-                if (distroCandidate == "alpaquita") {
-                    if (!outZst.isFile || outZst.length() < 2L * 1024L * 1024L) {
-                        assets.open("rootfs/alpaquita_rootfs.tar.zst").use { input ->
-                            FileOutputStream(outZst).use { output ->
-                                input.copyTo(output, 1024 * 1024)
-                            }
-                        }
-                        Log.i("Onboarding", "Explicitly deployed alpaquita rootfs: ${outZst.absolutePath} (${outZst.length()} bytes)")
-                    }
-                    val outZstSha = File(homeDir, "alpaquita_rootfs.tar.zst.sha256")
-                    if (assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst.sha256") == true) {
-                        assets.open("rootfs/alpaquita_rootfs.tar.zst.sha256").use { input ->
-                            FileOutputStream(outZstSha).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                    }
-                } else {
-                    val hasAlpineRootfs = (outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
-                        (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)
-                    if (!hasAlpineRootfs) {
-                        val assetName = if (assets.list("rootfs")?.contains("alpine_rootfs.tar.gz") == true)
-                            "rootfs/alpine_rootfs.tar.gz" else "rootfs/alpine_rootfs.tar"
-                        val target = if (assetName.endsWith(".tar.gz")) outGz else outTar
-                        assets.open(assetName).use { input ->
+                val archivePath = rootfsSource.archiveFile?.absolutePath ?: run {
+                    val bundled = rootfsSource as RootfsSource.BundledAsset
+                    val target = File(homeDir, bundled.assetPath.substringAfterLast('/'))
+                    if (!target.isFile || target.length() < 2L * 1024L * 1024L) {
+                        assets.open(bundled.assetPath).use { input ->
                             FileOutputStream(target).use { output ->
                                 input.copyTo(output, 1024 * 1024)
                             }
                         }
-                        Log.i("Onboarding", "Explicitly deployed alpine fallback rootfs: ${target.absolutePath} (${target.length()} bytes)")
                     }
+                    rootfsSource.checksumAssetPath?.let { shaAsset ->
+                        val outSha = File(homeDir, shaAsset.substringAfterLast('/'))
+                        assets.open(shaAsset).use { input ->
+                            FileOutputStream(outSha).use { output -> input.copyTo(output) }
+                        }
+                    }
+                    target.absolutePath
                 }
 
-                val familyScript = if (distroCandidate == "alpaquita" && assets.list("scripts")?.contains("setup_alpaquita_family.sh") == true)
-                    "setup_alpaquita_family.sh" else "setup_alpine_family.sh"
-                val debBytes = assets.open("scripts/$familyScript").use { it.readBytes() }
-                val debPayload = Base64.encodeToString(debBytes, Base64.NO_WRAP)
-                check(runShellCommand(arrayOf(bash, File(homeDir, "flux_install.sh").absolutePath, distroCandidate, debPayload)) == 0) { "Guest install failed for $distroCandidate" }
-                setSetupPhaseFraction(1f)
+                val python = TermuxHostPaths.BIN + "/python"
+                val prootDistro = TermuxHostPaths.PROOT_DISTRO
+                val prootBin = TermuxHostPaths.libProot(this@OnboardingActivity).absolutePath
+                val prootLoader = TermuxHostPaths.libLoader(this@OnboardingActivity).absolutePath
+                val termuxExec = TermuxHostPaths.termuxExec(this@OnboardingActivity)
+
+                val env = mutableMapOf(
+                    "PD_PROOT_BIN" to prootBin,
+                    "PROOT_LOADER" to prootLoader,
+                    "LD_LIBRARY_PATH" to TermuxHostPaths.LIB,
+                    "PATH" to "${TermuxHostPaths.BIN}:/system/bin",
+                    "HOME" to TermuxHostPaths.HOME,
+                    "PREFIX" to TermuxHostPaths.PREFIX,
+                    "TMPDIR" to TermuxHostPaths.TMPDIR
+                )
+                if (termuxExec.exists()) {
+                    env["LD_PRELOAD"] = termuxExec.absolutePath
+                }
+
+                // Remove previous alpaquita container if present
+                runShellCommand(arrayOf(python, prootDistro, "remove", "alpaquita"), extraEnv = env)
+
+                // Direct installation of prebuilt rootfs!
+                val installCode = runShellCommand(
+                    arrayOf(python, prootDistro, "install", archivePath, "--name", "alpaquita"),
+                    extraEnv = env
+                )
+                check(installCode == 0) { "proot-distro install failed with code $installCode" }
+
+                setSetupPhaseFraction(1f, "Alpaquita container installed")
 
                 val gpuDetect = GpuAccelDetector.detect()
-                enterSetupPhase("F", "${gpuDetect.mode} · ${gpuDetect.vendorHint}")
-                updateBaseStatus(
-                    "F. Configuring Hardware Accel " +
-                        "(${gpuDetect.mode}, vendor=${gpuDetect.vendorHint})..."
-                )
                 getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
+                    .putString("linux_method", "proot")
                     .putString("flux_gpu", gpuDetect.mode)
                     .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                     .apply()
-                val hwScript = File(File(usrDir, "tmp"), "setup_hw_accel_debian.sh")
-                assets.open("scripts/setup_hw_accel_debian.sh").use { input -> FileOutputStream(hwScript).use { input.copyTo(it) } }
-                hwScript.setExecutable(true)
-                check(runShellCommand(arrayOf(
-                    TermuxHostPaths.BIN + "/python",
-                    TermuxHostPaths.PROOT_DISTRO,
-                    "login", distroCandidate, "--shared-tmp", "--",
-                    "env", "FLUX_GPU=${gpuDetect.mode}", "bash", "/tmp/setup_hw_accel_debian.sh"
-                )) == 0) { "GPU setup failed" }
-                setSetupPhaseFraction(1f)
 
-                if (enableXfceGui) {
-                    enterSetupPhase("GUI", "Installing XFCE4 desktop…")
-                    updateBaseStatus("GUI. Provisioning XFCE4 Desktop...")
-                    val guiScript = File(File(usrDir, "tmp"), "setup_xfce4.sh")
-                    assets.open("scripts/setup_xfce4.sh").use { input -> FileOutputStream(guiScript).use { input.copyTo(it) } }
-                    guiScript.setExecutable(true)
-                    check(runShellCommand(arrayOf(
-                        TermuxHostPaths.BIN + "/python",
-                        TermuxHostPaths.PROOT_DISTRO,
-                        "login", distroCandidate, "--shared-tmp", "--",
-                        "env", "FLUX_THEME=dark", "bash", "/tmp/setup_xfce4.sh"
-                    )) == 0) { "XFCE4 setup failed" }
-                    setSetupPhaseFraction(1f)
-                } else {
-                    updateBaseStatus("GUI. Skipping XFCE4 Desktop (Toggle Off)...")
-                }
-
-                if (enableDebianCustomization) {
-                    enterSetupPhase("G", "Applying shell polish…")
-                    updateBaseStatus("G. Customizing Guest Environment...")
-                    val customScript = File(File(usrDir, "tmp"), "setup_customization_alpine.sh")
-                    assets.open("scripts/setup_customization_alpine.sh").use { input -> FileOutputStream(customScript).use { input.copyTo(it) } }
-                    customScript.setExecutable(true)
-                    check(runShellCommand(arrayOf(
-                        TermuxHostPaths.BIN + "/python",
-                        TermuxHostPaths.PROOT_DISTRO,
-                        "login", distroCandidate, "--shared-tmp", "--",
-                        "sh", "/tmp/setup_customization_alpine.sh"
-                    )) == 0) { "Customization failed" }
-                    setSetupPhaseFraction(1f)
-                } else {
-                    updateBaseStatus("G. Skipping Guest Customization (Toggle Off)...")
-                }
-
-                // Step H: AI CLI tools only if opted in on plan page (default OFF)
-                maybeRunCliToolsSetupProot()
-
-                // Persist linux_method = proot
-                getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
-                    .edit().putString("linux_method", "proot").apply()
+                AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
                 updateBaseStatus("Full Environment Setup Successful!")
                 finishSetupProgressSuccess()
             } catch (e: Exception) {
@@ -2952,7 +2807,7 @@ class OnboardingActivity : AppCompatActivity() {
         }
         summaryCard.addView(summaryHeader)
 
-        summaryCard.addView(summaryRow(R.drawable.ic_terminal, "Guest OS", "Debian 13 (Trixie)", "READY"))
+        summaryCard.addView(summaryRow(R.drawable.ic_terminal, "Guest OS", "Alpaquita (glibc)", "READY"))
         summaryCard.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, dp(10)) })
 
         val runtimeBadge = when (aiCliSetupOutcome) {
@@ -3129,13 +2984,14 @@ class OnboardingActivity : AppCompatActivity() {
                     Log.w("Onboarding", "Script $assetPath not found in assets", e)
                 }
             }
-            // Deploy font.ttf
-            val termuxDir = File(homeDir, ".termux").also { it.mkdirs() }
-            val fontOut = File(termuxDir, "font.ttf")
-            assets.open("fonts/font.ttf").use { input -> FileOutputStream(fontOut).use { input.copyTo(it) } }
-            // Pinned Alpine rootfs for proot-distro install ./file --name alpine
-            deployRootfsArchive(homeDir)
-            // Bundled XFCE theme/icon/cursor/wallpaper archives → shared tmp
+                // Deploy font.ttf
+                val termuxDir = File(homeDir, ".termux").also { it.mkdirs() }
+                val fontOut = File(termuxDir, "font.ttf")
+                assets.open("fonts/font.ttf").use { input -> FileOutputStream(fontOut).use { input.copyTo(it) } }
+                // Pinned Alpine rootfs for proot-distro install ./file --name alpine (or external rootfs via RootfsSourceResolver)
+                val outZstSha = File(homeDir, "alpaquita_rootfs.tar.zst.sha256")
+                deployRootfsArchive(homeDir)
+                // Bundled XFCE theme/icon/cursor/wallpaper archives → shared tmp
             // (guest sees them at /tmp/flux_xfce_assets via --shared-tmp).
             deployXfceAssets()
         } catch (e: Exception) {
@@ -3179,65 +3035,38 @@ class OnboardingActivity : AppCompatActivity() {
         }
     }
 
-    /** Copy assets/rootfs/alpaquita_rootfs.tar.zst → $HOME by streaming (skip if already present & large). */
+    /** Resolve rootfs source; only streams BundledAsset if local file / PAD is not present. */
     private fun deployRootfsArchive(homeDir: File) {
-        val outZst = File(homeDir, "alpaquita_rootfs.tar.zst")
-        val outGz = File(homeDir, "alpine_rootfs.tar.gz")
-        val outTar = File(homeDir, "alpine_rootfs.tar")
-        val hasAlpaquitaAsset = assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst") == true
-
-        if (hasAlpaquitaAsset) {
-            val outZstSha = File(homeDir, "alpaquita_rootfs.tar.zst.sha256")
-            if (assets.list("rootfs")?.contains("alpaquita_rootfs.tar.zst.sha256") == true) {
-                try {
-                    assets.open("rootfs/alpaquita_rootfs.tar.zst.sha256").use { input ->
-                        FileOutputStream(outZstSha).use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("Onboarding", "Failed to deploy Alpaquita sha256", e)
-                }
-            }
-            if (outZst.isFile && outZst.length() > 2L * 1024L * 1024L) {
-                Log.i("Onboarding", "Alpaquita rootfs already deployed: ${outZst.absolutePath}")
-                return
-            }
+        val resolved = RootfsSourceResolver.resolve(this, homeDir)
+        if (resolved is RootfsSource.BundledAsset) {
+            val target = File(homeDir, resolved.assetPath.substringAfterLast('/'))
+            if (target.isFile && target.length() > 2L * 1024L * 1024L) return
             try {
-                assets.open("rootfs/alpaquita_rootfs.tar.zst").use { input ->
-                    FileOutputStream(outZst).use { output ->
-                        input.copyTo(output, 1024 * 1024)
-                    }
-                }
-                Log.i("Onboarding", "Streamed Alpaquita rootfs: ${outZst.absolutePath} (${outZst.length()} bytes)")
-            } catch (e: Exception) {
-                Log.e("Onboarding", "Failed to stream Alpaquita rootfs archive from assets", e)
-            }
-        } else {
-            if ((outGz.isFile && outGz.length() > 2L * 1024L * 1024L) ||
-                (outTar.isFile && outTar.length() > 2L * 1024L * 1024L)) {
-                Log.i("Onboarding", "Alpine fallback rootfs already deployed")
-                return
-            }
-            try {
-                val assetName = if (assets.list("rootfs")?.contains("alpine_rootfs.tar.gz") == true)
-                    "rootfs/alpine_rootfs.tar.gz" else "rootfs/alpine_rootfs.tar"
-                val target = if (assetName.endsWith(".tar.gz")) outGz else outTar
-                assets.open(assetName).use { input ->
+                assets.open(resolved.assetPath).use { input ->
                     FileOutputStream(target).use { output ->
                         input.copyTo(output, 1024 * 1024)
                     }
                 }
-                Log.i("Onboarding", "Streamed Alpine fallback rootfs: ${target.absolutePath} (${target.length()} bytes)")
+                resolved.checksumAssetPath?.let { shaAsset ->
+                    val outSha = File(homeDir, shaAsset.substringAfterLast('/'))
+                    assets.open(shaAsset).use { input ->
+                        FileOutputStream(outSha).use { output -> input.copyTo(output) }
+                    }
+                }
+                Log.i("Onboarding", "Streamed bundled rootfs: ${target.absolutePath}")
             } catch (e: Exception) {
-                Log.e("Onboarding", "Failed to stream Alpine fallback rootfs archive from assets", e)
+                Log.e("Onboarding", "Failed to stream bundled rootfs", e)
             }
+        } else if (resolved != null) {
+            // Note: adjacent checksum alpaquita_rootfs.tar.zst.sha256 checked at source location
+            Log.i("Onboarding", "Using external rootfs source ${resolved::class.simpleName}: skipping archive copy to HOME")
         }
     }
 
     private fun runShellCommand(
         cmd: Array<String>,
-        forceHostSetup: Boolean = false
+        forceHostSetup: Boolean = false,
+        extraEnv: Map<String, String>? = null
     ): Int {
         val exe = cmd.firstOrNull() ?: ""
         val underAppData = exe.startsWith("/data/data/") || exe.startsWith("/data/app/") || exe.startsWith("/data/user/")
@@ -3245,6 +3074,7 @@ class OnboardingActivity : AppCompatActivity() {
             arrayOf("/system/bin/linker64") + cmd else cmd
         val pb = ProcessBuilder(*adjusted)
         HostCommandBuilder.applyTo(this, pb, forceHostSetup = forceHostSetup)
+        extraEnv?.forEach { (k, v) -> pb.environment()[k] = v }
         pb.redirectErrorStream(true)
         val proc = pb.start()
         val buf = ByteArray(1024)

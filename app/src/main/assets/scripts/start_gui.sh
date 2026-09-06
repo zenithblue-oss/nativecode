@@ -2,7 +2,7 @@
 # start_gui.sh - Launch XFCE4 Desktop Environment in PRoot Distro
 # Paths: TermuxHostPaths via fluxlinux-host.env (SSOT)
 
-DISTRO=${1:-alpine}
+DISTRO=${1:-alpaquita}
 PKG="${TERMUX_APP__PACKAGE_NAME:-com.zenithblue.nativecode}"
 _HOST_ENV="${TERMUX__PREFIX:-/data/data/${PKG}/files/usr}/etc/fluxlinux-host.env"
 [ -r "$_HOST_ENV" ] && . "$_HOST_ENV"
@@ -91,27 +91,30 @@ fi
 export TERMUX_X11_APK_PATH
 echo "FluxLinux: APK path = $TERMUX_X11_APK_PATH"
 
-# Extract libXlorie.so from our APK to /data/data app lib dir
-# This is the only location app_process can dlopen without corrupting its linker namespace
+# Ensure libXlorie.so is available in /data/data app lib dir
 APP_LIB_DIR="/data/data/$PKG/lib"
 mkdir -p "$APP_LIB_DIR" 2>/dev/null
+if [ ! -f "$APP_LIB_DIR/libXlorie.so" ]; then
+  for _cand in $APP_LIB_DIR/../lib/*/libXlorie.so "$NATIVE_LIB_DIR/libXlorie.so" /data/app/*/"$PKG"*/lib/*/libXlorie.so; do
+    if [ -f "$_cand" ]; then
+      cp -f "$_cand" "$APP_LIB_DIR/libXlorie.so" && chmod 755 "$APP_LIB_DIR/libXlorie.so" 2>/dev/null && break
+    fi
+  done
+fi
 if [ ! -f "$APP_LIB_DIR/libXlorie.so" ] && [ -n "$TERMUX_X11_APK_PATH" ]; then
   echo "FluxLinux: Extracting libXlorie.so from APK..."
-  # Try arm64 first, then armeabi-v7a
   ( cd "$APP_LIB_DIR" && \
     unzip -o "$TERMUX_X11_APK_PATH" 'lib/arm64-v8a/libXlorie.so' 2>/dev/null && \
     mv -f lib/arm64-v8a/libXlorie.so . && rm -rf lib ) || \
   ( cd "$APP_LIB_DIR" && \
     unzip -o "$TERMUX_X11_APK_PATH" 'lib/armeabi-v7a/libXlorie.so' 2>/dev/null && \
     mv -f lib/armeabi-v7a/libXlorie.so . && rm -rf lib )
-  ls -la "$APP_LIB_DIR/libXlorie.so" 2>/dev/null && \
-    echo "FluxLinux: libXlorie.so ready in $APP_LIB_DIR" || \
-    echo "FluxLinux: [WARN] libXlorie.so extraction failed"
 fi
 
 # Launch the X server via app_process
 # CLEAR LD_LIBRARY_PATH — setting it to Termux libs breaks system linker (libunwindstack.so)
-# CmdEntryPoint finds libXlorie.so via ClassLoader resource lookup inside our APK
+TMPDIR="$TMPDIR" \
+XKB_CONFIG_ROOT="$TERMUX_PREFIX/share/xkeyboard-config-2" \
 LD_LIBRARY_PATH="" LD_PRELOAD="" \
 CLASSPATH="$TERMUX_PREFIX/libexec/termux-x11/loader.apk" \
 TERMUX_X11_APK_PATH="$TERMUX_X11_APK_PATH" \
@@ -159,74 +162,52 @@ if [ "$DISTRO" = "termux" ]; then
   export PULSE_SERVER=127.0.0.1
   env DISPLAY=:0 startxfce4
 else
-  # Single guest script: read mode file inside rootfs (no host quote hell)
-  python "$TERMUX_PREFIX/bin/proot-distro" login "$DISTRO" --shared-tmp -- /bin/bash -c '
-    export DISPLAY=:0
-    export PULSE_SERVER=tcp:127.0.0.1
-    export XDG_RUNTIME_DIR=/tmp
-    export VTEST_SOCKET_NAME=/tmp/.virgl_test
+  # Direct proot launch for alpaquita/debian guest XFCE
+  PROOT_BIN="${PD_PROOT_BIN:-$TERMUX_PREFIX/bin/proot}"
+  [ -f "$NATIVE_LIB_DIR/libproot.so" ] && PROOT_BIN="$NATIVE_LIB_DIR/libproot.so"
+  LOADER_BIN="${PROOT_LOADER:-$TERMUX_PREFIX/libexec/proot/loader}"
+  [ -f "$NATIVE_LIB_DIR/libloader.so" ] && LOADER_BIN="$NATIVE_LIB_DIR/libloader.so"
+  ROOTFS="$TERMUX_PREFIX/var/lib/proot-distro/containers/$DISTRO/rootfs"
+  mkdir -p "$TMPDIR/runtime-flux" "$ROOTFS/.l2s" 2>/dev/null
+  chmod 700 "$TMPDIR/runtime-flux" 2>/dev/null
 
-    GPU_MODE=virgl
-    if [ -r /etc/fluxlinux/gpu_mode ]; then
-      GPU_MODE=$(tr -d "[:space:]" </etc/fluxlinux/gpu_mode)
-    fi
-    case "$GPU_MODE" in turnip|virgl) ;; *) GPU_MODE=virgl ;; esac
-    echo "FluxLinux(guest): GPU mode=$GPU_MODE"
+  export PROOT_LOADER="$LOADER_BIN"
+  export PROOT_TMP_DIR="$TMPDIR"
+  export PROOT_L2S_DIR="$ROOTFS/.l2s"
+  unset LD_PRELOAD
 
-    apply_gpu_env() {
-      unset GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE VK_ICD_FILENAMES
-      unset LIBGL_ALWAYS_SOFTWARE TU_DEBUG MESA_VK_WSI_DEBUG
-      case "$GPU_MODE" in
-        turnip)
-          export MESA_LOADER_DRIVER_OVERRIDE=zink
-          export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
-          export TU_DEBUG=noconform
-          export MESA_VK_WSI_DEBUG=sw
-          export MESA_GL_VERSION_OVERRIDE=4.6
-          export MESA_GLES_VERSION_OVERRIDE=3.2
-          ;;
-        virgl)
-          if [ -S /tmp/.virgl_test ]; then
-            export GALLIUM_DRIVER=virpipe
-          else
-            export LIBGL_ALWAYS_SOFTWARE=1
-            export GALLIUM_DRIVER=llvmpipe
-            echo "FluxLinux(guest): VirGL socket missing — llvmpipe fallback"
-          fi
-          ;;
-        *)
-          export LIBGL_ALWAYS_SOFTWARE=1
-          export GALLIUM_DRIVER=llvmpipe
-          ;;
-      esac
-    }
+  LINKER="/system/bin/linker64"
+  [ ! -x "$LINKER" ] && LINKER=""
 
-    apply_gpu_env
-    # Preserve exported GPU vars across su - (login shell clears some env)
-    export GPU_MODE
-    su - flux -c "
-      export DISPLAY=:0
-      export PULSE_SERVER=tcp:127.0.0.1
-      export XDG_RUNTIME_DIR=/tmp
-      export VTEST_SOCKET_NAME=/tmp/.virgl_test
-      export GPU_MODE=$GPU_MODE
-      if [ \"\$GPU_MODE\" = turnip ]; then
-        export MESA_LOADER_DRIVER_OVERRIDE=zink
-        export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
-        export TU_DEBUG=noconform
-        export MESA_VK_WSI_DEBUG=sw
-        export MESA_GL_VERSION_OVERRIDE=4.6
-        export MESA_GLES_VERSION_OVERRIDE=3.2
-      elif [ \"\$GPU_MODE\" = virgl ] && [ -S /tmp/.virgl_test ]; then
-        export GALLIUM_DRIVER=virpipe
-      else
-        export LIBGL_ALWAYS_SOFTWARE=1
-        export GALLIUM_DRIVER=llvmpipe
-      fi
-      xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null
-      dbus-launch --exit-with-session startxfce4
-    "
-  '
+  $LINKER "$PROOT_BIN" \
+    --kill-on-exit \
+    --link2symlink \
+    -L \
+    --change-id=1000:1000 \
+    --rootfs="$ROOTFS" \
+    --cwd=/home/flux \
+    --bind=/dev \
+    --bind=/proc \
+    --bind=/sys \
+    --bind=/dev/urandom:/dev/random \
+    --bind="$TMPDIR:/tmp" \
+    --bind="$ROOTFS/tmp:/dev/shm" \
+    /usr/bin/env -i \
+      HOME=/home/flux \
+      USER=flux \
+      LOGNAME=flux \
+      PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+      DISPLAY=:0 \
+      PULSE_SERVER=tcp:127.0.0.1 \
+      XDG_RUNTIME_DIR=/tmp/runtime-flux \
+      LIBGL_ALWAYS_SOFTWARE=1 \
+      GALLIUM_DRIVER=llvmpipe \
+      /bin/bash -c '
+        dbus-daemon --session --fork --address=unix:path=/tmp/dbus-session.sock
+        export DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-session.sock
+        xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
+        startxfce4
+      '
 fi
 
 exit 0

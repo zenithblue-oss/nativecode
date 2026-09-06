@@ -244,6 +244,8 @@ object RootShell {
     fun executeScriptAsset(
         context: Context,
         assetName: String,
+        args: List<String> = emptyList(),
+        extraEnv: Map<String, String> = emptyMap(),
         onLine: (String) -> Unit = {},
         onDone: (Int) -> Unit = {}
     ) {
@@ -261,7 +263,9 @@ object RootShell {
                 mainHandler.post { onLine("[RootShell] ERROR: no working su binary") }
                 -1
             } else {
-                runCommand(buildSuArgs(inv, "sh \"$stagedPath\""), onLine)
+                val argStr = if (args.isEmpty()) "" else " " + args.joinToString(" ") { "\"$it\"" }
+                val envPrefix = if (extraEnv.isEmpty()) "" else extraEnv.entries.joinToString(" ", postfix = " ") { "${it.key}=\"${it.value}\"" }
+                runCommand(buildSuArgs(inv, "${envPrefix}sh \"$stagedPath\"$argStr"), onLine)
             }
             mainHandler.post { onDone(code) }
         }

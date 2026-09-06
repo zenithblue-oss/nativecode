@@ -2081,8 +2081,9 @@ class MainActivity : AppCompatActivity() {
         if (!::sessionClient.isInitialized) {
             initTerminalView()
         }
-        val sessionExec = LinuxCommandBuilder.sessionExec(this, args)
-        val session = TerminalSession(sessionExec, cwd, args, env, 10000, sessionClient)
+        val sessionExec = LinuxCommandBuilder.sessionExec(this, args, method = method)
+        val sessionArgs = LinuxCommandBuilder.sessionArgs(this, args, method = method)
+        val session = TerminalSession(sessionExec, cwd, sessionArgs, env, 10000, sessionClient)
         sessionsList.add(session)
         terminalSessionTypes.add(type)
         switchTerminalSession(sessionsList.size - 1)
@@ -12850,6 +12851,13 @@ class MainActivity : AppCompatActivity() {
     private fun deployScripts() {
         try {
             TermuxHostPaths.applyPackageToExtractedPrefix(filesDir)
+            val appLibDir = File(filesDir.parentFile, "lib")
+            appLibDir.mkdirs()
+            val srcXlorie = File(applicationInfo.nativeLibraryDir, "libXlorie.so")
+            val dstXlorie = File(appLibDir, "libXlorie.so")
+            if (srcXlorie.exists() && (!dstXlorie.exists() || dstXlorie.length() != srcXlorie.length())) {
+                srcXlorie.copyTo(dstXlorie, overwrite = true)
+            }
             val homeDir = File(filesDir, "home").also { it.mkdirs() }
             val scripts = arrayOf(
                 "setup_termux.sh",
@@ -12963,9 +12971,9 @@ class MainActivity : AppCompatActivity() {
             File("/data/local/tmp/chrootAlpine/usr/bin/startxfce4").exists() ||
                 File("/data/local/tmp/chrootDebian13/usr/bin/startxfce4").exists()
         } else {
-            val alpineRootfs = File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpine/rootfs")
-            val debianRootfs = File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/debian/rootfs")
-            File(alpineRootfs, "usr/bin/startxfce4").exists() || File(debianRootfs, "usr/bin/startxfce4").exists()
+            File(ProjectPathResolver.prootRootfsDir(this), "usr/bin/startxfce4").exists() ||
+                File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpaquita/rootfs/usr/bin/startxfce4").exists() ||
+                File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpine/rootfs/usr/bin/startxfce4").exists()
         }
     }
 
@@ -13053,7 +13061,7 @@ class MainActivity : AppCompatActivity() {
     private fun guiHostScriptArgs(scriptName: String): Array<String> {
         val bash = TermuxHostPaths.libBash(this).absolutePath
         val script = File(TermuxHostPaths.HOME, scriptName)
-        return arrayOf(bash, script.absolutePath, "alpine")
+        return arrayOf(bash, script.absolutePath, ProjectPathResolver.DEFAULT_DISTRO)
     }
 
     /** Start XFCE: proot → start_gui.sh; chroot → start_gui_chroot.sh (host X11 + root DE). */
@@ -13352,7 +13360,8 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onTitleChanged(session: TerminalSession)   {}
             override fun onSessionFinished(session: TerminalSession) {
-                Log.d("Terminal", "Session finished: ${session.exitStatus}")
+                val transcript = try { session.emulator?.screen?.transcriptText } catch (e: Exception) { e.message }
+                Log.d("Terminal", "Session finished: ${session.exitStatus} transcript: $transcript")
                 mainHandler.post {
                     val idx = sessionsList.indexOf(session)
                     if (idx != -1) {
@@ -18560,7 +18569,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         val sessionExec = LinuxCommandBuilder.sessionExec(this, args, method = method)
-        val session = TerminalSession(sessionExec, cwd, args, env, 10000, sessionClient)
+        val sessionArgs = LinuxCommandBuilder.sessionArgs(this, args, method = method)
+        val session = TerminalSession(sessionExec, cwd, sessionArgs, env, 10000, sessionClient)
         workspaceSessions.add(session)
         workspaceTabNames.add(type)
         activeWorkspaceTabIndex = workspaceSessions.size - 1

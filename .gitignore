@@ -7,6 +7,9 @@ build
 
 # Ignore local properties (sensitive SDK locations)
 local.properties
+key.properties
+*.jks
+*.keystore
 
 # Ignore large bootstrap assets and packaging roots
 bootstrap.tar

@@ -84,9 +84,12 @@ if [ -r "$PREFIX/etc/profile" ]; then
     export PROOT_TMP_DIR="$TMPDIR"
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-$PREFIX/lib}"
     export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin${PATH:+:$PATH}"
+    export LD_PRELOAD="${LD_PRELOAD:-}"
+    export PD_PROOT_BIN="${PD_PROOT_BIN:-}"
+    export PROOT_LOADER="${PROOT_LOADER:-}"
 fi
 
-mkdir -p "$TMPDIR" 2>/dev/null || true
+mkdir -p "$TMPDIR" 2>/dev/null || /system/bin/mkdir -p "$TMPDIR" 2>/dev/null || true
 
 PYTHON="${PREFIX}/bin/python"
 PROOT_DISTRO="${PREFIX}/bin/proot-distro"

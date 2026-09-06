@@ -164,8 +164,13 @@ object ShellCommandRunner {
         env["GIT_TERMINAL_PROMPT"] = "0"
 
         // Override with envMap if provided (e.g. chroot-specific values)
-        envMap?.forEach { (k, v) ->
-            env[k] = v
+        if (envMap != null) {
+            envMap.forEach { (k, v) ->
+                env[k] = v
+            }
+            if (!envMap.containsKey("LD_PRELOAD")) {
+                env.remove("LD_PRELOAD")
+            }
         }
     }
 }
