@@ -32,6 +32,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.setPadding
 import android.system.Os
 import com.zenithblue.nativecode.cliauth.AiCliProvisionState
+import com.zenithblue.nativecode.onboarding.LegacyProotDataMigrator
 import com.zenithblue.nativecode.onboarding.OnboardingIo
 import com.zenithblue.nativecode.onboarding.RootfsSource
 import com.zenithblue.nativecode.onboarding.RootfsSourceResolver
@@ -1989,10 +1990,22 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun prootSetupPhases(): List<SetupPhase> {
-        return listOf(
-            SetupPhase("A", "Preparing host environment…", 15),
-            SetupPhase("B", "Installing Alpaquita Linux…", 85)
+        val phases = mutableListOf(
+            SetupPhase("A", "Preparing host environment…", 10),
+            SetupPhase("B", "Installing Alpaquita Linux…", 40),
+            SetupPhase("E", "Configuring Alpaquita runtime…", 10),
+            SetupPhase("F", "Configuring hardware acceleration…", 10)
         )
+        if (enableXfceGui) {
+            phases.add(SetupPhase("GUI", "Configuring XFCE4 desktop…", 10))
+        }
+        if (enableDebianCustomization) {
+            phases.add(SetupPhase("G", "Applying shell customization…", 10))
+        }
+        if (enableAiCliInstall) {
+            phases.add(SetupPhase("H", "Verifying AI CLI tools…", 10))
+        }
+        return phases
     }
 
     private fun chrootSetupPhases(): List<SetupPhase> {
@@ -2524,7 +2537,11 @@ class OnboardingActivity : AppCompatActivity() {
                     var content = loginInitPy.readText()
                     content = content.replace(
                         "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\"",
-                        "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\""
+                        "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\", \"PROOT_TMP_DIR\""
+                    )
+                    content = content.replace(
+                        "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\"",
+                        "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\", \"PROOT_TMP_DIR\""
                     )
                     loginInitPy.writeText(content)
                 }
@@ -2596,12 +2613,53 @@ class OnboardingActivity : AppCompatActivity() {
 
                 setSetupPhaseFraction(1f, "Alpaquita container installed")
 
+                enterSetupPhase("E", "Configuring Alpaquita runtime…")
+                val codeE = runPrebuiltGuestRepair("setup_alpaquita_family.sh")
+                check(codeE == 0) { "Phase E runtime repair failed: $codeE" }
+                setSetupPhaseFraction(1f, "Phase E completed")
+
                 val gpuDetect = GpuAccelDetector.detect()
                 getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
                     .putString("linux_method", "proot")
                     .putString("flux_gpu", gpuDetect.mode)
                     .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                     .apply()
+
+                enterSetupPhase("F", "Configuring hardware acceleration…")
+                val codeF = runPrebuiltGuestRepair(
+                    "setup_hw_accel_debian.sh",
+                    mapOf("FLUX_GPU" to gpuDetect.mode)
+                )
+                check(codeF == 0) { "Phase F runtime repair failed: $codeF" }
+                setSetupPhaseFraction(1f, "Phase F completed")
+
+                if (enableXfceGui) {
+                    enterSetupPhase("GUI", "Configuring XFCE4 desktop…")
+                    val codeGui = runPrebuiltGuestRepair(
+                        "setup_xfce4.sh",
+                        mapOf("FLUX_THEME" to "dark")
+                    )
+                    check(codeGui == 0) { "GUI runtime repair failed: $codeGui" }
+                    setSetupPhaseFraction(1f, "GUI completed")
+                }
+
+                if (enableDebianCustomization) {
+                    enterSetupPhase("G", "Applying shell customization…")
+                    val codeG = runPrebuiltGuestRepair("setup_customization_alpine.sh")
+                    check(codeG == 0) { "Phase G runtime repair failed: $codeG" }
+                    setSetupPhaseFraction(1f, "Phase G completed")
+                }
+
+                if (enableAiCliInstall) {
+                    enterSetupPhase("H", "Verifying AI CLI tools…")
+                    val codeH = runPrebuiltGuestRepair("setup_cli_tools.sh")
+                    check(codeH == 0) { "Phase H runtime repair failed: $codeH" }
+                    setSetupPhaseFraction(1f, "Phase H completed")
+                }
+
+                verifyRuntimeSentinel(enableXfceGui)
+
+                LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
 
                 AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
                 updateBaseStatus("Full Environment Setup Successful!")
@@ -2611,6 +2669,65 @@ class OnboardingActivity : AppCompatActivity() {
                 updateBaseStatus("Error: ${e.message}")
                 failSetupProgress("Error: ${e.message}")
             }
+        }
+    }
+
+    private fun runPrebuiltGuestRepair(
+        scriptName: String,
+        extraEnv: Map<String, String> = emptyMap(),
+        user: String = "root"
+    ): Int {
+        val usrTmp = File(filesDir, "usr/tmp")
+        usrTmp.mkdirs()
+        val script = File(usrTmp, scriptName)
+        val assetPath = "scripts/$scriptName"
+        assets.open(assetPath).use { input ->
+            FileOutputStream(script).use { output -> input.copyTo(output) }
+        }
+        script.setExecutable(true)
+
+        val envPrefix = extraEnv.entries.joinToString(" ") { "${it.key}=${it.value}" }
+        val guestCmd = if (envPrefix.isBlank()) "bash /tmp/$scriptName" else "env $envPrefix bash /tmp/$scriptName"
+
+        val python = "${TermuxHostPaths.BIN}/python"
+        val prootDistro = TermuxHostPaths.PROOT_DISTRO
+        val hostEnv = mutableMapOf(
+            "PD_PROOT_BIN" to TermuxHostPaths.libProot(this).absolutePath,
+            "PROOT_LOADER" to TermuxHostPaths.libLoader(this).absolutePath,
+            "PROOT_TMP_DIR" to TermuxHostPaths.TMPDIR
+        )
+
+        val cmd = arrayOf(
+            python,
+            prootDistro,
+            "login",
+            "alpaquita",
+            "--shared-tmp",
+            "--user",
+            user,
+            "--",
+            "/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            guestCmd
+        )
+        return runShellCommand(cmd, extraEnv = hostEnv)
+    }
+
+    private fun verifyRuntimeSentinel(enableXfceGui: Boolean) {
+        val rootfsDir = ProjectPathResolver.prootRootfsDir(this)
+        val releaseFile = File(rootfsDir, "etc/nativecode/rootfs-release")
+        check(releaseFile.canRead()) { "Sentinel check failed: /etc/nativecode/rootfs-release not readable" }
+        val releaseText = releaseFile.readText()
+        check(releaseText.contains("DISTRO=alpaquita")) { "Sentinel check failed: DISTRO!=alpaquita" }
+        check(releaseText.contains("LIBC=glibc")) { "Sentinel check failed: LIBC!=glibc" }
+        check(File(rootfsDir, "home/flux").isDirectory) { "Sentinel check failed: /home/flux not found" }
+        check(File(rootfsDir, "bin/bash").exists() || File(rootfsDir, "usr/bin/bash").exists()) { "Sentinel check failed: bash not found" }
+        check(File(rootfsDir, "usr/bin/git").exists()) { "Sentinel check failed: git not found" }
+        check(File(rootfsDir, "usr/bin/gh").exists()) { "Sentinel check failed: gh not found" }
+        if (enableXfceGui) {
+            check(File(rootfsDir, "usr/bin/startxfce4").exists()) { "Sentinel check failed: startxfce4 not found" }
         }
     }
 
@@ -3075,6 +3192,9 @@ class OnboardingActivity : AppCompatActivity() {
         val pb = ProcessBuilder(*adjusted)
         HostCommandBuilder.applyTo(this, pb, forceHostSetup = forceHostSetup)
         extraEnv?.forEach { (k, v) -> pb.environment()[k] = v }
+        if (extraEnv != null && !extraEnv.containsKey("LD_PRELOAD")) {
+            pb.environment().remove("LD_PRELOAD")
+        }
         pb.redirectErrorStream(true)
         val proc = pb.start()
         val buf = ByteArray(1024)
