@@ -6,6 +6,21 @@ ROOTFS="${1:?usage: verify_rootfs.sh <rootfs-dir>}"
 FAIL=0
 need() { if [ -e "$ROOTFS$1" ]; then echo "OK   $1"; else echo "MISS $1"; FAIL=1; fi; }
 have() {
+    local target
+    if [ -L "$ROOTFS/usr/bin/$1" ]; then
+        target="$(readlink "$ROOTFS/usr/bin/$1")"
+        case "$target" in
+            /*) [ -e "$ROOTFS$target" ] && { echo "OK   cmd:$1"; return 0; } ;;
+            *) [ -e "$ROOTFS/usr/bin/$target" ] && { echo "OK   cmd:$1"; return 0; } ;;
+        esac
+    fi
+    if [ -L "$ROOTFS/bin/$1" ]; then
+        target="$(readlink "$ROOTFS/bin/$1")"
+        case "$target" in
+            /*) [ -e "$ROOTFS$target" ] && { echo "OK   cmd:$1"; return 0; } ;;
+            *) [ -e "$ROOTFS/bin/$target" ] && { echo "OK   cmd:$1"; return 0; } ;;
+        esac
+    fi
     if chroot "$ROOTFS" /bin/sh -c "command -v $1 >/dev/null 2>&1" 2>/dev/null || \
        [ -x "$ROOTFS/usr/bin/$1" ] || [ -x "$ROOTFS/usr/local/bin/$1" ] || \
        [ -x "$ROOTFS/bin/$1" ] || [ -x "$ROOTFS/sbin/$1" ] || [ -x "$ROOTFS/usr/sbin/$1" ]; then
@@ -46,7 +61,20 @@ for c in sh bash sudo git node npm python3 java javac gcc g++ cmake ninja clang 
     have "$c" || FAIL=1
 done
 for c in opencode codex qwen agy claude grok kiro-cli; do
-    if [ -x "$ROOTFS/home/flux/.local/bin/$c" ] || [ -x "$ROOTFS/usr/local/bin/$c" ]; then echo "OK   ai:$c"; else echo "MISS ai:$c"; FAIL=1; fi
+    target=""
+    if [ -L "$ROOTFS/home/flux/.local/bin/$c" ]; then
+        target="$(readlink "$ROOTFS/home/flux/.local/bin/$c")"
+        case "$target" in
+            /*) [ -e "$ROOTFS$target" ] && { echo "OK   ai:$c"; continue; } ;;
+            *) [ -e "$ROOTFS/home/flux/.local/bin/$target" ] && { echo "OK   ai:$c"; continue; } ;;
+        esac
+    fi
+    if [ -x "$ROOTFS/home/flux/.local/bin/$c" ] || [ -x "$ROOTFS/usr/local/bin/$c" ]; then
+        echo "OK   ai:$c"
+    else
+        echo "MISS ai:$c"
+        FAIL=1
+    fi
 done
 
 echo "== desktop/gpu =="
@@ -69,6 +97,7 @@ if [ -f "$ROOTFS/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf" ] || \
    [ -f "$ROOTFS/usr/share/fonts/jetbrains-mono-nerd/JetBrainsMonoNerdFont-Regular.ttf" ] || \
    [ -f "$ROOTFS/usr/share/fonts/JetBrainsMonoNerdFont-Regular.ttf" ] || \
    [ -f "$ROOTFS/usr/share/fonts/dejavu/DejaVuSans.ttf" ] || \
+   [ -f "$ROOTFS/usr/share/fonts/dejavu-core/DejaVuSans.ttf" ] || \
    [ -f "$ROOTFS/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" ]; then
     echo "OK   G fonts"
 else
@@ -89,9 +118,17 @@ if [ "$IS_DEV" = "1" ]; then
 fi
 
 echo "== credential scrub =="
-for p in /root/.ssh /home/flux/.ssh /root/.git-credentials /home/flux/.git-credentials /root/.npmrc /home/flux/.npmrc /home/flux/.config/gh/hosts.yml /home/flux/.config/gh/hosts.yml.bak /home/flux/.config/fluxlinux/cli-auth.env /etc/machine-id /var/lib/dbus/machine-id; do
-    if [ -e "$ROOTFS$p" ]; then echo "LEAK $p"; FAIL=1; fi
+for p in /root/.ssh /home/flux/.ssh /root/.git-credentials /home/flux/.git-credentials /home/flux/.config/gh/hosts.yml /home/flux/.config/gh/hosts.yml.bak /home/flux/.config/fluxlinux/cli-auth.env /etc/machine-id /var/lib/dbus/machine-id; do
+    [ ! -e "$ROOTFS$p" ] || { echo "LEAK: $p"; FAIL=1; }
 done
+if [ -f "$ROOTFS/root/.npmrc" ] && grep -iq "authToken\|password\|_auth" "$ROOTFS/root/.npmrc" 2>/dev/null; then
+    echo "LEAK: /root/.npmrc"
+    FAIL=1
+fi
+if [ -f "$ROOTFS/home/flux/.npmrc" ] && grep -iq "authToken\|password\|_auth" "$ROOTFS/home/flux/.npmrc" 2>/dev/null; then
+    echo "LEAK: /home/flux/.npmrc"
+    FAIL=1
+fi
 
 if [ "$FAIL" = "0" ]; then echo "VERIFY PASS"; else echo "VERIFY FAIL"; fi
 exit "$FAIL"

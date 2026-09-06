@@ -31,6 +31,7 @@ util-macros
 font-util-dev
 bdftopcf
 xkbcomp
+libdisplay-info-dev
 libxkbfile-dev
 libxcvt-dev
 libx11-dev
@@ -55,6 +56,7 @@ libxshmfence-dev
 libepoxy-dev
 
 # Wayland / DRM / Audio / Compression headers
+vte3-dev
 wayland-dev
 wayland-protocols
 libdrm-dev

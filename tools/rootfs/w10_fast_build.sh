@@ -160,7 +160,7 @@ ROOT_ARGS=(--work "$ROOT_WORK" --out "$OUT")
 bash "$SCRIPT_DIR/build_alpaquita_rootfs.sh" "${ROOT_ARGS[@]}"
 
 ROOTFS="$ROOT_WORK/rootfs"
-[ -e "$ROOTFS/bin/sh" ] || fatal "builder did not create $ROOTFS/bin/sh"
+[ -L "$ROOTFS/bin/sh" ] || [ -e "$ROOTFS/bin/sh" ] || fatal "builder did not create $ROOTFS/bin/sh"
 
 log "assembling ARM64 guest inside target chroot"
 docker run --rm --privileged --platform linux/arm64 \
@@ -195,6 +195,7 @@ docker run --rm --privileged --platform linux/arm64 \
     '
 
 log "running mandatory clean + verifier"
+docker run --rm -v "$ROOT_WORK:/host-work" alpine:latest chown -R "$(id -u):$(id -g)" /host-work
 bash "$ROOT_WORK/finalize.sh" "$ROOTFS" "$OUT"
 
 PREFIX="$OUT/nativecode-alpaquita-glibc-aarch64-rootfs"

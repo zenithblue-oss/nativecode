@@ -21,6 +21,13 @@ BUNDLE_SHA="$BUNDLE.sha256"
 
 mkdir -p "$WORK" "$OUT" "$DESTDIR" "$WORK/.stamps"
 
+export PATH="$DESTDIR/usr/bin:$PATH"
+export PKG_CONFIG_PATH="$DESTDIR/usr/lib/pkgconfig:$DESTDIR/usr/share/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+export C_INCLUDE_PATH="$DESTDIR/usr/include:${C_INCLUDE_PATH:-}"
+export CPLUS_INCLUDE_PATH="$DESTDIR/usr/include:${CPLUS_INCLUDE_PATH:-}"
+export LIBRARY_PATH="$DESTDIR/usr/lib:${LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="$DESTDIR/usr/lib:/usr/lib:${LD_LIBRARY_PATH:-}"
+
 log() { echo "build-gui-bundle: $*"; }
 
 verify_sha256() {
@@ -228,6 +235,7 @@ build_xfce_core() {
         "libxfce4ui:4.20.0:$XFCE_LIBXFCE4UI_SHA256:xfce"
         "garcon:4.20.0:$XFCE_GARCON_SHA256:xfce"
         "exo:4.20.0:$XFCE_EXO_SHA256:xfce"
+        "iceauth:1.0.11:$ICEAUTH_SHA256:xorg"
         "xfce4-panel:4.20.0:$XFCE_XFCE4_PANEL_SHA256:xfce"
         "xfce4-session:4.20.0:$XFCE_XFCE4_SESSION_SHA256:xfce"
         "xfwm4:4.20.0:$XFCE_XFWM4_SHA256:xfce"
@@ -261,6 +269,10 @@ build_xfce_core() {
                 TARBALL="$WORK/$name-$ver.tar.xz"
                 url="https://download.gnome.org/sources/$name/$major_minor/$name-$ver.tar.xz"
                 ;;
+            xorg)
+                TARBALL="$WORK/$name-$ver.tar.xz"
+                url="https://www.x.org/pub/individual/app/$name-$ver.tar.xz"
+                ;;
             *)
                 url="https://archive.xfce.org/src/$cat/$name/$major_minor/$name-$ver.tar.bz2"
                 ;;
@@ -269,6 +281,11 @@ build_xfce_core() {
         download_and_verify "$url" "$TARBALL" "$sha"
         if [ ! -d "$SRC" ]; then
             tar -xf "$TARBALL" -C "$WORK"
+        fi
+
+        # Sync destdir installed headers and libraries into container /usr for downstream builds
+        if [ -d "$DESTDIR/usr" ]; then
+            cp -rn "$DESTDIR/usr"/* /usr/ 2>/dev/null || cp -r "$DESTDIR/usr"/* /usr/ 2>/dev/null || true
         fi
 
         cd "$SRC"
@@ -353,4 +370,5 @@ build_fastfetch
 build_tigervnc
 build_xfce_core
 archive_bundle
+chmod -R a+rX "$OUT" "$WORK" 2>/dev/null || true
 log "GUI bundle build completed successfully."
