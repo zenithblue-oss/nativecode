@@ -18,13 +18,17 @@ TERMUX_HOME="${TERMUX__HOME:-/data/data/$PKG/files/home}"
 export HOME="$TERMUX_HOME"
 export TMPDIR="${TMPDIR:-$TERMUX_PREFIX/tmp}"
 export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$TMPDIR}"
-export PATH="$TERMUX_PREFIX/bin:$TERMUX_PREFIX/bin/applets:/system/bin:/system/xbin:$PATH"
+export PATH="/system/bin:/system/xbin:$TERMUX_PREFIX/bin:$TERMUX_PREFIX/bin/applets:$PATH"
 export LD_LIBRARY_PATH="$TERMUX_PREFIX/lib:$TERMUX_PREFIX/opt/virglrenderer-android/lib"
 export TERMUX_APP__PACKAGE_NAME="$PKG"
 export TERMUX_X11_OVERRIDE_PACKAGE="$PKG"
 export TERMUX__PREFIX="$TERMUX_PREFIX"
 export TERMUX__HOME="$TERMUX_HOME"
-export XKB_CONFIG_ROOT="$TERMUX_PREFIX/share/X11/xkb"
+if [ -d "$TERMUX_PREFIX/share/xkeyboard-config-2" ]; then
+  export XKB_CONFIG_ROOT="$TERMUX_PREFIX/share/xkeyboard-config-2"
+else
+  export XKB_CONFIG_ROOT="$TERMUX_PREFIX/share/X11/xkb"
+fi
 
 # Configure PulseAudio (use home to avoid root-owned stale tmp dirs)
 export PULSE_RUNTIME_PATH="${HOME}/.pulse"
@@ -162,52 +166,66 @@ if [ "$DISTRO" = "termux" ]; then
   export PULSE_SERVER=127.0.0.1
   env DISPLAY=:0 startxfce4
 else
-  # Direct proot launch for alpaquita/debian guest XFCE
-  PROOT_BIN="${PD_PROOT_BIN:-$TERMUX_PREFIX/bin/proot}"
-  [ -f "$NATIVE_LIB_DIR/libproot.so" ] && PROOT_BIN="$NATIVE_LIB_DIR/libproot.so"
-  LOADER_BIN="${PROOT_LOADER:-$TERMUX_PREFIX/libexec/proot/loader}"
-  [ -f "$NATIVE_LIB_DIR/libloader.so" ] && LOADER_BIN="$NATIVE_LIB_DIR/libloader.so"
-  ROOTFS="$TERMUX_PREFIX/var/lib/proot-distro/containers/$DISTRO/rootfs"
-  mkdir -p "$TMPDIR/runtime-flux" "$ROOTFS/.l2s" 2>/dev/null
-  chmod 700 "$TMPDIR/runtime-flux" 2>/dev/null
-
-  export PROOT_LOADER="$LOADER_BIN"
-  export PROOT_TMP_DIR="$TMPDIR"
-  export PROOT_L2S_DIR="$ROOTFS/.l2s"
   unset LD_PRELOAD
 
-  LINKER="/system/bin/linker64"
-  [ ! -x "$LINKER" ] && LINKER=""
+  LINKER=""
+  [ -x /system/bin/linker64 ] && LINKER="/system/bin/linker64"
+  PYTHON_BIN="${TERMUX_PREFIX}/bin/python"
+  PYTHON_CMD="$PYTHON_BIN"
+  [ -n "$LINKER" ] && [ -f "$PYTHON_BIN" ] && PYTHON_CMD="$LINKER $PYTHON_BIN"
 
-  $LINKER "$PROOT_BIN" \
-    --kill-on-exit \
-    --link2symlink \
-    -L \
-    --change-id=1000:1000 \
-    --rootfs="$ROOTFS" \
-    --cwd=/home/flux \
-    --bind=/dev \
-    --bind=/proc \
-    --bind=/sys \
-    --bind=/dev/urandom:/dev/random \
-    --bind="$TMPDIR:/tmp" \
-    --bind="$ROOTFS/tmp:/dev/shm" \
-    /usr/bin/env -i \
-      HOME=/home/flux \
-      USER=flux \
-      LOGNAME=flux \
-      PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-      DISPLAY=:0 \
-      PULSE_SERVER=tcp:127.0.0.1 \
-      XDG_RUNTIME_DIR=/tmp/runtime-flux \
-      LIBGL_ALWAYS_SOFTWARE=1 \
-      GALLIUM_DRIVER=llvmpipe \
-      /bin/bash -c '
-        dbus-daemon --session --fork --address=unix:path=/tmp/dbus-session.sock
-        export DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-session.sock
-        xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
-        startxfce4
-      '
+  $PYTHON_CMD "$TERMUX_PREFIX/bin/proot-distro" \
+    login "$DISTRO" \
+    --shared-tmp \
+    --user flux \
+    -- /bin/bash --noprofile --norc -c '
+      export HOME=/home/flux
+      export USER=flux
+      export LOGNAME=flux
+      export DISPLAY=:0
+      export PULSE_SERVER=tcp:127.0.0.1
+      export XDG_RUNTIME_DIR=/tmp
+      export VTEST_SOCKET_NAME=/tmp/.virgl_test
+      export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+      GPU_MODE=virgl
+      if [ -r /etc/fluxlinux/gpu_mode ]; then
+        GPU_MODE=$(tr -d "[:space:]" </etc/fluxlinux/gpu_mode)
+      fi
+
+      unset GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE VK_ICD_FILENAMES
+      unset LIBGL_ALWAYS_SOFTWARE TU_DEBUG MESA_VK_WSI_DEBUG
+
+      case "$GPU_MODE" in
+        turnip)
+          export MESA_LOADER_DRIVER_OVERRIDE=zink
+          export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
+          export TU_DEBUG=noconform
+          export MESA_VK_WSI_DEBUG=sw
+          export MESA_GL_VERSION_OVERRIDE=4.6
+          export MESA_GLES_VERSION_OVERRIDE=3.2
+          ;;
+        virgl)
+          if [ -S /tmp/.virgl_test ]; then
+            export GALLIUM_DRIVER=virpipe
+          else
+            export LIBGL_ALWAYS_SOFTWARE=1
+            export GALLIUM_DRIVER=llvmpipe
+          fi
+          ;;
+        *)
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export GALLIUM_DRIVER=llvmpipe
+          ;;
+      esac
+
+      mkdir -p /tmp/runtime-flux
+      chmod 700 /tmp/runtime-flux 2>/dev/null || true
+      export XDG_RUNTIME_DIR=/tmp/runtime-flux
+
+      xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
+      exec dbus-launch --exit-with-session startxfce4
+    '
 fi
 
 exit 0
