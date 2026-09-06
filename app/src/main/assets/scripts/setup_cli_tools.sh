@@ -396,13 +396,26 @@ _phase="$(date +%s)"
 
 # Grok repair: installer may place binary at $HOME/.grok/bin/grok without PATH.
 as_flux 'if [ -x "$HOME/.grok/bin/grok" ] && ! command -v grok >/dev/null 2>&1; then mkdir -p "$HOME/.local/bin"; ln -sfn "$HOME/.grok/bin/grok" "$HOME/.local/bin/grok" 2>/dev/null || true; fi' || true
-# OpenCode repair: ensure bundled native binary is linked if postinstall was skipped
-as_flux 'if [ -f "$HOME/.local/lib/node_modules/opencode-ai/postinstall.mjs" ] && ! opencode --version >/dev/null 2>&1; then (cd "$HOME/.local/lib/node_modules/opencode-ai" && node postinstall.mjs >/dev/null 2>&1 || true); fi' || true
+# OpenCode repair: mandatory offline postinstall execution when opencode --version fails
+if ! flux_has opencode; then
+    if as_flux '[ -f "$HOME/.local/lib/node_modules/opencode-ai/postinstall.mjs" ]'; then
+        echo ">>> Performing offline postinstall repair for opencode-ai..."
+        as_flux 'export PATH="$HOME/.local/bin:$PATH"; cd "$HOME/.local/lib/node_modules/opencode-ai" && node postinstall.mjs' || true
+        if ! flux_has opencode; then
+            echo "ERROR: opencode postinstall failed to make opencode executable"
+        fi
+    fi
+fi
 
 if [ "${PREBUILT_H:-0}" = "1" ]; then
     echo ">>> NativeCode: baked AI CLIs — verifying only (no npm/curl installs, no self-update)"
     for _b in opencode codex qwen agy claude grok kiro-cli; do
-        if flux_has "$_b"; then record_ok "$_b"; else echo "WARN: baked $_b missing"; record_fail "$_b"; fi
+        if flux_has "$_b"; then
+            record_ok "$_b"
+        else
+            echo "WARN: baked $_b missing or broken"
+            record_fail "$_b"
+        fi
     done
 elif flux_has node && flux_has npm; then
     npm_global_install "opencode-ai" "opencode"

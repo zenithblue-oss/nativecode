@@ -98,15 +98,58 @@ mode_guest_matrix() {
     fi
     echo "LD_PRELOAD in guest: (clean / empty)"
 
+    echo "Executing 7 AI CLI versions..."
+    local ai_versions
+    ai_versions="$(run_proot_guest flux '
+        export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        for t in opencode codex qwen claude agy grok kiro-cli; do
+            printf "%s: " "$t"
+            $t --version 2>&1 || exit 1
+        done
+    ')"
+    echo "$ai_versions" | sed 's/^/  /'
+    echo "$ai_versions" | grep -q "opencode: 1\." || { echo "FAIL: opencode version missing/failed"; exit 1; }
+    echo "$ai_versions" | grep -q "codex:" || { echo "FAIL: codex version missing/failed"; exit 1; }
+    echo "$ai_versions" | grep -q "qwen:" || { echo "FAIL: qwen version missing/failed"; exit 1; }
+    echo "$ai_versions" | grep -q "claude:" || { echo "FAIL: claude version missing/failed"; exit 1; }
+    echo "$ai_versions" | grep -q "agy:" || { echo "FAIL: agy version missing/failed"; exit 1; }
+    echo "$ai_versions" | grep -q "grok:" || { echo "FAIL: grok version missing/failed"; exit 1; }
+    echo "$ai_versions" | grep -q "kiro-cli:" || { echo "FAIL: kiro-cli version missing/failed"; exit 1; }
+
+    echo "Testing OpenCode terminal launcher (launch_tool.sh opencode -> opencode --auto)..."
+    local opencode_cmdline
+    opencode_cmdline="$(run_proot_guest flux '
+        export PATH="$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:/opt/nodejs/bin:/usr/local/bin:/usr/bin:/bin:/sbin"
+        /tmp/launch_tool.sh opencode &
+        _pid=$!
+        sleep 0.8
+        cat /proc/$_pid/cmdline 2>/dev/null | tr "\0" " " || true
+        kill -9 $_pid 2>/dev/null || true
+    ')"
+    echo "OpenCode spawned cmdline: $opencode_cmdline"
+    echo "$opencode_cmdline" | grep -q -- "opencode --auto" || { echo "FAIL: launch_tool.sh did not invoke opencode --auto"; exit 1; }
+
+    echo "Checking dynamic link diagnostics for libICE and libXmuu..."
+    local lib_diag
+    lib_diag="$(run_proot_guest flux '
+        /lib/ld-linux-aarch64.so.1 --list /usr/bin/xfce4-session | grep libICE || true
+        /lib/ld-linux-aarch64.so.1 --list /usr/bin/xrdb | grep libXmuu || true
+    ')"
+    echo "$lib_diag" | sed 's/^/  /'
+    echo "$lib_diag" | grep -q "libICE.so" || { echo "FAIL: libICE.so resolution failed"; exit 1; }
+    echo "$lib_diag" | grep -q "libXmuu.so" || { echo "FAIL: libXmuu.so resolution failed"; exit 1; }
+    if echo "$lib_diag" | grep -qi "not found\|permission denied"; then
+        echo "FAIL: dynamic link error in libICE or libXmuu"
+        exit 1
+    fi
+
     echo "PASS: Guest Matrix"
 }
 
 mode_project_matrix() {
     echo "=== [3/6] PROJECT & WORKSPACE MATRIX ==="
-    # Clean previous run state
     run_proot_guest flux 'rm -rf /home/flux/repos/w13-smoke-test "/home/flux/repos/W13 project (test)"'
 
-    # Normal project
     run_proot_guest flux '
         mkdir -p /home/flux/repos/w13-smoke-test
         cd /home/flux/repos/w13-smoke-test
@@ -122,7 +165,6 @@ mode_project_matrix() {
     echo "Smoke project commit: $smoke_head"
     [ -n "$smoke_head" ] || { echo "FAIL: smoke project commit failed"; exit 1; }
 
-    # Spaces in path test
     run_proot_guest flux '
         mkdir -p "/home/flux/repos/W13 project (test)"
         cd "/home/flux/repos/W13 project (test)"
@@ -164,26 +206,166 @@ mode_git_matrix() {
     echo "PASS: Git Matrix"
 }
 
-mode_x11_probe() {
-    echo "=== [5/6] X11 & XFCE DESKTOP PROBE ==="
-    local xfce_bin
-    xfce_bin="$(run_proot_guest flux 'command -v startxfce4 xfwm4 xfce4-session xfce4-terminal 2>&1')"
-    echo "XFCE binaries:"
-    echo "$xfce_bin" | sed 's/^/  /'
+mode_gui_matrix() {
+    echo "=== [5/6] GUI FULL LIFECYCLE & IDEMPOTENCY MATRIX ==="
+    local native_lib_dir
+    native_lib_dir="$(get_native_lib_dir)"
 
-    local gpu_mode
-    gpu_mode="$(run_proot_guest flux '[ -r /etc/fluxlinux/gpu_mode ] && cat /etc/fluxlinux/gpu_mode || echo virgl')"
-    echo "Guest GPU mode: $gpu_mode"
+    # Deploy latest start_gui.sh and stop_gui.sh to device
+    adb_cmd push app/src/main/assets/scripts/start_gui.sh /data/local/tmp/start_gui.sh >/dev/null
+    adb_cmd push app/src/main/assets/scripts/stop_gui.sh /data/local/tmp/stop_gui.sh >/dev/null
+    adb_run_as "cp /data/local/tmp/start_gui.sh /data/data/$PKG/files/home/start_gui.sh && chmod 755 /data/data/$PKG/files/home/start_gui.sh"
+    adb_run_as "cp /data/local/tmp/stop_gui.sh /data/data/$PKG/files/home/stop_gui.sh && chmod 755 /data/data/$PKG/files/home/stop_gui.sh"
 
-    local xkb_check
-    xkb_check="$(adb_run_as "ls -d /data/data/$PKG/files/usr/share/xkeyboard-config-2 2>/dev/null || echo missing")"
-    echo "Host xkeyboard-config-2: $xkb_check"
+    # Step 1: Execute STOP
+    echo "[Step 1] Execute STOP..."
+    adb_cmd shell "run-as $PKG env \
+        TERMUX_APP__PACKAGE_NAME=$PKG \
+        TERMUX__PREFIX=/data/data/$PKG/files/usr \
+        TERMUX__HOME=/data/data/$PKG/files/home \
+        PREFIX=/data/data/$PKG/files/usr \
+        TMPDIR=/data/data/$PKG/files/usr/tmp \
+        PROOT_TMP_DIR=/data/data/$PKG/files/usr/tmp \
+        LD_LIBRARY_PATH=/data/data/$PKG/files/usr/lib \
+        PATH=$native_lib_dir:/data/data/$PKG/files/usr/bin:/system/bin \
+        /system/bin/linker64 $native_lib_dir/libbash.so /data/data/$PKG/files/home/stop_gui.sh alpaquita" >/dev/null 2>&1 || true
 
-    local xlorie_check
-    xlorie_check="$(adb_run_as "ls -l $(get_native_lib_dir)/libXlorie.so 2>/dev/null || echo missing")"
-    echo "libXlorie.so: $xlorie_check"
+    # Step 2: Verify teardown
+    echo "[Step 2] Verify no residual X11/XFCE processes..."
+    local residual
+    residual="$(adb_cmd shell "/system/bin/toybox ps -A -o PID,NAME,ARGS | /system/bin/toybox grep -E 'termux-x11|xfce4-session|xfwm4|dbus-daemon' | /system/bin/toybox grep -v grep || true" | tr -d '\r')"
+    if [ -n "$residual" ]; then
+        echo "FAIL: residual processes after STOP:"
+        echo "$residual"
+        exit 1
+    fi
+    echo "Confirmed: clean state (0 residual processes)"
 
-    echo "PASS: X11 & XFCE Probe"
+    # Step 3: Execute START through actual app host path
+    echo "[Step 3] Execute START through app host path..."
+    adb_cmd shell "run-as $PKG env \
+        TERMUX_APP__PACKAGE_NAME=$PKG \
+        TERMUX__PREFIX=/data/data/$PKG/files/usr \
+        TERMUX__HOME=/data/data/$PKG/files/home \
+        PREFIX=/data/data/$PKG/files/usr \
+        TMPDIR=/data/data/$PKG/files/usr/tmp \
+        PROOT_TMP_DIR=/data/data/$PKG/files/usr/tmp \
+        LD_LIBRARY_PATH=/data/data/$PKG/files/usr/lib \
+        PATH=$native_lib_dir:/data/data/$PKG/files/usr/bin:/system/bin \
+        /system/bin/linker64 $native_lib_dir/libbash.so /data/data/$PKG/files/home/start_gui.sh alpaquita > /data/data/$PKG/files/home/smoke_gui_start.log 2>&1 &"
+
+    adb_cmd shell "/system/bin/toybox sleep 4"
+
+    # Step 4: Assert log contains NO "Permission denied"
+    echo "[Step 4] Assert host log contains NO 'Permission denied'..."
+    local start_log
+    start_log="$(adb_run_as "cat /data/data/$PKG/files/home/smoke_gui_start.log" | tr -d '\r')"
+    echo "$start_log" | sed 's/^/  /'
+    if echo "$start_log" | grep -qi "permission denied"; then
+        echo "FAIL: Permission denied detected in GUI start log!"
+        exit 1
+    fi
+
+    # Step 5: Assert X11 socket exists
+    echo "[Step 5] Assert X11 socket exists..."
+    local x_sock
+    x_sock="$(adb_run_as "test -S /data/data/$PKG/files/usr/tmp/.X11-unix/X0 && echo exists || echo missing" | tr -d '\r')"
+    [ "$x_sock" = "exists" ] || { echo "FAIL: X0 socket missing"; exit 1; }
+    echo "Confirmed: X0 socket ready"
+
+    # Step 6: Assert termux-x11 process alive
+    echo "[Step 6] Assert termux-x11 process alive..."
+    local x11_pid
+    x11_pid="$(adb_cmd shell "/system/bin/toybox pidof termux-x11" | tr -d '\r' || true)"
+    [ -n "$x11_pid" ] || { echo "FAIL: termux-x11 process not running"; exit 1; }
+    echo "Confirmed: termux-x11 alive (PID=$x11_pid)"
+
+    # Step 7: Assert xfce4-session alive in guest
+    echo "[Step 7] Assert xfce4-session alive..."
+    local xfce_pid
+    xfce_pid="$(adb_cmd shell "/system/bin/toybox pidof xfce4-session" | tr -d '\r' || true)"
+    [ -n "$xfce_pid" ] || { echo "FAIL: xfce4-session not running"; exit 1; }
+    echo "Confirmed: xfce4-session alive (PID=$xfce_pid)"
+
+    # Step 8: Execute START again
+    echo "[Step 8] Execute START again (testing idempotency)..."
+    local second_start
+    second_start="$(adb_cmd shell "run-as $PKG env \
+        TERMUX_APP__PACKAGE_NAME=$PKG \
+        TERMUX__PREFIX=/data/data/$PKG/files/usr \
+        TERMUX__HOME=/data/data/$PKG/files/home \
+        PREFIX=/data/data/$PKG/files/usr \
+        TMPDIR=/data/data/$PKG/files/usr/tmp \
+        PROOT_TMP_DIR=/data/data/$PKG/files/usr/tmp \
+        LD_LIBRARY_PATH=/data/data/$PKG/files/usr/lib \
+        PATH=$native_lib_dir:/data/data/$PKG/files/usr/bin:/system/bin \
+        /system/bin/linker64 $native_lib_dir/libbash.so /data/data/$PKG/files/home/start_gui.sh alpaquita" | tr -d '\r')"
+    echo "$second_start" | sed 's/^/  /'
+    echo "$second_start" | grep -q "Reusing existing termux-x11 server" || { echo "FAIL: second start did not reuse termux-x11"; exit 1; }
+    echo "$second_start" | grep -q "Active xfce4-session already running" || { echo "FAIL: second start did not recognize existing xfce session"; exit 1; }
+
+    # Step 9: Prove no duplicate X server or session
+    echo "[Step 9] Prove no duplicate X server/session..."
+    local x11_count xfce_count
+    x11_count="$(adb_cmd shell "/system/bin/toybox pidof termux-x11 | /system/bin/toybox wc -w" | tr -d '\r')"
+    xfce_count="$(adb_cmd shell "/system/bin/toybox pidof xfce4-session | /system/bin/toybox wc -w" | tr -d '\r')"
+    [ "$x11_count" -eq 1 ] || { echo "FAIL: duplicate termux-x11 processes ($x11_count)"; exit 1; }
+    [ "$xfce_count" -eq 1 ] || { echo "FAIL: duplicate xfce4-session processes ($xfce_count)"; exit 1; }
+    echo "Confirmed: exactly 1 termux-x11 and 1 xfce4-session"
+
+    # Step 10: Execute STOP
+    echo "[Step 10] Execute STOP..."
+    adb_cmd shell "run-as $PKG env \
+        TERMUX_APP__PACKAGE_NAME=$PKG \
+        TERMUX__PREFIX=/data/data/$PKG/files/usr \
+        TERMUX__HOME=/data/data/$PKG/files/home \
+        PREFIX=/data/data/$PKG/files/usr \
+        TMPDIR=/data/data/$PKG/files/usr/tmp \
+        PROOT_TMP_DIR=/data/data/$PKG/files/usr/tmp \
+        LD_LIBRARY_PATH=/data/data/$PKG/files/usr/lib \
+        PATH=$native_lib_dir:/data/data/$PKG/files/usr/bin:/system/bin \
+        /system/bin/linker64 $native_lib_dir/libbash.so /data/data/$PKG/files/home/stop_gui.sh alpaquita" >/dev/null
+
+    # Step 11: Prove teardown
+    echo "[Step 11] Prove teardown..."
+    local teardown_check
+    teardown_check="$(adb_cmd shell "/system/bin/toybox ps -A -o PID,NAME,ARGS | /system/bin/toybox grep -E 'termux-x11|xfce4-session|xfwm4|dbus-daemon' | /system/bin/toybox grep -v grep || true" | tr -d '\r')"
+    [ -z "$teardown_check" ] || { echo "FAIL: processes still alive after stop: $teardown_check"; exit 1; }
+    echo "Confirmed: complete teardown verified"
+
+    # Step 12: START again and prove restart
+    echo "[Step 12] START again and prove restart..."
+    adb_cmd shell "run-as $PKG env \
+        TERMUX_APP__PACKAGE_NAME=$PKG \
+        TERMUX__PREFIX=/data/data/$PKG/files/usr \
+        TERMUX__HOME=/data/data/$PKG/files/home \
+        PREFIX=/data/data/$PKG/files/usr \
+        TMPDIR=/data/data/$PKG/files/usr/tmp \
+        PROOT_TMP_DIR=/data/data/$PKG/files/usr/tmp \
+        LD_LIBRARY_PATH=/data/data/$PKG/files/usr/lib \
+        PATH=$native_lib_dir:/data/data/$PKG/files/usr/bin:/system/bin \
+        /system/bin/linker64 $native_lib_dir/libbash.so /data/data/$PKG/files/home/start_gui.sh alpaquita > /data/data/$PKG/files/home/smoke_gui_restart.log 2>&1 &"
+
+    adb_cmd shell "/system/bin/toybox sleep 4"
+    local restart_x11 restart_xfce
+    restart_x11="$(adb_cmd shell "/system/bin/toybox pidof termux-x11" | tr -d '\r' || true)"
+    restart_xfce="$(adb_cmd shell "/system/bin/toybox pidof xfce4-session" | tr -d '\r' || true)"
+    [ -n "$restart_x11" ] || { echo "FAIL: restart termux-x11 not alive"; exit 1; }
+    [ -n "$restart_xfce" ] || { echo "FAIL: restart xfce4-session not alive"; exit 1; }
+    echo "Confirmed: restart successful (termux-x11 PID=$restart_x11, xfce4-session PID=$restart_xfce)"
+
+    # Clean up final state
+    adb_cmd shell "run-as $PKG env \
+        TERMUX_APP__PACKAGE_NAME=$PKG \
+        TERMUX__PREFIX=/data/data/$PKG/files/usr \
+        TERMUX__HOME=/data/data/$PKG/files/home \
+        PREFIX=/data/data/$PKG/files/usr \
+        TMPDIR=/data/data/$PKG/files/usr/tmp \
+        PROOT_TMP_DIR=/data/data/$PKG/files/usr/tmp \
+        LD_LIBRARY_PATH=/data/data/$PKG/files/usr/lib \
+        PATH=$native_lib_dir:/data/data/$PKG/files/usr/bin:/system/bin \
+        /system/bin/linker64 $native_lib_dir/libbash.so /data/data/$PKG/files/home/stop_gui.sh alpaquita" >/dev/null
+    echo "PASS: GUI Full Lifecycle & Idempotency"
 }
 
 mode_logs() {
@@ -199,21 +381,21 @@ case "$mode" in
     --guest-matrix) mode_guest_matrix ;;
     --project-matrix) mode_project_matrix ;;
     --git-matrix) mode_git_matrix ;;
-    --x11-probe) mode_x11_probe ;;
+    --gui-matrix) mode_gui_matrix ;;
     --logs) mode_logs ;;
     --all)
         mode_preflight
         mode_guest_matrix
         mode_project_matrix
         mode_git_matrix
-        mode_x11_probe
+        mode_gui_matrix
         mode_logs
         echo "========================================"
         echo "ALL W13 APP SMOKE TESTS COMPLETED: PASS"
         echo "========================================"
         ;;
     *)
-        echo "Usage: $0 [--preflight|--guest-matrix|--project-matrix|--git-matrix|--x11-probe|--logs|--all]"
+        echo "Usage: $0 [--preflight|--guest-matrix|--project-matrix|--git-matrix|--gui-matrix|--logs|--all]"
         exit 1
         ;;
 esac

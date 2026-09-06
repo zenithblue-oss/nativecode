@@ -27,7 +27,7 @@ object ChrootCommandBuilder {
     /** Session executable — must be a system binary (SELinux blocks exec of app-data scripts). */
     const val SESSION_EXEC = "/system/bin/sh"
 
-    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v3"
+    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v4"
     private const val TERM_WRAPPER_VERSION = "nativecode-chroot-term-wrapper v3"
 
     fun build(
@@ -280,7 +280,16 @@ if ! command -v "${'$'}1" >/dev/null 2>&1; then
   echo "launch_tool: command not found: ${'$'}1 (PATH=${'$'}PATH)" >&2
   exit 127
 fi
-exec "${'$'}@"
+cmd="${'$'}1"
+shift
+case "${'$'}cmd" in
+  opencode)
+    exec opencode --auto "${'$'}@"
+    ;;
+  *)
+    exec "${'$'}cmd" "${'$'}@"
+    ;;
+esac
 """.trimIndent()
         return try {
             val f = File(scriptPath)

@@ -40,6 +40,10 @@ fi
 
 if [ "${PREBUILT_GUI:-0}" = "1" ]; then
     command -v startxfce4 >/dev/null 2>&1 || handle_error "startxfce4 missing in prebuilt rootfs"
+    if [ -x /usr/bin/iceauth ] && [ ! -e /cache/gui-work/destdir/usr/bin/iceauth ]; then
+        mkdir -p /cache/gui-work/destdir/usr/bin 2>/dev/null || true
+        ln -sfn /usr/bin/iceauth /cache/gui-work/destdir/usr/bin/iceauth 2>/dev/null || true
+    fi
 elif command -v apk >/dev/null 2>&1; then
     echo "FluxLinux: Installing XFCE4 packages via apk..."
     apk update || handle_error "APK Update"

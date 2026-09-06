@@ -4,7 +4,7 @@
 - **Target Branch:** `feature/prebuilt-alpine-rootfs-w1-w6`
 - **Device Tested:** Physical Xiaomi Poco X6 Pro (`2311DRK48I`), MT6897, Android 16 (SDK 36, targetSdk 37 W^X), ADB serial `192.168.1.53:37491`
 - **Distribution:** Alpaquita glibc stream (`FORMAT_VERSION=1`, `DISTRO=alpaquita`, `LIBC=glibc`, SHA256 `70cf5b9aaa02eff3105876e131c16e68f11f8403ec5ed0bb96c79b688c198257`)
-- **Status:** **PASS** (100% of acceptance criteria verified on physical hardware).
+- **Status:** **PASS** (100% of acceptance criteria verified on physical hardware, including GUI idempotency and OpenCode CLI execution).
 
 ---
 
@@ -65,8 +65,35 @@
 
 ## 5. Test Automation Results
 - `tools/app/test_alpaquita_app_runtime_contract.sh`: **PASS**
-- `tools/app/w13_full_app_smoke.sh --all`: **PASS**
+- `tools/app/w13_full_app_smoke.sh --all`: **PASS** (preflight, guest matrix, project matrix, git matrix, gui lifecycle matrix, logs)
 - `tools/rootfs/test_build_pipeline.sh`: **BUILD-PIPELINE: ALL PASS**
 - `tools/rootfs/test_prebuilt_paths.sh`: **PREBUILT-PATHS: ALL PASS (14/14)**
 - `./gradlew test`: **BUILD SUCCESSFUL**
 - `./gradlew assembleDebug`: **BUILD SUCCESSFUL**
+
+---
+
+## 6. Pass 14 Review Hardening Evidence
+1. **Android 16 Host Execution (TargetSdk 37 W^X)**:
+   - `start_gui.sh` and `stop_gui.sh` use `TB=/system/bin/toybox` for all file/process operations (`id`, `mkdir`, `rm`, `ln`, `mv`, `cp`, `chmod`, `sleep`, `ps`, `pidof`, `pkill`).
+   - Sourced host environment with `unset LD_PRELOAD`.
+   - Host ELF binaries (`python3.14`, `pulseaudio`, `virgl_test_server_android`) explicitly wrapped with `/system/bin/linker64`.
+   - Verified live host logs contain zero "Permission denied" errors.
+2. **XFCE D-Bus Session & Settings Server**:
+   - Initialized D-Bus session before calling `xfconf-query`, eliminating the "Unable to contact settings server" dialog.
+   - Fixed `iceauth` path resolution for XFCE session authority via `/cache/gui-work/destdir/usr/bin/iceauth` symlink in `setup_xfce4.sh`.
+3. **GUI Idempotency**:
+   - `start_gui.sh` detects alive `termux-x11` server with active `X0` socket and reuses it without spawning duplicate `app_process`.
+   - Guest detects active `xfce4-session` and refreshes X11 display activity immediately without duplicate desktop sessions.
+   - `start_gui.sh` fails with non-zero exit codes on true failure instead of unconditional `exit 0`.
+4. **OpenCode Postinstall & Builder Fixes**:
+   - Verified `node postinstall.mjs` execution creates native binary on physical device (version `1.18.27`).
+   - Removed `|| true` from `build_alpaquita_rootfs.sh` postinstall step and enforced `opencode --version`.
+   - Upgraded Phase H repair in `setup_cli_tools.sh` to run offline postinstall when `opencode --version` fails.
+5. **OpenCode Terminal Mode**:
+   - `ChrootCommandBuilder.kt` bumped to `nativecode-launch-tool v4`, dispatching `opencode` as `opencode --auto "$@"`.
+   - Validated spawned command line in guest process table contains `opencode --auto`.
+6. **Live Hardware Verification**:
+   - Verified 7 AI CLI versions: `opencode 1.18.27`, `codex 0.153.2`, `qwen 0.23.0`, `claude 2.1.263`, `agy 1.1.27`, `grok 1.0.13`, `kiro-cli 2.21.1`.
+   - Clean dynamic loader diagnostics for `libICE.so.6` and `libXmuu.so.1`.
+   - 12-step GUI live lifecycle test passed: STOP -> clean state -> START -> NO permission denied -> X0 socket ready -> termux-x11 + xfce4-session alive -> second START idempotent -> STOP teardown -> START restart verified.
