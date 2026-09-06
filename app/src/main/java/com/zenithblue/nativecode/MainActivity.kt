@@ -48,6 +48,7 @@ import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
+import com.zenithblue.nativecode.onboarding.LegacyProotDataMigrator
 import android.view.ContextMenu
 import android.view.MenuItem
 import android.net.Uri
@@ -604,6 +605,8 @@ class MainActivity : AppCompatActivity() {
         activeProjectMethod = prefs.getString("active_project_method", null)
             ?: getProjects().find { it.path == activeProjectPath }?.linuxMethod
             ?: LinuxCommandBuilder.currentMethod
+
+        executor.execute { LegacyProotDataMigrator.migrateIfNeeded(this) }
 
         buildRootLayout()
         setContentView(drawerLayout)
