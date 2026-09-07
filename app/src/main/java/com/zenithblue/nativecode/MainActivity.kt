@@ -2168,8 +2168,8 @@ class MainActivity : AppCompatActivity() {
                 "qwen-code"   -> "qwen-code"
                 "grok"        -> "grok"
                 "kiro"        -> "kiro"
-                "shell-root"  -> "Debian Shell Rooted"
-                else          -> "Debian Shell"
+                "shell-root"  -> "Rooted Linux Shell"
+                else          -> "Linux Shell"
             }
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -2421,7 +2421,7 @@ class MainActivity : AppCompatActivity() {
             addSection("FREE CLI TOOLS", "// OPEN SOURCE / FREE", freeTools)
             addSection("PAID CLI TOOLS", "// PRO / SUBSCRIPTION", paidTools)
         }
-        addSection("DEBIAN SHELL", "// SYSTEM SHELL", shellTools)
+        addSection("LINUX SHELL", "// SYSTEM SHELL", shellTools)
 
         scrollView.addView(container)
         scrollView.post {
@@ -2658,7 +2658,7 @@ class MainActivity : AppCompatActivity() {
             addSection("FREE CLI TOOLS", "// OPEN SOURCE / FREE", freeTools)
             addSection("PAID CLI TOOLS", "// PRO / SUBSCRIPTION", paidTools)
         }
-        addSection("DEBIAN SHELL", "// SYSTEM SHELL", shellTools)
+        addSection("LINUX SHELL", "// SYSTEM SHELL", shellTools)
     }
 
     private fun refreshToolCardsForMethod() {
@@ -8526,7 +8526,7 @@ class MainActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD
         }
         val chrootSub = TextView(this).apply {
-            text = if (ProjectPathResolver.isChrootInstalled()) "Installed & Ready. Kernel-level speed." else "Requires Root & Debian 13 Chroot Setup"
+            text = if (ProjectPathResolver.isChrootInstalled()) "Installed & Ready. Kernel-level speed." else "Requires Root & Linux Chroot Setup"
             textSize = 11f
             setTextColor(if (ProjectPathResolver.isChrootInstalled()) NC.PRIMARY else NC.SECONDARY)
         }
@@ -8581,7 +8581,7 @@ class MainActivity : AppCompatActivity() {
         card.addView(modeContainer)
 
         card.addView(spacer(12))
-        card.addView(infoRow("OS Version", "Debian 13 (Trixie)"))
+        card.addView(infoRow("OS Version", "Alpaquita Linux (glibc AArch64)"))
         return card
     }
 
@@ -18647,8 +18647,8 @@ class MainActivity : AppCompatActivity() {
             
             val titleTv = TextView(this).apply {
                 val displayName = when (tabName) {
-                    "shell-root" -> "Debian Shell Rooted"
-                    "shell" -> "Debian Shell"
+                    "shell-root" -> "Rooted Linux Shell"
+                    "shell" -> "Linux Shell"
                     else -> tabName
                 }
                 text = "${i + 1}. $displayName"

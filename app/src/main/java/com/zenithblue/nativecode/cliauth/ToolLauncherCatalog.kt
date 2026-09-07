@@ -13,8 +13,8 @@ data class LauncherToolDef(
 object ToolLauncherCatalog {
 
     val SHELL: List<LauncherToolDef> = listOf(
-        LauncherToolDef("shell", "Debian Shell", "User: flux"),
-        LauncherToolDef("shell-root", "Debian Shell Rooted", "User: root")
+        LauncherToolDef("shell", "Linux Shell", "User: flux"),
+        LauncherToolDef("shell-root", "Rooted Linux Shell", "User: root")
     )
 
     val FREE: List<LauncherToolDef> = listOf(
@@ -43,8 +43,8 @@ object ToolLauncherCatalog {
     /** Dropdown / open-with pairs. */
     fun openWithPairs(method: String, showAi: Boolean): List<Pair<String, String>> {
         val shells = listOf(
-            "Debian Shell" to "shell",
-            "Debian Shell Rooted" to "shell-root"
+            "Linux Shell" to "shell",
+            "Rooted Linux Shell" to "shell-root"
         )
         if (!showAi) return shells
         val ai = listOf(

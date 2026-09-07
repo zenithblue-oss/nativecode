@@ -100,6 +100,6 @@ object ProjectPathResolver {
 
     /** Human-readable label for a linux method. */
     fun methodLabel(method: String = LinuxCommandBuilder.currentMethod): String {
-        return if (method == "chroot") "Chroot (Debian Trixie)" else "Debian 13 (Trixie)"
+        return if (method == "chroot") "Chroot (Alpaquita Linux)" else "Alpaquita Linux (glibc AArch64)"
     }
 }

@@ -27,7 +27,7 @@ android {
         applicationId = "com.zenithblue.nativecode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 6
+        versionCode = 7
         versionName = "1.5"
         buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
     }

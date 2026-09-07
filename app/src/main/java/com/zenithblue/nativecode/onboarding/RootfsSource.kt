@@ -3,7 +3,9 @@ package com.zenithblue.nativecode.onboarding
 import android.content.Context
 import android.util.Log
 import com.google.android.play.core.assetpacks.AssetPackManagerFactory
+import com.zenithblue.nativecode.BuildConfig
 import java.io.File
+import java.security.MessageDigest
 
 sealed interface RootfsSource {
     val distro: String
@@ -50,34 +52,44 @@ object RootfsSourceResolver {
 
     /**
      * Resolves the best available rootfs source in priority order:
-     * 1. Debug / local filesystem file (/data/local/tmp, app private files, /sdcard/Download)
-     * 2. Play Asset Delivery pack (nativecode_runtime)
-     * 3. Bundled assets in APK (fallback)
+     * DEBUG: 1. local filesystem (/data/local/tmp, app private files, /sdcard/Download)
+     *        2. Play Asset Delivery pack (nativecode_runtime)
+     *        3. Bundled assets in APK (fallback)
+     * RELEASE (Play policy-safe): 1. Play Asset Delivery pack
+     *                             2. Bundled assets fallback.
+     * Local sideload paths are never trusted in release builds.
+     * The compiled-in [PINNED_ALPAQUITA_SHA256] is always authoritative;
+     * adjacent .sha256 files are consistency-checked only and can never
+     * redefine the expected hash.
      */
     fun resolve(context: Context, homeDir: File? = null): RootfsSource? {
-        // 1. Debug / local filesystem candidates
-        val localCandidates = mutableListOf<File>()
-        localCandidates.add(File("/data/local/tmp", ALPAQUITA_NAME))
-        if (homeDir != null) {
-            localCandidates.add(File(homeDir, ALPAQUITA_NAME))
-            localCandidates.add(File(homeDir, "rootfs/$ALPAQUITA_NAME"))
-        }
-        localCandidates.add(File(context.filesDir, "home/$ALPAQUITA_NAME"))
-        localCandidates.add(File("/sdcard/Download", ALPAQUITA_NAME))
-        localCandidates.add(File("/storage/emulated/0/Download", ALPAQUITA_NAME))
-
-        for (candidate in localCandidates) {
-            if (candidate.isFile && candidate.length() > 2L * 1024L * 1024L && candidate.canRead()) {
-                val shaFile = File(candidate.parentFile, ALPAQUITA_SHA_NAME)
-                val sha = readShaFile(shaFile) ?: PINNED_ALPAQUITA_SHA256
-                Log.i(TAG, "Resolved LocalFile rootfs: ${candidate.absolutePath} (${candidate.length()} bytes)")
-                return RootfsSource.LocalFile(
-                    archive = candidate,
-                    checksum = if (shaFile.isFile) shaFile else null,
-                    expectedSha256 = sha,
-                    distro = "alpaquita"
-                )
+        // 1. Debug-only local filesystem candidates (dev/test sideload).
+        if (BuildConfig.DEBUG) {
+            val localCandidates = mutableListOf<File>()
+            localCandidates.add(File("/data/local/tmp", ALPAQUITA_NAME))
+            if (homeDir != null) {
+                localCandidates.add(File(homeDir, ALPAQUITA_NAME))
+                localCandidates.add(File(homeDir, "rootfs/$ALPAQUITA_NAME"))
             }
+            localCandidates.add(File(context.filesDir, "home/$ALPAQUITA_NAME"))
+            localCandidates.add(File("/sdcard/Download", ALPAQUITA_NAME))
+            localCandidates.add(File("/storage/emulated/0/Download", ALPAQUITA_NAME))
+
+            for (candidate in localCandidates) {
+                if (candidate.isFile && candidate.length() > 2L * 1024L * 1024L && candidate.canRead()) {
+                    val shaFile = File(candidate.parentFile, ALPAQUITA_SHA_NAME)
+                    val sha = pinnedShaOrWarn(shaFile, candidate.absolutePath)
+                    Log.i(TAG, "Resolved LocalFile rootfs (DEBUG only): ${candidate.absolutePath} (${candidate.length()} bytes)")
+                    return RootfsSource.LocalFile(
+                        archive = candidate,
+                        checksum = if (shaFile.isFile) shaFile else null,
+                        expectedSha256 = sha,
+                        distro = "alpaquita"
+                    )
+                }
+            }
+        } else {
+            Log.i(TAG, "Release build: skipping local filesystem rootfs sources (Play-delivered only)")
         }
 
         // 2. Play Asset Delivery pack: nativecode_runtime
@@ -90,7 +102,7 @@ object RootfsSourceResolver {
                     val packFile = File(assetsPath, ALPAQUITA_NAME)
                     if (packFile.isFile && packFile.length() > 2L * 1024L * 1024L) {
                         val shaFile = File(assetsPath, ALPAQUITA_SHA_NAME)
-                        val sha = readShaFile(shaFile) ?: PINNED_ALPAQUITA_SHA256
+                        val sha = pinnedShaOrWarn(shaFile, packFile.absolutePath)
                         Log.i(TAG, "Resolved PlayAssetPack rootfs: ${packFile.absolutePath} (${packFile.length()} bytes)")
                         return RootfsSource.PlayAssetPack(
                             archive = packFile,
@@ -137,6 +149,44 @@ object RootfsSourceResolver {
         }
 
         return null
+    }
+
+    /**
+     * Compiled-in pin is always authoritative. An adjacent .sha256 file is
+     * checked for consistency only: a mismatch is logged but never trusted.
+     */
+    private fun pinnedShaOrWarn(shaFile: File, archivePath: String): String {
+        val onDisk = readShaFile(shaFile)
+        if (onDisk != null && !onDisk.equals(PINNED_ALPAQUITA_SHA256, ignoreCase = true)) {
+            Log.w(TAG, "Adjacent checksum mismatch for $archivePath (on-disk=${onDisk.take(16)}…, pinned=${PINNED_ALPAQUITA_SHA256.take(16)}…). Using pinned SHA.")
+        }
+        return PINNED_ALPAQUITA_SHA256
+    }
+
+    /**
+     * Streams the archive and compares its actual SHA-256 against the pin.
+     * Call before proot-distro install / chroot setup regardless of source.
+     */
+    fun verifyArchiveAgainstPin(archive: File): Boolean {
+        return try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            archive.inputStream().buffered(1024 * 1024).use { input ->
+                val buf = ByteArray(1024 * 1024)
+                var read: Int
+                while (input.read(buf).also { read = it } != -1) {
+                    digest.update(buf, 0, read)
+                }
+            }
+            val actual = digest.digest().joinToString("") { "%02x".format(it) }
+            val ok = actual.equals(PINNED_ALPAQUITA_SHA256, ignoreCase = true)
+            if (!ok) {
+                Log.e(TAG, "SHA-256 mismatch for ${archive.absolutePath} (actual=${actual.take(16)}…, pinned=${PINNED_ALPAQUITA_SHA256.take(16)}…)")
+            }
+            ok
+        } catch (e: Exception) {
+            Log.e(TAG, "SHA-256 verification failed for ${archive.absolutePath}: ${e.message}")
+            false
+        }
     }
 
     private fun readShaFile(shaFile: File): String? {

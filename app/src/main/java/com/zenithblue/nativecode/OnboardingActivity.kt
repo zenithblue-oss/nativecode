@@ -1574,7 +1574,7 @@ class OnboardingActivity : AppCompatActivity() {
                 val sizeStr = currentSource?.archiveFile?.length()?.let { " (${OnboardingIo.formatBytes(it)})" } ?: ""
                 "Runtime artifact detected: ${currentSource?.archiveFile?.name ?: "Bundled"}$sizeStr\nSHA256: ${currentSource?.expectedSha256?.take(16)}… [VERIFIED]"
             } else {
-                "Play Asset Pack: nativecode_runtime (1.25 GB on-demand download)\nPack delivers prebuilt Alpaquita rootfs directly to device."
+                "Play Asset Pack: nativecode_runtime (~1.5 GB on-demand download)\nPack delivers prebuilt Alpaquita rootfs directly to device."
             }
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
@@ -2435,11 +2435,17 @@ class OnboardingActivity : AppCompatActivity() {
                 val chrootEnv = mutableMapOf<String, String>()
                 when (rootfsSource) {
                     is RootfsSource.LocalFile -> {
+                        check(RootfsSourceResolver.verifyArchiveAgainstPin(rootfsSource.archive)) {
+                            "Rootfs SHA-256 mismatch — expected pinned ${RootfsSourceResolver.PINNED_ALPAQUITA_SHA256}"
+                        }
                         chrootArgs.add(rootfsSource.archive.absolutePath)
                         rootfsSource.expectedSha256?.let { chrootEnv["FLUX_ROOTFS_SHA256"] = it }
                         Log.i("Onboarding", "Chroot using LocalFile rootfs: ${rootfsSource.archive.absolutePath}")
                     }
                     is RootfsSource.PlayAssetPack -> {
+                        check(RootfsSourceResolver.verifyArchiveAgainstPin(rootfsSource.archive)) {
+                            "Rootfs SHA-256 mismatch — expected pinned ${RootfsSourceResolver.PINNED_ALPAQUITA_SHA256}"
+                        }
                         chrootArgs.add(rootfsSource.archive.absolutePath)
                         rootfsSource.expectedSha256?.let { chrootEnv["FLUX_ROOTFS_SHA256"] = it }
                         Log.i("Onboarding", "Chroot using PlayAssetPack rootfs: ${rootfsSource.archive.absolutePath}")
@@ -2617,6 +2623,20 @@ class OnboardingActivity : AppCompatActivity() {
                     }
                     target.absolutePath
                 }
+
+                // Play-release gate: actual archive bytes MUST match the compiled pin,
+                // regardless of source (LocalFile DEBUG-only, PlayAssetPack, BundledAsset).
+                val archiveFile = File(archivePath)
+                check(archiveFile.isFile && archiveFile.length() > 2L * 1024L * 1024L) {
+                    "Rootfs archive missing or too small: $archivePath"
+                }
+                updateBaseStatus("B. Verifying runtime SHA-256...")
+                appendSetupLog(">>> Verifying rootfs SHA-256 (${rootfsSource::class.simpleName}): $archivePath\n")
+                check(RootfsSourceResolver.verifyArchiveAgainstPin(archiveFile)) {
+                    "Rootfs SHA-256 mismatch — expected pinned ${RootfsSourceResolver.PINNED_ALPAQUITA_SHA256}"
+                }
+                appendSetupLog(">>> Rootfs SHA-256 verified against pinned release.\n")
+                Log.i("Onboarding", "Installing ${rootfsSource::class.simpleName} rootfs (SHA verified): $archivePath")
 
                 val python = TermuxHostPaths.BIN + "/python"
                 val prootDistro = TermuxHostPaths.PROOT_DISTRO
