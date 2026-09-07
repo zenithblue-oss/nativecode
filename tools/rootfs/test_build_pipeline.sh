@@ -565,4 +565,8 @@ if ! bash -c "
 fi
 echo "PASS: flux_install.sh succeeds when adjacent SHA256 matches"
 
+echo "== checking XFCE overlay panel structural contract =="
+python3 "$REPO_ROOT/tools/rootfs/test_xfce_overlay.py"
+echo "PASS: XFCE overlay panel contract validated"
+
 echo "BUILD-PIPELINE: ALL PASS"

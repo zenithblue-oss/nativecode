@@ -2,6 +2,7 @@
 # verify_rootfs.sh — offline verifier for built rootfs tree (no network).
 # Usage: tools/rootfs/verify_rootfs.sh /path/to/rootfs
 set -u
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOTFS="${1:?usage: verify_rootfs.sh <rootfs-dir>}"
 FAIL=0
 DISTRO="${ROOTFS_DISTRO:-}"
@@ -115,6 +116,22 @@ if [ -f "$XCONF/xfce4-desktop.xml" ]; then
 fi
 if [ -f "$ROOTFS/home/flux/.config/xfce4/helpers.rc" ]; then
     grep -q '^TerminalEmulator=xfce4-terminal$' "$ROOTFS/home/flux/.config/xfce4/helpers.rc" || { echo "FAIL helpers.rc TerminalEmulator=xfce4-terminal"; FAIL=1; }
+fi
+if [ -f "$XCONF/xfce4-panel.xml" ]; then
+    PY_VALIDATOR=""
+    for cand in "$DIR/test_xfce_overlay.py" "$DIR/tools/rootfs/test_xfce_overlay.py" "${REPO_ROOT:-}/tools/rootfs/test_xfce_overlay.py" "$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null)/tools/rootfs/test_xfce_overlay.py" "/home/user/repos/NC-PLAY/tools/rootfs/test_xfce_overlay.py"; do
+        if [ -n "$cand" ] && [ -f "$cand" ]; then
+            PY_VALIDATOR="$cand"
+            break
+        fi
+    done
+    if [ -n "$PY_VALIDATOR" ]; then
+        python3 "$PY_VALIDATOR" "$XCONF/xfce4-panel.xml" || { echo "FAIL xfce4-panel overlay structural contract"; FAIL=1; }
+        echo "panel CONFIG CONTRACT PASS"
+    else
+        echo "FAIL test_xfce_overlay.py not found"
+        FAIL=1
+    fi
 fi
 
 if [ "$(uname -m)" = "aarch64" ] && [ -x "$ROOTFS/bin/sh" ] && [ -x "$ROOTFS/home/flux/.local/bin/opencode" ]; then
