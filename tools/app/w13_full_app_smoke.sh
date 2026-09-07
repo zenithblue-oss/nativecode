@@ -5,6 +5,7 @@ set -euo pipefail
 
 SERIAL="${ADB_SERIAL:-192.168.1.53:37491}"
 PKG="com.zenithblue.nativecode"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 adb_cmd() {
     adb -s "$SERIAL" "$@"
@@ -374,6 +375,100 @@ mode_logs() {
     echo "PASS: Logs"
 }
 
+mode_xfce_config() {
+    echo "=== FOCUSED MODE: XFCE CONFIGURATION ==="
+    local guest_out
+    guest_out="$(run_proot_guest flux '
+        echo "=== HELPERS ==="
+        cat ~/.config/xfce4/helpers.rc 2>/dev/null || true
+        echo "=== THEME ==="
+        grep -o "ThemeName.*" ~/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml 2>/dev/null || true
+        echo "=== ICONS ==="
+        grep -o "IconThemeName.*" ~/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml 2>/dev/null || true
+        echo "=== CURSOR ==="
+        grep -o "CursorThemeName.*" ~/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml 2>/dev/null || true
+        echo "=== XFWM ==="
+        grep -o "theme.*" ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml 2>/dev/null || true
+        echo "=== WALLPAPER ==="
+        grep -o "/home/flux/Pictures/Wallpapers/.*" ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml 2>/dev/null || true
+        echo "=== PERMS ==="
+        stat -c "%u:%g %a %n" ~/.config/xfce4/helpers.rc ~/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml 2>/dev/null || true
+    ')"
+    echo "$guest_out" | sed 's/^/  /'
+
+    echo "$guest_out" | grep -q "Space-transparency" || { echo "FAIL: Space-transparency theme missing"; exit 1; }
+    echo "$guest_out" | grep -q "Papirus-Dark" || { echo "FAIL: Papirus-Dark icons missing"; exit 1; }
+    echo "$guest_out" | grep -q "Vimix-white-cursors" || { echo "FAIL: Vimix cursor missing"; exit 1; }
+    echo "$guest_out" | grep -q "fluxlinux-dark.png" || { echo "FAIL: fluxlinux-dark.png wallpaper missing"; exit 1; }
+    echo "$guest_out" | grep -q "TerminalEmulator=xfce4-terminal" || { echo "FAIL: helpers.rc TerminalEmulator missing"; exit 1; }
+
+    echo "PASS: XFCE Configuration"
+}
+
+mode_xfce_terminal() {
+    echo "=== FOCUSED MODE: XFCE TERMINAL ==="
+    local term_ver
+    term_ver="$(run_proot_guest flux 'xfce4-terminal --version 2>&1 || true')"
+    echo "Terminal version output: $term_ver"
+    echo "$term_ver" | grep -qi "xfce4-terminal\|cannot open display" || { echo "FAIL: xfce4-terminal executable error"; exit 1; }
+
+    local native_lib_dir
+    native_lib_dir="$(get_native_lib_dir)"
+    local x11_alive
+    x11_alive="$(adb_cmd shell "/system/bin/toybox pidof termux-x11" | tr -d '\r' || true)"
+    local stop_after=0
+    if [ -z "$x11_alive" ]; then
+        stop_after=1
+        adb_cmd shell "run-as $PKG env \
+            TERMUX_APP__PACKAGE_NAME=$PKG \
+            TERMUX__PREFIX=/data/data/$PKG/files/usr \
+            TERMUX__HOME=/data/data/$PKG/files/home \
+            PREFIX=/data/data/$PKG/files/usr \
+            TMPDIR=/data/data/$PKG/files/usr/tmp \
+            PROOT_TMP_DIR=/data/data/$PKG/files/usr/tmp \
+            LD_LIBRARY_PATH=/data/data/$PKG/files/usr/lib \
+            PATH=$native_lib_dir:/data/data/$PKG/files/usr/bin:/system/bin \
+            /system/bin/linker64 $native_lib_dir/libbash.so /data/data/$PKG/files/home/start_gui.sh alpaquita >/dev/null 2>&1 &"
+        adb_cmd shell "/system/bin/toybox sleep 4"
+    fi
+
+    local exo_test
+    exo_test="$(run_proot_guest flux '
+        mkdir -p /tmp/runtime-flux
+        chmod 700 /tmp/runtime-flux
+        export XDG_RUNTIME_DIR=/tmp/runtime-flux
+        export DISPLAY=:0
+        eval $(dbus-launch --sh-syntax 2>/dev/null || true)
+        exo-open --launch TerminalEmulator &
+        sleep 2
+        ps -A -o pid,comm,args | grep -E "xfce4-terminal|xfce4-mime-helper" | grep -v grep || true
+    ')"
+    echo "exo-open test process output:"
+    echo "$exo_test" | sed 's/^/  /'
+    echo "$exo_test" | grep -q "xfce4-terminal" || { echo "FAIL: exo-open TerminalEmulator did not launch xfce4-terminal"; exit 1; }
+
+    if [ "$stop_after" = "1" ]; then
+        adb_cmd shell "run-as $PKG env \
+            TERMUX_APP__PACKAGE_NAME=$PKG \
+            TERMUX__PREFIX=/data/data/$PKG/files/usr \
+            TERMUX__HOME=/data/data/$PKG/files/home \
+            PREFIX=/data/data/$PKG/files/usr \
+            TMPDIR=/data/data/$PKG/files/usr/tmp \
+            PROOT_TMP_DIR=/data/data/$PKG/files/usr/tmp \
+            LD_LIBRARY_PATH=/data/data/$PKG/files/usr/lib \
+            PATH=$native_lib_dir:/data/data/$PKG/files/usr/bin:/system/bin \
+            /system/bin/linker64 $native_lib_dir/libbash.so /data/data/$PKG/files/home/stop_gui.sh alpaquita" >/dev/null 2>&1 || true
+    fi
+
+    echo "PASS: XFCE Terminal"
+}
+
+mode_immutable_runtime() {
+    echo "=== FOCUSED MODE: IMMUTABLE RUNTIME ==="
+    bash "$DIR/test_prebuilt_runtime_immutable_contract.sh"
+    echo "PASS: Immutable Runtime"
+}
+
 mode="${1:---all}"
 
 case "$mode" in
@@ -383,19 +478,25 @@ case "$mode" in
     --git-matrix) mode_git_matrix ;;
     --gui-matrix) mode_gui_matrix ;;
     --logs) mode_logs ;;
+    --xfce-config) mode_xfce_config ;;
+    --xfce-terminal) mode_xfce_terminal ;;
+    --immutable-runtime) mode_immutable_runtime ;;
     --all)
         mode_preflight
         mode_guest_matrix
         mode_project_matrix
         mode_git_matrix
         mode_gui_matrix
+        mode_xfce_config
+        mode_xfce_terminal
+        mode_immutable_runtime
         mode_logs
         echo "========================================"
         echo "ALL W13 APP SMOKE TESTS COMPLETED: PASS"
         echo "========================================"
         ;;
     *)
-        echo "Usage: $0 [--preflight|--guest-matrix|--project-matrix|--git-matrix|--gui-matrix|--logs|--all]"
+        echo "Usage: $0 [--preflight|--guest-matrix|--project-matrix|--git-matrix|--gui-matrix|--logs|--xfce-config|--xfce-terminal|--immutable-runtime|--all]"
         exit 1
         ;;
 esac

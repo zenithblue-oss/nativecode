@@ -100,6 +100,12 @@ if [ -f "$OUT/nativecode-gui-alpaquita-glibc-aarch64.tar.zst" ]; then
     fi
 fi
 
+# Stage overlay
+mkdir -p "$WORK/rootfs-overlay"
+if [ -d "$SCRIPT_DIR/overlay/alpaquita" ]; then
+    cp -a "$SCRIPT_DIR/overlay/alpaquita/." "$WORK/rootfs-overlay/"
+fi
+
 cat > "$ASSEMBLE" <<ASSEMBLE_EOF
 #!/bin/sh
 set -eu
@@ -185,6 +191,23 @@ if [ -d /xfce-staging ]; then
     fi
     [ ! -f /xfce-staging/fluxlinux-dark.png ] || cp -f /xfce-staging/fluxlinux-dark.png "\$WALLPAPER_DIR/fluxlinux-dark.png"
     [ ! -f /xfce-staging/fluxlinux-light.png ] || cp -f /xfce-staging/fluxlinux-light.png "\$WALLPAPER_DIR/fluxlinux-light.png"
+fi
+
+# Bake XFCE overlay
+if [ -d /rootfs-overlay/home/flux/.config/xfce4 ]; then
+    mkdir -p /home/flux/.config
+    cp -a /rootfs-overlay/home/flux/.config/xfce4 /home/flux/.config/
+    chown -R 1000:1000 /home/flux/.config /home/flux/Pictures 2>/dev/null || true
+    chmod -R u+rwX,go+rX /home/flux/.config
+else
+    echo "assemble-inside: FATAL: /rootfs-overlay/home/flux/.config/xfce4 missing" >&2
+    exit 1
+fi
+
+# Bake iceauth compatibility symlink to remove runtime /cache/gui-work dependency
+if [ -x /usr/bin/iceauth ]; then
+    mkdir -p /cache/gui-work/destdir/usr/bin
+    ln -sfn /usr/bin/iceauth /cache/gui-work/destdir/usr/bin/iceauth
 fi
 
 # Bake Oh My Zsh + plugins + theme as flux
@@ -291,6 +314,19 @@ esac
 ANDROID_EOF
     chmod 644 /etc/profile.d/nativecode-android.sh
 fi
+
+guest_log "verifying all baked AI CLIs execute"
+su -s /bin/sh flux -c '
+  export PATH="\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH"
+  opencode --version
+  codex --version
+  qwen --version
+  claude --version
+  agy --version
+  grok --version
+  kiro-cli --version
+'
+
 guest_log "guest assembly finished"
 ASSEMBLE_EOF
 chmod +x "$ASSEMBLE"
@@ -309,10 +345,10 @@ log "             umount /rootfs/run 2>/dev/null || true; \\"
 log "             umount /rootfs/sys 2>/dev/null || true; \\"
 log "             umount /rootfs/proc 2>/dev/null || true; \\"
 log "             umount /rootfs/dev 2>/dev/null || true; \\"
-log "             rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging; \\"
+log "             rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay; \\"
 log "           }; \\"
 log "           trap cleanup EXIT INT TERM; \\"
-log "           mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts; \\"
+log "           mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts; \\"
 log "           mount --bind /dev /rootfs/dev; \\"
 log "           mount -t proc proc /rootfs/proc; \\"
 log "           mount -t sysfs sysfs /rootfs/sys; \\"
@@ -322,6 +358,7 @@ log "           cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-co
 log "           ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/); \\"
 log "           ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/); \\"
 log "           ([ ! -d /host-work/gui-staging ] || cp -a /host-work/gui-staging/. /rootfs/gui-staging/); \\"
+log "           ([ ! -d /host-work/rootfs-overlay ] || cp -a /host-work/rootfs-overlay/. /rootfs/rootfs-overlay/); \\"
 log "           cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh; \\"
 log "           chroot /rootfs /bin/sh /assemble.sh'"
 

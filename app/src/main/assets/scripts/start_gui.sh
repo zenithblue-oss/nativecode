@@ -186,11 +186,17 @@ fi
 
 echo "FluxLinux: startxfce4=READY"
 
-# Guest GPU mode from setup_hw_accel_debian.sh (/etc/fluxlinux/gpu_mode)
-GPU_MODE="virgl"
-if [ -r "$ROOTFS/etc/fluxlinux/gpu_mode" ]; then
-  GPU_MODE=$("$TB" tr -d '[:space:]' <"$ROOTFS/etc/fluxlinux/gpu_mode")
-fi
+# Guest GPU mode from launch hint or /etc/fluxlinux/gpu_mode
+GPU_HINT="${2:-}"
+case "$GPU_HINT" in
+  turnip|virgl) GPU_MODE="$GPU_HINT" ;;
+  *)
+    GPU_MODE=virgl
+    if [ -r "$ROOTFS/etc/fluxlinux/gpu_mode" ]; then
+      GPU_MODE=$("$TB" tr -d '[:space:]' <"$ROOTFS/etc/fluxlinux/gpu_mode")
+    fi
+    ;;
+esac
 case "$GPU_MODE" in
   turnip|virgl) ;;
   *) GPU_MODE=virgl ;;
@@ -226,9 +232,19 @@ else
         exit 0
       fi
 
-      GPU_MODE=virgl
-      if [ -r /etc/fluxlinux/gpu_mode ]; then
+      GPU_MODE="'"$GPU_MODE"'"
+      if [ -z "$GPU_MODE" ] && [ -r /etc/fluxlinux/gpu_mode ]; then
         GPU_MODE=$(tr -d "[:space:]" </etc/fluxlinux/gpu_mode)
+      fi
+      case "$GPU_MODE" in
+        turnip|virgl) ;;
+        *) GPU_MODE=virgl ;;
+      esac
+
+      if [ ! -s /var/lib/dbus/machine-id ] && [ ! -s /etc/machine-id ]; then
+        dbus-uuidgen --ensure=/etc/machine-id 2>/dev/null || true
+        mkdir -p /var/lib/dbus 2>/dev/null || true
+        ln -sf /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || cp -f /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || true
       fi
 
       unset GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE VK_ICD_FILENAMES

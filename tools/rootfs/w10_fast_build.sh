@@ -54,7 +54,9 @@ while [ $# -gt 0 ]; do
 done
 
 mkdir -p "$CACHE" "$OUT" "$GUI_WORK"
-[ "$CLEAN_ROOT" = "0" ] || rm -rf "$ROOT_WORK"
+if [ "$CLEAN_ROOT" != "0" ] && [ -d "$ROOT_WORK" ]; then
+    docker run --rm -v "$CACHE:/cache" alpine:latest rm -rf "/cache/rootfs-work" 2>/dev/null || rm -rf "$ROOT_WORK" || true
+fi
 mkdir -p "$ROOT_WORK"
 
 JOBS="${JOBS:-$(nproc)}"
@@ -175,10 +177,10 @@ docker run --rm --privileged --platform linux/arm64 \
             umount /rootfs/sys 2>/dev/null || true
             umount /rootfs/proc 2>/dev/null || true
             umount /rootfs/dev 2>/dev/null || true
-            rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging
+            rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay
         }
         trap cleanup EXIT INT TERM
-        mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging \
+        mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay \
                  /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts
         mount --bind /dev /rootfs/dev
         mount -t proc proc /rootfs/proc
@@ -189,6 +191,7 @@ docker run --rm --privileged --platform linux/arm64 \
         if [ -d /host-work/opt-staging ]; then cp -a /host-work/opt-staging/. /rootfs/opt-staging/; fi
         if [ -d /host-work/xfce-staging ]; then cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/; fi
         if [ -d /host-work/gui-staging ]; then cp -a /host-work/gui-staging/. /rootfs/gui-staging/; fi
+        if [ -d /host-work/rootfs-overlay ]; then cp -a /host-work/rootfs-overlay/. /rootfs/rootfs-overlay/; fi
         cp /host-work/assemble-inside.sh /rootfs/assemble.sh
         chmod +x /rootfs/assemble.sh
         chroot /rootfs /bin/sh /assemble.sh

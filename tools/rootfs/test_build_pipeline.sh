@@ -226,6 +226,9 @@ for c in opencode codex qwen agy claude grok kiro-cli; do
     touch "$DUMMY_FS/home/flux/.local/bin/$c" && chmod +x "$DUMMY_FS/home/flux/.local/bin/$c"
 done
 
+mkdir -p "$DUMMY_FS/home/flux/.config"
+cp -a "$REPO_ROOT/tools/rootfs/overlay/alpaquita/home/flux/.config/xfce4" "$DUMMY_FS/home/flux/.config/"
+
 set +e
 VERIFY_DEV0_OUT="$(bash "$REPO_ROOT/tools/rootfs/verify_rootfs.sh" "$DUMMY_FS" 2>&1)"
 VERIFY_DEV0_RC=$?

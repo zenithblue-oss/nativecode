@@ -93,6 +93,44 @@ if [ "$DISTRO" = "alpaquita" ]; then
     need /usr/lib/libdisplay-info.so.3
 fi
 
+echo "== XFCE baked configuration overlay =="
+need /home/flux/.config/xfce4/helpers.rc
+need /home/flux/.config/xfce4/terminal/terminalrc
+need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
+need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml
+need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
+
+XCONF="$ROOTFS/home/flux/.config/xfce4/xfconf/xfce-perchannel-xml"
+if [ -f "$XCONF/xsettings.xml" ]; then
+    grep -q 'ThemeName.*Space-transparency' "$XCONF/xsettings.xml" || { echo "FAIL xsettings ThemeName Space-transparency"; FAIL=1; }
+    grep -q 'IconThemeName.*Papirus-Dark' "$XCONF/xsettings.xml" || { echo "FAIL xsettings IconThemeName Papirus-Dark"; FAIL=1; }
+    grep -q 'CursorThemeName.*Vimix-white-cursors' "$XCONF/xsettings.xml" || { echo "FAIL xsettings CursorThemeName Vimix-white-cursors"; FAIL=1; }
+fi
+if [ -f "$XCONF/xfwm4.xml" ]; then
+    grep -q 'theme.*Space-transparency' "$XCONF/xfwm4.xml" || { echo "FAIL xfwm4 theme Space-transparency"; FAIL=1; }
+fi
+if [ -f "$XCONF/xfce4-desktop.xml" ]; then
+    grep -q 'fluxlinux-dark.png' "$XCONF/xfce4-desktop.xml" || { echo "FAIL xfce4-desktop wallpaper fluxlinux-dark.png"; FAIL=1; }
+fi
+if [ -f "$ROOTFS/home/flux/.config/xfce4/helpers.rc" ]; then
+    grep -q '^TerminalEmulator=xfce4-terminal$' "$ROOTFS/home/flux/.config/xfce4/helpers.rc" || { echo "FAIL helpers.rc TerminalEmulator=xfce4-terminal"; FAIL=1; }
+fi
+
+if [ "$(uname -m)" = "aarch64" ] && [ -x "$ROOTFS/bin/sh" ] && [ -x "$ROOTFS/home/flux/.local/bin/opencode" ]; then
+    echo "== executing AI tools (ARM64) =="
+    chroot "$ROOTFS" su -s /bin/sh flux -c '
+      export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+      opencode --version
+      codex --version
+      qwen --version
+      claude --version
+      agy --version
+      grok --version
+      kiro-cli --version
+    ' || FAIL=1
+fi
+
 echo "== customization assets (COMPONENT_G=1) =="
 [ -d "$ROOTFS/usr/share/themes/Space-transparency" ] || { echo "MISS G theme Space-transparency"; FAIL=1; }
 [ -d "$ROOTFS/usr/share/themes/Space-light" ] || { echo "MISS G theme Space-light"; FAIL=1; }

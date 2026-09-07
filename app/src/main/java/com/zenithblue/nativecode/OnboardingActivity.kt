@@ -1505,7 +1505,7 @@ class OnboardingActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(8))
         }
         specHead.addView(TextView(this).apply {
-            text = "PRE-BAKED LINUX USERLAND"
+            text = "PRE-BUILT LINUX USERLAND"
             textSize = 14f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
@@ -1516,9 +1516,11 @@ class OnboardingActivity : AppCompatActivity() {
 
         val specLines = listOf(
             "· Base Distro" to "Alpaquita Linux (glibc AArch64)",
-            "· Dev Toolchain" to "Python 3.14 · Node.js 24 · Git · GitHub CLI",
-            "· Desktop & Display" to "XFCE4 GUI · TigerVNC Server · Mesa 3D",
-            "· AI CLI Suite" to "OpenCode · Kiro · Claude · Codex · Grok · Qwen"
+            "· Dev Toolchain" to "Developer toolchain",
+            "· Desktop & Display" to "XFCE desktop + display stack",
+            "· Customization" to "NativeCode desktop defaults",
+            "· Version Control" to "Git + GitHub CLI",
+            "· AI Suite" to "AI CLI suite (OpenCode, Codex, Qwen, Claude, Antigravity, Grok, Kiro)"
         )
         specLines.forEach { (k, v) ->
             specCard.addView(TextView(this).apply {
@@ -1529,6 +1531,14 @@ class OnboardingActivity : AppCompatActivity() {
                 setPadding(0, dp(2), 0, dp(2))
             })
         }
+        specCard.addView(TextView(this).apply {
+            text = "\nNativeCode verifies and installs the image as delivered.\nNo guest package-install or repair scripts run during onboarding."
+            textSize = 10.5f
+            setTextColor(NC.OUTLINE)
+            typeface = Typeface.MONOSPACE
+            setLineSpacing(dp(2).toFloat(), 1.2f)
+            setPadding(0, dp(4), 0, dp(2))
+        })
         root.addView(specCard)
 
         // 2. Play Asset Delivery / Rootfs Source Card
@@ -1990,22 +2000,10 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun prootSetupPhases(): List<SetupPhase> {
-        val phases = mutableListOf(
-            SetupPhase("A", "Preparing host environment…", 10),
-            SetupPhase("B", "Installing Alpaquita Linux…", 40),
-            SetupPhase("E", "Configuring Alpaquita runtime…", 10),
-            SetupPhase("F", "Configuring hardware acceleration…", 10)
+        return listOf(
+            SetupPhase("A", "Preparing host environment…", 20),
+            SetupPhase("B", "Installing Alpaquita Linux…", 80)
         )
-        if (enableXfceGui) {
-            phases.add(SetupPhase("GUI", "Configuring XFCE4 desktop…", 10))
-        }
-        if (enableDebianCustomization) {
-            phases.add(SetupPhase("G", "Applying shell customization…", 10))
-        }
-        if (enableAiCliInstall) {
-            phases.add(SetupPhase("H", "Verifying AI CLI tools…", 10))
-        }
-        return phases
     }
 
     private fun chrootSetupPhases(): List<SetupPhase> {
@@ -2560,6 +2558,32 @@ class OnboardingActivity : AppCompatActivity() {
                 enterSetupPhase("B", "Installing Alpaquita Linux container…")
                 updateBaseStatus("B. Installing Alpaquita Linux Container...")
 
+                val existing = inspectExistingAlpaquita()
+                if (existing.installed) {
+                    if (existing.valid) {
+                        appendSetupLog(">>> Existing valid Alpaquita environment detected — setup already complete.\n")
+                        val gpuDetect = GpuAccelDetector.detect()
+                        getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
+                            .putString("linux_method", "proot")
+                            .putString("flux_gpu", gpuDetect.mode)
+                            .putString("flux_gpu_vendor", gpuDetect.vendorHint)
+                            .apply()
+                        verifyRuntimeSentinel(enableXfceGui)
+                        LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
+                        AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
+                        updateBaseStatus("Existing Alpaquita environment detected — setup already complete.")
+                        setSetupPhaseFraction(1f, "Setup already complete")
+                        finishSetupProgressSuccess()
+                        return@execute
+                    } else {
+                        appendSetupLog(">>> Existing Linux environment incomplete: ${existing.reason}\n")
+                        val msg = "Existing Linux environment is incomplete.\nUse Linux Runtime settings to reset/reinstall it."
+                        updateBaseStatus(msg)
+                        failSetupProgress(msg)
+                        return@execute
+                    }
+                }
+
                 val rootfsSource = RootfsSourceResolver.resolve(this, homeDir)
                 checkNotNull(rootfsSource) { "No rootfs source resolved" }
 
@@ -2613,49 +2637,12 @@ class OnboardingActivity : AppCompatActivity() {
 
                 setSetupPhaseFraction(1f, "Alpaquita container installed")
 
-                enterSetupPhase("E", "Configuring Alpaquita runtime…")
-                val codeE = runPrebuiltGuestRepair("setup_alpaquita_family.sh")
-                check(codeE == 0) { "Phase E runtime repair failed: $codeE" }
-                setSetupPhaseFraction(1f, "Phase E completed")
-
                 val gpuDetect = GpuAccelDetector.detect()
                 getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
                     .putString("linux_method", "proot")
                     .putString("flux_gpu", gpuDetect.mode)
                     .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                     .apply()
-
-                enterSetupPhase("F", "Configuring hardware acceleration…")
-                val codeF = runPrebuiltGuestRepair(
-                    "setup_hw_accel_debian.sh",
-                    mapOf("FLUX_GPU" to gpuDetect.mode)
-                )
-                check(codeF == 0) { "Phase F runtime repair failed: $codeF" }
-                setSetupPhaseFraction(1f, "Phase F completed")
-
-                if (enableXfceGui) {
-                    enterSetupPhase("GUI", "Configuring XFCE4 desktop…")
-                    val codeGui = runPrebuiltGuestRepair(
-                        "setup_xfce4.sh",
-                        mapOf("FLUX_THEME" to "dark")
-                    )
-                    check(codeGui == 0) { "GUI runtime repair failed: $codeGui" }
-                    setSetupPhaseFraction(1f, "GUI completed")
-                }
-
-                if (enableDebianCustomization) {
-                    enterSetupPhase("G", "Applying shell customization…")
-                    val codeG = runPrebuiltGuestRepair("setup_customization_alpine.sh")
-                    check(codeG == 0) { "Phase G runtime repair failed: $codeG" }
-                    setSetupPhaseFraction(1f, "Phase G completed")
-                }
-
-                if (enableAiCliInstall) {
-                    enterSetupPhase("H", "Verifying AI CLI tools…")
-                    val codeH = runPrebuiltGuestRepair("setup_cli_tools.sh")
-                    check(codeH == 0) { "Phase H runtime repair failed: $codeH" }
-                    setSetupPhaseFraction(1f, "Phase H completed")
-                }
 
                 verifyRuntimeSentinel(enableXfceGui)
 
@@ -2672,47 +2659,54 @@ class OnboardingActivity : AppCompatActivity() {
         }
     }
 
-    private fun runPrebuiltGuestRepair(
-        scriptName: String,
-        extraEnv: Map<String, String> = emptyMap(),
-        user: String = "root"
-    ): Int {
-        val usrTmp = File(filesDir, "usr/tmp")
-        usrTmp.mkdirs()
-        val script = File(usrTmp, scriptName)
-        val assetPath = "scripts/$scriptName"
-        assets.open(assetPath).use { input ->
-            FileOutputStream(script).use { output -> input.copyTo(output) }
+    private data class ExistingProotState(
+        val installed: Boolean,
+        val valid: Boolean,
+        val reason: String
+    )
+
+    private fun inspectExistingAlpaquita(): ExistingProotState {
+        val root = File(
+            filesDir,
+            "usr/var/lib/proot-distro/containers/alpaquita/rootfs"
+        )
+        if (!root.isDirectory) {
+            return ExistingProotState(false, false, "missing")
         }
-        script.setExecutable(true)
 
-        val envPrefix = extraEnv.entries.joinToString(" ") { "${it.key}=${it.value}" }
-        val guestCmd = if (envPrefix.isBlank()) "bash /tmp/$scriptName" else "env $envPrefix bash /tmp/$scriptName"
+        val marker = File(root, "etc/nativecode/rootfs-release")
+        if (!marker.isFile) {
+            return ExistingProotState(true, false, "release marker missing")
+        }
 
-        val python = "${TermuxHostPaths.BIN}/python"
-        val prootDistro = TermuxHostPaths.PROOT_DISTRO
-        val hostEnv = mutableMapOf(
-            "PD_PROOT_BIN" to TermuxHostPaths.libProot(this).absolutePath,
-            "PROOT_LOADER" to TermuxHostPaths.libLoader(this).absolutePath,
-            "PROOT_TMP_DIR" to TermuxHostPaths.TMPDIR
+        val text = runCatching { marker.readText() }.getOrDefault("")
+
+        val required = listOf(
+            "FORMAT_VERSION=1",
+            "DISTRO=alpaquita",
+            "LIBC=glibc",
+            "COMPONENT_E=1",
+            "COMPONENT_F=1",
+            "COMPONENT_GUI=1",
+            "COMPONENT_G=1",
+            "COMPONENT_H=1",
+            "COMPONENT_GH=1"
         )
 
-        val cmd = arrayOf(
-            python,
-            prootDistro,
-            "login",
-            "alpaquita",
-            "--shared-tmp",
-            "--user",
-            user,
-            "--",
-            "/bin/bash",
-            "--noprofile",
-            "--norc",
-            "-c",
-            guestCmd
+        val hasShell = File(root, "usr/bin/busybox").exists() ||
+            File(root, "usr/bin/bash").exists() ||
+            File(root, "bin/sh").isFile ||
+            File(root, "bin/sh").exists()
+        val valid =
+            required.all { req -> text.lineSequence().any { it == req } } &&
+            hasShell &&
+            File(root, "usr/bin/startxfce4").exists()
+
+        return ExistingProotState(
+            installed = true,
+            valid = valid,
+            reason = if (valid) "ready" else "invalid marker/runtime"
         )
-        return runShellCommand(cmd, extraEnv = hostEnv)
     }
 
     private fun verifyRuntimeSentinel(enableXfceGui: Boolean) {
@@ -2724,8 +2718,8 @@ class OnboardingActivity : AppCompatActivity() {
         check(releaseText.contains("LIBC=glibc")) { "Sentinel check failed: LIBC!=glibc" }
         check(File(rootfsDir, "home/flux").isDirectory) { "Sentinel check failed: /home/flux not found" }
         check(File(rootfsDir, "bin/bash").exists() || File(rootfsDir, "usr/bin/bash").exists()) { "Sentinel check failed: bash not found" }
-        check(File(rootfsDir, "usr/bin/git").exists()) { "Sentinel check failed: git not found" }
-        check(File(rootfsDir, "usr/bin/gh").exists()) { "Sentinel check failed: gh not found" }
+        check(File(rootfsDir, "usr/bin/git").exists() || File(rootfsDir, "usr/local/bin/git").exists()) { "Sentinel check failed: git not found" }
+        check(File(rootfsDir, "usr/local/bin/gh").exists() || File(rootfsDir, "usr/bin/gh").exists()) { "Sentinel check failed: gh not found" }
         if (enableXfceGui) {
             check(File(rootfsDir, "usr/bin/startxfce4").exists()) { "Sentinel check failed: startxfce4 not found" }
         }

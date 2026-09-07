@@ -13064,7 +13064,8 @@ class MainActivity : AppCompatActivity() {
     private fun guiHostScriptArgs(scriptName: String): Array<String> {
         val bash = TermuxHostPaths.libBash(this).absolutePath
         val script = File(TermuxHostPaths.HOME, scriptName)
-        return arrayOf(bash, script.absolutePath, ProjectPathResolver.DEFAULT_DISTRO)
+        val gpu = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("flux_gpu", "virgl") ?: "virgl"
+        return arrayOf(bash, script.absolutePath, ProjectPathResolver.DEFAULT_DISTRO, gpu)
     }
 
     /** Start XFCE: proot → start_gui.sh; chroot → start_gui_chroot.sh (host X11 + root DE). */
@@ -15489,221 +15490,102 @@ class MainActivity : AppCompatActivity() {
         headerTitleRow.addView(methodBadge)
         pageLayout.addView(headerTitleRow)
         pageLayout.addView(TextView(this).apply {
-            text = "// INSTALL · BROWSER / DEVICE-CODE SIGN-IN · PER ISOLATION"
+            text = "// INCLUDED IN THE PRE-BUILT LINUX RUNTIME"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
-            setPadding(0, dp(4), 0, dp(8))
+            setPadding(0, dp(6), 0, dp(6))
         })
         pageLayout.addView(TextView(this).apply {
-            text = "Auth is per isolation (proot ≠ chroot). Suite install is optional (guest-only remotes)."
+            text = "NativeCode does not install, repair, authenticate, or remove\n" +
+                "AI CLI tools from this page.\n\n" +
+                "Use each CLI directly in its terminal. Authentication and account\n" +
+                "management are handled by the CLI vendor."
             textSize = 12f
             setTextColor(NC.OUTLINE)
             typeface = Typeface.MONOSPACE
+            setLineSpacing(dp(2).toFloat(), 1.25f)
             setPadding(0, 0, 0, dp(12))
         })
 
-        val installHost = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
-        }
-        cliAuthInstallHost = installHost
-        pageLayout.addView(installHost)
-        rebuildCliAuthInstallCard()
-
-        val credHost = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
-        }
-        cliAuthCredentialsHost = credHost
-        pageLayout.addView(credHost)
-        rebuildCliAuthCredentialsCard()
-
-        val refreshBtn = secondaryButton("REFRESH STATUS") {
-            refreshCliAuthPage(force = true)
+        val openTermBtn = primaryButton("OPEN TERMINAL") {
+            navigateBackFromSubpage(ID_CLI_AUTH)
+            createNewTerminalSession("shell")
         }.apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(14) }
+            textSize = 13f
+        }
+        pageLayout.addView(openTermBtn)
+
+        data class BundledTool(val name: String, val cmd: String, val sessionType: String)
+        val bundledTools = listOf(
+            BundledTool("OpenCode", "opencode --auto", "opencode"),
+            BundledTool("Codex", "codex", "codex"),
+            BundledTool("Qwen Code", "qwen", "qwen-code"),
+            BundledTool("Claude Code", "claude", "claude-code"),
+            BundledTool("Antigravity", "agy", "agy"),
+            BundledTool("Grok", "grok", "grok"),
+            BundledTool("Kiro", "kiro-cli", "kiro")
+        )
+
+        bundledTools.forEach { tool ->
+            val card = glassCard().apply {
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(10) }
+            }
+            val titleRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, 0, 0, dp(4))
+            }
+            titleRow.addView(TextView(this).apply {
+                text = tool.name
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            })
+            titleRow.addView(textBadge("BUNDLED", NC.PRIMARY, Color.parseColor("#0A0A0A")))
+            card.addView(titleRow)
+
+            val cmdRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(2), 0, dp(2))
+            }
+            cmdRow.addView(TextView(this).apply {
+                text = tool.cmd
+                textSize = 12f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            })
+            val openBtn = secondaryButton("OPEN") {
+                navigateBackFromSubpage(ID_CLI_AUTH)
+                createNewTerminalSession(tool.sessionType)
+            }.apply {
+                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
+                textSize = 11f
+            }
+            cmdRow.addView(openBtn)
+            card.addView(cmdRow)
+
+            pageLayout.addView(card)
+        }
+
+        val safetyBtn = secondaryButton("AI SAFETY & REPORT") {
+            if (pageStack.isEmpty() || pageStack.peek() != ID_AI_SAFETY) {
+                pageStack.push(ID_AI_SAFETY)
+            }
+            navigateToPage(ID_AI_SAFETY)
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6); bottomMargin = dp(16) }
             textSize = 12f
         }
-        pageLayout.addView(refreshBtn)
-
-        val list = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        cliAuthListContainer = list
-        pageLayout.addView(list)
+        pageLayout.addView(safetyBtn)
     }
 
-    /** C10 — clear-all AI creds + suite flag + link to AI Safety. */
-    private fun rebuildCliAuthCredentialsCard() {
-        val host = cliAuthCredentialsHost ?: return
-        host.removeAllViews()
-        val method = LinuxCommandBuilder.currentMethod
-        val card = glassCard()
-        card.addView(TextView(this).apply {
-            text = "CREDENTIALS / SIGN-OUT"
-            textSize = 14f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 0, dp(6))
-        })
-        card.addView(TextView(this).apply {
-            text = "Sign-out removes local tokens/keys for $method. " +
-                "Does not delete Debian packages or projects. GitHub is separate."
-            textSize = 11f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-            setLineSpacing(dp(2).toFloat(), 1.2f)
-            setPadding(0, 0, 0, dp(10))
-        })
-        card.addView(
-            primaryButton("CLEAR ALL AI CREDENTIALS") {
-                confirmClearAllAiCredentials()
-            }.apply {
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(8) }
-                textSize = 12f
-            }
-        )
-        card.addView(
-            secondaryButton("CLEAR SUITE FLAG") {
-                confirmClearAiSuiteFlag()
-            }.apply {
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(8) }
-                textSize = 12f
-            }
-        )
-        card.addView(
-            secondaryButton("AI SAFETY & REPORT") {
-                if (pageStack.isEmpty() || pageStack.peek() != ID_AI_SAFETY) {
-                    pageStack.push(ID_AI_SAFETY)
-                }
-                navigateToPage(ID_AI_SAFETY)
-            }.apply {
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-                textSize = 12f
-            }
-        )
-        host.addView(card)
-    }
-
-    private fun confirmClearAllAiCredentials() {
-        val method = LinuxCommandBuilder.currentMethod
-        showBrutalistConfirmDialog(
-            title = "CLEAR ALL AI CREDENTIALS?",
-            message =
-                "Logs out every AI CLI for ${method.uppercase()} and deletes stored API keys " +
-                    "under guest cli-auth.env for those tools. GitHub login is separate. Continue?",
-            confirmLabel = "CLEAR ALL",
-            cancelLabel = "CANCEL",
-            destructive = true
-        ) {
-            Toast.makeText(this, "Clearing AI credentials…", Toast.LENGTH_SHORT).show()
-            CredentialClearService.clearAllAiCredentials(this, method) { _, msg ->
-                runOnUiThread {
-                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-                    refreshCliAuthPage(force = true)
-                }
-            }
-        }
-    }
-
-    private fun confirmClearAiSuiteFlag() {
-        val method = LinuxCommandBuilder.currentMethod
-        showBrutalistConfirmDialog(
-            title = "CLEAR AI SUITE FLAG?",
-            message =
-                "Hides Free/Paid AI launchers until you Install AI CLI tools again. " +
-                    "Bins may still exist in the $method guest. Continue?",
-            confirmLabel = "CLEAR FLAG",
-            cancelLabel = "CANCEL",
-            destructive = true
-        ) {
-            CredentialClearService.clearAiSuiteProvisionFlag(this, method)
-            rebuildCliAuthInstallCard()
-            rebuildCliAuthCredentialsCard()
-            refreshToolCardsForMethod()
-            Toast.makeText(
-                this,
-                "AI suite flag cleared — reinstall to show launchers",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
-    /** Install / re-install AI CLI suite card (C6). */
-    private fun rebuildCliAuthInstallCard() {
-        val host = cliAuthInstallHost ?: return
-        host.removeAllViews()
-        val method = LinuxCommandBuilder.currentMethod
-        val provisioned = AiCliProvisionState.shouldShowAiToolLaunchers(this, method)
-        val other = if (method == "chroot") "proot" else "chroot"
-        val otherOk = AiCliProvisionState.shouldShowAiToolLaunchers(this, other)
-
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_CONTAINER,
-                strokeColor = if (provisioned) NC.OUTLINE_VAR else NC.PRIMARY,
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 6,
-                cornerRadiusDp = 0
-            )
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-        }
-        card.addView(TextView(this).apply {
-            text = if (provisioned) "RE-INSTALL / REPAIR AI CLI TOOLS" else "INSTALL AI CLI TOOLS"
-            textSize = 14f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 0, 0, dp(6))
-        })
-        card.addView(TextView(this).apply {
-            text = "Runs setup_cli_tools.sh in $method guest (network; third-party curl/npm). " +
-                "Guest-only. Not required for Debian shells.\n" +
-                "Proot & chroot installs are separate" +
-                if (otherOk) " · $other suite already marked installed." else "."
-            textSize = 11f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-            setPadding(0, 0, 0, dp(8))
-            setLineSpacing(dp(2).toFloat(), 1.2f)
-        })
-        InstallPlanCatalog.aiCliInventory().take(6).forEach { line ->
-            card.addView(TextView(this).apply {
-                text = "· ${line.label}"
-                textSize = 10f
-                setTextColor(NC.OUTLINE)
-                typeface = Typeface.MONOSPACE
-            })
-        }
-        val btnLabel = if (provisioned) "RE-INSTALL AI TOOLS" else "INSTALL AI TOOLS"
-        card.addView(
-            primaryButton(btnLabel) {
-                confirmAndInstallAiCliTools()
-            }.apply {
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(12) }
-                textSize = 12f
-            }
-        )
-        host.addView(card)
-    }
-
-    private fun confirmAndInstallAiCliTools() {
-        val method = LinuxCommandBuilder.currentMethod
-        showBrutalistConfirmDialog(
-            title = "INSTALL AI CLI TOOLS?",
-            message =
-                "Runs setup_cli_tools.sh inside the current $method guest.\n\n" +
-                    "Uses network and third-party installers (npm/curl). " +
-                    "Does not modify the host APK. Debian shells work without this.",
-            confirmLabel = "INSTALL",
-            cancelLabel = "CANCEL",
-            destructive = false
-        ) {
-            val runMode = if (method == "chroot") "chroot_guest" else "proot"
-            runScriptInTerminal("setup_cli_tools.sh", runMode)
-        }
-    }
+    private fun rebuildCliAuthCredentialsCard() {}
+    private fun rebuildCliAuthInstallCard() {}
 
     // ── AI Safety & Report (C5 / B16 + C10 pointers) ─────────────────────────
 
@@ -16414,47 +16296,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Paint AI CLI cards. Cache-first: reopen page is instant; guest probe only
-     * when cold / stale / [force] (REFRESH or post login-logout).
+     * Non-mutating AI CLI page: update isolation method badge.
      */
     private fun refreshCliAuthPage(force: Boolean = false) {
         val method = LinuxCommandBuilder.currentMethod
         cliAuthMethodBadge?.text = method.uppercase()
-        rebuildCliAuthInstallCard()
-        rebuildCliAuthCredentialsCard()
-        val list = cliAuthListContainer ?: return
-        val cached = CliAuthService.cachedAll(method)
-
-        if (cached != null && !force) {
-            paintCliAuthList(list, cached)
-            if (CliAuthService.isCacheFresh(method)) return
-            // Stale: keep cards, silent re-probe
-            CliAuthService.probeAll(this, method, force = true) { statuses ->
-                if (cliAuthListContainer !== list) return@probeAll
-                if (LinuxCommandBuilder.currentMethod != method) return@probeAll
-                paintCliAuthList(list, statuses)
-            }
-            return
-        }
-
-        if (cached != null && force) {
-            paintCliAuthList(list, cached, footer = "Refreshing ${method.uppercase()}…")
-        } else {
-            list.removeAllViews()
-            list.addView(TextView(this).apply {
-                text = "Probing ${method.uppercase()} guest…"
-                textSize = 12f
-                setTextColor(NC.ON_SURF_VAR)
-                typeface = Typeface.MONOSPACE
-                setPadding(0, dp(8), 0, dp(8))
-            })
-        }
-
-        CliAuthService.probeAll(this, method, force = true) { statuses ->
-            if (cliAuthListContainer !== list) return@probeAll
-            if (LinuxCommandBuilder.currentMethod != method) return@probeAll
-            paintCliAuthList(list, statuses)
-        }
     }
 
     private fun paintCliAuthList(
