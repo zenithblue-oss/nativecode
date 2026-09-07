@@ -35,6 +35,20 @@ grep -q 'val existing = inspectExistingAlpaquita()' "$ONB"
 grep -q 'Existing valid Alpaquita environment detected — setup already complete' "$ONB" || \
 grep -q 'Existing Alpaquita environment detected — setup already complete' "$ONB"
 
+# 5. No maybeRunCliToolsSetup or obsolete AI outcome copy
+if grep -q 'maybeRunCliToolsSetup' "$ONB"; then
+    echo "FAIL: OnboardingActivity still has dead maybeRunCliToolsSetup" >&2
+    exit 1
+fi
+
+if grep -q 'Retry in Settings' "$ONB" || \
+   grep -q 'AI tools skipped' "$ONB" || \
+   grep -q 'AI tools incomplete' "$ONB" || \
+   grep -q 'Off — shells only' "$ONB"; then
+    echo "FAIL: OnboardingActivity still has obsolete AI retry / skipped copy" >&2
+    exit 1
+fi
+
 echo "PASS: Onboarding immutable runtime contract"
 
 echo "== [2/3] AI CLI TOOLS PAGE NON-MUTATING CONTRACT =="
@@ -52,6 +66,17 @@ fi
 
 if grep -q 'fun confirmAndInstallAiCliTools' "$MAIN"; then
     echo "FAIL: MainActivity still has confirmAndInstallAiCliTools" >&2
+    exit 1
+fi
+
+# 2. Settings Hub does not add Repairs button
+if grep -q 'settingsHubLayout.addView(buildScriptsSectionButton())' "$MAIN"; then
+    echo "FAIL: MainActivity still adds buildScriptsSectionButton to settingsHubLayout" >&2
+    exit 1
+fi
+
+if grep -q 'Settings → Repairs' "$MAIN" || grep -q 'Settings -> Repairs' "$MAIN"; then
+    echo "FAIL: MainActivity still contains stale Settings -> Repairs copy" >&2
     exit 1
 fi
 
@@ -99,6 +124,9 @@ grep -q 'CursorThemeName.*Vimix-white-cursors' "$VERIFY"
 grep -q 'theme.*Space-transparency' "$VERIFY"
 grep -q 'fluxlinux-dark.png' "$VERIFY"
 grep -q 'TerminalEmulator=xfce4-terminal' "$VERIFY"
+
+# 6. Structural XFCE overlay panel contract
+python3 "$ROOT/tools/rootfs/test_xfce_overlay.py"
 
 echo "PASS: Rootfs build and verification contract"
 echo "IMMUTABLE-RUNTIME-CONTRACT: ALL PASS"

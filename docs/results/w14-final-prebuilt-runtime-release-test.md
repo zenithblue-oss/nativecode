@@ -1,5 +1,9 @@
 # NativeCode — Final Prebuilt Runtime Release Test Report
 
+> INVALIDATED: post-report physical-device validation on f27e2fb showed
+> xfce4-panel did not render, and the complete UI regression matrix had
+> not actually been executed. Superseded by W15.
+
 ## Release Baseline & Artifacts
 - **COMMIT:** Working branch `feature/prebuilt-alpine-rootfs-w1-w6`
 - **ROOTFS_SHA256:** `02be3de800ab006b318f7225490a0fe8239a33c84b1a3b1445b9273368b5dd8a`

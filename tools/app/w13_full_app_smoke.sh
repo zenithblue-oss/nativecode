@@ -402,6 +402,32 @@ mode_xfce_config() {
     echo "$guest_out" | grep -q "fluxlinux-dark.png" || { echo "FAIL: fluxlinux-dark.png wallpaper missing"; exit 1; }
     echo "$guest_out" | grep -q "TerminalEmulator=xfce4-terminal" || { echo "FAIL: helpers.rc TerminalEmulator missing"; exit 1; }
 
+    echo "=== PANEL XFCONF CHECKS ==="
+    local panel_out
+    panel_out="$(run_proot_guest flux '
+        export DISPLAY=:0
+        eval $(dbus-launch --sh-syntax)
+        echo "POS=$(xfconf-query -c xfce4-panel -p /panels/panel-1/position 2>/dev/null || true)"
+        echo "LEN=$(xfconf-query -c xfce4-panel -p /panels/panel-1/length 2>/dev/null || true)"
+        echo "SIZ=$(xfconf-query -c xfce4-panel -p /panels/panel-1/size 2>/dev/null || true)"
+        echo "PIDS=$(xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids 2>/dev/null || true)"
+        echo "P1=$(xfconf-query -c xfce4-panel -p /plugins/plugin-1 2>/dev/null || true)"
+        echo "P2=$(xfconf-query -c xfce4-panel -p /plugins/plugin-2 2>/dev/null || true)"
+        echo "P3=$(xfconf-query -c xfce4-panel -p /plugins/plugin-3 2>/dev/null || true)"
+        echo "P4=$(xfconf-query -c xfce4-panel -p /plugins/plugin-4 2>/dev/null || true)"
+        echo "P5=$(xfconf-query -c xfce4-panel -p /plugins/plugin-5 2>/dev/null || true)"
+    ')"
+    echo "$panel_out" | sed 's/^/  /'
+
+    echo "$panel_out" | grep -q "POS=p=6;x=0;y=0" || { echo "FAIL: panel position missing or malformed"; exit 1; }
+    echo "$panel_out" | grep -q "LEN=100" || { echo "FAIL: panel length missing"; exit 1; }
+    echo "$panel_out" | grep -q "SIZ=32" || { echo "FAIL: panel size missing"; exit 1; }
+    echo "$panel_out" | grep -q "P1=applicationsmenu" || { echo "FAIL: plugin-1 applicationsmenu missing"; exit 1; }
+    echo "$panel_out" | grep -q "P2=tasklist" || { echo "FAIL: plugin-2 tasklist missing"; exit 1; }
+    echo "$panel_out" | grep -q "P3=separator" || { echo "FAIL: plugin-3 separator missing"; exit 1; }
+    echo "$panel_out" | grep -q "P4=systray" || { echo "FAIL: plugin-4 systray missing"; exit 1; }
+    echo "$panel_out" | grep -q "P5=clock" || { echo "FAIL: plugin-5 clock missing"; exit 1; }
+
     echo "PASS: XFCE Configuration"
 }
 
