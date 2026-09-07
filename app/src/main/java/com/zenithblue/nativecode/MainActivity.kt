@@ -4176,10 +4176,6 @@ class MainActivity : AppCompatActivity() {
         settingsHubLayout.addView(buildX11SettingsSectionButton())
         settingsHubLayout.addView(spacer(16))
 
-        // Repairs (host / guest / chroot fix scripts)
-        settingsHubLayout.addView(buildScriptsSectionButton())
-        settingsHubLayout.addView(spacer(16))
-
         // Onboarding Setup
         settingsHubLayout.addView(buildOnboardingSectionButton())
         settingsHubLayout.addView(spacer(16))
@@ -7714,7 +7710,7 @@ class MainActivity : AppCompatActivity() {
         val xfceReady = isXfceInstalled()
         val sectionSub = TextView(this).apply {
             text = when {
-                !xfceReady -> "Desktop not installed. Install via Settings → Repairs."
+                !xfceReady -> "Desktop runtime unavailable — reinstall the Linux Runtime."
                 methodNow == "chroot" -> "Termux X11 + XFCE4 inside Debian (root)."
                 else -> "Termux X11 + XFCE4 graphical environment."
             }
