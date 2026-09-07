@@ -131,14 +131,22 @@ object RootfsSourceResolver {
                 )
             }
             if (rootfsAssets.contains("alpine_rootfs.tar.gz")) {
-                Log.i(TAG, "Resolved BundledAsset alpine_rootfs.tar.gz")
+                if (!BuildConfig.DEBUG) {
+                    Log.i(TAG, "Release build: ignoring legacy alpine_rootfs.tar.gz fallback (immutable Alpaquita runtime only)")
+                    return null
+                }
+                Log.i(TAG, "Resolved BundledAsset alpine_rootfs.tar.gz (DEBUG only)")
                 return RootfsSource.BundledAsset(
                     assetPath = "rootfs/alpine_rootfs.tar.gz",
                     distro = "alpine"
                 )
             }
             if (rootfsAssets.contains("alpine_rootfs.tar")) {
-                Log.i(TAG, "Resolved BundledAsset alpine_rootfs.tar")
+                if (!BuildConfig.DEBUG) {
+                    Log.i(TAG, "Release build: ignoring legacy alpine_rootfs.tar fallback (immutable Alpaquita runtime only)")
+                    return null
+                }
+                Log.i(TAG, "Resolved BundledAsset alpine_rootfs.tar (DEBUG only)")
                 return RootfsSource.BundledAsset(
                     assetPath = "rootfs/alpine_rootfs.tar",
                     distro = "alpine"
