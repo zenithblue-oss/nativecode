@@ -22,6 +22,23 @@
 -dontwarn android.content.IIntentReceiver
 -dontwarn android.content.IIntentSender
 -dontwarn android.content.pm.IPackageManager
+# WorkManager (transitive via play:asset-delivery, runs on-demand pack
+# downloads) + Room (its database). R8 full mode breaks Room's reflective
+# instantiation of the generated WorkDatabase_Impl without these keeps —
+# caused 100% launch crash in release builds (release-only, debug unaffected).
+-keep class androidx.work.** { *; }
+-keep class * extends androidx.work.Worker { *; }
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep @androidx.room.Entity class * { *; }
+-keepclassmembers class * {
+    @androidx.room.PrimaryKey <fields>;
+}
+-dontwarn androidx.work.**
+-dontwarn androidx.room.**
+
 # Keep Preference classes parsed from XML
 -keep class androidx.preference.** { *; }
 -keepclassmembers class * extends androidx.preference.Preference {
