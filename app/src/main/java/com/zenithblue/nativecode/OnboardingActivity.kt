@@ -38,9 +38,8 @@ import com.zenithblue.nativecode.onboarding.RootfsSource
 import com.zenithblue.nativecode.onboarding.RootfsSourceResolver
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
 import com.zenithblue.nativecode.onboarding.OnboardingUiKit
-import com.zenithblue.nativecode.onboarding.OnboardingUiKit.CustomBrutalistToggle
-import com.zenithblue.nativecode.cliauth.CliToolsInstaller
-import com.zenithblue.nativecode.cliauth.InstallPlanCatalog
+import com.zenithblue.nativecode.onboarding.SetupPhase
+import com.zenithblue.nativecode.onboarding.SetupProgressCoordinator
 import com.zenithblue.nativecode.terminal.GpuAccelDetector
 import com.zenithblue.nativecode.terminal.HostCommandBuilder
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
@@ -64,12 +63,8 @@ class OnboardingActivity : AppCompatActivity() {
 
     // ── Shared setup status state ──────────────────────────────────────────────
     private var isDebianBaseSetupStarted = false
-    private var enableDebianCustomization = true
-    private var enableXfceGui = true
-    /** C6: AI CLI suite opt-in (default OFF). Step H only when true. */
-    private var enableAiCliInstall = false
-    /** Complete-page truth: SKIPPED | READY | PARTIAL */
-    private var aiCliSetupOutcome = "SKIPPED"
+    private val setupProgressCoordinator = SetupProgressCoordinator()
+    private var setupProgressGeneration = 0L
 
     // ── Linux isolation method selected on page 4 ─────────────────────────────
     // "proot" (default, rootless) or "chroot" (requires KernelSU/Magisk root)
@@ -120,8 +115,6 @@ class OnboardingActivity : AppCompatActivity() {
             mainHandler.postDelayed(this, 1000L)
         }
     }
-
-    private data class SetupPhase(val id: String, val label: String, val weight: Int)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -485,7 +478,7 @@ class OnboardingActivity : AppCompatActivity() {
                 category = "AI ENGINE",
                 title = "AI Tools & LLM Harness",
                 iconResId = R.drawable.ic_smart_toy,
-                desc = "Run Claude Code, Codex, Aider, and OpenCode AI CLI tools directly inside your native terminal environment.",
+                desc = "Run OpenCode, Codex, Qwen Code, Claude Code, Antigravity, Grok and Kiro directly inside the prebuilt Linux environment.",
                 type = PreviewType.AI_CLI
             ),
             SlideData(
@@ -1515,16 +1508,15 @@ class OnboardingActivity : AppCompatActivity() {
         specCard.addView(specHead)
 
         val specLines = listOf(
-            "· Base Distro" to "Alpaquita Linux (glibc AArch64)",
-            "· Dev Toolchain" to "Developer toolchain",
-            "· Desktop & Display" to "XFCE desktop + display stack",
-            "· Customization" to "NativeCode desktop defaults",
-            "· Version Control" to "Git + GitHub CLI",
-            "· AI Suite" to "AI CLI suite (OpenCode, Codex, Qwen, Claude, Antigravity, Grok, Kiro)"
+            "• Shell + developer toolchain",
+            "• Git + GitHub CLI",
+            "• XFCE desktop + NativeCode theme",
+            "• Python / Node / JVM / Rust / Go",
+            "• OpenCode / Codex / Qwen / Claude / Antigravity / Grok / Kiro"
         )
-        specLines.forEach { (k, v) ->
+        specLines.forEach { line ->
             specCard.addView(TextView(this).apply {
-                text = "$k — $v"
+                text = line
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -1532,7 +1524,7 @@ class OnboardingActivity : AppCompatActivity() {
             })
         }
         specCard.addView(TextView(this).apply {
-            text = "\nNativeCode verifies and installs the image as delivered.\nNo guest package-install or repair scripts run during onboarding."
+            text = "\nNativeCode verifies and installs this runtime as delivered.\nNo guest package-install or repair scripts run after extraction."
             textSize = 10.5f
             setTextColor(NC.OUTLINE)
             typeface = Typeface.MONOSPACE
@@ -1824,13 +1816,13 @@ class OnboardingActivity : AppCompatActivity() {
 
         setupStepTitleText = TextView(this).apply {
             text = if (setupFinished) {
-                "Full environment setup complete"
+                "Prebuilt Linux runtime ready"
             } else if (setupFailed) {
                 "Setup failed — open log for details"
             } else if (isDebianBaseSetupStarted) {
                 currentSetupPhase()?.label ?: "Installing environment…"
             } else {
-                "Initializing full environment setup (base + AI CLIs)…"
+                "Preparing prebuilt Linux runtime…"
             }
             textSize = 14f
             setTextColor(if (setupFailed) NC.ERROR else NC.ON_SURFACE)
@@ -2001,15 +1993,17 @@ class OnboardingActivity : AppCompatActivity() {
 
     private fun prootSetupPhases(): List<SetupPhase> {
         return listOf(
-            SetupPhase("A", "Preparing host environment…", 20),
-            SetupPhase("B", "Installing Alpaquita Linux…", 80)
+            SetupPhase("A", "Preparing NativeCode host…", 10),
+            SetupPhase("B", "Installing prebuilt Linux runtime…", 85),
+            SetupPhase("C", "Verifying environment…", 5)
         )
     }
 
     private fun chrootSetupPhases(): List<SetupPhase> {
         return listOf(
             SetupPhase("R0", "Checking root access…", 10),
-            SetupPhase("R1", "Installing Alpaquita Linux (chroot)…", 90)
+            SetupPhase("R1", "Installing prebuilt Linux runtime (chroot)…", 85),
+            SetupPhase("R2", "Verifying environment…", 5)
         )
     }
 
@@ -2023,6 +2017,7 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun beginSetupPhases(method: String) {
+        setupProgressGeneration = setupProgressCoordinator.begin()
         setupFailed = false
         setupFinished = false
         setupPhases = if (method == "chroot") chrootSetupPhases() else prootSetupPhases()
@@ -2106,11 +2101,15 @@ class OnboardingActivity : AppCompatActivity() {
     private fun enterSetupPhase(phaseId: String, detail: String? = null) {
         val idx = setupPhases.indexOfFirst { it.id == phaseId }
         if (idx < 0) return
+        val gen = setupProgressGeneration
         setupPhaseIndex = idx
         setupPhaseFraction = 0.05f
         val phase = setupPhases[idx]
         updateSetupFgs(phase.label)
+        val computed = setupProgressCoordinator.computePercent(gen, setupPhases, setupPhaseIndex, setupPhaseFraction) ?: return
+        setupOverallPercent = computed
         mainHandler.post {
+            if (gen != setupProgressGeneration) return@post
             if (::setupStepTitleText.isInitialized) {
                 setupStepTitleText.text = phase.label
                 setupStepTitleText.setTextColor(NC.ON_SURFACE)
@@ -2119,40 +2118,35 @@ class OnboardingActivity : AppCompatActivity() {
                 setupDetailText.text = detail
                     ?: "Step ${idx + 1} of ${setupPhases.size}"
             }
-            recomputeSetupPercent(capAt99 = true)
             applySetupProgressUi()
         }
     }
 
     private fun setSetupPhaseFraction(fraction: Float, detail: String? = null) {
+        val gen = setupProgressGeneration
         setupPhaseFraction = fraction.coerceIn(0f, 1f)
+        val computed = setupProgressCoordinator.computePercent(gen, setupPhases, setupPhaseIndex, setupPhaseFraction) ?: return
+        setupOverallPercent = computed
         mainHandler.post {
+            if (gen != setupProgressGeneration) return@post
             if (detail != null && ::setupDetailText.isInitialized) {
                 setupDetailText.text = detail
             }
-            recomputeSetupPercent(capAt99 = true)
             applySetupProgressUi()
         }
     }
 
-    private fun recomputeSetupPercent(capAt99: Boolean) {
-        if (setupFinished) {
-            setupOverallPercent = 100
-            return
+    private fun recomputeSetupPercent(capAt99: Boolean = true) {
+        val gen = setupProgressGeneration
+        val computed = setupProgressCoordinator.computePercent(gen, setupPhases, setupPhaseIndex, setupPhaseFraction)
+        if (computed != null) {
+            setupOverallPercent = computed
         }
-        if (setupPhases.isEmpty()) {
-            setupOverallPercent = 0
-            return
-        }
-        val completed = setupPhases.take(setupPhaseIndex).sumOf { it.weight }
-        val curW = setupPhases.getOrNull(setupPhaseIndex)?.weight ?: 0
-        val raw = completed + curW * setupPhaseFraction
-        val total = setupPhases.sumOf { it.weight }.coerceAtLeast(1)
-        val pct = ((raw * 100f) / total).toInt()
-        setupOverallPercent = if (capAt99) min(99, pct) else pct.coerceIn(0, 100)
     }
 
     private fun finishSetupProgressSuccess() {
+        val gen = setupProgressGeneration
+        setupProgressCoordinator.finishSuccess(gen)
         setupFinished = true
         setupFailed = false
         setupOverallPercent = 100
@@ -2160,9 +2154,10 @@ class OnboardingActivity : AppCompatActivity() {
         stopSetupElapsedTimer()
         stopSetupFgs()
         mainHandler.post {
+            if (gen != setupProgressGeneration) return@post
             stopProgressPulse()
             if (::setupStepTitleText.isInitialized) {
-                setupStepTitleText.text = "Full environment setup complete"
+                setupStepTitleText.text = "Prebuilt Linux runtime ready"
                 setupStepTitleText.setTextColor(NC.PRIMARY)
             }
             if (::setupDetailText.isInitialized) {
@@ -2177,10 +2172,13 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun failSetupProgress(message: String) {
+        val gen = setupProgressGeneration
+        setupProgressCoordinator.fail(gen)
         setupFailed = true
         stopSetupElapsedTimer()
         stopSetupFgs()
         mainHandler.post {
+            if (gen != setupProgressGeneration) return@post
             stopProgressPulse()
             if (::setupStepTitleText.isInitialized) {
                 setupStepTitleText.text = message
@@ -2298,11 +2296,14 @@ class OnboardingActivity : AppCompatActivity() {
 
         val fromBar = setupAnimatedPercent
         val durationMs = (280L + (kotlin.math.abs(target - fromBar) * 8f).toLong()).coerceIn(280L, 720L)
+        val gen = setupProgressGeneration
 
+        var barCancelled = false
         progressBarAnimator = ValueAnimator.ofFloat(fromBar, target).apply {
             duration = durationMs
             interpolator = DecelerateInterpolator(1.6f)
             addUpdateListener { va ->
+                if (gen != setupProgressGeneration) return@addUpdateListener
                 val v = va.animatedValue as Float
                 setupAnimatedPercent = v
                 if (::setupProgressFill.isInitialized) {
@@ -2310,7 +2311,11 @@ class OnboardingActivity : AppCompatActivity() {
                 }
             }
             addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationCancel(animation: Animator) {
+                    barCancelled = true
+                }
                 override fun onAnimationEnd(animation: Animator) {
+                    if (barCancelled || gen != setupProgressGeneration) return
                     setupAnimatedPercent = target
                     if (::setupProgressFill.isInitialized) {
                         setupProgressFill.scaleX = if (target <= 0f) 0f else (target / 100f).coerceIn(0.001f, 1f)
@@ -2324,10 +2329,12 @@ class OnboardingActivity : AppCompatActivity() {
 
         val fromPct = setupDisplayedPercentInt
         val toPct = setupOverallPercent
+        var textCancelled = false
         percentTextAnimator = ValueAnimator.ofInt(fromPct, toPct).apply {
             duration = durationMs
             interpolator = DecelerateInterpolator(1.4f)
             addUpdateListener { va ->
+                if (gen != setupProgressGeneration) return@addUpdateListener
                 val n = va.animatedValue as Int
                 setupDisplayedPercentInt = n
                 if (::setupPercentText.isInitialized) {
@@ -2335,7 +2342,11 @@ class OnboardingActivity : AppCompatActivity() {
                 }
             }
             addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationCancel(animation: Animator) {
+                    textCancelled = true
+                }
                 override fun onAnimationEnd(animation: Animator) {
+                    if (textCancelled || gen != setupProgressGeneration) return
                     setupDisplayedPercentInt = toPct
                     if (::setupPercentText.isInitialized) {
                         setupPercentText.text = "$toPct%"
@@ -2549,14 +2560,14 @@ class OnboardingActivity : AppCompatActivity() {
 
                 File(varDir, "log/apt").mkdirs(); File(varDir, "lib/dpkg").mkdirs(); tmpDir.mkdirs()
 
-                enterSetupPhase("A", "Preparing host environment…")
+                enterSetupPhase("A", "Preparing NativeCode host…")
                 updateBaseStatus("A. Preparing Host Environment...")
                 deployScripts()
                 File(etcDir, "resolv.conf").writeText("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
                 setSetupPhaseFraction(1f, "Host environment ready")
 
-                enterSetupPhase("B", "Installing Alpaquita Linux container…")
-                updateBaseStatus("B. Installing Alpaquita Linux Container...")
+                enterSetupPhase("B", "Installing prebuilt Linux runtime…")
+                updateBaseStatus("B. Inspecting Linux runtime...")
 
                 val existing = inspectExistingAlpaquita()
                 if (existing.installed) {
@@ -2568,7 +2579,8 @@ class OnboardingActivity : AppCompatActivity() {
                             .putString("flux_gpu", gpuDetect.mode)
                             .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                             .apply()
-                        verifyRuntimeSentinel(enableXfceGui)
+                        enterSetupPhase("C", "Verifying environment…")
+                        verifyRuntimeSentinel()
                         LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
                         AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
                         updateBaseStatus("Existing Alpaquita environment detected — setup already complete.")
@@ -2644,12 +2656,14 @@ class OnboardingActivity : AppCompatActivity() {
                     .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                     .apply()
 
-                verifyRuntimeSentinel(enableXfceGui)
+                enterSetupPhase("C", "Verifying environment…")
+                verifyRuntimeSentinel()
 
                 LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
 
                 AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
-                updateBaseStatus("Full Environment Setup Successful!")
+                updateBaseStatus("Prebuilt Linux Runtime Setup Successful!")
+                setSetupPhaseFraction(1f, "Environment verified")
                 finishSetupProgressSuccess()
             } catch (e: Exception) {
                 Log.e("Onboarding", "Debian Base Setup failed", e)
@@ -2709,7 +2723,7 @@ class OnboardingActivity : AppCompatActivity() {
         )
     }
 
-    private fun verifyRuntimeSentinel(enableXfceGui: Boolean) {
+    private fun verifyRuntimeSentinel() {
         val rootfsDir = ProjectPathResolver.prootRootfsDir(this)
         val releaseFile = File(rootfsDir, "etc/nativecode/rootfs-release")
         check(releaseFile.canRead()) { "Sentinel check failed: /etc/nativecode/rootfs-release not readable" }
@@ -2720,9 +2734,14 @@ class OnboardingActivity : AppCompatActivity() {
         check(File(rootfsDir, "bin/bash").exists() || File(rootfsDir, "usr/bin/bash").exists()) { "Sentinel check failed: bash not found" }
         check(File(rootfsDir, "usr/bin/git").exists() || File(rootfsDir, "usr/local/bin/git").exists()) { "Sentinel check failed: git not found" }
         check(File(rootfsDir, "usr/local/bin/gh").exists() || File(rootfsDir, "usr/bin/gh").exists()) { "Sentinel check failed: gh not found" }
-        if (enableXfceGui) {
-            check(File(rootfsDir, "usr/bin/startxfce4").exists()) { "Sentinel check failed: startxfce4 not found" }
-        }
+        check(File(rootfsDir, "usr/bin/startxfce4").exists()) { "Sentinel check failed: startxfce4 not found" }
+        check(File(rootfsDir, "usr/bin/xfce4-panel").exists()) { "Sentinel check failed: xfce4-panel not found" }
+        check(File(rootfsDir, "usr/bin/xfce4-terminal").exists()) { "Sentinel check failed: xfce4-terminal not found" }
+        check(
+            File(rootfsDir, "home/flux/.local/bin/opencode").exists() ||
+            File(rootfsDir, "usr/local/bin/opencode").exists() ||
+            File(rootfsDir, "usr/bin/opencode").exists()
+        ) { "Sentinel check failed: opencode not found" }
     }
 
     /** Copy asset to file with approximate byte progress for setup UI. */
@@ -2773,65 +2792,6 @@ class OnboardingActivity : AppCompatActivity() {
         }
     }
 
-    // ── AI CLI tools (gated; shared CliToolsInstaller) ─────────────────────────
-
-    private fun maybeRunCliToolsSetupProot() {
-        if (!enableAiCliInstall) {
-            updateBaseStatus("H. Skipping AI CLI tools (not selected on install plan).")
-            AiCliProvisionState.markAiCliProvisioned(this, "proot", false)
-            aiCliSetupOutcome = "SKIPPED"
-            return
-        }
-        enterSetupPhase("H", "NVM, Node, opencode, codex…")
-        updateBaseStatus("H. Installing AI CLI tools (NVM, Node, opencode, codex, claude, …)...")
-        val cliCode = CliToolsInstaller.runProotSync(this) { chunk -> appendSetupLog(chunk) }
-        if (cliCode == 0) {
-            updateBaseStatus("H. AI CLI tools provisioned successfully.")
-            AiCliProvisionState.markAiCliProvisioned(this, "proot", true)
-            aiCliSetupOutcome = "READY"
-        } else {
-            updateBaseStatus(
-                "H. AI CLI tools finished with exit $cliCode " +
-                    "(continuing; install later via Settings → AI CLI tools)."
-            )
-            AiCliProvisionState.markAiCliProvisioned(this, "proot", false)
-            aiCliSetupOutcome = "PARTIAL"
-        }
-        setSetupPhaseFraction(1f)
-    }
-
-    private fun maybeRunCliToolsSetupChroot(onDone: () -> Unit) {
-        if (!enableAiCliInstall) {
-            updateBaseStatus("[CHROOT] H. Skipping AI CLI tools (not selected on install plan).")
-            AiCliProvisionState.markAiCliProvisioned(this, "chroot", false)
-            aiCliSetupOutcome = "SKIPPED"
-            onDone()
-            return
-        }
-        enterSetupPhase("H", "NVM, Node, opencode, codex…")
-        updateBaseStatus("[CHROOT] H. Installing AI CLI tools (NVM, Node, opencode, codex, claude, …)...")
-        CliToolsInstaller.runChrootAsync(
-            ctx = this,
-            onLine = { chunk -> appendSetupLog(chunk) },
-            onDone = { code ->
-                if (code == 0) {
-                    updateBaseStatus("[CHROOT] H. AI CLI tools provisioned successfully.")
-                    AiCliProvisionState.markAiCliProvisioned(this, "chroot", true)
-                    aiCliSetupOutcome = "READY"
-                } else {
-                    updateBaseStatus(
-                        "[CHROOT] H. AI CLI tools finished with exit $code " +
-                            "(continuing; install later via Settings → AI CLI tools)."
-                    )
-                    AiCliProvisionState.markAiCliProvisioned(this, "chroot", false)
-                    aiCliSetupOutcome = "PARTIAL"
-                }
-                setSetupPhaseFraction(1f)
-                onDone()
-            }
-        )
-    }
-
     // ── Page 7: Complete ──────────────────────────────────────────────────────
     private fun buildCompletePage(): View {
         val root = LinearLayout(this).apply {
@@ -2869,8 +2829,8 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(logoCard)
 
         val title = TextView(this).apply {
-            text = "Setup Successful!"
-            textSize = 28f
+            text = "ENVIRONMENT READY"
+            textSize = 24f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
@@ -2879,13 +2839,8 @@ class OnboardingActivity : AppCompatActivity() {
         }
         root.addView(title)
 
-        val subtitleText = when (aiCliSetupOutcome) {
-            "READY" -> "Linux container & AI CLI tools provisioned"
-            "PARTIAL" -> "Linux container ready · AI tools incomplete"
-            else -> "Linux container ready · AI tools skipped"
-        }
         val subtitle = TextView(this).apply {
-            text = subtitleText
+            text = "Prebuilt Alpaquita Linux runtime verified and ready"
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -2909,7 +2864,7 @@ class OnboardingActivity : AppCompatActivity() {
         }
 
         val summaryHeader = TextView(this).apply {
-            text = "[ PROVISIONED COMPONENTS ]"
+            text = "[ INCLUDED IN THE RUNTIME ]"
             textSize = 11f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -2918,29 +2873,27 @@ class OnboardingActivity : AppCompatActivity() {
         }
         summaryCard.addView(summaryHeader)
 
-        summaryCard.addView(summaryRow(R.drawable.ic_terminal, "Guest OS", "Alpaquita (glibc)", "READY"))
+        summaryCard.addView(summaryRow(R.drawable.ic_terminal, "Runtime", "Alpaquita Linux (glibc AArch64)", "READY"))
         summaryCard.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, dp(10)) })
 
-        val runtimeBadge = when (aiCliSetupOutcome) {
-            "READY" -> "READY"
-            "PARTIAL" -> "PARTIAL"
-            else -> "SKIPPED"
-        }
-        val runtimeDetail = when (aiCliSetupOutcome) {
-            "READY" -> "Node.js / NVM"
-            "PARTIAL" -> "Install incomplete"
-            else -> "Not installed (optional)"
-        }
-        summaryCard.addView(summaryRow(R.drawable.ic_laptop, "Dev Runtime", runtimeDetail, runtimeBadge))
+        summaryCard.addView(summaryRow(R.drawable.ic_display, "Desktop", "XFCE Desktop + NativeCode Theme", "READY"))
         summaryCard.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, dp(10)) })
 
-        val aiDetail = when (aiCliSetupOutcome) {
-            "READY" -> "CLI suite installed"
-            "PARTIAL" -> "Retry in Settings → AI CLI tools"
-            else -> "Off — shells only"
-        }
-        summaryCard.addView(summaryRow(R.drawable.ic_smart_toy, "AI Tools", aiDetail, runtimeBadge))
+        summaryCard.addView(summaryRow(R.drawable.ic_laptop, "Toolchain", "Git + GitHub CLI + Dev Toolchain", "READY"))
+        summaryCard.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, dp(10)) })
+
+        summaryCard.addView(summaryRow(R.drawable.ic_smart_toy, "AI Suite", "7 AI CLI Tools Included", "READY"))
         root.addView(summaryCard)
+
+        val instructions = TextView(this).apply {
+            text = "Launch tools from Terminal, Workspace, or AI CLI Tools."
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(16))
+        }
+        root.addView(instructions)
 
         val spacer2 = View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
         root.addView(spacer2)
