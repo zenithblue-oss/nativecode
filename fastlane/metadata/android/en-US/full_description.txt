@@ -2,7 +2,7 @@ NativeCode turns your phone or tablet into a portable Linux workstation and AI d
 
 Key Features:
 
-- Debian 13 (Trixie) Linux container — native glibc userland with apt and the full package manager
+- Alpaquita Linux container — native glibc userland with apk and a complete development environment
 - Two isolation modes — PRoot (no root required, recommended) and Chroot (kernel-space, for rooted devices)
 - XFCE4 desktop GUI — integrated Termux-X11 display server with VirGL GPU acceleration
 - AI CLI engine — run Claude Code, Codex, OpenCode, Agy, Grok, Qwen and Kiro in the native terminal
@@ -11,6 +11,6 @@ Key Features:
 - Pre-configured runtimes — Node.js 26 LTS, Python 3.12, GCC and standard package managers
 - CLI provisioning — guided install and credential management for AI vendor tools
 
-An onboarding wizard guides first-time setup: device check, isolation mode choice, and one-tap installation of the full Debian environment with live progress.
+An onboarding wizard guides first-time setup: device checks and one-tap installation of the rootless Alpaquita PRoot environment with live progress.
 
 Transform your phone or tablet into a portable Linux & AI workstation for coding and software development.

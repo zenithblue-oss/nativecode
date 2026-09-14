@@ -5,6 +5,7 @@ import android.content.res.AssetManager
 import android.util.Log
 import com.zenithblue.nativecode.terminal.ChrootCommandBuilder
 import com.zenithblue.nativecode.terminal.TermuxHostPaths
+import com.zenithblue.nativecode.onboarding.LinuxGuestDefaults
 import java.io.File
 import java.io.FileOutputStream
 
@@ -39,6 +40,9 @@ object AppUpgrade {
      */
     fun runIfNeeded(ctx: Context) {
         val app = ctx.applicationContext
+        // Rootfs packs are external to the APK version. Repair visible guest
+        // defaults on every cold start, including same-version debug installs.
+        LinuxGuestDefaults.apply(app)
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val last = prefs.getInt(KEY_LAST_VERSION_CODE, 0)
         val now = BuildConfig.VERSION_CODE
@@ -64,7 +68,7 @@ object AppUpgrade {
      */
     fun migrate(ctx: Context, from: Int, to: Int) {
         restageAllHostScripts(ctx)
-        ChrootCommandBuilder.ensureLauncherScript(ctx)
+        if (!BuildConfig.PLAY_STORE_BUILD) ChrootCommandBuilder.ensureLauncherScript(ctx)
         TermuxHostPaths.writeHostEnvFile(ctx.filesDir)
         if (File(ctx.filesDir, "usr/lib/libtermux-exec.so").exists()) {
             TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir)

@@ -13,6 +13,12 @@ fun getGitCommitHash(): String {
     }
 }
 
+val nativeCodeReportUrl = providers.gradleProperty("nativecode.report.url")
+    .orElse("https://api.nativecode.app/v1/report")
+    .get()
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 
 plugins {
     id("com.android.application")
@@ -27,9 +33,27 @@ android {
         applicationId = "com.zenithblue.nativecode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 9
-        versionName = "1.6.1"
+        versionCode = 11
+        versionName = "1.6.3"
         buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
+        buildConfigField("String", "REPORT_ENDPOINT", "\"$nativeCodeReportUrl\"")
+    }
+
+    flavorDimensions += "store"
+    productFlavors {
+        create("play") {
+            dimension = "store"
+            buildConfigField("boolean", "PLAY_STORE_BUILD", "true")
+            // Play-delivered runtime/SDK packs are ARM64-only. Keeping the base app
+            // ARM64-only also avoids shipping legacy Termux binaries for unsupported ABIs.
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
+        }
+        create("full") {
+            dimension = "store"
+            buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
+        }
     }
 
     val keystorePropertiesFile = rootProject.file("key.properties")
@@ -93,7 +117,7 @@ android {
         noCompress += listOf("xz", "tar", "gz", "zst")
     }
 
-    assetPacks += listOf(":nativecode_runtime")
+    assetPacks += listOf(":nativecode_runtime", ":nativecode_android_dev")
 
     lint {
         abortOnError = false
@@ -118,8 +142,12 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.activity:activity-compose:1.8.2")
 
-    // Termux App and its shared lib
-    implementation("com.github.termux:termux-app:v0.118.0")
+    // Keep the upstream app/view/shared APIs, but replace terminal-emulator's
+    // legacy JNI artifact with an API-identical, ARM64/16 KB-patched local AAR.
+    implementation("com.github.termux:termux-app:v0.118.0") {
+        exclude(group = "com.github.termux.termux-app", module = "terminal-emulator")
+    }
+    implementation(files("libs/terminal-emulator-v0.118.0-16k.aar"))
     // Fix listenable future conflict
     implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")
 

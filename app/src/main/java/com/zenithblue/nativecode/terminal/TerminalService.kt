@@ -38,6 +38,7 @@ class TerminalService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        com.zenithblue.nativecode.bridge.NativeCodeBridge.start(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

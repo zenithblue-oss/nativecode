@@ -1,6 +1,7 @@
 package com.zenithblue.nativecode.terminal
 
 import android.content.Context
+import com.zenithblue.nativecode.BuildConfig
 
 /** Entry point for building terminal commands.
  *  Delegates to ProotCommandBuilder or ChrootCommandBuilder based on method. */
@@ -11,7 +12,10 @@ object LinuxCommandBuilder {
 
     /** Guest user for session type. Rooted shell → root; everything else → flux. */
     fun sessionUserForType(type: String): String =
-        if (type == "shell-root") "root" else "flux"
+        if (!BuildConfig.PLAY_STORE_BUILD && type == "shell-root") "root" else "flux"
+
+    private fun effectiveMethod(method: String): String =
+        if (BuildConfig.PLAY_STORE_BUILD) "proot" else method
 
     fun build(
         ctx: Context,
@@ -20,7 +24,7 @@ object LinuxCommandBuilder {
         useSharedTmp: Boolean = true,
         method: String = currentMethod
     ): Pair<Array<String>, HashMap<String, String>> {
-        return when (method) {
+        return when (effectiveMethod(method)) {
             "chroot" -> ChrootCommandBuilder.build(ctx, shellCmd, user)
             else -> ProotCommandBuilder.build(ctx, shellCmd, user, useSharedTmp)
         }
@@ -33,7 +37,7 @@ object LinuxCommandBuilder {
         useSharedTmp: Boolean = true,
         method: String = currentMethod
     ): Pair<Array<String>, HashMap<String, String>> {
-        return when (method) {
+        return when (effectiveMethod(method)) {
             "chroot" -> ChrootCommandBuilder.buildInteractive(ctx, user, workDir)
             else -> ProotCommandBuilder.buildInteractive(ctx, user, workDir, useSharedTmp)
         }
@@ -55,7 +59,7 @@ object LinuxCommandBuilder {
         args: Array<String>,
         method: String = currentMethod
     ): String {
-        return if (method == "chroot") {
+        return if (effectiveMethod(method) == "chroot") {
             ChrootCommandBuilder.SESSION_EXEC
         } else {
             val exe = args.firstOrNull() ?: TermuxHostPaths.libProot(ctx).absolutePath
@@ -73,7 +77,7 @@ object LinuxCommandBuilder {
         args: Array<String>,
         method: String = currentMethod
     ): Array<String> {
-        if (method == "chroot") return args
+        if (effectiveMethod(method) == "chroot") return args
         val exe = args.firstOrNull() ?: ""
         if (exe.startsWith("/data/app/") || exe.startsWith("/data/data/") || exe.startsWith("/data/user/")) {
             return arrayOf("/system/bin/linker64") + args

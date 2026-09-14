@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -101,14 +100,20 @@ fun SystemTelemetryCards(
             )
         }
 
-        // Edge-to-Edge Horizontal Scroll Cards Row - fixed: no infinite width on tablet DrawerLayout
+        val ramUsedGb = if (ramTotalMb > 0) String.format(java.util.Locale.US, "%.1fGB", ramUsedMb / 1024.0) else "$memPercentage%"
+        val ramSub = if (ramTotalMb > 0) "${ramUsedMb}M / ${ramTotalMb}M" else "RAM Allocated"
+        val swapPercentage = if (swapTotalMb > 0) ((swapUsedMb * 100) / swapTotalMb).toInt().coerceIn(0, 100) else 0
+        val swapUsedGb = if (swapTotalMb > 0) String.format(java.util.Locale.US, "%.1fGB", swapUsedMb / 1024.0) else "0GB"
+        val swapSub = if (swapTotalMb > 0) "${swapUsedMb}M / ${swapTotalMb}M" else "No Swap"
+
         Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // CPU USAGE Card
             CompactTelemetryCard(
+                modifier = Modifier.weight(1f),
                 title = "CPU USAGE",
                 mainValue = "$cpuPercentage%",
                 subValue = if (cpuPercentage > 80) "[HIGH LOAD]" else "[NORMAL]",
@@ -116,10 +121,8 @@ fun SystemTelemetryCards(
                 progressColor = if (cpuPercentage > 80) ErrorRed else PrimaryPurple
             )
 
-            // RAM ALLOCATED Card
-            val ramUsedGb = if (ramTotalMb > 0) String.format(java.util.Locale.US, "%.1fGB", ramUsedMb / 1024.0) else "$memPercentage%"
-            val ramSub = if (ramTotalMb > 0) "${ramUsedMb}M / ${ramTotalMb}M" else "RAM Allocated"
             CompactTelemetryCard(
+                modifier = Modifier.weight(1f),
                 title = "RAM ALLOCATED",
                 mainValue = ramUsedGb,
                 subValue = ramSub,
@@ -127,11 +130,18 @@ fun SystemTelemetryCards(
                 progressColor = if (memPercentage > 80) ErrorRed else PrimaryPurple
             )
 
-            // SWAP USAGE Card
-            val swapPercentage = if (swapTotalMb > 0) ((swapUsedMb * 100) / swapTotalMb).toInt().coerceIn(0, 100) else 0
-            val swapUsedGb = if (swapTotalMb > 0) String.format(java.util.Locale.US, "%.1fGB", swapUsedMb / 1024.0) else "0GB"
-            val swapSub = if (swapTotalMb > 0) "${swapUsedMb}M / ${swapTotalMb}M" else "No Swap"
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             CompactTelemetryCard(
+                modifier = Modifier.weight(1f),
                 title = "SWAP USAGE",
                 mainValue = swapUsedGb,
                 subValue = swapSub,
@@ -139,8 +149,8 @@ fun SystemTelemetryCards(
                 progressColor = PrimaryPurple
             )
 
-            // TOTAL STORAGE Card
             CompactTelemetryCard(
+                modifier = Modifier.weight(1f),
                 title = "TOTAL STORAGE",
                 mainValue = "$diskPercentage%",
                 subValue = "Disk Allocated",
@@ -153,6 +163,7 @@ fun SystemTelemetryCards(
 
 @Composable
 fun CompactTelemetryCard(
+    modifier: Modifier = Modifier,
     title: String,
     mainValue: String,
     subValue: String,
@@ -160,8 +171,7 @@ fun CompactTelemetryCard(
     progressColor: Color
 ) {
     Box(
-        modifier = Modifier
-            .width(165.dp)
+        modifier = modifier
             .padding(end = 6.dp, bottom = 6.dp)
     ) {
         // Cyber Brutalist Shadow Layer
@@ -178,7 +188,7 @@ fun CompactTelemetryCard(
         // Main Card Container
         Column(
             modifier = Modifier
-                .width(165.dp)
+                .fillMaxWidth()
                 .background(CardBackground, RoundedCornerShape(8.dp))
                 .border(1.dp, BorderDim, RoundedCornerShape(8.dp))
                 .padding(14.dp),

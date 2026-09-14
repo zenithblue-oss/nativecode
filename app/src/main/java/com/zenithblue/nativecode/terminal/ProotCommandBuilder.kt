@@ -9,6 +9,10 @@ object ProotCommandBuilder {
     private const val GIT_SAFE_DIRECTORY =
         "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=\"\$PWD\"; "
 
+    private const val ANDROID_DEV_ENV =
+        "export ANDROID_HOME=/opt/android-sdk ANDROID_SDK_ROOT=/opt/android-sdk; " +
+            "export PATH=/opt/android-sdk/build-tools/36.1.0:/opt/android-sdk/platform-tools:\$PATH; "
+
     private const val FLUX_INTERACTIVE_HOME =
         GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
 
@@ -67,7 +71,7 @@ object ProotCommandBuilder {
         // Single-quote guest payload so host bash never expands $HOME/$PATH/etc.
         // Escape embedded single quotes: ' → '\''.
         val distro = resolveDistro(ctx)
-        val escaped = shellCmd.replace("'", "'\\''")
+        val escaped = (ANDROID_DEV_ENV + shellCmd).replace("'", "'\\''")
         val py = pythonCmd(ctx)
         val command =
             "exec $py $prootDistro login $distro $sharedTmpFlag --user $user -- " +

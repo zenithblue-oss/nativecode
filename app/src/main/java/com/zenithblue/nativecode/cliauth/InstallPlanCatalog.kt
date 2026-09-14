@@ -11,7 +11,7 @@ object InstallPlanCatalog {
     fun baseInventory(method: String): List<InventoryLine> =
         if (method == "chroot") {
             listOf(
-                InventoryLine("Root access", "KernelSU / Magisk"),
+                InventoryLine("Root access", "Device superuser provider"),
                 InventoryLine("Alpine Linux chroot base", "setup_alpine_chroot.sh"),
                 InventoryLine("Guest packages / users", "setup_alpine_family.sh"),
                 InventoryLine("Hardware acceleration", "setup_hw_accel_debian.sh")

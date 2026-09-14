@@ -2,17 +2,17 @@
 
 **App:** NativeCode (`com.zenithblue.nativecode`)  
 **Type:** `specialUse`  
-**Services:** `BackgroundService`, `AppTerminalService`, `ProjectTerminalService`  
+**Services:** `BackgroundService`, `TerminalService`
 **Demo video:** [`fgs-special-use-demo.mp4`](./fgs-special-use-demo.mp4) — **~50s live UI**  
-Path: open app → Terminal → Debian Shell (session + FGS) → shade shows **NativeCode — Terminal** → Settings → **START XFCE DESKTOP** → shade shows **Desktop Session** + Terminal together. Onboarding install uses the same `BackgroundService` with **Environment Setup**.
+Path: open app → Terminal → Alpaquita Shell (session + FGS) → shade shows **NativeCode — Terminal** → Settings → **START XFCE DESKTOP** → shade shows **Desktop Session** + Terminal together. Onboarding install uses `BackgroundService` with **Environment Setup**.
 
 ## Justification (≤ 300 characters — paste into Console)
 
 ```
-NativeCode keeps user-started Linux terminals, project shells, XFCE desktop, and onboarding Debian install/setup alive after leaving the app. specialUse fits this developer environment. Ongoing notifications show status; close sessions, Stop Desktop, or finish setup ends it.
+NativeCode keeps user-started Linux terminals, project shells, XFCE desktop, and onboarding Alpaquita installation alive after leaving the app. specialUse fits this developer environment. Ongoing notifications show status; close sessions, Stop Desktop, or finish setup ends it.
 ```
 
-**Character count:** 275
+**Character count:** 273
 
 ## User-visible stop paths
 
@@ -29,6 +29,6 @@ Each FGS declares `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` with a short su
 
 ## Reviewer notes
 
-- Open-source, local-first: guest data stays in proot/chroot on device.
-- FGS starts only after user opens a terminal session, starts XFCE, or starts onboarding Debian install.
+- Local-first: guest data stays in the app-private PRoot environment on device.
+- FGS starts only after the user opens a terminal session, starts XFCE, or starts onboarding installation.
 - `POST_NOTIFICATIONS` requested on Android 13+ so the ongoing notification is visible.

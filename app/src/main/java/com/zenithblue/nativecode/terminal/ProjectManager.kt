@@ -1,6 +1,7 @@
 package com.zenithblue.nativecode.terminal
 
 import android.content.Context
+import com.zenithblue.nativecode.BuildConfig
 import java.io.File
 
 /** Handles project creation: folder setup and git clone, unified for proot/chroot. */
@@ -65,7 +66,7 @@ object ProjectManager {
 
     /** Opposite isolation method. */
     fun oppositeMethod(method: String): String =
-        if (method == "chroot") "proot" else "chroot"
+        if (BuildConfig.PLAY_STORE_BUILD || method == "chroot") "proot" else "chroot"
 
     /**
      * If [method] host tree lacks `.git` but the opposite rootfs has it,
@@ -76,6 +77,9 @@ object ProjectManager {
         projectPath: String,
         preferredMethod: String
     ): String? {
+        if (BuildConfig.PLAY_STORE_BUILD) {
+            return "proot".takeIf { hasGitCheckout(ctx, projectPath, it) }
+        }
         if (hasGitCheckout(ctx, projectPath, preferredMethod)) return preferredMethod
         val other = oppositeMethod(preferredMethod)
         if (hasGitCheckout(ctx, projectPath, other)) return other

@@ -33,10 +33,12 @@ import androidx.core.view.setPadding
 import android.system.Os
 import com.zenithblue.nativecode.cliauth.AiCliProvisionState
 import com.zenithblue.nativecode.onboarding.LegacyProotDataMigrator
+import com.zenithblue.nativecode.onboarding.LinuxGuestDefaults
 import com.zenithblue.nativecode.onboarding.OnboardingIo
 import com.zenithblue.nativecode.onboarding.RootfsSource
 import com.zenithblue.nativecode.onboarding.RootfsSourceResolver
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
+import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
 import com.zenithblue.nativecode.onboarding.OnboardingUiKit
 import com.zenithblue.nativecode.onboarding.SetupPhase
 import com.zenithblue.nativecode.onboarding.SetupProgressCoordinator
@@ -67,7 +69,7 @@ class OnboardingActivity : AppCompatActivity() {
     private var setupProgressGeneration = 0L
 
     // ── Linux isolation method selected on page 4 ─────────────────────────────
-    // "proot" (default, rootless) or "chroot" (requires KernelSU/Magisk root)
+    // "proot" (default, rootless) or "chroot" (full debug build only)
     private var selectedIsolationMethod = "proot"
 
     // page 4 (Full Environment Setup: base + AI CLIs) — progress-first UI
@@ -166,7 +168,11 @@ class OnboardingActivity : AppCompatActivity() {
 
         // Optional deep-link from Settings → Chroot install
         intent.getStringExtra("preferred_isolation")?.let { pref ->
-            if (pref == "chroot" || pref == "proot") selectedIsolationMethod = pref
+            if (!BuildConfig.PLAY_STORE_BUILD && pref == "chroot") {
+                selectedIsolationMethod = pref
+            } else if (pref == "proot") {
+                selectedIsolationMethod = pref
+            }
         }
         val privacyOk = getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
             .getBoolean("privacy_accepted", false)
@@ -290,19 +296,19 @@ class OnboardingActivity : AppCompatActivity() {
         card.addView(
             bullet(
                 "01 · NO NATIVECODE CLOUD",
-                "NativeCode is open source. We do not operate a backend that collects your personal data, analytics, or telemetry."
+                "NativeCode does not operate an analytics or advertising backend and does not collect device identifiers or telemetry."
             )
         )
         card.addView(
             bullet(
                 "02 · YOUR DATA STAYS LOCAL",
-                "Files, projects, packages, and credentials live on this device inside your Linux proot or chroot distro — not on our servers."
+                "Files, projects, packages, and credentials are stored on this device inside the isolated Alpaquita Linux PRoot environment."
             )
         )
         card.addView(
             bullet(
                 "03 · OPTIONAL NETWORK",
-                "You may choose GitHub login, AI CLIs, or package downloads. Those talks go to those third parties only when you start them — never silently by NativeCode cloud."
+                "When you use GitHub, AI CLIs, or package managers, prompts, selected code, account identifiers, diagnostics, and downloads may be sent directly to those providers under their policies."
             )
         )
         card.addView(
@@ -314,13 +320,13 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(card)
 
         val policyLink = TextView(this).apply {
-            text = "Full policy on zenithblue.dev ↗"
+            text = "Full privacy policy ↗"
             textSize = 13f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
             setPadding(0, 0, 0, dp(20))
             setOnClickListener {
-                val url = "https://zenith-blue.web.app/nativecode/privacy"
+                val url = "https://zenithblue-dev.github.io/nativecode-ai/privacy/"
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
                 } catch (_: Exception) {
@@ -1535,6 +1541,10 @@ class OnboardingActivity : AppCompatActivity() {
 
         // 2. Play Asset Delivery / Rootfs Source Card
         var currentSource = RootfsSourceResolver.resolve(this, File(filesDir, "home"))
+        var devPackReady = !BuildConfig.PLAY_STORE_BUILD ||
+            AndroidDevPackManager.resolveArchive(this) != null ||
+            AndroidDevPackManager.isApplied(this)
+        fun deliveryReady() = currentSource != null && devPackReady
 
         val padCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1562,19 +1572,21 @@ class OnboardingActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
         val statusBadgeTv = textBadge(
-            if (currentSource != null) "READY" else "DOWNLOAD REQUIRED",
-            if (currentSource != null) NC.PRIMARY_CON else NC.SEC_CON,
-            if (currentSource != null) NC.ON_PRIMARY_CON else NC.ON_SEC_CON
+            if (deliveryReady()) "READY" else "DOWNLOAD REQUIRED",
+            if (deliveryReady()) NC.PRIMARY_CON else NC.SEC_CON,
+            if (deliveryReady()) NC.ON_PRIMARY_CON else NC.ON_SEC_CON
         )
         padHead.addView(statusBadgeTv)
         padCard.addView(padHead)
 
         val detailTv = TextView(this).apply {
-            text = if (currentSource != null) {
+            text = if (currentSource != null && devPackReady) {
                 val sizeStr = currentSource?.archiveFile?.length()?.let { " (${OnboardingIo.formatBytes(it)})" } ?: ""
-                "Runtime artifact detected: ${currentSource?.archiveFile?.name ?: "Bundled"}$sizeStr\nSHA256: ${currentSource?.expectedSha256?.take(16)}… [VERIFIED]"
+                "Runtime + Android SDK 36 packs ready: ${currentSource?.archiveFile?.name ?: "Bundled"}$sizeStr\nSHA256: ${currentSource?.expectedSha256?.take(16)}… [VERIFIED]"
+            } else if (currentSource != null) {
+                "Runtime pack ready. Android SDK 36 + ARM64 aapt2 pack (~76 MB) is required."
             } else {
-                "Play Asset Pack: nativecode_runtime (~1.5 GB on-demand download)\nPack delivers prebuilt Alpaquita rootfs directly to device."
+                "Play Asset Packs: Alpaquita runtime (~1.5 GB) + Android SDK 36 (~76 MB)."
             }
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
@@ -1586,22 +1598,78 @@ class OnboardingActivity : AppCompatActivity() {
         val padProgressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = false
             max = 100
-            progress = if (currentSource != null) 100 else 0
-            visibility = if (currentSource != null) View.GONE else View.VISIBLE
+            progress = if (deliveryReady()) 100 else 0
+            visibility = if (deliveryReady()) View.GONE else View.VISIBLE
             layoutParams = LinearLayout.LayoutParams(MATCH, dp(12)).apply { topMargin = dp(6); bottomMargin = dp(6) }
         }
         padCard.addView(padProgressBar)
 
         var planAccepted = false
         var startBtnRef: View? = null
+        var downloadBtnRef: View? = null
 
         fun updateStartBtnState() {
-            val enabled = planAccepted && currentSource != null
+            val enabled = planAccepted && deliveryReady()
             startBtnRef?.isEnabled = enabled
             startBtnRef?.alpha = if (enabled) 1f else 0.45f
         }
 
+        fun requestAndroidDevPack() {
+            padProgressBar.visibility = View.VISIBLE
+            detailTv.text = "Requesting nativecode_android_dev from Google Play…"
+            PlayAssetDeliveryManager.requestDownload(this, PlayAssetDeliveryManager.PACK_ANDROID_DEV) { state ->
+                when (state) {
+                    is PlayAssetDeliveryManager.DownloadState.Pending -> {
+                        detailTv.text = "Android SDK download pending…"
+                        padProgressBar.isIndeterminate = true
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Downloading -> {
+                        padProgressBar.isIndeterminate = false
+                        padProgressBar.progress = state.percentage
+                        detailTv.text = "Android SDK: ${OnboardingIo.formatBytes(state.bytesDownloaded)} / ${OnboardingIo.formatBytes(state.totalBytes)} (${state.percentage}%)"
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Transferring -> {
+                        padProgressBar.isIndeterminate = false
+                        padProgressBar.progress = state.percentage
+                        detailTv.text = "Transferring Android SDK (${state.percentage}%)…"
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Completed -> {
+                        devPackReady = state.archiveFile.isFile &&
+                            AndroidDevPackManager.verifyArchive(state.archiveFile)
+                        padProgressBar.isIndeterminate = false
+                        padProgressBar.progress = if (devPackReady) 100 else 0
+                        padProgressBar.visibility = if (devPackReady) View.GONE else View.VISIBLE
+                        detailTv.text = if (devPackReady) {
+                            "Runtime + Android SDK 36 packs downloaded and SHA-256 verified."
+                        } else {
+                            "Android SDK pack checksum verification failed."
+                        }
+                        if (devPackReady) {
+                            statusBadgeTv.text = "READY"
+                            statusBadgeTv.setBackgroundColor(NC.PRIMARY_CON)
+                            statusBadgeTv.setTextColor(NC.ON_PRIMARY_CON)
+                            downloadBtnRef?.visibility = View.GONE
+                        }
+                        updateStartBtnState()
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.WaitingForWifi ->
+                        detailTv.text = "Waiting for Wi-Fi for Android SDK pack."
+                    is PlayAssetDeliveryManager.DownloadState.Failed -> {
+                        padProgressBar.visibility = View.GONE
+                        detailTv.text = "Android SDK download failed (${state.errorCode}): ${state.message}"
+                    }
+                    is PlayAssetDeliveryManager.DownloadState.Canceled ->
+                        detailTv.text = "Android SDK download canceled"
+                    else -> Unit
+                }
+            }
+        }
+
         val downloadBtn = primaryButton("Download via Google Play", R.drawable.ic_download) {
+            if (currentSource != null && BuildConfig.PLAY_STORE_BUILD && !devPackReady) {
+                requestAndroidDevPack()
+                return@primaryButton
+            }
             padProgressBar.visibility = View.VISIBLE
             detailTv.text = "Requesting nativecode_runtime from Google Play…"
             PlayAssetDeliveryManager.requestDownload(this, PlayAssetDeliveryManager.PACK_RUNTIME) { state ->
@@ -1629,7 +1697,12 @@ class OnboardingActivity : AppCompatActivity() {
                         statusBadgeTv.text = "READY"
                         statusBadgeTv.setBackgroundColor(NC.PRIMARY_CON)
                         statusBadgeTv.setTextColor(NC.ON_PRIMARY_CON)
-                        updateStartBtnState()
+                        if (BuildConfig.PLAY_STORE_BUILD && !devPackReady) {
+                            requestAndroidDevPack()
+                        } else {
+                            downloadBtnRef?.visibility = View.GONE
+                            updateStartBtnState()
+                        }
                     }
                     is PlayAssetDeliveryManager.DownloadState.WaitingForWifi -> {
                         detailTv.text = "Waiting for Wi-Fi (large download). Cellular prompt shown."
@@ -1645,7 +1718,8 @@ class OnboardingActivity : AppCompatActivity() {
                 }
             }
         }
-        if (currentSource != null) {
+        downloadBtnRef = downloadBtn
+        if (deliveryReady()) {
             downloadBtn.visibility = View.GONE
         }
         padCard.addView(downloadBtn)
@@ -2416,15 +2490,15 @@ class OnboardingActivity : AppCompatActivity() {
         startSetupFgs(
             "Installing Alpaquita Linux — setup scripts running"
         )
-        // ── CHROOT path (KernelSU / Magisk root required) ────────────────────
-        if (selectedIsolationMethod == "chroot") {
+        // ── CHROOT path (full debug build only) ─────────────────────────────
+        if (!BuildConfig.PLAY_STORE_BUILD && selectedIsolationMethod == "chroot") {
             beginSetupPhases("chroot")
-            enterSetupPhase("R0", "Verifying KernelSU / Magisk root…")
+            enterSetupPhase("R0", "Verifying root access…")
             updateBaseStatus("[CHROOT] Checking root access...")
             executor.execute {
                 val rootOk = RootShell.isRootAvailable()
                 if (!rootOk) {
-                    updateBaseStatus("[CHROOT] ERROR: Root not available. Grant superuser to NativeCode in KernelSU/Magisk manager, then retry.")
+                    updateBaseStatus("[CHROOT] ERROR: Root not available. Grant access in your root manager, then retry.")
                     failSetupProgress("Root not available — grant superuser, then retry")
                     return@execute
                 }
@@ -2586,6 +2660,7 @@ class OnboardingActivity : AppCompatActivity() {
                             .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                             .apply()
                         enterSetupPhase("C", "Verifying environment…")
+                        applyAndroidDevPackForPlay()
                         verifyRuntimeSentinel()
                         LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
                         AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
@@ -2677,6 +2752,7 @@ class OnboardingActivity : AppCompatActivity() {
                     .apply()
 
                 enterSetupPhase("C", "Verifying environment…")
+                applyAndroidDevPackForPlay()
                 verifyRuntimeSentinel()
 
                 LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
@@ -2698,6 +2774,15 @@ class OnboardingActivity : AppCompatActivity() {
         val valid: Boolean,
         val reason: String
     )
+
+    private fun applyAndroidDevPackForPlay() {
+        if (!BuildConfig.PLAY_STORE_BUILD) return
+        updateBaseStatus("C. Applying Android SDK 36…")
+        appendSetupLog(">>> Verifying and applying Play-delivered Android SDK 36 overlay…\n")
+        val result = AndroidDevPackManager.applyAvailablePack(this)
+        check(result.success) { result.message }
+        appendSetupLog(">>> ${result.message}\n")
+    }
 
     private fun inspectExistingAlpaquita(): ExistingProotState {
         val root = File(
@@ -2745,6 +2830,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     private fun verifyRuntimeSentinel() {
         val rootfsDir = ProjectPathResolver.prootRootfsDir(this)
+        check(LinuxGuestDefaults.apply(this)) { "Guest defaults could not be applied" }
         val releaseFile = File(rootfsDir, "etc/nativecode/rootfs-release")
         check(releaseFile.canRead()) { "Sentinel check failed: /etc/nativecode/rootfs-release not readable" }
         val releaseText = releaseFile.readText()
@@ -2762,6 +2848,14 @@ class OnboardingActivity : AppCompatActivity() {
             File(rootfsDir, "usr/local/bin/opencode").exists() ||
             File(rootfsDir, "usr/bin/opencode").exists()
         ) { "Sentinel check failed: opencode not found" }
+        if (BuildConfig.PLAY_STORE_BUILD) {
+            check(File(rootfsDir, "opt/android-sdk/platforms/android-36/android.jar").isFile) {
+                "Sentinel check failed: Android Platform 36 not found"
+            }
+            check(File(rootfsDir, "opt/android-sdk/build-tools/36.1.0/aapt2").canExecute()) {
+                "Sentinel check failed: ARM64 aapt2 36.1.0 not executable"
+            }
+        }
     }
 
     /** Copy asset to file with approximate byte progress for setup UI. */
@@ -3001,7 +3095,7 @@ class OnboardingActivity : AppCompatActivity() {
             }
 
             // 2. As root: mkdir chroot/tmp, cp staged script in, chmod +x, then run
-            val chrootTmpPath = "/data/local/tmp/chrootAlpine/tmp"
+            val chrootTmpPath = "${com.zenithblue.nativecode.terminal.ChrootCommandBuilder.CHROOT_PATH}/tmp"
             val copyCmd = "mkdir -p $chrootTmpPath && cp ${staged.absolutePath} $chrootTmpPath/$scriptName && chmod +x $chrootTmpPath/$scriptName"
             val copyCode = RootShell.executeSync(copyCmd)
             if (copyCode != 0) {
@@ -3049,7 +3143,12 @@ class OnboardingActivity : AppCompatActivity() {
                 "uninstall_alpine_chroot.sh",
                 "uninstall_debian13_chroot.sh",
                 "nativecode_chroot.sh"
-            )
+            ).let { all ->
+                if (BuildConfig.PLAY_STORE_BUILD) {
+                    all.filter { it in setOf("setup_termux.sh", "flux_install.sh", "start_gui.sh", "stop_gui.sh") }
+                        .toTypedArray()
+                } else all
+            }
             for (script in scripts) {
                 val assetPath = when {
                     script == "setup_alpaquita_chroot.sh" ||

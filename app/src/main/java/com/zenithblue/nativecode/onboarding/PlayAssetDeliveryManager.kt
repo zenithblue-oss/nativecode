@@ -13,6 +13,17 @@ import java.io.File
 object PlayAssetDeliveryManager {
     private const val TAG = "PlayAssetDelivery"
     const val PACK_RUNTIME = "nativecode_runtime"
+    const val PACK_ANDROID_DEV = "nativecode_android_dev"
+
+    private fun archiveName(packName: String): String = when (packName) {
+        PACK_ANDROID_DEV -> AndroidDevPackManager.ARCHIVE_NAME
+        else -> RootfsSourceResolver.ALPAQUITA_NAME
+    }
+
+    private fun checksumName(packName: String): String = when (packName) {
+        PACK_ANDROID_DEV -> AndroidDevPackManager.SHA_NAME
+        else -> RootfsSourceResolver.ALPAQUITA_SHA_NAME
+    }
 
     sealed interface DownloadState {
         object Idle : DownloadState
@@ -30,7 +41,7 @@ object PlayAssetDeliveryManager {
             val manager = AssetPackManagerFactory.getInstance(context)
             val location = manager.getPackLocation(packName)
             val path = location?.assetsPath() ?: return false
-            val archive = File(path, RootfsSourceResolver.ALPAQUITA_NAME)
+            val archive = File(path, archiveName(packName))
             archive.isFile && archive.length() > 2L * 1024L * 1024L
         } catch (e: Exception) {
             Log.w(TAG, "isPackInstalled error: ${e.message}")
@@ -44,7 +55,7 @@ object PlayAssetDeliveryManager {
             val location = manager.getPackLocation(packName)
             val path = location?.assetsPath() ?: return null
             val dir = File(path)
-            if (File(dir, RootfsSourceResolver.ALPAQUITA_NAME).isFile) dir else null
+            if (File(dir, archiveName(packName)).isFile) dir else null
         } catch (e: Exception) {
             null
         }
@@ -86,8 +97,8 @@ object PlayAssetDeliveryManager {
                         val path = loc?.assetsPath()
                         if (path != null) {
                             val assetsDir = File(path)
-                            val archive = File(assetsDir, RootfsSourceResolver.ALPAQUITA_NAME)
-                            val sha = File(assetsDir, RootfsSourceResolver.ALPAQUITA_SHA_NAME)
+                            val archive = File(assetsDir, archiveName(packName))
+                            val sha = File(assetsDir, checksumName(packName))
                             activity.runOnUiThread {
                                 onStateChange(DownloadState.Completed(assetsDir, archive, if (sha.isFile) sha else null))
                             }

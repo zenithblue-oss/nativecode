@@ -16,6 +16,7 @@ bootstrap.tar
 bootstrap_root/
 tools/rootfs/out/
 *.tar.zst
+nativecode_android_dev/src/main/assets/*.tar.xz
 # NOTE (Play release): before ./gradlew bundleRelease, stage the prebuilt
 # runtime into the on-demand asset pack (stays local, NOT committed):
 #   cp tools/rootfs/out/alpaquita_rootfs.tar.zst{,.sha256} nativecode_runtime/src/main/assets/

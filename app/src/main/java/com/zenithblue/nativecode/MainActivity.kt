@@ -48,7 +48,11 @@ import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import com.zenithblue.nativecode.onboarding.LegacyProotDataMigrator
+import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
+import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
+import com.google.android.play.core.assetpacks.AssetPackStateUpdateListener
 import android.view.ContextMenu
 import android.view.MenuItem
 import android.net.Uri
@@ -58,6 +62,14 @@ import java.io.File
 import com.zenithblue.nativecode.terminal.*
 import com.zenithblue.nativecode.marketplace.*
 import com.zenithblue.nativecode.github.*
+import com.zenithblue.nativecode.bridge.NativeCodeBridge
+import com.zenithblue.nativecode.media.MediaCodecSelector
+import com.zenithblue.nativecode.media.MediaCodecDecodeBenchmark
+import com.zenithblue.nativecode.media.MediaCodecEncodeBenchmark
+import com.zenithblue.nativecode.agent.AgentBridgeServer
+import com.zenithblue.nativecode.agent.AgentBridgeProtocol
+import org.json.JSONObject
+import com.zenithblue.nativecode.media.MediaBridgeServer
 import com.zenithblue.nativecode.cliauth.*
 import com.zenithblue.nativecode.git.*
 import java.io.FileOutputStream
@@ -165,6 +177,16 @@ class MainActivity : AppCompatActivity() {
     private var aiSafetyMethodBadge: TextView? = null
     /** Settings → Privacy Policy & Open Source Licenses. */
     private lateinit var privacyPolicyScrollView: ScrollView
+    /** Settings → Play-delivered runtime and SDK components. */
+    private lateinit var componentsScrollView: ScrollView
+    /** Settings → Hardware & VPU Diagnostics. */
+    private lateinit var hardwareScrollView: ScrollView
+    private lateinit var vpuStatusBadge: TextView
+    private lateinit var vpuSocDetailTv: TextView
+    private lateinit var vpuDecodersTv: TextView
+    private lateinit var vpuEncodersTv: TextView
+    private lateinit var bridgeStatusTv: TextView
+    private lateinit var bridgeLogTv: TextView
     /** Repairs page: host | guest | chroot */
     private var repairsSelectedTab: String = "host"
     private var repairsRootOk: Boolean? = null
@@ -386,6 +408,8 @@ class MainActivity : AppCompatActivity() {
     private val ID_AI_SAFETY = 20
     private val ID_APPS = 21
     private val ID_PRIVACY_POLICY = 22
+    private val ID_COMPONENTS = 23
+    private val ID_HARDWARE = 24
 
     private var fileViewerBackPage = ID_FILES
     private var diffViewerBackPage = ID_GIT
@@ -558,6 +582,14 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.GetContent()
     ) { uri -> uri?.let { handleImageAttachment(it, isWorkspace = true) } }
 
+    private val termDocumentPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { handleFileAttachment(it, isWorkspace = false) } }
+
+    private val wsDocumentPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { handleFileAttachment(it, isWorkspace = true) } }
+
     private val projectSessionsMap = HashMap<String, ArrayList<TerminalSession>>()
     private val projectTabNamesMap = HashMap<String, ArrayList<String>>()
     private val projectActiveTabIndexMap = HashMap<String, Int>()
@@ -574,6 +606,7 @@ class MainActivity : AppCompatActivity() {
 
         // Safe if Splash already ran; covers deep-link / skip-splash entry
         AppUpgrade.runIfNeeded(this)
+        com.zenithblue.nativecode.bridge.NativeCodeBridge.start(this)
         
         // Enable fullscreen/immersive mode
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -599,7 +632,14 @@ class MainActivity : AppCompatActivity() {
         workspaceFontSize = termFontSize
         scriptFontSize = termFontSize
         showExtraKeys = prefs.getBoolean("pref_show_extra_keys", true)
-        LinuxCommandBuilder.currentMethod = prefs.getString("linux_method", "proot") ?: "proot"
+        val storedMethod = prefs.getString("linux_method", "proot") ?: "proot"
+        LinuxCommandBuilder.currentMethod = if (BuildConfig.PLAY_STORE_BUILD) "proot" else storedMethod
+        if (BuildConfig.PLAY_STORE_BUILD && storedMethod != "proot") {
+            prefs.edit()
+                .putString("linux_method", "proot")
+                .remove("ai_cli_tools_provisioned_chroot")
+                .apply()
+        }
         activeProjectName = prefs.getString("active_project_name", activeProjectName) ?: activeProjectName
         activeProjectPath = prefs.getString("active_project_path", activeProjectPath) ?: activeProjectPath
         activeProjectMethod = prefs.getString("active_project_method", null)
@@ -607,6 +647,15 @@ class MainActivity : AppCompatActivity() {
             ?: LinuxCommandBuilder.currentMethod
 
         executor.execute { LegacyProotDataMigrator.migrateIfNeeded(this) }
+        if (BuildConfig.PLAY_STORE_BUILD &&
+            !AndroidDevPackManager.isApplied(this) &&
+            AndroidDevPackManager.resolveArchive(this) != null
+        ) {
+            executor.execute {
+                val result = AndroidDevPackManager.applyAvailablePack(this)
+                Log.i("AndroidDevPack", result.message)
+            }
+        }
 
         buildRootLayout()
         setContentView(drawerLayout)
@@ -660,6 +709,12 @@ class MainActivity : AppCompatActivity() {
             val isLandscape = resources.displayMetrics.widthPixels > resources.displayMetrics.heightPixels
             val isKeyboardOpen = ime.bottom > 0
 
+            // System bars are hidden in immersive mode. Never retain a stale
+            // pre-hide top inset; that produced a temporary blank strip above
+            // the first page header until navigation forced another layout.
+            mainContentLayout.setPadding(0, 0, if (isLandscape) bars.right else 0, 0)
+            sideNavContainer.setPadding(if (isLandscape) bars.left else 0, 0, 0, bars.bottom)
+
             if (::bottomNavContainer.isInitialized) {
                 if (!isLandscape && (showGlobalNav || showProjectNav) && !isKeyboardOpen) {
                     bottomNavContainer.visibility = View.VISIBLE
@@ -692,7 +747,6 @@ class MainActivity : AppCompatActivity() {
         setupGlobalNavRailListener()
         setupProjectNavRailListener()
 
-        deployScripts()
         val targetPage = intent.getIntExtra("target_page", ID_HOME)
         if (targetPage != ID_HOME) {
             pageStack.push(targetPage)
@@ -702,6 +756,7 @@ class MainActivity : AppCompatActivity() {
         }
         onSetupComplete()
         handleIntent(intent)
+        InAppReportService.retryQueued(applicationContext)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -729,8 +784,8 @@ class MainActivity : AppCompatActivity() {
      * @return effective method used after optional recovery
      */
     private fun applyProjectIsolation(path: String, preferredMethod: String): String {
-        var method = preferredMethod
-        val found = ProjectManager.detectRepoMethod(this, path, preferredMethod)
+        var method = if (BuildConfig.PLAY_STORE_BUILD) "proot" else preferredMethod
+        val found = ProjectManager.detectRepoMethod(this, path, method)
         if (found != null && found != preferredMethod) {
             method = found
             val list = getProjects().toMutableList()
@@ -761,7 +816,7 @@ class MainActivity : AppCompatActivity() {
         intent?.let {
             // Chroot uninstall script deep-link: nativecode://callback?result=success&name=distro_uninstall_...
             val data = it.data
-            if (data != null && data.scheme == "nativecode" && data.host == "callback") {
+            if (!BuildConfig.PLAY_STORE_BUILD && data != null && data.scheme == "nativecode" && data.host == "callback") {
                 val name = data.getQueryParameter("name").orEmpty()
                 val result = data.getQueryParameter("result").orEmpty()
                 if (name.contains("uninstall", ignoreCase = true) && result == "success") {
@@ -957,6 +1012,12 @@ class MainActivity : AppCompatActivity() {
         if (::privacyPolicyScrollView.isInitialized) {
             privacyPolicyScrollView.visibility = View.GONE
         }
+        if (::componentsScrollView.isInitialized) {
+            componentsScrollView.visibility = View.GONE
+        }
+        if (::hardwareScrollView.isInitialized) {
+            hardwareScrollView.visibility = View.GONE
+        }
         if (::prootSettingsScrollView.isInitialized) {
             prootSettingsScrollView.visibility = View.GONE
         }
@@ -1072,7 +1133,7 @@ class MainActivity : AppCompatActivity() {
             }
             ID_SETTINGS -> {
                 settingsHubScrollView.visibility = View.VISIBLE
-                refreshChrootSettingsHubRootGate(force = false)
+                if (!BuildConfig.PLAY_STORE_BUILD) refreshChrootSettingsHubRootGate(force = false)
                 refreshSettingsGithubCard()
             }
             ID_PROOT_SETTINGS -> {
@@ -1082,7 +1143,7 @@ class MainActivity : AppCompatActivity() {
                 applyCachedProotInfo()
                 refreshProotSettingsCard(force = false)
             }
-            ID_CHROOT_SETTINGS -> {
+            ID_CHROOT_SETTINGS -> if (!BuildConfig.PLAY_STORE_BUILD) {
                 if (::chrootSettingsScrollView.isInitialized) {
                     chrootSettingsScrollView.visibility = View.VISIBLE
                 }
@@ -1098,7 +1159,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 refreshSoftwareManagerPage(force = false)
             }
-            ID_MARKETPLACE -> {
+            ID_MARKETPLACE -> if (!BuildConfig.PLAY_STORE_BUILD) {
                 if (::marketplaceScrollView.isInitialized) {
                     marketplaceScrollView.visibility = View.VISIBLE
                 }
@@ -1133,11 +1194,23 @@ class MainActivity : AppCompatActivity() {
                     refreshAiSafetyPage()
                 }
             }
+            ID_COMPONENTS -> {
+                if (::componentsScrollView.isInitialized) {
+                    componentsScrollView.visibility = View.VISIBLE
+                }
+            }
             ID_PRIVACY_POLICY -> {
                 if (::privacyPolicyScrollView.isInitialized) {
                     privacyPolicyScrollView.visibility = View.VISIBLE
                     privacyPolicyScrollView.scrollTo(0, 0)
                 }
+            }
+            ID_HARDWARE -> {
+                if (::hardwareScrollView.isInitialized) {
+                    hardwareScrollView.visibility = View.VISIBLE
+                    hardwareScrollView.scrollTo(0, 0)
+                }
+                refreshHardwarePage()
             }
             ID_SCRIPT_INSTALL -> {
                 if (::scriptInstallLayout.isInitialized) {
@@ -1233,12 +1306,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @android.annotation.SuppressLint("MissingSuperCall", "GestureBackNavigation")
     override fun onBackPressed() {
         android.util.Log.e("NativeCodeNav", "onBackPressed called! currentPageId=$currentPageId, stack=$pageStack, privacyPolicyScrollVis=${if (::privacyPolicyScrollView.isInitialized) privacyPolicyScrollView.visibility else -1}")
         
         // Priority 1: Settings subpages (MUST check before any project/workspace checks)
         if (::privacyPolicyScrollView.isInitialized && privacyPolicyScrollView.visibility == View.VISIBLE) {
             navigateBackFromSubpage(ID_PRIVACY_POLICY, fallback = ID_SETTINGS)
+            return
+        }
+        if (::hardwareScrollView.isInitialized && hardwareScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_HARDWARE, fallback = ID_SETTINGS)
+            return
+        }
+        if (::componentsScrollView.isInitialized && componentsScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_COMPONENTS, fallback = ID_SETTINGS)
             return
         }
         if (::aiSafetyScrollView.isInitialized && aiSafetyScrollView.visibility == View.VISIBLE) {
@@ -1372,7 +1454,8 @@ class MainActivity : AppCompatActivity() {
         if (id == ID_SCRIPTS || id == ID_SCRIPT_INSTALL || id == ID_PROJECT_CREATE ||
             id == ID_CHROOT_SETTINGS || id == ID_PROOT_SETTINGS ||
             id == ID_SOFTWARE_MANAGER || id == ID_MARKETPLACE || id == ID_APPS || id == ID_MP_INSTALLER ||
-            id == ID_CLI_AUTH || id == ID_AI_SAFETY || id == ID_PRIVACY_POLICY
+            id == ID_CLI_AUTH || id == ID_AI_SAFETY || id == ID_PRIVACY_POLICY || id == ID_COMPONENTS ||
+            id == ID_HARDWARE
         ) {
             showGlobalNav = false
             showProjectNav = false
@@ -1408,18 +1491,19 @@ class MainActivity : AppCompatActivity() {
             projectBottomNavigation.visibility = android.view.View.GONE
         }
         
-        // Handle window insets based on orientation
+        // Insets are owned by the window-insets listener. Keep this path free
+        // of cached top insets, which can be stale while immersive mode starts.
         if (isLandscape && ::mainContentLayout.isInitialized) {
             rootLayout.rootWindowInsets?.let { insets ->
                 val bars = androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(insets).getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-                mainContentLayout.setPadding(0, bars.top, bars.right, bars.bottom)
+                mainContentLayout.setPadding(0, 0, bars.right, 0)
                 bottomNavContainer.setPadding(0, 0, 0, 0)
-                sideNavContainer.setPadding(bars.left, bars.top, 0, bars.bottom)
+                sideNavContainer.setPadding(bars.left, 0, 0, bars.bottom)
             }
         } else if (::mainContentLayout.isInitialized) {
             rootLayout.rootWindowInsets?.let { insets ->
                 val bars = androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(insets).getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-                mainContentLayout.setPadding(0, bars.top, 0, 0)
+                mainContentLayout.setPadding(0, 0, 0, 0)
                 bottomNavContainer.setPadding(bars.left, 0, bars.right, bars.bottom)
                 sideNavContainer.setPadding(0, 0, 0, 0)
             }
@@ -1528,7 +1612,7 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(NC.SURFACE_LOWEST)
             val params = androidx.drawerlayout.widget.DrawerLayout.LayoutParams(dp(260), MATCH).apply {
-                gravity = Gravity.START
+                gravity = androidx.core.view.GravityCompat.START
             }
             layoutParams = params
             setPadding(dp(16), dp(20), dp(16), dp(16))
@@ -1859,13 +1943,15 @@ class MainActivity : AppCompatActivity() {
         buildScriptsLayout()
         buildCliAuthPage()
         buildAiSafetyPage()
+        buildComponentsPage()
         buildPrivacyPolicyPage()
+        buildHardwarePage()
         buildProotSettingsPage()
-        buildChrootSettingsPage()
+        if (!BuildConfig.PLAY_STORE_BUILD) buildChrootSettingsPage()
         buildSoftwareManagerPage()
-        buildMarketplacePage()
+        if (!BuildConfig.PLAY_STORE_BUILD) buildMarketplacePage()
         buildAppsPage()
-        buildMarketplaceInstallerLayout()
+        if (!BuildConfig.PLAY_STORE_BUILD) buildMarketplaceInstallerLayout()
         buildScriptInstallLayout()
         buildProjectCreateLayout()
         buildProjectsListLayout()
@@ -1885,13 +1971,15 @@ class MainActivity : AppCompatActivity() {
         contentFrame.addView(scriptsScrollView)
         contentFrame.addView(cliAuthScrollView)
         contentFrame.addView(aiSafetyScrollView)
+        contentFrame.addView(componentsScrollView)
         contentFrame.addView(privacyPolicyScrollView)
+        contentFrame.addView(hardwareScrollView)
         contentFrame.addView(prootSettingsScrollView)
-        contentFrame.addView(chrootSettingsScrollView)
+        if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(chrootSettingsScrollView)
         contentFrame.addView(softwareManagerScrollView)
-        contentFrame.addView(marketplaceScrollView)
+        if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(marketplaceScrollView)
         contentFrame.addView(appsScrollView)
-        contentFrame.addView(mpInstallerLayout)
+        if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(mpInstallerLayout)
         contentFrame.addView(scriptInstallLayout)
         contentFrame.addView(projectCreateContainer)
         contentFrame.addView(projectsListContainer)
@@ -2040,11 +2128,11 @@ class MainActivity : AppCompatActivity() {
             ).show()
             return
         }
-        if (type == "codex" && LinuxCommandBuilder.currentMethod == "chroot") {
+        if (!BuildConfig.PLAY_STORE_BUILD && type == "codex" && LinuxCommandBuilder.currentMethod == "chroot") {
             Toast.makeText(this, "Codex unavailable in chroot", Toast.LENGTH_SHORT).show()
             return
         }
-        if (type == "shell-root" && LinuxCommandBuilder.currentMethod == "chroot") {
+        if (!BuildConfig.PLAY_STORE_BUILD && type == "shell-root" && LinuxCommandBuilder.currentMethod == "chroot") {
             executor.execute {
                 val rootOk = RootShell.isRootAvailable()
                 mainHandler.post {
@@ -2068,7 +2156,7 @@ class MainActivity : AppCompatActivity() {
         ensureBootstrapExtracted()
         maybeToastHeavyToolLaunch(type)
         // Warm RootShell su cache so ChrootCommandBuilder.shellRootCommand uses discovered path
-        if (LinuxCommandBuilder.currentMethod == "chroot") {
+        if (!BuildConfig.PLAY_STORE_BUILD && LinuxCommandBuilder.currentMethod == "chroot") {
             executor.execute { try { RootShell.isRootAvailable() } catch (_: Exception) {} }
         }
         val cwd     = File(filesDir, "home").absolutePath
@@ -3271,7 +3359,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         }
 
-        val bgIv = object : ImageView(this) {
+        val bgIv = object : androidx.appcompat.widget.AppCompatImageView(this) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
                 setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), 0)
             }
@@ -3537,62 +3625,91 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setImagePathClipboard(guestPath: String) {
+    private fun setAttachmentPathClipboard(guestPath: String) {
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("image_path", guestPath))
+        cm.setPrimaryClip(ClipData.newPlainText("linux_attachment_path", guestPath))
     }
 
-    /**
-     * Stage under app UID, then install into proot rootfs (direct) or chroot (root cp).
-     * Guest clipboard path is always a Debian path when verified.
-     */
     private fun handleImageAttachment(uri: Uri, isWorkspace: Boolean) {
+        handleAttachment(uri, isWorkspace, imageOnly = true)
+    }
+
+    private fun handleFileAttachment(uri: Uri, isWorkspace: Boolean) {
+        handleAttachment(uri, isWorkspace, imageOnly = false)
+    }
+
+    private fun queryAttachmentName(uri: Uri): String? = try {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getString(0) else null
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun safeAttachmentName(uri: Uri, mime: String?, imageOnly: Boolean): String {
+        val raw = queryAttachmentName(uri)
+            ?.substringAfterLast('/')
+            ?.substringAfterLast('\\')
+            .orEmpty()
+        val safe = raw
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trim('.', '_')
+            .take(96)
+        val fallback = if (imageOnly) "image.${mimeToImageExt(mime)}" else "file"
+        return "attach_${System.currentTimeMillis()}_${safe.ifBlank { fallback }}"
+    }
+
+    /** Copy a picked Android document into the active Linux guest and copy its guest path. */
+    private fun handleAttachment(uri: Uri, isWorkspace: Boolean, imageOnly: Boolean) {
         val method = resolveAttachMethod(isWorkspace)
         val mime = contentResolver.getType(uri)
-        if (mime != null && !mime.startsWith("image/")) {
+        if (imageOnly && mime != null && !mime.startsWith("image/")) {
             Toast.makeText(this, "Not an image", Toast.LENGTH_SHORT).show()
             return
         }
-        val ext = mimeToImageExt(mime)
-        val fname = "attach_${System.currentTimeMillis()}.$ext"
+        val fname = safeAttachmentName(uri, mime, imageOnly)
         val guestPath = if (isWorkspace && activeProjectPath.isNotBlank()) {
             "${activeProjectPath.trimEnd('/')}/$fname"
         } else {
             "/home/flux/$fname"
         }
 
+        Toast.makeText(this, "Copying into Linux…", Toast.LENGTH_SHORT).show()
+
         executor.execute {
+            var stageFile: File? = null
             try {
                 val stageDir = ProjectPathResolver.stageAttachDir(this@MainActivity)
-                val stageFile = File(stageDir, fname)
+                stageFile = File(stageDir, fname)
                 contentResolver.openInputStream(uri)?.use { inp ->
                     FileOutputStream(stageFile).use { out -> inp.copyTo(out) }
                 } ?: run {
                     mainHandler.post {
-                        Toast.makeText(this@MainActivity, "Failed to read image", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Failed to read selection", Toast.LENGTH_SHORT).show()
                     }
                     return@execute
                 }
-                if (!stageFile.isFile || stageFile.length() <= 0L) {
+                if (!stageFile.isFile || (imageOnly && stageFile.length() <= 0L)) {
                     mainHandler.post {
-                        Toast.makeText(this@MainActivity, "Image copy empty", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Selected file could not be copied", Toast.LENGTH_SHORT).show()
                     }
                     return@execute
                 }
+                val stagedSize = stageFile.length()
 
                 val finalGuestPath: String
                 if (method == "chroot") {
                     if (!RootShell.isRootAvailable()) {
                         finalGuestPath = ProjectPathResolver.stageAttachGuestPath(fname)
                         Log.w(
-                            "ImageAttach",
+                            "FileAttach",
                             "chroot no root; bind fallback path=$finalGuestPath stage=${stageFile.absolutePath}"
                         )
                         mainHandler.post {
-                            setImagePathClipboard(finalGuestPath)
+                            setAttachmentPathClipboard(finalGuestPath)
                             Toast.makeText(
                                 this@MainActivity,
-                                "No root for /home/flux — using $finalGuestPath",
+                                "Copied path: $finalGuestPath",
                                 Toast.LENGTH_LONG
                             ).show()
                         }
@@ -3605,9 +3722,10 @@ class MainActivity : AppCompatActivity() {
                     )
                     if (result.exitCode != 0) {
                         Log.e(
-                            "ImageAttach",
+                            "FileAttach",
                             "chroot cp fail code=${result.exitCode} out=${result.stdout.take(200)}"
                         )
+                        stageFile.delete()
                         mainHandler.post {
                             Toast.makeText(
                                 this@MainActivity,
@@ -3623,7 +3741,7 @@ class MainActivity : AppCompatActivity() {
                     val hostTarget = ProjectPathResolver.resolve(this@MainActivity, guestPath, method)
                     hostTarget.parentFile?.mkdirs()
                     stageFile.copyTo(hostTarget, overwrite = true)
-                    if (!hostTarget.isFile || hostTarget.length() <= 0L) {
+                    if (!hostTarget.isFile || hostTarget.length() != stagedSize) {
                         mainHandler.post {
                             Toast.makeText(this@MainActivity, "Proot write failed", Toast.LENGTH_SHORT).show()
                         }
@@ -3634,19 +3752,20 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 Log.i(
-                    "ImageAttach",
+                    "FileAttach",
                     "ok method=$method workspace=$isWorkspace guest=$finalGuestPath"
                 )
                 mainHandler.post {
-                    setImagePathClipboard(finalGuestPath)
+                    setAttachmentPathClipboard(finalGuestPath)
                     Toast.makeText(
                         this@MainActivity,
-                        "Copied: $finalGuestPath",
+                        "Copied path: $finalGuestPath",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
             } catch (e: Exception) {
-                Log.e("ImageAttach", "Failed to copy image", e)
+                stageFile?.delete()
+                Log.e("FileAttach", "Failed to copy attachment", e)
                 mainHandler.post {
                     Toast.makeText(
                         this@MainActivity,
@@ -3656,6 +3775,32 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showAttachmentTutorial(onContinue: (() -> Unit)? = null) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Attach to Linux")
+            .setMessage(
+                "IMAGE selects a picture. FILE selects any document. NativeCode copies it into the active " +
+                    "project (or /home/flux), then copies the Linux path to Android's clipboard. Paste that " +
+                    "path into your terminal or agent. Hold either icon to reopen this help."
+            )
+            .setPositiveButton(if (onContinue == null) "GOT IT" else "CONTINUE") { _, _ ->
+                getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
+                    .putBoolean("attachment_tutorial_seen", true)
+                    .apply()
+                onContinue?.invoke()
+            }
+            .apply {
+                if (onContinue != null) setNegativeButton("CANCEL", null)
+            }
+            .show()
+    }
+
+    private fun pickAttachmentWithTutorial(picker: () -> Unit) {
+        val seen = getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
+            .getBoolean("attachment_tutorial_seen", false)
+        if (seen) picker() else showAttachmentTutorial(picker)
     }
 
     private fun makeToolbarKeyBtn(label: String, widePad: Boolean = false, cornerRadius: Int = dp(5), marginRight: Int = dp(5), height: Int = WRAP, exactWidth: Int? = null, iconResId: Int? = null): TextView {
@@ -3709,7 +3854,8 @@ class MainActivity : AppCompatActivity() {
         tvRef: () -> TerminalView?,
         sessionRef: () -> TerminalSession?,
         modState: ModifierState,
-        onPickImage: () -> Unit
+        onPickImage: () -> Unit,
+        onPickDocument: () -> Unit
     ): LinearLayout {
         val wrapper = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -3821,16 +3967,31 @@ class MainActivity : AppCompatActivity() {
         val attachBtn = ImageView(this).apply {
             setImageResource(R.drawable.ic_attach_image)
             setColorFilter(NC.ON_SURF_VAR)
+            contentDescription = "Attach image to Linux"
             scaleType = ImageView.ScaleType.FIT_CENTER
             background = roundedBg(NC.SURFACE, NC.BORDER, 0)
             setPadding(dp(13), dp(13), dp(13), dp(13))
             layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = 0 }
-            setOnClickListener { onPickImage() }
+            setOnClickListener { pickAttachmentWithTutorial(onPickImage) }
+            setOnLongClickListener { showAttachmentTutorial(); true }
+        }
+
+        val documentBtn = ImageView(this).apply {
+            setImageResource(R.drawable.ic_attach_file)
+            setColorFilter(NC.ON_SURF_VAR)
+            contentDescription = "Attach file to Linux"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            background = roundedBg(NC.SURFACE, NC.BORDER, 0)
+            setPadding(dp(13), dp(13), dp(13), dp(13))
+            layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = 0 }
+            setOnClickListener { pickAttachmentWithTutorial(onPickDocument) }
+            setOnLongClickListener { showAttachmentTutorial(); true }
         }
 
         row1.addView(ctrlBtn); row1.addView(altBtn); row1.addView(shiftBtn)
         coreBtn1.forEach { row1.addView(it) }
         row1.addView(attachBtn)
+        row1.addView(documentBtn)
 
         // ── Row 2: Scrollable special keys ────────────────────────────────
         val row2scroll = HorizontalScrollView(this).apply {
@@ -4041,12 +4202,9 @@ class MainActivity : AppCompatActivity() {
             sessionRef = { terminalSession },
             modState = termModState,
             onPickImage = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    termImagePickerLauncher.launch("image/*")
-                } else {
-                    termImagePickerLauncher.launch("image/*")
-                }
-            }
+                termImagePickerLauncher.launch("image/*")
+            },
+            onPickDocument = { termDocumentPickerLauncher.launch(arrayOf("*/*")) }
         ).apply {
             visibility = if (showExtraKeys) View.VISIBLE else View.GONE
         }
@@ -4148,6 +4306,18 @@ class MainActivity : AppCompatActivity() {
         settingsHubLayout.addView(buildGuiLaunchCard())
         settingsHubLayout.addView(spacer(16))
 
+        if (BuildConfig.PLAY_STORE_BUILD) {
+            settingsHubLayout.addView(
+                settingsHubNavRow(
+                    iconRes = R.drawable.ic_download,
+                    title = "COMPONENTS",
+                    subtitle = "Linux runtime · Android SDK 36",
+                    pageId = ID_COMPONENTS
+                )
+            )
+            settingsHubLayout.addView(spacer(16))
+        }
+
         // Terminal Settings card
         settingsHubLayout.addView(buildTerminalSettingsCard())
         settingsHubLayout.addView(spacer(16))
@@ -4180,12 +4350,166 @@ class MainActivity : AppCompatActivity() {
         settingsHubLayout.addView(buildOnboardingSectionButton())
         settingsHubLayout.addView(spacer(16))
 
+        // Hardware Diagnostics & VPU Bridges
+        settingsHubLayout.addView(buildHardwareSectionButton())
+        settingsHubLayout.addView(spacer(16))
+
         // Privacy Policy — opens public GitHub markdown
         settingsHubLayout.addView(buildPrivacyPolicyCard())
         settingsHubLayout.addView(spacer(20))
 
         // App version code + commit from gradle BuildConfig
         settingsHubLayout.addView(buildSettingsVersionFooter())
+    }
+
+    private fun buildAndroidSdkPackCard(): View {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOW,
+                strokeColor = NC.OUTLINE_VAR,
+                shadowColor = NC.SHADOW_DARK,
+                offsetDp = 6,
+                cornerRadiusDp = 0
+            )
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        card.addView(TextView(this).apply {
+            text = "ANDROID SDK 36"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        val status = TextView(this).apply {
+            text = when {
+                AndroidDevPackManager.isApplied(this@MainActivity) ->
+                    "READY · Platform 36 · ARM64 aapt2 36.1.0"
+                AndroidDevPackManager.resolveArchive(this@MainActivity) != null ->
+                    "PACK READY · apply to Alpaquita"
+                else -> "OPTIONAL PLAY ASSET PACK · ~76 MB download"
+            }
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, dp(6), 0, dp(10))
+        }
+        card.addView(status)
+
+        val action = primaryButton(
+            if (AndroidDevPackManager.resolveArchive(this) != null) "APPLY SDK" else "DOWNLOAD SDK"
+        ) {}
+        action.setOnClickListener {
+            action.isEnabled = false
+            action.alpha = 0.5f
+
+            fun applyPack() {
+                status.text = "Verifying and applying SDK overlay…"
+                executor.execute {
+                    val result = AndroidDevPackManager.applyAvailablePack(this@MainActivity)
+                    runOnUiThread {
+                        status.text = result.message
+                        action.isEnabled = !result.success
+                        action.alpha = if (result.success) 0.5f else 1f
+                        if (result.success) {
+                            action.text = "SDK READY"
+                        }
+                    }
+                }
+            }
+
+            if (AndroidDevPackManager.resolveArchive(this) != null) {
+                applyPack()
+            } else {
+                status.text = "Requesting nativecode_android_dev from Google Play…"
+                var listener: AssetPackStateUpdateListener? = null
+                listener = PlayAssetDeliveryManager.requestDownload(
+                    this,
+                    PlayAssetDeliveryManager.PACK_ANDROID_DEV
+                ) { state ->
+                    when (state) {
+                        is PlayAssetDeliveryManager.DownloadState.Pending ->
+                            status.text = "SDK download pending…"
+                        is PlayAssetDeliveryManager.DownloadState.Downloading ->
+                            status.text = "SDK downloading ${state.percentage}%"
+                        is PlayAssetDeliveryManager.DownloadState.Transferring ->
+                            status.text = "SDK transferring ${state.percentage}%"
+                        is PlayAssetDeliveryManager.DownloadState.Completed -> {
+                            listener?.let { PlayAssetDeliveryManager.unregisterListener(this, it) }
+                            applyPack()
+                        }
+                        is PlayAssetDeliveryManager.DownloadState.WaitingForWifi ->
+                            status.text = "Waiting for Wi-Fi approval…"
+                        is PlayAssetDeliveryManager.DownloadState.Failed -> {
+                            listener?.let { PlayAssetDeliveryManager.unregisterListener(this, it) }
+                            status.text = "SDK download failed (${state.errorCode})"
+                            action.isEnabled = true
+                            action.alpha = 1f
+                        }
+                        is PlayAssetDeliveryManager.DownloadState.Canceled -> {
+                            listener?.let { PlayAssetDeliveryManager.unregisterListener(this, it) }
+                            status.text = "SDK download canceled"
+                            action.isEnabled = true
+                            action.alpha = 1f
+                        }
+                        else -> Unit
+                    }
+                }
+            }
+        }
+        card.addView(action)
+        return card
+    }
+
+    private fun buildComponentsPage() {
+        componentsScrollView = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            visibility = View.GONE
+            clipToPadding = false
+            setPadding(0, 0, 0, dp(80))
+            setBackgroundColor(NC.BG)
+        }
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        componentsScrollView.addView(page)
+        page.addView(
+            buildSubPageHeader(
+                title = "COMPONENTS",
+                subtitle = "// PLAY-DELIVERED DEVELOPMENT COMPONENTS",
+                iconRes = R.drawable.ic_download,
+                pageId = ID_COMPONENTS
+            ) { badge -> badge.text = "PLAY" }
+        )
+
+        val rootfs = ProjectPathResolver.prootRootfsDir(this)
+        page.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOW,
+                strokeColor = NC.OUTLINE_VAR,
+                shadowColor = NC.SHADOW_DARK,
+                offsetDp = 6,
+                cornerRadiusDp = 0
+            )
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            addView(TextView(this@MainActivity).apply {
+                text = "ALPAQUITA RUNTIME"
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+            })
+            addView(TextView(this@MainActivity).apply {
+                val xfce = File(rootfs, "usr/bin/startxfce4").isFile
+                text = if (xfce) "READY · PRoot · XFCE4" else "NOT INSTALLED · complete onboarding"
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(6), 0, 0)
+            })
+        })
+        page.addView(spacer(16))
+        page.addView(buildAndroidSdkPackCard())
     }
 
     private fun buildX11SettingsSectionButton(): View {
@@ -4608,7 +4932,7 @@ class MainActivity : AppCompatActivity() {
                 typeface = Typeface.DEFAULT_BOLD
             }
             val sub = TextView(this@MainActivity).apply {
-                text = "Debian rootfs size (app storage)"
+                text = "Alpaquita rootfs size (app storage)"
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -4792,7 +5116,7 @@ class MainActivity : AppCompatActivity() {
                 card.alpha = 0.45f
                 card.isEnabled = false
                 card.isClickable = false
-                sub?.text = "No root · KernelSU / Magisk required"
+                sub?.text = "No root access"
                 sub?.setTextColor(NC.ERROR)
                 badge?.visibility = View.VISIBLE
                 badge?.text = "NO ROOT"
@@ -4803,7 +5127,7 @@ class MainActivity : AppCompatActivity() {
                 card.setOnClickListener {
                     Toast.makeText(
                         this,
-                        "Chroot needs root. Grant superuser in KernelSU/Magisk.",
+                        "Chroot needs root access. Grant it in your root manager.",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -5266,7 +5590,7 @@ class MainActivity : AppCompatActivity() {
             title = "INSTALL AI CLI TOOLS?",
             message =
                 "setup_cli_tools.sh installs Node/NVM and third-party AI CLIs " +
-                    "inside the Debian guest (network). Guest-only — not a host APK update.",
+                    "inside the Alpaquita guest (network). Guest-only — not a host APK update.",
             confirmLabel = "RUN",
             cancelLabel = "CANCEL",
             destructive = false,
@@ -5324,7 +5648,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(6))
         })
         card.addView(TextView(this).apply {
-            text = "Debian guest scripts work on proot and chroot."
+            text = "Alpaquita guest scripts work on proot and chroot."
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -5633,8 +5957,8 @@ class MainActivity : AppCompatActivity() {
 
         when (runMode) {
             "chroot", "chroot_host" -> {
-                // Host-level chroot script (setup or uninstall) executed via explicit /system/bin/su
-                args = arrayOf("/system/bin/sh", "-c", "/system/bin/su -c \"sh $scriptPath\"")
+                // Host-level chroot script (full debug build only).
+                args = arrayOf("/system/bin/sh", "-c", RootShell.shellRootCommand("sh $scriptPath"))
                 envMap = HashMap(System.getenv()).apply {
                     put("PATH", "/system/bin:/system/xbin:/sbin:$nld:/data/data/com.zenithblue.nativecode/files/usr/bin")
                     put("HOME", "/data/data/com.zenithblue.nativecode/files/home")
@@ -7039,12 +7363,15 @@ class MainActivity : AppCompatActivity() {
         val webView = android.webkit.WebView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             setBackgroundColor(NC.BG)
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
+            settings.javaScriptEnabled = false
+            settings.domStorageEnabled = false
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.blockNetworkLoads = true
             // Let WebView scroll its own content (fixed chrome above)
             isVerticalScrollBarEnabled = true
-            val html = buildObsidianMarkdownHtml(mdContent, file.parentFile?.absolutePath ?: "")
-            loadDataWithBaseURL("file://${file.parent}/", html, "text/html", "UTF-8", null)
+            val html = buildObsidianMarkdownHtml(mdContent)
+            loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
         }
 
         val codeCard = buildCodeViewerCard(file, fillParent = true).apply {
@@ -7076,18 +7403,13 @@ class MainActivity : AppCompatActivity() {
         return container
     }
 
-    private fun buildObsidianMarkdownHtml(rawMd: String, basePath: String): String {
-        val safeMd = rawMd
-            .replace("\\", "\\\\")
-            .replace("`", "\\`")
-            .replace("$", "\\$")
-
+    private fun buildObsidianMarkdownHtml(rawMd: String): String {
+        val safeMd = android.text.TextUtils.htmlEncode(rawMd)
         return """
             <!DOCTYPE html>
             <html>
             <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
             <style>
               body {
                 background-color: #131313;
@@ -7098,24 +7420,6 @@ class MainActivity : AppCompatActivity() {
                 margin: 0;
                 word-wrap: break-word;
               }
-              h1, h2, h3, h4, h5, h6 {
-                color: #60f99e;
-                font-family: monospace, sans-serif;
-                border-bottom: 1px solid #3c4a3f;
-                padding-bottom: 6px;
-                margin-top: 24px;
-                margin-bottom: 12px;
-              }
-              a { color: #60f99e; text-decoration: none; font-weight: 500; }
-              code {
-                background-color: #201f1f;
-                color: #60f99e;
-                font-family: monospace;
-                padding: 2px 6px;
-                border-radius: 0;
-                font-size: 0.9em;
-                word-break: break-word;
-              }
               pre {
                 background-color: #0e0e0e;
                 border: 1px solid #3c4a3f;
@@ -7124,115 +7428,15 @@ class MainActivity : AppCompatActivity() {
                 overflow-x: auto;
                 max-width: 100%;
               }
-              pre code { background: transparent; padding: 0; color: #e5e2e1; }
-              blockquote {
-                border-left: 3px solid #60f99e;
-                margin: 12px 0;
-                padding-left: 14px;
-                color: #bbcbbc;
-                background: #1c1b1b;
-                padding-top: 4px;
-                padding-bottom: 4px;
+                color: #e5e2e1;
+                font-family: monospace;
+                white-space: pre-wrap;
+                word-break: break-word;
               }
-              ul, ol { padding-left: 24px; margin: 12px 0; }
-              li { margin-bottom: 6px; }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 18px 0;
-                background: #1c1b1b;
-                border-radius: 6px;
-                overflow: hidden;
-              }
-              th, td {
-                border: 1px solid #3c4a3f;
-                padding: 10px 14px;
-                text-align: left;
-              }
-              th { background-color: #201f1f; color: #60f99e; font-family: monospace; }
-              hr { border: none; border-top: 1px solid #3c4a3f; margin: 24px 0; }
-              img { max-width: 100%; height: auto; border-radius: 6px; display: block; margin: 12px auto; }
-              div[align="center"] { text-align: center; }
             </style>
             </head>
             <body>
-              <div id="content"></div>
-              <script>
-                const rawMarkdown = `$safeMd`;
-
-                function parseMarkdownOffline(md) {
-                  let html = md;
-
-                  // Code blocks ```
-                  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(m, lang, code) {
-                    return '<pre><code>' + escapeXml(code) + '</code></pre>';
-                  });
-
-                  // Tables
-                  html = html.replace(/(?:^|\n)((?:\|[^\n]+\|\n?)+)/g, function(m, tableStr) {
-                    const lines = tableStr.trim().split('\n').filter(l => l.trim().length > 0);
-                    if (lines.length < 2) return m;
-                    let tHtml = '<table>';
-                    lines.forEach((line, idx) => {
-                      if (line.includes('---')) return;
-                      const cells = line.split('|').map(c => c.trim()).filter((c, i, a) => i > 0 && i < a.length - 1);
-                      const tag = idx === 0 ? 'th' : 'td';
-                      tHtml += '<tr>' + cells.map(c => '<' + tag + '>' + parseInline(c) + '</' + tag + '>').join('') + '</tr>';
-                    });
-                    tHtml += '</table>';
-                    return tHtml;
-                  });
-
-                  // Headers
-                  html = html.replace(/^######\s*(.*)$/gm, '<h6>$1</h6>');
-                  html = html.replace(/^#####\s*(.*)$/gm, '<h5>$1</h5>');
-                  html = html.replace(/^####\s*(.*)$/gm, '<h4>$1</h4>');
-                  html = html.replace(/^###\s*(.*)$/gm, '<h3>$1</h3>');
-                  html = html.replace(/^##\s*(.*)$/gm, '<h2>$1</h2>');
-                  html = html.replace(/^#\s*(.*)$/gm, '<h1>$1</h1>');
-
-                  // Blockquotes
-                  html = html.replace(/^>\s*(.*)$/gm, '<blockquote>$1</blockquote>');
-
-                  // HR
-                  html = html.replace(/^---+$|^\*\*\*+$/gm, '<hr>');
-
-                  // Inline
-                  html = parseInline(html);
-
-                  // Lists
-                  html = html.replace(/^\s*[-*]\s+(.*)$/gm, '<li>$1</li>');
-                  html = html.replace(/(?:<li>.*?<\/li>\n?)+/g, function(m) { return '<ul>' + m + '</ul>'; });
-
-                  // Paragraphs
-                  html = html.replace(/\n{2,}/g, '</p><p>');
-
-                  return html;
-                }
-
-                function parseInline(text) {
-                  return text
-                    .replace(/\!\s*\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />')
-                    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-                    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-                    .replace(/`([^`]+)`/g, '<code>$1</code>');
-                }
-
-                function escapeXml(str) {
-                  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                }
-
-                try {
-                  if (typeof marked !== 'undefined' && marked.parse) {
-                    document.getElementById('content').innerHTML = marked.parse(rawMarkdown);
-                  } else {
-                    document.getElementById('content').innerHTML = parseMarkdownOffline(rawMarkdown);
-                  }
-                } catch(e) {
-                  document.getElementById('content').innerHTML = parseMarkdownOffline(rawMarkdown);
-                }
-              </script>
+              <pre>$safeMd</pre>
             </body>
             </html>
         """.trimIndent()
@@ -7711,7 +7915,7 @@ class MainActivity : AppCompatActivity() {
         val sectionSub = TextView(this).apply {
             text = when {
                 !xfceReady -> "Desktop runtime unavailable — reinstall the Linux Runtime."
-                methodNow == "chroot" -> "Termux X11 + XFCE4 inside Debian (root)."
+                methodNow == "chroot" -> "Termux X11 + XFCE4 inside Alpaquita (root)."
                 else -> "Termux X11 + XFCE4 graphical environment."
             }
             textSize = 12f
@@ -8440,6 +8644,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildEnvironmentCard(): LinearLayout {
+        if (BuildConfig.PLAY_STORE_BUILD) return buildPlayEnvironmentCard()
         val card = glassCard()
         card.addView(sectionHeader(R.drawable.ic_laptop_thick, "Linux Isolation Mode", NC.PRIMARY))
 
@@ -8520,7 +8725,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val chrootTitle = TextView(this).apply {
-            text = "CHROOT (KernelSU / Root)"
+            text = "CHROOT (Root required)"
             textSize = 14f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
@@ -8552,7 +8757,7 @@ class MainActivity : AppCompatActivity() {
                 val rootAvailable = RootShell.isRootAvailable()
                 mainHandler.post {
                     if (!rootAvailable) {
-                        Toast.makeText(this, "Root access (su) not detected via KernelSU/Magisk", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Root access was not granted", Toast.LENGTH_LONG).show()
                     } else if (!ProjectPathResolver.isChrootInstalled()) {
                         Toast.makeText(this, "Root detected! Please run Chroot setup in Onboarding to finish installation.", Toast.LENGTH_LONG).show()
                         LinuxCommandBuilder.currentMethod = "chroot"
@@ -8583,6 +8788,18 @@ class MainActivity : AppCompatActivity() {
         card.addView(spacer(12))
         card.addView(infoRow("OS Version", "Alpaquita Linux (glibc AArch64)"))
         return card
+    }
+
+    private fun buildPlayEnvironmentCard(): LinearLayout = glassCard().apply {
+        addView(sectionHeader(R.drawable.ic_laptop_thick, "Linux Environment", NC.PRIMARY))
+        addView(TextView(this@MainActivity).apply {
+            text = "Alpaquita Linux runs in isolated, rootless PRoot mode. NativeCode does not request superuser access."
+            textSize = 12f
+            setTextColor(NC.ON_SURF_VAR)
+            setPadding(0, 0, 0, dp(12))
+        })
+        addView(infoRow("Execution mode", "PRoot (rootless)"))
+        addView(infoRow("OS Version", "Alpaquita Linux (glibc AArch64)"))
     }
 
     /**
@@ -8642,7 +8859,7 @@ class MainActivity : AppCompatActivity() {
         headerTitleRow.addView(headerIcon)
         headerTitleRow.addView(titleTv)
         val subTitleTv = TextView(this).apply {
-            text = "// DEBIAN LINUX — APP STORAGE"
+            text = "// ALPAQUITA LINUX — APP STORAGE"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -8665,7 +8882,7 @@ class MainActivity : AppCompatActivity() {
         card.addView(sectionHeader(R.drawable.ic_storage, "Storage", NC.PRIMARY))
 
         val subTv = TextView(this).apply {
-            text = "// DEBIAN ROOTFS — MEASURED IN-APP"
+            text = "// ALPAQUITA ROOTFS — MEASURED IN-APP"
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -8835,7 +9052,7 @@ class MainActivity : AppCompatActivity() {
                 else -> "${mins / 1440}d ago"
             }
         } else "unknown"
-        return "Cached · Debian proot rootfs · $age"
+        return "Cached · Alpaquita PRoot rootfs · $age"
     }
 
     private fun saveProotInfo(dirPresent: Boolean, bytes: Long?) {
@@ -8852,7 +9069,7 @@ class MainActivity : AppCompatActivity() {
         prootRefreshBtn?.isEnabled = !loading
         prootRefreshBtn?.alpha = if (loading) 0.45f else 1f
         if (loading) {
-            prootSizeHintTv?.text = "Measuring Debian proot rootfs…"
+            prootSizeHintTv?.text = "Measuring Alpaquita PRoot rootfs…"
             prootSizeHintTv?.setTextColor(NC.PRIMARY)
             prootSizeValueTv?.alpha = 0.45f
         } else {
@@ -8882,7 +9099,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 bytes = measureProotRootfsBytes(rootfs)
                 measureNote = if (bytes != null) {
-                    "Debian proot rootfs · measured in-app"
+                    "Alpaquita PRoot rootfs · measured in-app"
                 } else {
                     "Size probe failed"
                 }
@@ -8994,7 +9211,7 @@ class MainActivity : AppCompatActivity() {
         headerTitleRow.addView(headerIcon)
         headerTitleRow.addView(titleTv)
         val subTitleTv = TextView(this).apply {
-            text = "// ROOT-LEVEL DEBIAN — OUTSIDE APP STORAGE"
+            text = "// ROOT-LEVEL ALPAQUITA — OUTSIDE APP STORAGE"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -9022,7 +9239,7 @@ class MainActivity : AppCompatActivity() {
         card.addView(sectionHeader(R.drawable.ic_storage, "Storage & Manage", NC.PRIMARY))
 
         val subTv = TextView(this).apply {
-            text = "// ROOT-LEVEL DEBIAN — OUTSIDE APP STORAGE"
+            text = "// ROOT-LEVEL ALPAQUITA — OUTSIDE APP STORAGE"
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -9629,7 +9846,7 @@ class MainActivity : AppCompatActivity() {
             liveBytes != null -> {
                 displayBytes = liveBytes
                 dimmedCache = false
-                measureNote = "Debian rootfs · binds excluded (sdcard/mnt/dev)"
+                measureNote = "Alpaquita rootfs · binds excluded (sdcard/mnt/dev)"
             }
             !dirExists -> {
                 displayBytes = null
@@ -10842,7 +11059,7 @@ class MainActivity : AppCompatActivity() {
                 text = if (env == "chroot")
                     "Guest not ready. Open Settings → Chroot Settings to install rootfs."
                 else
-                    "Guest not ready. Complete onboarding / Proot Settings for Debian."
+                    "Guest not ready. Complete onboarding / PRoot Settings for Alpaquita."
                 setTextColor(NC.ERROR)
                 typeface = Typeface.MONOSPACE
                 textSize = 12f
@@ -11285,11 +11502,11 @@ class MainActivity : AppCompatActivity() {
         if (!AptInventoryService.guestReady(this, env)) {
             smPackages = emptyList()
             smScanEnv = null
-            smStatusTv?.text = "Guest not ready ($env). Install Debian first."
+            smStatusTv?.text = "Guest not ready ($env). Install Alpaquita first."
             smListContainer?.removeAllViews()
             smListContainer?.addView(TextView(this).apply {
                 text = if (env == "chroot") "Open Chroot Settings to install rootfs."
-                else "Complete onboarding / proot Debian install."
+                else "Complete onboarding / PRoot Alpaquita install."
                 setTextColor(NC.ERROR)
                 typeface = Typeface.MONOSPACE
                 textSize = 12f
@@ -11595,6 +11812,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmMarketplaceUninstall(aptOrId: String) {
+        if (BuildConfig.PLAY_STORE_BUILD) return
         val env = currentLinuxEnv()
         val entry = InstallRegistry.forEnv(this, env).find {
             it.id == aptOrId || it.aptProvides.any { p -> p.equals(aptOrId, true) }
@@ -11616,6 +11834,10 @@ class MainActivity : AppCompatActivity() {
      * Home + Settings entries call this; already-accepted skips dialog.
      */
     private fun openMarketplace() {
+        if (BuildConfig.PLAY_STORE_BUILD) {
+            Toast.makeText(this, "Marketplace is unavailable in the Google Play build", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (MarketplaceConsent.isAccepted(this)) {
             goToMarketplace()
             return
@@ -11627,7 +11849,7 @@ class MainActivity : AppCompatActivity() {
                 "Installs run inside your Linux guest (proot/chroot), may use network, " +
                 "and can change packages there.\n\n" +
                 "Third-party scripts — review package details before install. " +
-                "Not required for core NativeCode or Debian shells.\n\n" +
+                "Not required for core NativeCode or Alpaquita shells.\n\n" +
                 "Accept once to open Marketplace.",
             confirmLabel = "I UNDERSTAND",
             cancelLabel = "NOT NOW",
@@ -11639,6 +11861,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun goToMarketplace() {
+        if (BuildConfig.PLAY_STORE_BUILD) return
         if (pageStack.isEmpty() || pageStack.peek() != ID_MARKETPLACE) {
             pageStack.push(ID_MARKETPLACE)
         }
@@ -11646,6 +11869,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshMarketplacePage(force: Boolean) {
+        if (BuildConfig.PLAY_STORE_BUILD) return
         mpEnvBadge?.text = envBadgeLabel()
         if (!MarketplaceConsent.isAccepted(this)) {
             mpStatusTv?.text = "Consent required"
@@ -12213,6 +12437,7 @@ class MainActivity : AppCompatActivity() {
      * Prepare stage + open repairs script-runner terminal for marketplace install.
      */
     private fun runMarketplaceInstall(id: String) {
+        if (BuildConfig.PLAY_STORE_BUILD) return
         if (!MarketplaceConsent.isAccepted(this)) {
             openMarketplace()
             return
@@ -12247,6 +12472,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun runMarketplaceUninstall(id: String) {
+        if (BuildConfig.PLAY_STORE_BUILD) return
         val cat = mpCatalog
         if (cat == null) {
             InstallRegistry.remove(this, currentLinuxEnv(), id)
@@ -12883,7 +13109,12 @@ class MainActivity : AppCompatActivity() {
                 "chroot_processes.sh",
                 "chroot_size.sh",
                 "nativecode_chroot.sh"
-            )
+            ).let { all ->
+                if (BuildConfig.PLAY_STORE_BUILD) {
+                    all.filter { it in setOf("setup_termux.sh", "flux_install.sh", "start_gui.sh", "stop_gui.sh") }
+                        .toTypedArray()
+                } else all
+            }
             for (script in scripts) {
                 val assetPath = when {
                     script.contains("chroot") ||
@@ -12966,9 +13197,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun isXfceInstalled(): Boolean {
         val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
-        return if (method == "chroot") {
-            File("/data/local/tmp/chrootAlpine/usr/bin/startxfce4").exists() ||
-                File("/data/local/tmp/chrootDebian13/usr/bin/startxfce4").exists()
+        return if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+            File(ChrootCommandBuilder.CHROOT_PATH, "usr/bin/startxfce4").exists()
         } else {
             File(ProjectPathResolver.prootRootfsDir(this), "usr/bin/startxfce4").exists() ||
                 File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpaquita/rootfs/usr/bin/startxfce4").exists() ||
@@ -14464,7 +14694,7 @@ class MainActivity : AppCompatActivity() {
             !rootOk && !installed ->
                 "Chroot needs root + install (Settings → Chroot)"
             !rootOk ->
-                "Root access (su) not detected via KernelSU/Magisk"
+                "Root access was not granted"
             !installed ->
                 "Chroot not installed. Install via Settings → Chroot."
             else ->
@@ -15675,8 +15905,8 @@ class MainActivity : AppCompatActivity() {
                 setPadding(0, 0, 0, dp(6))
             })
             addView(TextView(this@MainActivity).apply {
-                text = "Email: ${AiVendorSafetyCatalog.NATIVECODE_REPORT_EMAIL}\n" +
-                    "App bugs that surface AI tools, or safety concerns for developer awareness. " +
+                text = "Submit inside NativeCode without opening another app. " +
+                    "Use this for app bugs that surface AI tools or safety concerns. " +
                     "Prefer vendor form when the issue is model output itself."
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
@@ -15726,8 +15956,9 @@ class MainActivity : AppCompatActivity() {
                     "· GitHub: Settings hub → LOGOUT\n" +
                         "· AI keys/sessions: AI CLI tools → LOGOUT / CLEAR ALL\n" +
                         "· Full wipe: Android App info → Clear storage\n" +
-                        "· Uninstall removes app private data\n" +
-                        "· Chroot on shared storage: Chroot Settings uninstall"
+                        "· Uninstall removes app private data" +
+                        if (BuildConfig.PLAY_STORE_BUILD) "" else
+                            "\n· Chroot on shared storage: Chroot Settings uninstall"
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -15884,11 +16115,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openPrivacyPolicyUrl() {
-        val url = "https://zenith-blue.web.app/nativecode/privacy"
+        val url = "https://zenithblue-dev.github.io/nativecode-ai/privacy/"
         try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         } catch (_: Exception) {
-            val fallbackUrl = "https://zenith-blue.web.app/nativecode-privacy.html"
+            val fallbackUrl = "https://zenithblue-dev.github.io/nativecode-ai/privacy/"
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)))
             } catch (_: Exception) {
@@ -15965,7 +16196,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(0, 0, 0, dp(4))
             })
             addView(TextView(this@MainActivity).apply {
-                text = "https://zenith-blue.web.app/nativecode/privacy"
+                text = "https://zenithblue-dev.github.io/nativecode-ai/privacy/"
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -15993,9 +16224,9 @@ class MainActivity : AppCompatActivity() {
             })
             val bullets = listOf(
                 "• Local-First & Zero Tracking: NativeCode collects no personal data, device identifiers, or analytics.",
-                "• Isolated Guest Environments: Debian Linux, terminal sessions, projects, and editor caches run on-device inside isolated PRoot / Chroot containers.",
+                "• Isolated Guest Environment: Alpaquita Linux, terminal sessions, projects, and editor caches run on-device inside rootless PRoot.",
                 "• On-Demand Network Only: Internet permission is invoked exclusively when you trigger package installs, git sync, or external repository downloads.",
-                "• Third-Party Tool Disclaimers: AI CLIs (Codex, Claude, Grok, aider) communicate directly with vendor endpoints you authenticate; governed by their respective vendor policies.",
+                "• Third-Party Tools: AI CLIs may send prompts, selected code, account identifiers, and diagnostics directly to the provider you authenticate; each provider's policy applies.",
                 "• Data Erasure: Deleting projects, clearing app storage, or uninstalling completely removes all guest rootfs data from this device."
             )
             bullets.forEach { b ->
@@ -16078,22 +16309,383 @@ class MainActivity : AppCompatActivity() {
                     setPadding(0, 0, 0, dp(8))
                 })
 
-                addView(
-                    secondaryButton("VIEW SOURCE REPOSITORY") {
-                        openExternalUrl(item.url, "No browser available to open ${item.name}")
-                    }.apply {
-                        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-                        textSize = 11f
-                    }
-                )
+                if (item.url.isNotBlank()) {
+                    addView(
+                        secondaryButton("VIEW SOURCE REPOSITORY") {
+                            openExternalUrl(item.url, "No browser available to open ${item.name}")
+                        }.apply {
+                            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+                            textSize = 11f
+                        }
+                    )
+                }
             })
             pageLayout.addView(spacer(10))
         }
     }
 
-    /**
-     * Brutalist composer: category chips + optional tool + description → mailto.
-     */
+    private fun buildHardwareSectionButton(): View {
+        return settingsHubNavRow(
+            iconRes = R.drawable.ic_tune_thick,
+            title = "HARDWARE",
+            subtitle = "VPU acceleration & host IPC bridge",
+            pageId = ID_HARDWARE
+        )
+    }
+
+    private fun buildHardwarePage() {
+        hardwareScrollView = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            visibility = View.GONE
+            clipToPadding = false
+            setPadding(0, 0, 0, dp(80))
+            setBackgroundColor(NC.BG)
+            isVerticalScrollBarEnabled = true
+        }
+        val pageLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        hardwareScrollView.addView(pageLayout)
+
+        // Header with Back Button
+        val headerTitleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val pageBackBtn = ImageView(this).apply {
+            setImageResource(R.drawable.ic_arrow_back)
+            setColorFilter(NC.PRIMARY)
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(8) }
+            contentDescription = "Back"
+            setOnClickListener {
+                navigateBackFromSubpage(ID_HARDWARE, fallback = ID_SETTINGS)
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(NC.SURFACE_CONTAINER)
+                setStroke(dp(1), NC.OUTLINE_VAR)
+            }
+        }
+        val titleTv = TextView(this).apply {
+            text = "HARDWARE & VPU"
+            textSize = 20f
+            setTextColor(NC.PRIMARY)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        }
+        val vpuBadge = textBadge("MEDIACODEC · IPC", NC.SURFACE_HIGHEST, NC.PRIMARY)
+        headerTitleRow.addView(pageBackBtn)
+        headerTitleRow.addView(titleTv)
+        headerTitleRow.addView(vpuBadge)
+        pageLayout.addView(headerTitleRow)
+
+        pageLayout.addView(TextView(this).apply {
+            text = "// HARDWARE VPU ACCELERATION & HOST AGENT BRIDGE"
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, dp(4), 0, dp(12))
+        })
+
+        // VPU Card
+        pageLayout.addView(glassCard().apply {
+            val titleRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val cardTitle = TextView(this@MainActivity).apply {
+                text = "VPU HARDWARE ACCELERATION"
+                textSize = 14f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            }
+            vpuStatusBadge = textBadge("ACTIVE", NC.SURFACE_HIGHEST, NC.PRIMARY)
+            titleRow.addView(cardTitle)
+            titleRow.addView(vpuStatusBadge)
+            addView(titleRow)
+
+            vpuSocDetailTv = TextView(this@MainActivity).apply {
+                text = "SoC: Loading..."
+                textSize = 12f
+                setTextColor(NC.PRIMARY_CON)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(6), 0, dp(4))
+            }
+            addView(vpuSocDetailTv)
+
+            vpuDecodersTv = TextView(this@MainActivity).apply {
+                text = "Decoders: Loading..."
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, 0, 0, dp(4))
+            }
+            addView(vpuDecodersTv)
+
+            vpuEncodersTv = TextView(this@MainActivity).apply {
+                text = "Encoders: Loading..."
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, 0, 0, dp(4))
+            }
+            addView(vpuEncodersTv)
+        })
+
+        pageLayout.addView(spacer(16))
+
+        // Bridge Daemon Card
+        pageLayout.addView(glassCard().apply {
+            addView(TextView(this@MainActivity).apply {
+                text = "NATIVECODE HOST IPC BRIDGE"
+                textSize = 14f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, 0, 0, dp(4))
+            })
+
+            bridgeStatusTv = TextView(this@MainActivity).apply {
+                text = "Bridge: Active (Abstract AF_UNIX)"
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, 0, 0, dp(8))
+            }
+            addView(bridgeStatusTv)
+
+            val btnRow1 = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+
+            val testPingBtn = Button(this@MainActivity).apply {
+                text = "TEST PING"
+                textSize = 11f
+                setTextColor(NC.PRIMARY)
+                background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
+                setOnClickListener {
+                    bridgeLogTv.text = "Testing @nativecode.agent.v1 ping..."
+                    Thread {
+                        try {
+                            val sock = connectAgentSocket()
+                            val startMs = System.currentTimeMillis()
+                            val req = JSONObject().apply {
+                                put("v", 1)
+                                put("cmd", "ping")
+                                put("client_id", "ui-tester")
+                            }
+                            AgentBridgeProtocol.writeControlString(sock.outputStream, req.toString())
+                            val respStr = AgentBridgeProtocol.readControlString(sock.inputStream)
+                            val elapsed = System.currentTimeMillis() - startMs
+                            val resp = JSONObject(respStr)
+                            sock.close()
+
+                            runOnUiThread {
+                                if (resp.optBoolean("ok", false)) {
+                                    Toast.makeText(this@MainActivity, "Agent Ping OK (${elapsed}ms)", Toast.LENGTH_SHORT).show()
+                                    bridgeLogTv.text = "Agent Ping: OK (Host UID ${resp.optInt("host_uid")}, RT ${elapsed}ms)"
+                                } else {
+                                    bridgeLogTv.text = "Agent Ping Failed: ${resp.optString("error")}"
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                bridgeLogTv.text = "Agent Ping Error: ${e.message}"
+                            }
+                        }
+                    }.start()
+                }
+            }
+
+            val testNotifBtn = Button(this@MainActivity).apply {
+                text = "TEST NOTIFY"
+                textSize = 11f
+                setTextColor(NC.PRIMARY)
+                background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+                setOnClickListener {
+                    bridgeLogTv.text = "Dispatching notification via @nativecode.agent.v1..."
+                    Thread {
+                        try {
+                            val sock = connectAgentSocket()
+                            val req = JSONObject().apply {
+                                put("v", 1)
+                                put("cmd", "notify")
+                                put("id", 1002)
+                                put("tag", "hardware_ui")
+                                put("title", "NativeCode Agent Bridge")
+                                put("message", "Live notification dispatched via AF_UNIX bridge!")
+                                put("priority", "high")
+                            }
+                            AgentBridgeProtocol.writeControlString(sock.outputStream, req.toString())
+                            val respStr = AgentBridgeProtocol.readControlString(sock.inputStream)
+                            val resp = JSONObject(respStr)
+                            sock.close()
+
+                            runOnUiThread {
+                                if (resp.optBoolean("ok", false)) {
+                                    Toast.makeText(this@MainActivity, "Notification Posted via Bridge!", Toast.LENGTH_SHORT).show()
+                                    bridgeLogTv.text = "Notification Posted: OK (Tag: hardware_ui, ID: 1002)"
+                                } else {
+                                    bridgeLogTv.text = "Notification Failed: ${resp.optString("error")}"
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                bridgeLogTv.text = "Notification Error: ${e.message}"
+                            }
+                        }
+                    }.start()
+                }
+            }
+
+            btnRow1.addView(testPingBtn)
+            btnRow1.addView(testNotifBtn)
+            addView(btnRow1)
+
+            val btnRow2 = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(8), 0, 0)
+            }
+
+            val benchDecBtn = Button(this@MainActivity).apply {
+                text = "BENCH DECODE"
+                textSize = 11f
+                setTextColor(NC.PRIMARY)
+                background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
+                setOnClickListener {
+                    val testFile = File(filesDir, "home/test_1080p30.mp4")
+                    if (!testFile.exists()) {
+                        bridgeLogTv.text = "Benchmark: /home/test_1080p30.mp4 not found"
+                        return@setOnClickListener
+                    }
+                    bridgeLogTv.text = "Benchmarking 1080p VPU hardware decode..."
+                    Thread {
+                        val res = MediaCodecDecodeBenchmark.runDecode(testFile, MediaCodecDecodeBenchmark.OutputMode.SURFACE_IMAGE_READER)
+                        runOnUiThread {
+                            if (res.error == null) {
+                                val fpsFormatted = String.format(Locale.US, "%.1f", res.fps)
+                                val rtFormatted = String.format(Locale.US, "%.1f", res.realtimeFactor)
+                                bridgeLogTv.text = "VPU Decode: ${res.codecName}\n${res.decodedFrames} frames in ${res.wallTimeMs} ms -> $fpsFormatted FPS (${rtFormatted}x realtime)"
+                            } else {
+                                bridgeLogTv.text = "VPU Decode Error: ${res.error}"
+                            }
+                        }
+                    }.start()
+                }
+            }
+
+            val benchEncBtn = Button(this@MainActivity).apply {
+                text = "BENCH ENCODE"
+                textSize = 11f
+                setTextColor(NC.PRIMARY)
+                background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+                setOnClickListener {
+                    bridgeLogTv.text = "Benchmarking 720p VPU hardware encode..."
+                    Thread {
+                        val testOutputFile = File(cacheDir, "bench_encoded_720p.mp4")
+                        val res = MediaCodecEncodeBenchmark.runEncodeBenchmark(
+                            outputFile = testOutputFile,
+                            width = 1280,
+                            height = 720,
+                            frameCount = 150,
+                            fps = 30,
+                            bitrate = 4_000_000,
+                            mime = "video/avc"
+                        )
+                        runOnUiThread {
+                            if (res.error == null) {
+                                val fpsFormatted = String.format(Locale.US, "%.1f", res.fps)
+                                val rtFormatted = String.format(Locale.US, "%.1f", res.realtimeFactor)
+                                val sizeKb = res.outputSizeBytes / 1024
+                                bridgeLogTv.text = "VPU Encode: ${res.codecName}\n${res.encodedFrames} frames in ${res.wallTimeMs} ms -> $fpsFormatted FPS (${rtFormatted}x realtime) [${sizeKb} KB MP4]"
+                            } else {
+                                bridgeLogTv.text = "VPU Encode Error: ${res.error}"
+                            }
+                        }
+                    }.start()
+                }
+            }
+
+            btnRow2.addView(benchDecBtn)
+            btnRow2.addView(benchEncBtn)
+            addView(btnRow2)
+
+            bridgeLogTv = TextView(this@MainActivity).apply {
+                text = "Bridge status: Ready"
+                textSize = 11f
+                setTextColor(NC.PRIMARY_CON)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(8), 0, 0)
+            }
+            addView(bridgeLogTv)
+        })
+    }
+
+    private fun refreshHardwarePage() {
+        val soc = "${Build.MANUFACTURER} ${Build.MODEL} (${Build.HARDWARE})"
+        vpuSocDetailTv.text = "Device: $soc\nAndroid API: ${Build.VERSION.SDK_INT}"
+
+        val avcDec = MediaCodecSelector.selectHardwareDecoder("video/avc")?.name ?: "None"
+        val hevcDec = MediaCodecSelector.selectHardwareDecoder("video/hevc")?.name ?: "None"
+        val av1Dec = MediaCodecSelector.selectHardwareDecoder("video/av01")?.name ?: "None"
+        val vp9Dec = MediaCodecSelector.selectHardwareDecoder("video/x-vnd.on2.vp9")?.name ?: "None"
+
+        val avcEnc = MediaCodecSelector.selectHardwareEncoder("video/avc")?.name ?: "None"
+        val hevcEnc = MediaCodecSelector.selectHardwareEncoder("video/hevc")?.name ?: "None"
+
+        val hasHw = avcDec != "None" || hevcDec != "None"
+        vpuStatusBadge.text = if (hasHw) "ACTIVE" else "UNAVAILABLE"
+        vpuStatusBadge.setTextColor(if (hasHw) NC.PRIMARY else NC.ERROR)
+
+        vpuDecodersTv.text = "Hardware Decoders:\n• H.264 / AVC: $avcDec\n• HEVC / H.265: $hevcDec\n• AV1: $av1Dec\n• VP9: $vp9Dec"
+        vpuEncodersTv.text = "Hardware Encoders:\n• H.264: $avcEnc\n• HEVC: $hevcEnc"
+
+        bridgeStatusTv.text = "AF_UNIX Bridge Sockets:\n• Agent Bridge: Probing...\n• Media VPU Bridge: Probing...\n• Peer UID: ${android.os.Process.myUid()} (Security Enforced)"
+
+        Thread {
+            val agentLive = probeLocalSocket("nativecode.agent.v1") || probeLocalSocket("nativecode.agent.v1.${android.os.Process.myUid()}")
+            val mediaLive = probeLocalSocket("nativecode.media.v1") || probeLocalSocket("nativecode.media.v1.${android.os.Process.myUid()}")
+            runOnUiThread {
+                val agentStatus = if (agentLive) "● ACTIVE (Live)" else "○ OFFLINE"
+                val mediaStatus = if (mediaLive) "● ACTIVE (Live)" else "○ OFFLINE"
+                bridgeStatusTv.text = "AF_UNIX Bridge Sockets:\n• Agent Bridge: @nativecode.agent.v1 ($agentStatus)\n• Media VPU Bridge: @nativecode.media.v1 ($mediaStatus)\n• Peer UID: ${android.os.Process.myUid()} (Security Enforced)"
+            }
+        }.start()
+    }
+
+    private fun probeLocalSocket(name: String): Boolean {
+        return try {
+            val s = android.net.LocalSocket()
+            s.connect(android.net.LocalSocketAddress(name, android.net.LocalSocketAddress.Namespace.ABSTRACT))
+            s.close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun connectAgentSocket(): android.net.LocalSocket {
+        val candidates = listOf(
+            "nativecode.agent.v1",
+            "nativecode.agent.v1.${android.os.Process.myUid()}"
+        )
+        for (name in candidates) {
+            try {
+                val s = android.net.LocalSocket()
+                s.connect(android.net.LocalSocketAddress(name, android.net.LocalSocketAddress.Namespace.ABSTRACT))
+                return s
+            } catch (ignored: Exception) {}
+        }
+        throw java.io.IOException("Agent bridge offline")
+    }
+
+    /** In-app report composer. Failed deliveries remain queued for automatic retry. */
     private fun showAiReportComposer(preselectedToolId: String?) {
         val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
         dialog.setCancelable(true)
@@ -16143,7 +16735,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(8))
         })
         card.addView(TextView(this).apply {
-            text = "→ ${AiVendorSafetyCatalog.NATIVECODE_REPORT_EMAIL}"
+            text = "SUBMITS IN APP · NO FILES, TOKENS, OR TERMINAL HISTORY"
             textSize = 11f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -16262,28 +16854,39 @@ class MainActivity : AppCompatActivity() {
                 textSize = 12f
             }
         )
-        btnRow.addView(
-            primaryButton("SEND EMAIL") {
-                val ok = ReportMailHelper.openNativeCodeReport(
-                    this@MainActivity,
+        val submitButton = primaryButton("SUBMIT IN APP") {}
+        submitButton.setOnClickListener {
+                submitButton.isEnabled = false
+                submitButton.text = "SUBMITTING…"
+                InAppReportService.submit(
+                    context = this@MainActivity,
                     toolId = selectedToolId,
                     category = selectedCategory,
                     description = descInput.text?.toString().orEmpty()
-                )
-                if (!ok) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "No mail app available",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    dialog.dismiss()
+                ) { result ->
+                    runOnUiThread {
+                        val message = when (result) {
+                            InAppReportService.Result.DELIVERED -> "Report submitted"
+                            InAppReportService.Result.QUEUED ->
+                                "Report queued securely; automatic retry enabled"
+                            InAppReportService.Result.REJECTED ->
+                                "Report not saved: description is too long"
+                        }
+                        Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                        if (result == InAppReportService.Result.REJECTED) {
+                            submitButton.isEnabled = true
+                            submitButton.text = "SUBMIT IN APP"
+                        } else {
+                            dialog.dismiss()
+                        }
+                    }
                 }
-            }.apply {
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-                textSize = 12f
-            }
-        )
+        }
+        submitButton.apply {
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            textSize = 12f
+        }
+        btnRow.addView(submitButton)
         card.addView(btnRow)
 
         scrim.addView(card)
@@ -16907,7 +17510,7 @@ class MainActivity : AppCompatActivity() {
         })
         githubCard.addView(ghUrlHeader)
         projectGithubInput = EditText(this).apply {
-            hint = "https://github.com/username/repo.git"
+            hint = "github.com/owner/repository"
             setHintTextColor(NC.OUTLINE)
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -17397,7 +18000,7 @@ class MainActivity : AppCompatActivity() {
         topRow.addView(countBadge)
 
         val subTitleTv = TextView(this).apply {
-            text = "// DEBIAN DISTRO REPOSITORY • DEPLOYMENT HOST"
+            text = "// ALPAQUITA LINUX REPOSITORY • DEPLOYMENT HOST"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -17440,7 +18043,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val emptyDesc = TextView(this).apply {
-                text = "No projects created in Debian rootfs yet.\nTap the '+ NEW PROJECT' button to initialize your first project repository."
+                text = "No projects created in the Alpaquita rootfs yet.\nTap the '+ NEW PROJECT' button to initialize your first project repository."
                 textSize = 12f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -18871,7 +19474,8 @@ class MainActivity : AppCompatActivity() {
             tvRef = { if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null },
             sessionRef = { if (activeWorkspaceTabIndex >= 0 && activeWorkspaceTabIndex < workspaceSessions.size) workspaceSessions[activeWorkspaceTabIndex] else null },
             modState = wsModState,
-            onPickImage = { wsImagePickerLauncher.launch("image/*") }
+            onPickImage = { wsImagePickerLauncher.launch("image/*") },
+            onPickDocument = { wsDocumentPickerLauncher.launch(arrayOf("*/*")) }
         ).apply {
             visibility = if (showExtraKeys) View.VISIBLE else View.GONE
         }

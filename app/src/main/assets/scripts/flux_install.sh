@@ -13,17 +13,14 @@ SETUP_B64="${2:-}"
 case "$DISTRO" in
     alpaquita)
         ROOTFS_NAME="alpaquita_rootfs.tar.zst"
-        ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/zenithblue-oss/fluxlinux/releases/download/rootfs/alpaquita_glibc_rootfs.tar.zst}"
         ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-${NATIVECODE_ROOTFS_SHA256:-}}"
         ;;
     alpine)
         ROOTFS_NAME="alpine_rootfs.tar.gz"
-        ROOTFS_URL="${FLUX_ROOTFS_URL:-https://github.com/zenithblue-oss/fluxlinux/releases/download/rootfs/alpine_3.24_rootfs.tar.gz}"
         ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-}"
         ;;
     *)
         ROOTFS_NAME="${DISTRO}_rootfs.tar.gz"
-        ROOTFS_URL="${FLUX_ROOTFS_URL:-}"
         ROOTFS_SHA256="${FLUX_ROOTFS_SHA256:-}"
         ;;
 esac

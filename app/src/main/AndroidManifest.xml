@@ -53,7 +53,7 @@
 
         <!--
           specialUse subtype: user-initiated Linux terminals, project shells, XFCE desktop,
-          and onboarding Debian proot/chroot install + setup scripts.
+          and onboarding Alpaquita Linux installation.
           Keep justification in sync with docs/policy/fgs-special-use-declaration.md
         -->
         <service
@@ -63,7 +63,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps user-started XFCE/desktop (Termux-X11) and onboarding Debian proot/chroot install + setup scripts alive with a visible notification. Desktop is stoppable in Settings; setup ends when install finishes or fails." />
+                android:value="Keeps user-started XFCE/desktop (Termux-X11) and onboarding Alpaquita Linux installation alive with a visible notification. Desktop is stoppable in Settings; setup ends when installation finishes or fails." />
         </service>
 
         <service

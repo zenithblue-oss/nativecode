@@ -1,19 +1,20 @@
 # Privacy Policy — NativeCode
 
-**Last updated:** 2026-07-31  
+**Last updated:** 2026-09-09
 **App:** NativeCode (`com.zenithblue.nativecode`)  
 **Developer:** ZenithBlue / NativeCode (GitHub: [zenithblue-oss](https://github.com/zenithblue-oss))  
 **Repository:** [zenithblue-oss/nativecode-ai](https://github.com/zenithblue-oss/nativecode-ai)
 
-This Privacy Policy describes how NativeCode handles information when you use the Android app. NativeCode is a developer environment that runs a Linux guest (proot/chroot), optional X11 desktop, terminal sessions, and optional third-party AI/developer CLIs.
+This Privacy Policy describes how NativeCode handles information when you use the Android app. The Google Play build runs an Alpaquita Linux PRoot guest, optional X11 desktop, terminal sessions, and optional third-party AI/developer CLIs.
 
 ---
 
 ## 1. Summary
 
-- NativeCode is **open source** and **local-first**. We do **not** collect personal data on a NativeCode cloud/backend.
-- Your files, projects, packages, and credentials stay **on this device** inside the Debian **proot** or **chroot** distro (and app private storage).
-- Optional features (GitHub login, AI CLI auth, package/marketplace installs, guest apt) may contact **third parties you choose** — not a NativeCode analytics service. The Debian rootfs base is packaged with the app; network is for packages/tools you request, not a silent app update.
+- NativeCode is **local-first**. We do not operate an advertising, analytics, or telemetry backend.
+- Your files, projects, packages, and credentials are stored **on this device** inside the Alpaquita Linux **PRoot** guest and app-private storage.
+- Optional GitHub, AI CLI, and guest package-manager features contact **third parties you choose**. AI providers may receive prompts, selected source code or files, account identifiers, tool diagnostics, and generated output when you invoke their tools.
+- The Play build receives the rootfs through Google Play Asset Delivery. It does not download executable marketplace scripts or request superuser access.
 - Auth tokens/credentials, when used, are stored **on-device** only.
 
 ---
@@ -26,8 +27,8 @@ Depending on how you use the app, the following may be stored locally:
 
 | Category | Examples |
 |----------|----------|
-| App preferences | Isolation method (proot/chroot), UI/settings flags |
-| Linux guest data | Debian rootfs, packages, home directory files, projects you create |
+| App preferences | UI, terminal, onboarding, and PRoot settings |
+| Linux guest data | Alpaquita rootfs, packages, home-directory files, projects you create |
 | Auth material (optional) | GitHub CLI tokens/config, AI CLI API keys or device-login session files under guest home |
 | Session state | Terminal history, project paths, onboarding progress |
 
@@ -39,11 +40,12 @@ NativeCode initiates network requests only for features that require it, for exa
 
 | Purpose | Typical destinations |
 |---------|----------------------|
-| Guest packages / optional tools | Debian/apt mirrors; marketplace or AI installer hosts **when you install**; rootfs base comes from the app package |
+| Guest packages / optional tools | Alpaquita/apk, npm, and official tool hosts **when you install**; the rootfs is delivered by Google Play |
 | GitHub authentication & API | `github.com` / GitHub API (when you connect GitHub) |
 | AI CLI install or auth | Official vendor endpoints (e.g. Anthropic, OpenAI/Codex, xAI/Grok, and other tools you enable) |
-| Marketplace / scripts | Hosts defined by catalog or install scripts (often raw GitHub) |
-| Package managers | npm registry, nvm installers, apt repositories (when you install tools) |
+| Package managers | apk repositories, npm registry, and official installer hosts (when you install tools) |
+| AI use | The chosen AI vendor may receive prompts, selected code/files, account identifiers, diagnostics, and generated output needed to provide the requested service |
+| NativeCode safety report | The configured HTTPS report service receives only app version, selected tool, category, isolation method, and the description you enter |
 
 **We do not sell personal information.** Third parties process data under **their** privacy policies when you authenticate or download software from them.
 
@@ -65,7 +67,7 @@ NativeCode may request Android permissions for its features (e.g. notifications 
 
 - Provide and maintain the developer environment (terminal, guest Linux, X11).
 - Authenticate optional third-party CLIs **at your request**.
-- Install guest packages, marketplace components, and optional AI CLIs **when you trigger install/setup** (base rootfs is app-local).
+- Install guest packages and optional AI CLIs **when you trigger installation/setup**.
 - Show status, storage size, and connection state in Settings.
 
 We do **not** use on-device credentials for advertising or cross-app tracking.
@@ -77,7 +79,7 @@ We do **not** use on-device credentials for advertising or cross-app tracking.
 We do not sell or rent your data. Data leaves the device when:
 
 1. You authenticate to a third party (GitHub, AI vendors).
-2. You install guest packages/scripts from remote hosts (or use optional AI installers) after you choose to.
+2. You install guest packages or optional AI tools from remote hosts after you choose to.
 3. The OS or a tool you run inside the guest makes its own network calls.
 
 Third-party services are independent controllers for data they receive. Review their policies before connecting accounts.
@@ -88,7 +90,7 @@ Third-party services are independent controllers for data they receive. Review t
 
 - **Local app & guest data:** retained until you delete it, clear storage, or uninstall.
 - **Tokens/keys:** retained until you sign out (where supported), overwrite config, clear guest home, clear app data, or uninstall.
-- **No separate NativeCode cloud retention** is operated by this app as of the date above.
+- **Safety reports:** failed submissions are kept in private app storage (maximum 10) for retry. Successfully submitted reports may be retained by the configured report service for abuse review and support.
 
 ---
 
@@ -96,7 +98,7 @@ Third-party services are independent controllers for data they receive. Review t
 
 - Traffic to third parties generally uses HTTPS where those services support it.
 - Credentials live in app/guest storage; protect your device with a lock screen and avoid untrusted apps with backup/debug access.
-- `allowBackup` and OS backup behavior may copy app files depending on device settings—treat device backups as sensitive if you store tokens.
+- Android backup is disabled for NativeCode (`allowBackup=false`). Protect any separate device or filesystem backups that you create.
 
 No method of electronic storage is 100% secure. Use official install/auth flows only.
 
@@ -112,7 +114,7 @@ NativeCode is a developer tool intended for adults and professional use. It is *
 
 Optional AI CLIs run as third-party tools inside the guest environment. Outputs are generated by those vendors or local models you install. You are responsible for how you use those tools and for complying with each vendor’s terms.
 
-**In-app:** Settings → **AI Safety & Report** — third-party ToS/AUP links, per-vendor report forms, and a developer report path (`mailto:zenithblue.dev@gmail.com`). Prefer vendor forms for model-output concerns; use the developer email for app-related safety awareness.
+**In-app:** Settings → **AI Safety & Report** provides third-party ToS/AUP links, vendor reporting links, and the NativeCode reporting form. Reports submit without leaving the app. Failed reports remain in a private, capped local retry queue. Source code, terminal history, files, and credentials are excluded unless you deliberately paste them into the description.
 
 ---
 
@@ -125,9 +127,8 @@ Optional AI CLIs run as third-party tools inside the guest environment. Outputs 
 | Settings → AI CLI tools → **CLEAR SUITE FLAG** | Hides AI launchers until reinstall (bins may remain) |
 | Settings → **AI Safety & Report** | In-app deletion guidance + vendor links |
 | Delete projects / files in the guest | Removes those files from guest storage |
-| **Clear app storage** (Android App info) | Wipes app data including guest rootfs under app storage (proot path) |
+| **Clear app storage** (Android App info) | Wipes app data including the PRoot guest |
 | **Uninstall** | Removes the app and its private data |
-| Chroot installs on shared storage | May need explicit uninstall/cleanup from Chroot Settings if used |
 
 For account data held only by GitHub or AI vendors, manage deletion in those services’ account settings.
 
@@ -150,7 +151,6 @@ We may update this file in the repository. The **Last updated** date at the top 
 Questions about this Privacy Policy or NativeCode data practices:
 
 - **Email:** [zenithblue.dev@gmail.com](mailto:zenithblue.dev@gmail.com) (privacy, AI report, app concerns)
-- **GitHub issues:** [zenithblue-oss/nativecode-ai](https://github.com/zenithblue-oss/nativecode-ai/issues)
 - **Developer:** zenithblue-oss (ZenithBlue / NativeCode)
 
 ---
@@ -162,6 +162,4 @@ When published on Google Play, the same policy text (or a hosted HTML copy of it
 1. Play Console → App content → Privacy policy  
 2. In-app Settings → Privacy Policy  
 
-This document lives at:
-
-`https://github.com/zenithblue-oss/nativecode-ai/blob/master/docs/privacy-policy.md`
+Public policy URL: `https://zenithblue-dev.github.io/nativecode-ai/privacy/`

@@ -1,12 +1,16 @@
 package com.zenithblue.nativecode.terminal
 
 import android.content.Context
+import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.MainActivity
 import java.io.File
 
 /** Resolves project paths from their in-Debian representation to Android host filesystem paths.
  *  Works for both proot (Termux-style) and chroot (KernelSU/Magisk) installations. */
 object ProjectPathResolver {
+
+    private fun effectiveMethod(method: String): String =
+        if (BuildConfig.PLAY_STORE_BUILD) "proot" else method
 
     /** Default guest distribution name (SSOT). Can be overridden by app config. */
     const val DEFAULT_DISTRO = "alpaquita"
@@ -39,7 +43,7 @@ object ProjectPathResolver {
      *  The returned file points to the actual location on the Android host where
      *  that path is stored (chroot rootfs or proot container rootfs). */
     fun resolve(ctx: Context, projectPath: String, method: String = LinuxCommandBuilder.currentMethod): File {
-        val rootfs = if (method == "chroot") {
+        val rootfs = if (effectiveMethod(method) == "chroot") {
             ChrootCommandBuilder.CHROOT_PATH
         } else {
             prootRootfsDir(ctx).absolutePath
@@ -54,7 +58,7 @@ object ProjectPathResolver {
     /** Inverse: given an Android host [file], returns the Debian-internal path.
      *  Returns null if the file is not inside the current Debian rootfs. */
     fun toDebianPath(ctx: Context, file: File, method: String = LinuxCommandBuilder.currentMethod): String? {
-        val rootfs = if (method == "chroot") {
+        val rootfs = if (effectiveMethod(method) == "chroot") {
             ChrootCommandBuilder.CHROOT_PATH
         } else {
             prootRootfsDir(ctx).absolutePath
@@ -69,37 +73,36 @@ object ProjectPathResolver {
 
     /** Returns the guest home directory for the currently active linux method. */
     fun guestHomeDir(ctx: Context, method: String = LinuxCommandBuilder.currentMethod): File {
-        return if (method == "chroot") {
+        return if (effectiveMethod(method) == "chroot") {
             File(ChrootCommandBuilder.CHROOT_PATH, "home/flux")
         } else {
             File(prootRootfsDir(ctx), "home/flux")
         }
     }
 
-    /**
-     * App-writable staging dir for image attach (under host-tmp bind parent).
-     * Chroot sessions bind [Context.getFilesDir]/usr/tmp → /mnt/host-tmp.
-     */
+    /** App-writable staging dir for file/image attachments exposed through host-tmp. */
     fun stageAttachDir(ctx: Context): File =
         File(ctx.filesDir, "usr/tmp/nativecode_attach").also { it.mkdirs() }
 
-    /** Guest path for staged attach when no-root chroot bind fallback is used. */
+    /** Guest path for an attachment when a chroot uses the host-tmp bind fallback. */
     fun stageAttachGuestPath(fileName: String): String =
         "/mnt/host-tmp/nativecode_attach/$fileName"
 
     /** True if chroot is installed (marker file exists). */
     fun isChrootInstalled(): Boolean {
+        if (BuildConfig.PLAY_STORE_BUILD) return false
         return File("${ChrootCommandBuilder.CHROOT_PATH}/.flux_configured").exists()
     }
 
     /** Host rootfs directory for Debian chroot (outside app storage). */
-    fun chrootRootfsDir(): File = File(ChrootCommandBuilder.CHROOT_PATH)
+    fun chrootRootfsDir(): File =
+        if (BuildConfig.PLAY_STORE_BUILD) File("/disabled/chroot") else File(ChrootCommandBuilder.CHROOT_PATH)
 
     /** True if chroot rootfs directory exists on host (may be partial install). */
     fun isChrootRootfsPresent(): Boolean = chrootRootfsDir().exists()
 
     /** Human-readable label for a linux method. */
     fun methodLabel(method: String = LinuxCommandBuilder.currentMethod): String {
-        return if (method == "chroot") "Chroot (Alpaquita Linux)" else "Alpaquita Linux (glibc AArch64)"
+        return if (effectiveMethod(method) == "chroot") "Chroot (Alpaquita Linux)" else "Alpaquita Linux (glibc AArch64)"
     }
 }

@@ -1,5 +1,7 @@
 package com.zenithblue.nativecode.legal
 
+import com.zenithblue.nativecode.BuildConfig
+
 /**
  * Open-source license entry metadata.
  */
@@ -23,7 +25,7 @@ object OpenSourceLicenses {
             component = "Core Android Workspace & Orchestrator",
             licenseType = "GPL-3.0-only",
             copyright = "Copyright (C) 2024-2026 Zenith Blue / zenithblue",
-            url = "https://github.com/zenithblue-oss/nativecode-ai",
+            url = "",
             licenseSummary = "GNU General Public License v3.0. Permissions include commercial use, modification, distribution, patent use, and private use, with requirements to disclose source, license and copyright notice, and same license (copyleft)."
         ),
         OssLicenseItem(
@@ -91,12 +93,12 @@ object OpenSourceLicenses {
             licenseSummary = "Apache License 2.0. Secure process stream consumption and root/chroot process wrappers."
         ),
         OssLicenseItem(
-            name = "Debian GNU/Linux",
-            component = "Guest Linux rootfs (Debian 13 Trixie)",
+            name = "Alpaquita Linux",
+            component = "Guest Linux rootfs (Alpaquita Linux)",
             licenseType = "DFSG / Various FOSS",
-            copyright = "Copyright (C) Software in the Public Interest, Inc. and Debian contributors",
-            url = "https://www.debian.org",
-            licenseSummary = "Debian Free Software Guidelines. Base distribution container packages distributed according to their individual upstream open-source licenses."
+            copyright = "Copyright (C) BellSoft and Alpaquita Linux package contributors",
+            url = "https://bell-sw.com/alpaquita-linux/",
+            licenseSummary = "Base distribution packages are distributed under their individual upstream open-source licenses. Package license texts are included in the delivered runtime."
         )
-    )
+    ).filterNot { BuildConfig.PLAY_STORE_BUILD && it.name == "libsuperuser" }
 }

@@ -109,7 +109,7 @@ class BackgroundService : Service() {
                 "NativeCode Environment Setup",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Shows while Debian proot/chroot install and setup scripts run"
+                description = "Shows while Alpaquita Linux installation and setup run"
                 setShowBadge(false)
             }
         )
@@ -127,7 +127,7 @@ class BackgroundService : Service() {
         const val TEXT_DESKTOP = "XFCE / GUI host services are active. Open app to stop."
         const val TITLE_INSTALL = "NativeCode — Environment Setup"
         const val TEXT_INSTALL =
-            "Debian install / setup scripts are running. Keep this notification until setup finishes."
+            "Alpaquita Linux installation is running. Keep this notification until setup finishes."
 
         fun desktopIntent(context: Context): Intent =
             Intent(context, BackgroundService::class.java).apply {

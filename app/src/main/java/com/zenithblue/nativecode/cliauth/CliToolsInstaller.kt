@@ -2,7 +2,9 @@ package com.zenithblue.nativecode.cliauth
 
 import android.content.Context
 import android.util.Log
+import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.RootShell
+import com.zenithblue.nativecode.terminal.ChrootCommandBuilder
 import com.zenithblue.nativecode.terminal.HostCommandBuilder
 import com.zenithblue.nativecode.terminal.TermuxHostPaths
 import java.io.File
@@ -55,6 +57,11 @@ object CliToolsInstaller {
         onLine: (String) -> Unit = {},
         onDone: (Int) -> Unit
     ) {
+        if (BuildConfig.PLAY_STORE_BUILD) {
+            onLine("Chroot is unavailable in the Google Play build.\n")
+            onDone(-1)
+            return
+        }
         Thread {
             try {
                 val stageDir = File(ctx.filesDir, "staged_scripts").also { it.mkdirs() }
@@ -65,7 +72,7 @@ object CliToolsInstaller {
                 staged.setReadable(true, false)
                 onLine("Staged $SCRIPT for chroot…\n")
 
-                val chrootTmp = "/data/local/tmp/chrootAlpine/tmp"
+                val chrootTmp = "${ChrootCommandBuilder.CHROOT_PATH}/tmp"
                 val copyCmd =
                     "mkdir -p $chrootTmp && cp ${staged.absolutePath} $chrootTmp/$SCRIPT && chmod +x $chrootTmp/$SCRIPT"
                 val copyCode = RootShell.executeSync(copyCmd)

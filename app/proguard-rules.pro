@@ -1,5 +1,6 @@
-# Keep NativeCode models and components accessed via reflection/JNI
--keep class com.zenithblue.nativecode.** { *; }
+# App components are preserved by AGP's generated manifest rules. NativeCode
+# has no app-package reflection/JNI entry points, so do not blanket-keep dead
+# full-build features in the Play artifact.
 
 # Keep Termux X11 and its JNI bindings
 -keep class com.termux.** { *; }
@@ -48,4 +49,3 @@
     public <init>(android.content.Context);
 }
 -keep class com.termux.x11.NcSwitchPreference { *; }
-
