@@ -7,7 +7,8 @@ Guest Linux GL/Vulkan uses baked Mesa. The Android app never downloads GPU drive
 | Host GPU | Method | Path |
 |---|---|---|
 | Snapdragon / Adreno / KGSL | **Turnip KGSL (Zink)** | Guest Turnip ICD → `/dev/kgsl-3d0` |
-| Mali / Xclipse / PowerVR / other | **Venus** (Zink over Venus for OpenGL) | Guest virtio ICD → vtest socket → `virgl_test_server_android --venus` → Android `libvulkan.so` |
+| Mali (/dev/mali0 direct) | **PanVK (Zink over PanVK)** | Guest PanVK ICD → `/dev/mali0` |
+| Mali (no direct access) / Xclipse / PowerVR / other | **Venus** (Zink over Venus for OpenGL) | Guest virtio ICD → vtest socket → `virgl_test_server_android --venus` → Android `libvulkan.so` |
 | Venus missing / Zink fail | **VirGL (virpipe)** | Guest virpipe → host vtest (no `--venus`) |
 | Nothing else | **llvmpipe (software)** | CPU |
 
@@ -48,9 +49,9 @@ Host Venus requires `virgl_render_server` (linker64-exec'd from `libexec/`). Wit
 ## State files (guest)
 
 ```
-/etc/fluxlinux/gpu_mode      turnip | venus | virgl | software
+/etc/fluxlinux/gpu_mode      turnip | panvk | venus | virgl | software
 /etc/fluxlinux/gpu_vendor    adreno/snapdragon | mali | ...
-/etc/fluxlinux/gpu_backend   turnip | venus | zink-venus | virgl-angle | llvmpipe
+/etc/fluxlinux/gpu_backend   turnip | panvk-zink | venus | zink-venus | virgl-angle | llvmpipe
 /etc/fluxlinux/gpu_method    human label shown on Hardware page
 ```
 

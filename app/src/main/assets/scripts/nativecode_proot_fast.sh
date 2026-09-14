@@ -3,7 +3,7 @@
 # Does NOT replace proot-distro / nativecode_proot.sh (compat default).
 #
 # Usage:
-#   nativecode_proot_fast.sh exec   [--profile cli|gpu-turnip|gpu-virgl|compat] -- CMD [ARGS...]
+#   nativecode_proot_fast.sh exec   [--profile cli|gpu-turnip|gpu-panvk|gpu-virgl|gpu-venus|compat] -- CMD [ARGS...]
 #   nativecode_proot_fast.sh sh     [--profile ...] -- 'shell string'
 #   nativecode_proot_fast.sh login  [--shell auto|bash|zsh] [--profile ...]
 #   nativecode_proot_fast.sh root-exec [--profile ...] -- CMD [ARGS...]
@@ -35,7 +35,7 @@ die() {
 usage() {
   cat <<'EOF' >&2
 usage:
-  nativecode_proot_fast.sh exec   [--profile cli|gpu-turnip|gpu-virgl|compat] -- CMD [ARGS...]
+  nativecode_proot_fast.sh exec   [--profile cli|gpu-turnip|gpu-panvk|gpu-virgl|gpu-venus|compat] -- CMD [ARGS...]
   nativecode_proot_fast.sh sh     [--profile ...] -- SHELL_STRING
   nativecode_proot_fast.sh login  [--shell auto|bash|zsh] [--profile ...]
   nativecode_proot_fast.sh root-exec [--profile ...] -- CMD [ARGS...]
@@ -169,6 +169,9 @@ build_binds_android_sys() {
   fi
   # kgsl if present
   add_bind /dev/kgsl-3d0
+  # mali if present
+  add_bind /dev/mali0
+  add_bind /dev/mali
   add_bind /dev/dri
 }
 
@@ -207,6 +210,10 @@ build_binds() {
       build_binds_cli
       build_binds_android_sys
       ;;
+    gpu-panvk)
+      build_binds_cli
+      build_binds_android_sys
+      ;;
     gpu-virgl)
       build_binds_cli
       build_binds_virgl
@@ -219,7 +226,7 @@ build_binds() {
       build_binds_compat
       ;;
     *)
-      die "unknown profile: $PROFILE (cli|gpu-turnip|gpu-virgl|gpu-venus|compat)"
+      die "unknown profile: $PROFILE (cli|gpu-turnip|gpu-panvk|gpu-virgl|gpu-venus|compat)"
       ;;
   esac
 }
@@ -237,6 +244,18 @@ guest_gpu_env_args() {
         "MESA_VK_WSI_DEBUG=sw" \
         "MESA_GL_VERSION_OVERRIDE=4.6" \
         "MESA_GLES_VERSION_OVERRIDE=3.2" \
+        "MESA_SHADER_CACHE_DIR=/tmp/mesa_shader_cache"
+      ;;
+    gpu-panvk)
+      printf '%s\n' \
+        "MESA_LOADER_DRIVER_OVERRIDE=zink" \
+        "GALLIUM_DRIVER=zink" \
+        "VK_ICD_FILENAMES=/opt/nativecode/panvk/icd.d/panvk_kbase.json" \
+        "VK_DRIVER_FILES=/opt/nativecode/panvk/icd.d/panvk_kbase.json" \
+        "LD_PRELOAD=/opt/nativecode/panvk/lib/kbase_shim.so" \
+        "WSI_X11_TERMUX=1" \
+        "PANVK_KBASE_DRI3=raw" \
+        "MESA_VK_WSI_DEBUG=sw" \
         "MESA_SHADER_CACHE_DIR=/tmp/mesa_shader_cache"
       ;;
     gpu-virgl)

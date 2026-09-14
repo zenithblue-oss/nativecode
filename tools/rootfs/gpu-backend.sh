@@ -28,9 +28,19 @@ gpu_unset_env() {
 }
 
 gpu_find_icd() {
-    # arg: virtio|freedreno  → print first matching json
+    # arg: virtio|freedreno|panvk  → print first matching json
     _kind="$1"
     _dir="/usr/share/vulkan/icd.d"
+    if [ "$_kind" = "panvk" ] || [ "$_kind" = "panfrost" ]; then
+        for _c in \
+            /opt/nativecode/panvk/icd.d/panvk_kbase.json \
+            /usr/share/vulkan/icd.d/panfrost_kbase_icd.aarch64.json \
+            /usr/share/vulkan/icd.d/panfrost_icd.aarch64.json
+        do
+            [ -f "$_c" ] && { printf '%s\n' "$_c"; return 0; }
+        done
+        return 1
+    fi
     [ -d "$_dir" ] || return 1
     _hit=$(find "$_dir" -maxdepth 1 -type f -name "*${_kind}*.json" 2>/dev/null | head -n 1)
     [ -n "$_hit" ] && [ -f "$_hit" ] && { printf '%s\n' "$_hit"; return 0; }
@@ -50,9 +60,15 @@ gpu_kgsl_present() {
     [ -e /dev/kgsl-3d0 ] || [ -e /dev/kgsl ]
 }
 
+gpu_mali_present() {
+    [ -e /dev/mali0 ] || [ -e /dev/mali ]
+}
+
 gpu_method_label() {
     case "$1" in
         turnip) printf '%s\n' "Turnip KGSL (Zink)" ;;
+        panvk) printf '%s\n' "PanVK (Kbase)" ;;
+        panvk-zink|zink-panvk) printf '%s\n' "Zink over PanVK" ;;
         venus) printf '%s\n' "Venus (VirtIO Vulkan)" ;;
         zink-venus) printf '%s\n' "Zink over Venus" ;;
         virgl-angle|virgl) printf '%s\n' "VirGL (virpipe)" ;;
@@ -62,10 +78,11 @@ gpu_method_label() {
 }
 
 gpu_apply() {
-    # arg: turnip|venus|zink-venus|virgl-angle|llvmpipe
+    # arg: turnip|panvk|panvk-zink|venus|zink-venus|virgl-angle|llvmpipe
     gpu_unset_env
     _be="$1"
     _fd=$(gpu_find_icd freedreno 2>/dev/null || true)
+    _pv=$(gpu_find_icd panvk 2>/dev/null || true)
     _vn=$(gpu_find_icd virtio 2>/dev/null || true)
     export VTEST_SOCKET_NAME="$VTEST_SOCK"
     case "$_be" in
@@ -77,6 +94,22 @@ gpu_apply() {
             export MESA_VK_WSI_DEBUG=sw
             export MESA_GL_VERSION_OVERRIDE=4.6
             export MESA_GLES_VERSION_OVERRIDE=3.2
+            export MESA_NO_ERROR=1
+            ;;
+        panvk)
+            [ -n "$_pv" ] && export VK_DRIVER_FILES="$_pv" && export VK_ICD_FILENAMES="$_pv"
+            [ -f /opt/nativecode/panvk/lib/kbase_shim.so ] && export LD_PRELOAD="/opt/nativecode/panvk/lib/kbase_shim.so${LD_PRELOAD:+:$LD_PRELOAD}"
+            export WSI_X11_TERMUX=1
+            export PANVK_KBASE_DRI3=raw
+            ;;
+        panvk-zink|zink-panvk)
+            export MESA_LOADER_DRIVER_OVERRIDE=zink
+            export GALLIUM_DRIVER=zink
+            [ -n "$_pv" ] && export VK_DRIVER_FILES="$_pv" && export VK_ICD_FILENAMES="$_pv"
+            [ -f /opt/nativecode/panvk/lib/kbase_shim.so ] && export LD_PRELOAD="/opt/nativecode/panvk/lib/kbase_shim.so${LD_PRELOAD:+:$LD_PRELOAD}"
+            export WSI_X11_TERMUX=1
+            export PANVK_KBASE_DRI3=raw
+            export MESA_VK_WSI_DEBUG=sw
             export MESA_NO_ERROR=1
             ;;
         venus|zink-venus)
@@ -123,6 +156,16 @@ gpu_probe_turnip() {
     _out=$(vulkaninfo --summary 2>/dev/null || true)
     gpu_renderer_is_soft "$_out" && return 1
     printf '%s' "$_out" | grep -qiE 'adreno|turnip|freedreno|qualcomm'
+}
+
+gpu_probe_panvk() {
+    gpu_mali_present || return 1
+    _pv=$(gpu_find_icd panvk) || return 1
+    if [ -x /opt/nativecode/panvk/bin/nativecode-mali-probe ]; then
+        /opt/nativecode/panvk/bin/nativecode-mali-probe >/dev/null 2>&1
+        return $?
+    fi
+    return 0
 }
 
 gpu_probe_venus() {
@@ -176,6 +219,8 @@ gpu_probe_virgl() {
 gpu_map_mode_to_backend() {
     case "$1" in
         turnip) printf '%s\n' turnip ;;
+        panvk) printf '%s\n' panvk-zink ;;
+        panvk-zink|zink-panvk) printf '%s\n' panvk-zink ;;
         venus) printf '%s\n' zink-venus ;;
         zink-venus) printf '%s\n' zink-venus ;;
         virgl|virgl-angle) printf '%s\n' virgl-angle ;;
@@ -197,11 +242,17 @@ gpu_read_backend() {
     printf '%s\n' zink-venus
 }
 
-# Login default: live nodes + baked ICDs. Do not require vulkaninfo or a live
-# vtest socket (Mali Venus env must be set before the host server is up).
+# Login default: live nodes + baked ICDs.
+# KGSL -> Turnip
+# Mali -> PanVK direct (no Venus fallback when /dev/mali0 is available)
+# VirtIO -> Venus
 gpu_login_select() {
     if gpu_kgsl_present && gpu_find_icd freedreno >/dev/null 2>&1; then
         printf '%s\n' turnip
+        return 0
+    fi
+    if gpu_mali_present && gpu_find_icd panvk >/dev/null 2>&1; then
+        printf '%s\n' panvk-zink
         return 0
     fi
     if gpu_find_icd virtio >/dev/null 2>&1; then
@@ -220,11 +271,11 @@ gpu_persist() {
     mkdir -p "$GPU_STATE_DIR"
     printf '%s\n' "$_be" > "$GPU_PROBE_FILE"
     chmod 644 "$GPU_PROBE_FILE" 2>/dev/null || true
-    # Do not clobber a configured Turnip/Venus hint with software fallback.
+    # Do not clobber a configured Turnip/PanVK/Venus hint with software fallback.
     if [ "$_be" = "llvmpipe" ] && [ -r "$GPU_MODE_FILE" ]; then
         _m=$(tr -d '[:space:]' <"$GPU_MODE_FILE")
         case "$_m" in
-            turnip|venus|virgl) return 0 ;;
+            turnip|panvk|venus|virgl) return 0 ;;
         esac
     fi
     printf '%s\n' "$_be" > "$GPU_BACKEND_FILE"
@@ -234,8 +285,10 @@ gpu_persist() {
 
 gpu_diagnose() {
     echo "kgsl=$(gpu_kgsl_present && echo yes || echo no)"
+    echo "mali=$(gpu_mali_present && echo yes || echo no)"
     echo "vtest_socket=$VTEST_SOCK exists=$([ -S "$VTEST_SOCK" ] && echo yes || echo no)"
     echo "freedreno_icd=$(gpu_find_icd freedreno 2>/dev/null || echo none)"
+    echo "panvk_icd=$(gpu_find_icd panvk 2>/dev/null || echo none)"
     echo "virtio_icd=$(gpu_find_icd virtio 2>/dev/null || echo none)"
     echo "gpu_mode=$([ -r "$GPU_MODE_FILE" ] && tr -d '[:space:]' <"$GPU_MODE_FILE" || echo unset)"
     echo "gpu_vendor=$([ -r "$GPU_VENDOR_FILE" ] && tr -d '[:space:]' <"$GPU_VENDOR_FILE" || echo unset)"

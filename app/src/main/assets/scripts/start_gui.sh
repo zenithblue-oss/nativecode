@@ -75,7 +75,7 @@ if [ -r "$ROOTFS/etc/fluxlinux/gpu_mode" ]; then
 fi
 NEED_VTEST=1
 case "${GUEST_GPU_BACKEND:-$GUEST_GPU_MODE}" in
-  turnip) NEED_VTEST=0 ;;
+  turnip|panvk|panvk-zink) NEED_VTEST=0 ;;
   software|llvmpipe) NEED_VTEST=0 ;;
 esac
 
@@ -226,7 +226,7 @@ echo "FluxLinux: startxfce4=READY"
 # Guest GPU mode from launch hint or /etc/fluxlinux/gpu_mode
 GPU_HINT="${2:-}"
 case "$GPU_HINT" in
-  turnip|venus|virgl|software) GPU_MODE="$GPU_HINT" ;;
+  turnip|panvk|venus|virgl|software) GPU_MODE="$GPU_HINT" ;;
   *)
     GPU_MODE="${GUEST_GPU_MODE:-virgl}"
     if [ -r "$ROOTFS/etc/fluxlinux/gpu_mode" ]; then
@@ -235,7 +235,7 @@ case "$GPU_HINT" in
     ;;
 esac
 case "$GPU_MODE" in
-  turnip|venus|virgl|software) ;;
+  turnip|panvk|venus|virgl|software) ;;
   *) GPU_MODE=venus ;;
 esac
 echo "FluxLinux: Guest GPU mode=$GPU_MODE backend=${GUEST_GPU_BACKEND:-}"
@@ -295,6 +295,16 @@ else
             export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
             export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
             export TU_DEBUG=noconform
+            export MESA_VK_WSI_DEBUG=sw
+            ;;
+          panvk|panvk-zink)
+            export MESA_LOADER_DRIVER_OVERRIDE=zink
+            export GALLIUM_DRIVER=zink
+            export VK_DRIVER_FILES=/opt/nativecode/panvk/icd.d/panvk_kbase.json
+            export VK_ICD_FILENAMES=/opt/nativecode/panvk/icd.d/panvk_kbase.json
+            [ -f /opt/nativecode/panvk/lib/kbase_shim.so ] && export LD_PRELOAD="/opt/nativecode/panvk/lib/kbase_shim.so${LD_PRELOAD:+:$LD_PRELOAD}"
+            export WSI_X11_TERMUX=1
+            export PANVK_KBASE_DRI3=raw
             export MESA_VK_WSI_DEBUG=sw
             ;;
           venus)

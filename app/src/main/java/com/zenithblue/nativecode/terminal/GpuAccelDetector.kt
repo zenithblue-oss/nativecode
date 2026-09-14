@@ -18,6 +18,7 @@ object GpuAccelDetector {
 
     /** Guest FLUX_GPU values accepted by setup_hw_accel_debian.sh */
     const val MODE_TURNIP = "turnip"
+    const val MODE_PANVK = "panvk"
     const val MODE_VENUS = "venus"
     const val MODE_VIRGL = "virgl"
 
@@ -66,8 +67,11 @@ object GpuAccelDetector {
         val kgsl = File("/dev/kgsl-3d0").exists() || File("/dev/kgsl-3d0").canRead()
         if (kgsl) parts += "kgsl=/dev/kgsl-3d0"
 
+        val mali = File("/dev/mali0").exists() || File("/dev/mali0").canRead()
+        if (mali) parts += "mali=/dev/mali0"
+
         val blob = parts.joinToString(" ").lowercase()
-        val result = classify(blob, kgsl)
+        val result = classify(blob, kgsl, mali)
         Log.i(TAG, "GPU detect mode=${result.mode} vendor=${result.vendorHint} signals=${result.signals}")
         return result
     }
@@ -77,16 +81,23 @@ object GpuAccelDetector {
 
     fun isTurnip(): Boolean = fluxGpuEnv() == MODE_TURNIP
 
+    fun isPanvk(): Boolean = fluxGpuEnv() == MODE_PANVK
+
     /**
      * Pure classification used by [detect] and unit tests.
      * [blob] is a lowercase concat of Build / getprop / node signals.
      */
-    fun classify(blob: String, kgslPresent: Boolean): Detection {
+    fun classify(blob: String, kgslPresent: Boolean, maliPresent: Boolean = false): Detection {
         val isAdreno = kgslPresent || matchesAdreno(blob)
-        val mode = if (isAdreno) MODE_TURNIP else MODE_VENUS
+        val isMali = matchesMali(blob)
+        val mode = when {
+            isAdreno -> MODE_TURNIP
+            isMali && maliPresent -> MODE_PANVK
+            else -> MODE_VENUS
+        }
         val vendor = when {
             isAdreno -> "adreno/snapdragon"
-            matchesMali(blob) -> "mali"
+            isMali -> "mali"
             matchesPowerVr(blob) -> "powervr"
             matchesXclipse(blob) -> "xclipse"
             else -> "unknown"
@@ -96,6 +107,8 @@ object GpuAccelDetector {
 
     fun methodLabel(mode: String): String = when (mode) {
         MODE_TURNIP -> "Turnip KGSL (Zink)"
+        MODE_PANVK -> "PanVK (Kbase)"
+        "panvk-zink" -> "Zink over PanVK"
         MODE_VENUS -> "Venus (VirtIO Vulkan)"
         MODE_VIRGL -> "VirGL (virpipe)"
         "zink-venus" -> "Zink over Venus"
@@ -106,6 +119,7 @@ object GpuAccelDetector {
 
     fun badgeLabel(backend: String): String = when (backend) {
         MODE_TURNIP -> "TURNIP"
+        MODE_PANVK, "panvk-zink" -> "PANVK"
         MODE_VENUS, "zink-venus" -> "VENUS"
         MODE_VIRGL, "virgl-angle" -> "VIRGL"
         "llvmpipe", "software" -> "SOFTWARE"

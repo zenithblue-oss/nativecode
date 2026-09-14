@@ -16,10 +16,10 @@ object GuestGpuConfig {
         }
         val dir = File(root, "etc/fluxlinux")
         if (!dir.exists() && !dir.mkdirs()) return
-        val backend = if (detect.mode == GpuAccelDetector.MODE_TURNIP) {
-            GpuAccelDetector.MODE_TURNIP
-        } else {
-            "zink-venus"
+        val backend = when (detect.mode) {
+            GpuAccelDetector.MODE_TURNIP -> GpuAccelDetector.MODE_TURNIP
+            GpuAccelDetector.MODE_PANVK -> "panvk-zink"
+            else -> "zink-venus"
         }
         write(dir, "gpu_mode", detect.mode)
         write(dir, "gpu_backend", backend)

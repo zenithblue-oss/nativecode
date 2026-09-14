@@ -26,6 +26,16 @@ class GpuAccelDetectorTest {
     }
 
     @Test
+    fun maliWithNodeIsPanvk() {
+        val d = GpuAccelDetector.classify("ro.hardware=mt6895 mali dimensity", kgslPresent = false, maliPresent = true)
+        assertEquals(GpuAccelDetector.MODE_PANVK, d.mode)
+        assertEquals("mali", d.vendorHint)
+        assertEquals("PANVK", GpuAccelDetector.badgeLabel(d.mode))
+        assertEquals("PanVK (Kbase)", GpuAccelDetector.methodLabel(d.mode))
+        assertEquals("Zink over PanVK", GpuAccelDetector.methodLabel("panvk-zink"))
+    }
+
+    @Test
     fun xclipseIsVenus() {
         val d = GpuAccelDetector.classify("xclipse 940", kgslPresent = false)
         assertEquals(GpuAccelDetector.MODE_VENUS, d.mode)
