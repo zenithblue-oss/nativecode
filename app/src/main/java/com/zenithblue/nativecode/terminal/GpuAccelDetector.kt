@@ -5,10 +5,12 @@ import android.util.Log
 import java.io.File
 
 /**
- * Host GPU vendor → guest accel mode.
+ * Host GPU vendor → guest accel mode hint.
  *
  * Snapdragon / Adreno (KGSL) → Turnip + Zink
- * Everything else (Mali, PowerVR, Xclipse, unknown) → VirGL
+ * Everything else → Venus (VirGL remains fallback at runtime)
+ *
+ * Runtime backend is chosen by guest `gpu-launch --auto` probes, not this hint alone.
  */
 object GpuAccelDetector {
 
@@ -16,6 +18,7 @@ object GpuAccelDetector {
 
     /** Guest FLUX_GPU values accepted by setup_hw_accel_debian.sh */
     const val MODE_TURNIP = "turnip"
+    const val MODE_VENUS = "venus"
     const val MODE_VIRGL = "virgl"
 
     data class Detection(
@@ -64,18 +67,8 @@ object GpuAccelDetector {
         if (kgsl) parts += "kgsl=/dev/kgsl-3d0"
 
         val blob = parts.joinToString(" ").lowercase()
-        val isAdreno = kgsl || matchesAdreno(blob)
-        val mode = if (isAdreno) MODE_TURNIP else MODE_VIRGL
-        val vendor = when {
-            isAdreno -> "adreno/snapdragon"
-            matchesMali(blob) -> "mali"
-            matchesPowerVr(blob) -> "powervr"
-            matchesXclipse(blob) -> "xclipse"
-            else -> "unknown"
-        }
-
-        val result = Detection(mode = mode, vendorHint = vendor, signals = blob)
-        Log.i(TAG, "GPU detect → mode=${result.mode} vendor=${result.vendorHint} signals=${result.signals}")
+        val result = classify(blob, kgsl)
+        Log.i(TAG, "GPU detect mode=${result.mode} vendor=${result.vendorHint} signals=${result.signals}")
         return result
     }
 
@@ -84,8 +77,42 @@ object GpuAccelDetector {
 
     fun isTurnip(): Boolean = fluxGpuEnv() == MODE_TURNIP
 
+    /**
+     * Pure classification used by [detect] and unit tests.
+     * [blob] is a lowercase concat of Build / getprop / node signals.
+     */
+    fun classify(blob: String, kgslPresent: Boolean): Detection {
+        val isAdreno = kgslPresent || matchesAdreno(blob)
+        val mode = if (isAdreno) MODE_TURNIP else MODE_VENUS
+        val vendor = when {
+            isAdreno -> "adreno/snapdragon"
+            matchesMali(blob) -> "mali"
+            matchesPowerVr(blob) -> "powervr"
+            matchesXclipse(blob) -> "xclipse"
+            else -> "unknown"
+        }
+        return Detection(mode = mode, vendorHint = vendor, signals = blob)
+    }
+
+    fun methodLabel(mode: String): String = when (mode) {
+        MODE_TURNIP -> "Turnip KGSL (Zink)"
+        MODE_VENUS -> "Venus (VirtIO Vulkan)"
+        MODE_VIRGL -> "VirGL (virpipe)"
+        "zink-venus" -> "Zink over Venus"
+        "virgl-angle" -> "VirGL (virpipe)"
+        "llvmpipe", "software" -> "llvmpipe (software)"
+        else -> mode
+    }
+
+    fun badgeLabel(backend: String): String = when (backend) {
+        MODE_TURNIP -> "TURNIP"
+        MODE_VENUS, "zink-venus" -> "VENUS"
+        MODE_VIRGL, "virgl-angle" -> "VIRGL"
+        "llvmpipe", "software" -> "SOFTWARE"
+        else -> "UNAVAILABLE"
+    }
+
     private fun matchesAdreno(blob: String): Boolean {
-        // Qualcomm SoC families / Adreno / KGSL markers
         val needles = listOf(
             "qcom", "qualcomm", "adreno", "kgsl", "snapdragon",
             "msm", "sdm", "sm8150", "sm8250", "sm8350", "sm8450", "sm8550", "sm8650", "sm8750",
@@ -93,7 +120,7 @@ object GpuAccelDetector {
             "lahaina", "taro", "kalama", "pineapple", "canoe", "sun",
             "kona", "lito", "bengal", "holi", "crow", "ravelin", "parrot", "blair",
             "anorak", "hamoa", "volcano", "pitti", "niobe", "cliq", "shima", "yupik",
-            "atoll", "trinket", "guppy", "strait", "bitra", "lahaina", "waipio"
+            "atoll", "trinket", "guppy", "strait", "bitra", "waipio"
         )
         return needles.any { blob.contains(it) }
     }

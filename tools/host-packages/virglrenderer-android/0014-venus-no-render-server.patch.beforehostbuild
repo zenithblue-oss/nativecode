@@ -1,0 +1,13 @@
+diff --git a/vtest/vtest_server.c b/vtest/vtest_server.c
+--- a/vtest/vtest_server.c
++++ b/vtest/vtest_server.c
+@@ -333,7 +333,9 @@
+ 
+    if (server.venus) {
+       server.ctx_flags |= VIRGL_RENDERER_VENUS;
+       server.ctx_flags |= VIRGL_RENDERER_RENDER_SERVER;
++      /* Skip host EGL. render-server is exec'd via linker64 (patch 0015). */
++      server.ctx_flags |= VIRGL_RENDERER_NO_VIRGL;
+    }
+    if (server.drm) {
+       server.ctx_flags |= VIRGL_RENDERER_DRM | VIRGL_RENDERER_ASYNC_FENCE_CB;

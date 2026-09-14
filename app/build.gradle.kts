@@ -37,6 +37,10 @@ android {
         versionName = "1.6.3"
         buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
         buildConfigField("String", "REPORT_ENDPOINT", "\"$nativeCodeReportUrl\"")
+        // 16 KB page-size devices (Android 15+): never ship 32-bit or extra-ABI JNI.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     flavorDimensions += "store"
@@ -108,6 +112,8 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // 32-bit proot loader is not 16 KB-alignable; keep it out of lib/.
+            excludes += listOf("**/libloader32.so", "lib/armeabi-v7a/**", "lib/x86/**", "lib/x86_64/**")
         }
     }
 
@@ -157,3 +163,17 @@ dependencies {
     // Play Asset Delivery
     implementation("com.google.android.play:asset-delivery-ktx:2.3.0")
 }
+
+tasks.register<Exec>("checkJni16kbAlignment") {
+    workingDir = rootProject.projectDir
+    commandLine(
+        "python3",
+        rootProject.file("scripts/check_elf_16k.py").absolutePath,
+        file("src/main/jniLibs").absolutePath,
+        file("src/full/jniLibs").absolutePath,
+        file("../termux-x11/src/main/jniLibs/arm64-v8a").absolutePath,
+        file("libs/terminal-emulator-v0.118.0-16k.aar").absolutePath
+    )
+}
+
+tasks.named("preBuild").configure { dependsOn("checkJni16kbAlignment") }

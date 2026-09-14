@@ -84,6 +84,9 @@ for c in opencode codex qwen agy claude grok kiro-cli; do
 done
 
 echo "== desktop/gpu =="
+need /usr/local/lib/nativecode/gpu-backend.sh
+need /usr/local/bin/gpu-launch
+need /etc/profile.d/flux-gpu.sh
 need /usr/bin/startxfce4
 [ -x "$ROOTFS/usr/bin/Xtigervnc" ] || [ -x "$ROOTFS/usr/bin/Xvnc" ] || { echo "MISS tigervnc server"; FAIL=1; }
 if [ "$DISTRO" = "alpaquita" ]; then

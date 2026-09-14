@@ -1,0 +1,26 @@
+diff --git a/src/proxy/proxy_server.c b/src/proxy/proxy_server.c
+--- a/src/proxy/proxy_server.c
++++ b/src/proxy/proxy_server.c
+@@ -69,11 +69,22 @@
+       /* for devenv without installing server */
+       char *const server_path = getenv("RENDER_SERVER_EXEC_PATH");
++#if defined(__TERMUX__) || defined(__ANDROID__)
++      /* targetSdk 29+ cannot exec $PREFIX ELFs; linker64 can. */
++      char *const argv[] = {
++         "/system/bin/linker64",
++         server_path ? server_path : RENDER_SERVER_EXEC_PATH,
++         "--socket-fd",
++         fd_str,
++         NULL,
++      };
++#else
+       char *const argv[] = {
+          server_path ? server_path : RENDER_SERVER_EXEC_PATH,
+          "--socket-fd",
+          fd_str,
+          NULL,
+       };
++#endif
+       execv(argv[0], argv);
+ 
+       proxy_log("failed to exec %s: %s", argv[0], strerror(errno));

@@ -77,6 +77,7 @@ AUDIT_LIST=(
     "mesa-dri-gallium"
     "mesa-gl"
     "mesa-vulkan-freedreno"
+    "mesa-vulkan-virtio"
     "vulkan-loader"
     "glycin-image-rs"
     "glycin-svg"

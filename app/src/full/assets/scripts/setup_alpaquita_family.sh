@@ -43,7 +43,7 @@ if [ "$PREBUILT_E" = "0" ]; then
     apk add --no-cache \
         bash sudo shadow coreutils glibc-locales tzdata ca-certificates \
         curl wget unzip tar xz dbus dbus-x11 libstdc++ fontconfig font-dejavu \
-        mesa mesa-dri-gallium mesa-gl mesa-vulkan-freedreno vulkan-loader \
+        mesa mesa-dri-gallium mesa-gl mesa-vulkan-freedreno mesa-vulkan-virtio vulkan-loader \
         glycin-image-rs glycin-svg gdk-pixbuf git python3 nodejs npm
 fi
 
@@ -116,8 +116,13 @@ _flux_fix_apk_writable
 
 mkdir -p /etc/fluxlinux
 if [ ! -s /etc/fluxlinux/gpu_mode ]; then
-    printf '%s\n' virgl > /etc/fluxlinux/gpu_mode
-    echo "FluxLinux: gpu_mode=virgl (first-paint; hw-accel may upgrade)"
+    _gpu="${FLUX_GPU:-venus}"
+    case "$_gpu" in
+        turnip|venus|virgl|software) ;;
+        *) _gpu=venus ;;
+    esac
+    printf '%s\n' "$_gpu" > /etc/fluxlinux/gpu_mode
+    echo "FluxLinux: gpu_mode=$_gpu (first-paint; F owns upgrades)"
 fi
 
 echo "FluxLinux: ${DISTRO_NAME} Alpaquita glibc setup complete!"

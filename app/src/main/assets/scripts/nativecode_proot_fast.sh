@@ -211,11 +211,15 @@ build_binds() {
       build_binds_cli
       build_binds_virgl
       ;;
+    gpu-venus)
+      build_binds_cli
+      build_binds_virgl
+      ;;
     compat)
       build_binds_compat
       ;;
     *)
-      die "unknown profile: $PROFILE (cli|gpu-turnip|gpu-virgl|compat)"
+      die "unknown profile: $PROFILE (cli|gpu-turnip|gpu-virgl|gpu-venus|compat)"
       ;;
   esac
 }
@@ -242,6 +246,16 @@ guest_gpu_env_args() {
       if [ -n "${DISPLAY:-}" ]; then printf 'DISPLAY=%s\n' "$DISPLAY"; fi
       if [ -n "${XDG_RUNTIME_DIR:-}" ]; then printf 'XDG_RUNTIME_DIR=%s\n' "$XDG_RUNTIME_DIR"; fi
       printf 'MESA_SHADER_CACHE_DIR=/tmp/mesa_shader_cache\n'
+      ;;
+    gpu-venus)
+      printf '%s\n' \
+        "VN_DEBUG=vtest" \
+        "GALLIUM_DRIVER=zink" \
+        "MESA_LOADER_DRIVER_OVERRIDE=zink" \
+        "VTEST_SOCKET_NAME=/tmp/.virgl_test" \
+        "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/virtio_icd.aarch64.json" \
+        "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/virtio_icd.aarch64.json" \
+        "MESA_SHADER_CACHE_DIR=/tmp/mesa_shader_cache"
       ;;
   esac
 }

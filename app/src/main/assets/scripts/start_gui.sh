@@ -22,7 +22,7 @@ export HOME="$TERMUX_HOME"
 export TMPDIR="${TMPDIR:-$TERMUX_PREFIX/tmp}"
 export PROOT_TMP_DIR="${PROOT_TMP_DIR:-$TMPDIR}"
 export PATH="/system/bin:/system/xbin:$TERMUX_PREFIX/bin:$TERMUX_PREFIX/bin/applets:$PATH"
-export LD_LIBRARY_PATH="$TERMUX_PREFIX/lib:$TERMUX_PREFIX/opt/virglrenderer-android/lib"
+export LD_LIBRARY_PATH="$TERMUX_PREFIX/opt/virglrenderer-android/lib:$TERMUX_PREFIX/lib"
 export TERMUX_APP__PACKAGE_NAME="$PKG"
 export TERMUX_X11_OVERRIDE_PACKAGE="$PKG"
 export TERMUX__PREFIX="$TERMUX_PREFIX"
@@ -63,21 +63,58 @@ else
   echo "FluxLinux: PulseAudio already running"
 fi
 
-# VirGL is optional. Launch via linker64 when available.
+# VirGL/Venus is optional. Turnip (Snapdragon) does not need the host vtest server.
+ROOTFS="$TERMUX_PREFIX/var/lib/proot-distro/containers/${DISTRO}/rootfs"
+GUEST_GPU_MODE=venus
+GUEST_GPU_BACKEND=""
+if [ -r "$ROOTFS/etc/fluxlinux/gpu_backend" ]; then
+  GUEST_GPU_BACKEND=$("$TB" tr -d '[:space:]' <"$ROOTFS/etc/fluxlinux/gpu_backend")
+fi
+if [ -r "$ROOTFS/etc/fluxlinux/gpu_mode" ]; then
+  GUEST_GPU_MODE=$("$TB" tr -d '[:space:]' <"$ROOTFS/etc/fluxlinux/gpu_mode")
+fi
+NEED_VTEST=1
+case "${GUEST_GPU_BACKEND:-$GUEST_GPU_MODE}" in
+  turnip) NEED_VTEST=0 ;;
+  software|llvmpipe) NEED_VTEST=0 ;;
+esac
+
 VIRGL_BIN="$TERMUX_PREFIX/bin/virgl_test_server_android"
 VIRGL_CMD="$VIRGL_BIN"
 [ -n "$LINKER" ] && [ -f "$VIRGL_BIN" ] && VIRGL_CMD="$LINKER $VIRGL_BIN"
 
-if [ -f "$VIRGL_BIN" ]; then
+if [ "$NEED_VTEST" = "1" ] && [ -f "$VIRGL_BIN" ]; then
   if ! "$TB" pidof virgl_test_server_android >/dev/null 2>&1; then
-    echo "FluxLinux: Starting VirGL server..."
-    $VIRGL_CMD --socket-path "$TERMUX_PREFIX/tmp/.virgl_test" >/dev/null 2>&1 &
+    VTEST_ARGS=(--socket-path "$TERMUX_PREFIX/tmp/.virgl_test")
+    HELP=$($VIRGL_CMD --help 2>&1 || true)
+    case "${GUEST_GPU_BACKEND:-$GUEST_GPU_MODE}" in
+      venus|zink-venus)
+        if printf '%s' "$HELP" | grep -q -- '--venus'; then
+          if printf '%s' "$HELP" | grep -q -- '--no-virgl'; then
+            VTEST_ARGS+=(--no-virgl --venus)
+          else
+            VTEST_ARGS+=(--venus)
+          fi
+        fi
+        echo "FluxLinux: Starting Venus host server..."
+        ;;
+      *)
+        echo "FluxLinux: Starting VirGL server..."
+        ;;
+    esac
+    RENDER_SERVER_EXEC_PATH="${TERMUX_PREFIX}/opt/virglrenderer-android/libexec/virgl_render_server"
+    export RENDER_SERVER_EXEC_PATH
+    LD_LIBRARY_PATH="${TERMUX_PREFIX}/opt/virglrenderer-android/lib" \
+      RENDER_SERVER_EXEC_PATH="$RENDER_SERVER_EXEC_PATH" \
+      $VIRGL_CMD "${VTEST_ARGS[@]}" >/dev/null 2>&1 &
     "$TB" sleep 1
   fi
-  test -S "${TMPDIR}/.virgl_test" && echo "FluxLinux: VirGL socket ready" || \
-    echo "FluxLinux: [WARN] VirGL socket not found"
+  test -S "${TMPDIR}/.virgl_test" && echo "FluxLinux: GPU vtest socket ready" || \
+    echo "FluxLinux: [WARN] GPU vtest socket not found"
+elif [ "$NEED_VTEST" = "0" ]; then
+  echo "FluxLinux: Host vtest not required (guest GPU=${GUEST_GPU_BACKEND:-$GUEST_GPU_MODE})"
 else
-  echo "FluxLinux: VirGL unavailable; using software rendering"
+  echo "FluxLinux: virgl_test_server_android unavailable; guest may use Turnip or software"
 fi
 
 # Start X server via app_process (needs system context)
@@ -189,19 +226,19 @@ echo "FluxLinux: startxfce4=READY"
 # Guest GPU mode from launch hint or /etc/fluxlinux/gpu_mode
 GPU_HINT="${2:-}"
 case "$GPU_HINT" in
-  turnip|virgl) GPU_MODE="$GPU_HINT" ;;
+  turnip|venus|virgl|software) GPU_MODE="$GPU_HINT" ;;
   *)
-    GPU_MODE=virgl
+    GPU_MODE="${GUEST_GPU_MODE:-virgl}"
     if [ -r "$ROOTFS/etc/fluxlinux/gpu_mode" ]; then
       GPU_MODE=$("$TB" tr -d '[:space:]' <"$ROOTFS/etc/fluxlinux/gpu_mode")
     fi
     ;;
 esac
 case "$GPU_MODE" in
-  turnip|virgl) ;;
-  *) GPU_MODE=virgl ;;
+  turnip|venus|virgl|software) ;;
+  *) GPU_MODE=venus ;;
 esac
-echo "FluxLinux: Guest GPU mode=$GPU_MODE"
+echo "FluxLinux: Guest GPU mode=$GPU_MODE backend=${GUEST_GPU_BACKEND:-}"
 
 # Launch XFCE in proot
 if [ "$DISTRO" = "termux" ]; then
@@ -232,46 +269,56 @@ else
         exit 0
       fi
 
-      GPU_MODE="'"$GPU_MODE"'"
-      if [ -z "$GPU_MODE" ] && [ -r /etc/fluxlinux/gpu_mode ]; then
-        GPU_MODE=$(tr -d "[:space:]" </etc/fluxlinux/gpu_mode)
-      fi
-      case "$GPU_MODE" in
-        turnip|virgl) ;;
-        *) GPU_MODE=virgl ;;
-      esac
-
       if [ ! -s /var/lib/dbus/machine-id ] && [ ! -s /etc/machine-id ]; then
         dbus-uuidgen --ensure=/etc/machine-id 2>/dev/null || true
         mkdir -p /var/lib/dbus 2>/dev/null || true
         ln -sf /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || cp -f /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || true
       fi
 
-      unset GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE VK_ICD_FILENAMES
-      unset LIBGL_ALWAYS_SOFTWARE TU_DEBUG MESA_VK_WSI_DEBUG
+      unset GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE VK_ICD_FILENAMES VK_DRIVER_FILES
+      unset LIBGL_ALWAYS_SOFTWARE TU_DEBUG MESA_VK_WSI_DEBUG VN_DEBUG
 
-      case "$GPU_MODE" in
-        turnip)
-          export MESA_LOADER_DRIVER_OVERRIDE=zink
-          export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
-          export TU_DEBUG=noconform
-          export MESA_VK_WSI_DEBUG=sw
-          export MESA_GL_VERSION_OVERRIDE=4.6
-          export MESA_GLES_VERSION_OVERRIDE=3.2
-          ;;
-        virgl)
-          if [ -S /tmp/.virgl_test ]; then
-            export GALLIUM_DRIVER=virpipe
-          else
+      GPU_MODE="'"$GPU_MODE"'"
+      GPU_BACKEND="'"${GUEST_GPU_BACKEND:-}"'"
+      if [ -f /usr/local/lib/nativecode/gpu-backend.sh ]; then
+        . /usr/local/lib/nativecode/gpu-backend.sh
+        if [ -n "$GPU_BACKEND" ]; then
+          gpu_apply "$GPU_BACKEND"
+        else
+          gpu_apply "$(gpu_map_mode_to_backend "$GPU_MODE")"
+        fi
+      else
+        case "$GPU_MODE" in
+          turnip)
+            export MESA_LOADER_DRIVER_OVERRIDE=zink
+            export GALLIUM_DRIVER=zink
+            export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
+            export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
+            export TU_DEBUG=noconform
+            export MESA_VK_WSI_DEBUG=sw
+            ;;
+          venus)
+            export VN_DEBUG=vtest
+            export GALLIUM_DRIVER=zink
+            export MESA_LOADER_DRIVER_OVERRIDE=zink
+            _vn=$(ls /usr/share/vulkan/icd.d/*virtio*.json 2>/dev/null | head -n 1)
+            [ -n "$_vn" ] && export VK_DRIVER_FILES="$_vn" && export VK_ICD_FILENAMES="$_vn"
+            export VTEST_SOCKET_NAME=/tmp/.virgl_test
+            ;;
+          virgl)
+            if [ -S /tmp/.virgl_test ]; then
+              export GALLIUM_DRIVER=virpipe
+            else
+              export LIBGL_ALWAYS_SOFTWARE=1
+              export GALLIUM_DRIVER=llvmpipe
+            fi
+            ;;
+          *)
             export LIBGL_ALWAYS_SOFTWARE=1
             export GALLIUM_DRIVER=llvmpipe
-          fi
-          ;;
-        *)
-          export LIBGL_ALWAYS_SOFTWARE=1
-          export GALLIUM_DRIVER=llvmpipe
-          ;;
-      esac
+            ;;
+        esac
+      fi
 
       mkdir -p /tmp/runtime-flux
       chmod 700 /tmp/runtime-flux 2>/dev/null || true

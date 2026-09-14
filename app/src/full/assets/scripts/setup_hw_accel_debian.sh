@@ -4,11 +4,13 @@
 #
 # Modes:
 #   turnip — Snapdragon / Adreno (KGSL) via Mesa Turnip + Zink
-#   virgl  — Mali / PowerVR / Xclipse / unknown (host virgl_test_server)
+#   venus  — Mali / PowerVR / Xclipse / unknown (Mesa Venus → host vtest)
+#   virgl  — VirGL/ANGLE fallback
 #
 # FLUX_GPU values:
 #   turnip | adreno | snapdragon | qcom  → turnip
-#   virgl  | mali | powervr | soft | ask | manual → see below
+#   venus  | mali | powervr | xclipse    → venus
+#   virgl  | virpipe                     → virgl
 #   unset  → auto-detect inside guest (getprop / /dev/kgsl-3d0 / cpuinfo)
 
 set -euo pipefail
@@ -43,22 +45,27 @@ VENDOR_STATE_FILE="$MODE_STATE_DIR/gpu_vendor"
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 normalize_mode() {
-    # stdin/arg → turnip|virgl|ask
+    # stdin/arg → turnip|venus|virgl|software|ask
     local raw
     raw=$(echo "${1:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
     case "$raw" in
         turnip|adreno|snapdragon|qcom|qualcomm|kgsl|zink)
             echo "turnip"
             ;;
-        virgl|virpipe|mali|powervr|xclipse|llvmpipe|soft|software|sw)
+        venus|virtio|mali|powervr|xclipse)
+            echo "venus"
+            ;;
+        virgl|virpipe|virgl-angle)
             echo "virgl"
+            ;;
+        llvmpipe|soft|software|sw)
+            echo "software"
             ;;
         ask|manual|"")
             echo "ask"
             ;;
         *)
-            # unknown explicit value → treat as virgl (safe default)
-            echo "virgl"
+            echo "venus"
             ;;
     esac
 }
@@ -107,23 +114,45 @@ auto_detect_mode() {
 
     if echo "$hints" | grep -qE 'mali|exynos|kirin|hisi|mediatek|mt6[0-9]|dimensity|helio|tensor|gs10|gs20|gs30'; then
         vendor="mali"
-        echo "virgl|$vendor|$hints"
+        echo "venus|$vendor|$hints"
         return
     fi
 
     if echo "$hints" | grep -qE 'powervr|imgtec|imagination|rogue'; then
         vendor="powervr"
-        echo "virgl|$vendor|$hints"
+        echo "venus|$vendor|$hints"
         return
     fi
 
     if echo "$hints" | grep -qE 'xclipse|amdgpu'; then
         vendor="xclipse"
-        echo "virgl|$vendor|$hints"
+        echo "venus|$vendor|$hints"
         return
     fi
 
-    echo "virgl|$vendor|$hints"
+    echo "venus|$vendor|$hints"
+}
+
+prepare_turnip_guest() {
+    echo "FluxLinux: Disabling XFCE4 compositor for Turnip..."
+    for userdir in /home/* /root; do
+        [ -d "$userdir" ] || continue
+        XFCE_CONF_DIR="$userdir/.config/xfce4/xfconf/xfce-perchannel-xml"
+        mkdir -p "$XFCE_CONF_DIR" 2>/dev/null || true
+        cat > "$XFCE_CONF_DIR/xfwm4.xml" << 'XFCEXML'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="use_compositing" type="bool" value="false"/>
+  </property>
+</channel>
+XFCEXML
+    done
+    echo "FluxLinux: Creating /dev/dri compatibility layer..."
+    mkdir -p /dev/dri 2>/dev/null || true
+    [ -e /dev/dri/card0 ] || ln -sf /dev/null /dev/dri/card0 2>/dev/null || true
+    [ -e /dev/dri/renderD128 ] || ln -sf /dev/null /dev/dri/renderD128 2>/dev/null || true
+    chmod 755 /dev/dri 2>/dev/null || true
 }
 
 # ── 1. deps ──────────────────────────────────────────────────────────────────
@@ -141,8 +170,9 @@ if command -v apk >/dev/null 2>&1; then
         echo "FluxLinux: Installing Vulkan/Mesa dependencies..."
         apk add --no-cache \
             mesa mesa-dri-gallium mesa-vulkan-freedreno vulkan-loader \
-            curl unzip
-        echo "FluxLinux: Alpine Setup Complete (VirGL default)."
+            curl unzip || true
+        apk add --no-cache mesa-vulkan-virtio vulkan-tools mesa-utils 2>/dev/null || true
+        echo "FluxLinux: Alpine/Alpaquita Mesa deps installed (Turnip ICD + optional Venus ICD)."
     fi
 elif command -v pacman >/dev/null 2>&1; then
     echo "Arch Linux detected (pacman). Running System Update..."
@@ -201,16 +231,18 @@ if [ "$want_menu" = "1" ] && [ -t 0 ]; then
     echo "      Select your GPU / Acceleration Mode"
     echo "============================================"
     echo "1) Adreno (Turnip + Zink) — Snapdragon"
-    echo "2) VirGL (Universal) — Mali / PowerVR / other"
+    echo "2) Venus (VirtIO Vulkan) — Mali / PowerVR / other"
+    echo "3) VirGL (legacy OpenGL fallback)"
     echo "============================================"
-    read -r -p "Enter choice [1-2]: " GPU_CHOICE
+    read -r -p "Enter choice [1-3]: " GPU_CHOICE
     case "${GPU_CHOICE:-}" in
         1) MODE="turnip"; VENDOR_HINT="manual-adreno" ;;
-        2) MODE="virgl"; VENDOR_HINT="manual-virgl" ;;
+        2) MODE="venus"; VENDOR_HINT="manual-venus" ;;
+        3) MODE="virgl"; VENDOR_HINT="manual-virgl" ;;
         *)
-            echo "Invalid choice. Defaulting to VirGL."
-            MODE="virgl"
-            VENDOR_HINT="invalid-default-virgl"
+            echo "Invalid choice. Defaulting to Venus."
+            MODE="venus"
+            VENDOR_HINT="invalid-default-venus"
             ;;
     esac
 elif [ "$NORMALIZED" = "ask" ]; then
@@ -223,133 +255,32 @@ elif [ "$NORMALIZED" = "ask" ]; then
     echo "FluxLinux: hints: $DETECT_HINTS"
 else
     MODE="$NORMALIZED"
-    if [ "$MODE" = "turnip" ]; then
-        VENDOR_HINT="env-adreno"
-    else
-        VENDOR_HINT="env-other"
-    fi
+    case "$MODE" in
+        turnip) VENDOR_HINT="env-adreno" ;;
+        venus) VENDOR_HINT="env-venus" ;;
+        virgl) VENDOR_HINT="env-virgl" ;;
+        software) VENDOR_HINT="env-software" ;;
+        *) VENDOR_HINT="env-other" ;;
+    esac
     echo "FluxLinux: FLUX_GPU=${RAW_FLUX_GPU} → mode=$MODE"
 fi
 
-# Arm64-only turnip packages: fall back to virgl on other arches
+# Arm64-only turnip packages: fall back to Venus on other arches
 if [ "$MODE" = "turnip" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "aarch64" ]; then
-    echo "FluxLinux: [WARN] Turnip not available for arch=$ARCH — falling back to VirGL."
-    MODE="virgl"
+    echo "FluxLinux: [WARN] Turnip not available for arch=$ARCH — falling back to Venus."
+    MODE="venus"
     VENDOR_HINT="${VENDOR_HINT}+arch-fallback"
 fi
 
 echo "FluxLinux: Configuring for mode=$MODE vendor=$VENDOR_HINT..."
 
-# ── 4. turnip install ────────────────────────────────────────────────────────
+# ── 4. turnip (baked ICD only — no remote driver download, Play policy) ──────
 
 if [ "$MODE" = "turnip" ]; then
-    # Mesa Turnip for Adreno — KGSL, proot-compatible
-    # https://github.com/lfdevs/mesa-for-android-container
-    TURNIP_VERSION="26.2.0-devel-20260709"
-    MESA_VERSION="26.2.0-devel-20260709"
-
-    if command -v apk >/dev/null 2>&1; then
-        echo "Alpine Linux detected (apk)."
-        if [ "${PREBUILT_F:-0}" = "1" ]; then
-            echo "NativeCode: Alpine Turnip stays VirGL (baked Mesa; no tarball install)"
-        else
-            apk add --no-cache mesa mesa-dri-gallium mesa-vulkan-freedreno vulkan-loader curl unzip || true
-        fi
-        MODE="virgl"
-        VENDOR_HINT="alpine-apk-virgl"
-    elif [ -f /etc/debian_version ]; then
-        DISTRO="debian_trixie"
-    elif [ -f /etc/lsb-release ] && grep -qi "Ubuntu" /etc/lsb-release; then
-        DISTRO="ubuntu_noble"
-    elif [ -f /etc/fedora-release ]; then
-        DISTRO="fedora_43"
-    else
-        DISTRO="debian_trixie"
-    fi
-
-    if [ "$MODE" = "turnip" ]; then
-        URL="https://github.com/lfdevs/mesa-for-android-container/releases/download/turnip-${TURNIP_VERSION}/turnip_${TURNIP_VERSION}_${DISTRO}_arm64.tar.gz"
-
-    echo "FluxLinux: Downloading Turnip drivers v${TURNIP_VERSION} for ${DISTRO}..."
-    if ! curl -L --fail -o /tmp/turnip.tar.gz "$URL"; then
-        echo "Error: Failed to download Turnip. Falling back to VirGL."
-        MODE="virgl"
-        VENDOR_HINT="${VENDOR_HINT}+turnip-download-fail"
-    else
-        echo "FluxLinux: Installing Turnip..."
-        tar -zxf /tmp/turnip.tar.gz -C /
-        ldconfig
-        rm -f /tmp/turnip.tar.gz
-        echo "FluxLinux: Turnip installed successfully!"
-
-        # XFCE compositor black-screens with Turnip
-        echo "FluxLinux: Disabling XFCE4 compositor for Turnip..."
-        for userdir in /home/* /root; do
-            [ -d "$userdir" ] || continue
-            XFCE_CONF_DIR="$userdir/.config/xfce4/xfconf/xfce-perchannel-xml"
-            mkdir -p "$XFCE_CONF_DIR" 2>/dev/null || true
-            cat > "$XFCE_CONF_DIR/xfwm4.xml" << 'XFCEXML'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfwm4" version="1.0">
-  <property name="general" type="empty">
-    <property name="use_compositing" type="bool" value="false"/>
-  </property>
-</channel>
-XFCEXML
-            chown -R "$(stat -c '%U:%G' "$userdir")" "$userdir/.config" 2>/dev/null || true
-        done
-
-        # Fake /dev/dri for apps that probe it (Turnip uses kgsl)
-        echo "FluxLinux: Creating /dev/dri compatibility layer..."
-        mkdir -p /dev/dri 2>/dev/null || true
-        [ -e /dev/dri/card0 ] || ln -sf /dev/null /dev/dri/card0 2>/dev/null || true
-        [ -e /dev/dri/renderD128 ] || ln -sf /dev/null /dev/dri/renderD128 2>/dev/null || true
-        chmod 755 /dev/dri 2>/dev/null || true
-
-        MESA_URL="https://github.com/lfdevs/mesa-for-android-container/releases/download/mesa-${MESA_VERSION}/mesa-for-android-container_${MESA_VERSION}_${DISTRO}_arm64.tar.gz"
-        echo "FluxLinux: Upgrading system Mesa to ${MESA_VERSION}..."
-        if curl -L --fail -o /tmp/mesa-upgrade.tar.gz "$MESA_URL"; then
-            tar -zxf /tmp/mesa-upgrade.tar.gz -C /
-            ldconfig
-            rm -f /tmp/mesa-upgrade.tar.gz
-            echo "FluxLinux: Mesa upgraded to ${MESA_VERSION}!"
-            cat > /etc/apt/preferences.d/pin-mesa << 'PINEOF'
-# FluxLinux: Mesa pinned — runtime upgraded via mesa-for-android-container
-Package: libgl1-mesa-dri
-Pin: version *
-Pin-Priority: -1
-
-Package: mesa-libgallium
-Pin: version *
-Pin-Priority: -1
-
-Package: libglx-mesa0
-Pin: version *
-Pin-Priority: -1
-
-Package: libegl-mesa0
-Pin: version *
-Pin-Priority: -1
-
-Package: mesa-va-drivers
-Pin: version *
-Pin-Priority: -1
-
-Package: mesa-vdpau-drivers
-Pin: version *
-Pin-Priority: -1
-
-Package: mesa-vulkan-drivers
-Pin: version *
-Pin-Priority: -1
-PINEOF
-            echo "FluxLinux: Mesa packages pinned."
-        else
-            rm -f /tmp/mesa-upgrade.tar.gz
-            echo "[WARN] Mesa upgrade download failed — stock Mesa remains."
-        fi
-    fi
-    fi
+    echo "NativeCode: Snapdragon Turnip uses baked mesa-vulkan-freedreno + /dev/kgsl-3d0."
+    echo "NativeCode: No remote Turnip/Mesa download (Play: no downloaded executable code)."
+    prepare_turnip_guest
+    VENDOR_HINT="${VENDOR_HINT}+baked-turnip"
 fi
 
 # ── 5. virgl note (deps already installed) ───────────────────────────────────
@@ -358,77 +289,90 @@ if [ "$MODE" = "virgl" ]; then
     echo "FluxLinux: VirGL mode — guest uses GALLIUM_DRIVER=virpipe."
     echo "FluxLinux: Host must run virgl_test_server_android (start_gui.sh)."
 fi
+if [ "$MODE" = "venus" ]; then
+    echo "FluxLinux: Venus mode — guest uses Mesa virtio ICD (VN_DEBUG=vtest)."
+    echo "FluxLinux: Host start_gui.sh starts virgl_test_server_android --venus when present."
+fi
 
 # ── 6. gpu-launch wrapper ────────────────────────────────────────────────────
 
-echo "FluxLinux: Creating 'gpu-launch' wrapper (mode=$MODE)..."
-
-cat <<'EOF' > /usr/local/bin/gpu-launch
+echo "FluxLinux: Installing gpu-launch (mode=$MODE)..."
+mkdir -p /usr/local/lib/nativecode /usr/local/bin
+if [ ! -f /usr/local/lib/nativecode/gpu-backend.sh ]; then
+    echo "FluxLinux: [WARN] gpu-backend.sh not baked — gpu-launch needs overlay/rootfs rebuild"
+fi
+if [ ! -x /usr/local/bin/gpu-launch ]; then
+    cat > /usr/local/bin/gpu-launch <<'GL'
 #!/bin/bash
-# FluxLinux GPU Launcher — mode baked at install time; override via FLUX_GPU_RUNTIME
-MODE="MODE_PLACEHOLDER"
-
-# Prefer state file if present (re-run start without reinstall)
-if [ -r /etc/fluxlinux/gpu_mode ]; then
-    _m=$(tr -d '[:space:]' </etc/fluxlinux/gpu_mode)
-    [ -n "$_m" ] && MODE="$_m"
-fi
-[ -n "${FLUX_GPU_RUNTIME:-}" ] && MODE="$FLUX_GPU_RUNTIME"
-
-unset GALLIUM_DRIVER
-unset MESA_LOADER_DRIVER_OVERRIDE
-unset VK_ICD_FILENAMES
-unset LIBGL_ALWAYS_SOFTWARE
-unset TU_DEBUG
-unset MESA_VK_WSI_DEBUG
-
-if [ "$MODE" = "turnip" ]; then
-    export MESA_LOADER_DRIVER_OVERRIDE=zink
-    export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
-    export TU_DEBUG=noconform
-    export MESA_VK_WSI_DEBUG=sw
-    export MESA_GL_VERSION_OVERRIDE=4.6
-    export MESA_GLES_VERSION_OVERRIDE=3.2
-    export MESA_NO_ERROR=1
-elif [ "$MODE" = "virgl" ]; then
-    export GALLIUM_DRIVER=virpipe
-    export MESA_GL_VERSION_OVERRIDE=4.0
-    export MESA_GLES_VERSION_OVERRIDE=3.1
-    export MESA_NO_ERROR=1
-    export VTEST_SOCKET_NAME=${VTEST_SOCKET_NAME:-/tmp/.virgl_test}
-    if [ "${FLUX_GPU_DEBUG:-0}" = "1" ]; then
-        echo "[DEBUG] GALLIUM_DRIVER=$GALLIUM_DRIVER"
-        echo "[DEBUG] VTEST_SOCKET_NAME=$VTEST_SOCKET_NAME"
-        ls -la /tmp/.virgl_test 2>/dev/null && echo "[DEBUG] VirGL socket exists" || \
-            echo "[DEBUG] VirGL socket NOT FOUND at /tmp/.virgl_test"
-    fi
+set -euo pipefail
+GPU_LIB="/usr/local/lib/nativecode/gpu-backend.sh"
+if [ -f "$GPU_LIB" ]; then
+    . "$GPU_LIB"
 else
-    # soft fallback
-    export LIBGL_ALWAYS_SOFTWARE=1
-    export GALLIUM_DRIVER=llvmpipe
+    exec "$@"
 fi
-
+MODE="${1:-}"
+case "$MODE" in
+    --auto|--turnip|--venus|--zink-venus|--virgl-angle|--software|--diagnose)
+        MODE="${MODE#--}"; shift ;;
+    *) MODE="" ;;
+esac
+[ -n "${FLUX_GPU_RUNTIME:-}" ] && MODE="$FLUX_GPU_RUNTIME"
+if [ "$MODE" = "diagnose" ]; then gpu_diagnose; exit 0; fi
+[ -z "$MODE" ] && MODE=$(gpu_read_backend)
+[ "$MODE" = "auto" ] && MODE=$(gpu_auto_select)
+gpu_persist "$MODE"
+gpu_apply "$MODE"
 exec "$@"
-EOF
-
-sed -i "s/MODE_PLACEHOLDER/$MODE/g" /usr/local/bin/gpu-launch
+GL
+fi
 chmod +x /usr/local/bin/gpu-launch
 
-# Profile snippet so login shells pick up mode (optional, non-destructive)
+# Login + interactive bash must apply Mesa/Venus env (not just FLUX_GPU_MODE).
+# Without this, vulkaninfo/fastfetch hit /dev/dri and report llvmpipe + 0 devices.
 mkdir -p /etc/profile.d
 cat > /etc/profile.d/flux-gpu.sh << 'PROFILE'
-# FluxLinux GPU mode helpers
-if [ -r /etc/fluxlinux/gpu_mode ]; then
-    export FLUX_GPU_MODE=$(tr -d '[:space:]' </etc/fluxlinux/gpu_mode)
+# NativeCode GPU: Venus is vtest AF_UNIX, not /dev/dri.
+# open(/dev/dri/card0)=EACCES under PRoot is expected. Do not wait for renderD128.
+if [ -r /usr/local/lib/nativecode/gpu-backend.sh ]; then
+    # shellcheck disable=SC1091
+    . /usr/local/lib/nativecode/gpu-backend.sh
+    _nc_gpu_be=$(gpu_read_backend 2>/dev/null || echo zink-venus)
+    gpu_apply "$_nc_gpu_be"
+    unset _nc_gpu_be
 fi
 PROFILE
 chmod 644 /etc/profile.d/flux-gpu.sh
+# Non-login interactive bash (XFCE terminal) skips profile.d.
+if [ -d /etc/bash ]; then
+    # Alpaquita interactive bash: `for f in /etc/bash/*.sh`
+    cp -f /etc/profile.d/flux-gpu.sh /etc/bash/flux-gpu.sh
+    mkdir -p /etc/bash/bashrc.d
+    ln -sf /etc/profile.d/flux-gpu.sh /etc/bash/bashrc.d/flux-gpu.sh 2>/dev/null || \
+        cp -f /etc/profile.d/flux-gpu.sh /etc/bash/bashrc.d/flux-gpu.sh
+fi
+if [ -d /home/flux ]; then
+    grep -q flux-gpu.sh /home/flux/.bashrc 2>/dev/null || \
+        echo '[ -r /etc/profile.d/flux-gpu.sh ] && . /etc/profile.d/flux-gpu.sh' >> /home/flux/.bashrc
+    chown flux:flux /home/flux/.bashrc 2>/dev/null || true
+fi
 
 # Persist mode for start_gui.sh / gpu-launch
 mkdir -p "$MODE_STATE_DIR"
 echo "$MODE" > "$MODE_STATE_FILE"
 echo "$VENDOR_HINT" > "$VENDOR_STATE_FILE"
-chmod 644 "$MODE_STATE_FILE" "$VENDOR_STATE_FILE"
+BACKEND_FILE="$MODE_STATE_DIR/gpu_backend"
+METHOD_FILE="$MODE_STATE_DIR/gpu_method"
+case "$MODE" in
+    turnip) BACKEND=turnip; METHOD="Turnip KGSL (Zink)" ;;
+    venus) BACKEND=zink-venus; METHOD="Zink over Venus" ;;
+    virgl) BACKEND=virgl-angle; METHOD="VirGL (virpipe)" ;;
+    software) BACKEND=llvmpipe; METHOD="llvmpipe (software)" ;;
+    *) BACKEND=zink-venus; METHOD="Zink over Venus" ;;
+esac
+echo "$BACKEND" > "$BACKEND_FILE"
+echo "$METHOD" > "$METHOD_FILE"
+chmod 644 "$MODE_STATE_FILE" "$VENDOR_STATE_FILE" "$BACKEND_FILE" "$METHOD_FILE"
 
 echo ""
 echo "============================================"
@@ -446,14 +390,17 @@ if [ "$MODE" = "virgl" ]; then
     echo "IMPORTANT: VirGL needs virgl_test_server on the host (start_gui.sh)."
     echo ""
 fi
-
+if [ "$MODE" = "venus" ]; then
+    echo "Venus: start_gui.sh starts host vtest with --venus when the binary supports it."
+    echo ""
+fi
 if [ "$MODE" = "turnip" ]; then
     echo "Turnip configured for Adreno/Snapdragon (KGSL)."
-    echo "If GL fails, re-run with: FLUX_GPU=virgl bash $0"
+    echo "If GL fails: gpu-launch --auto <app>  (Venus fallback)"
     echo ""
 fi
 
 echo "Test:"
-echo "  gpu-launch glmark2"
-echo "  gpu-launch glxinfo | grep 'OpenGL renderer'"
+echo "  gpu-launch --diagnose"
+echo "  gpu-launch --auto glxinfo | grep 'OpenGL renderer'"
 echo "============================================"

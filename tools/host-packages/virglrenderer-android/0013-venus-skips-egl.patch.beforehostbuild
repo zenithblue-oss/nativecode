@@ -1,0 +1,15 @@
+diff --git a/vtest/vtest_server.c b/vtest/vtest_server.c
+--- a/vtest/vtest_server.c
++++ b/vtest/vtest_server.c
+@@ -296,7 +296,10 @@
+    server.use_egl_surfaceless = true;
+    server.use_glx = false;
+    server.use_gles = true;
+-   server.no_virgl = false;
++   /* Venus does not need host EGL. Forcing VirGL on makes Mali/Xclipse fail
++    * when PREFIX/lib shadows Android libEGL (Xzs_Construct). */
++   if (server.venus)
++      server.no_virgl = true;
+ 
+    if (!server.no_virgl) {
+       server.ctx_flags = VIRGL_RENDERER_USE_EGL;

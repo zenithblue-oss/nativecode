@@ -14,14 +14,14 @@ object InstallPlanCatalog {
                 InventoryLine("Root access", "Device superuser provider"),
                 InventoryLine("Alpine Linux chroot base", "setup_alpine_chroot.sh"),
                 InventoryLine("Guest packages / users", "setup_alpine_family.sh"),
-                InventoryLine("Hardware acceleration", "setup_hw_accel_debian.sh")
+                InventoryLine("Hardware acceleration", "baked rootfs (Turnip / Venus)")
             )
         } else {
             listOf(
                 InventoryLine("Host bootstrap", "bootstrap.tar + host configs"),
                 InventoryLine("Alpine Linux guest", "flux_install / alpine"),
                 InventoryLine("Guest packages / users", "setup_alpine_family.sh"),
-                InventoryLine("Hardware acceleration", "setup_hw_accel_debian.sh")
+                InventoryLine("Hardware acceleration", "baked rootfs (Turnip / Venus)")
             )
         }
 

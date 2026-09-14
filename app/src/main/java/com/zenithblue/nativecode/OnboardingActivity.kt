@@ -43,6 +43,7 @@ import com.zenithblue.nativecode.onboarding.OnboardingUiKit
 import com.zenithblue.nativecode.onboarding.SetupPhase
 import com.zenithblue.nativecode.onboarding.SetupProgressCoordinator
 import com.zenithblue.nativecode.terminal.GpuAccelDetector
+import com.zenithblue.nativecode.terminal.GuestGpuConfig
 import com.zenithblue.nativecode.terminal.HostCommandBuilder
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import com.zenithblue.nativecode.terminal.TermuxHostPaths
@@ -2659,6 +2660,7 @@ class OnboardingActivity : AppCompatActivity() {
                             .putString("flux_gpu", gpuDetect.mode)
                             .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                             .apply()
+                        GuestGpuConfig.applyToRootfs(this@OnboardingActivity)
                         enterSetupPhase("C", "Verifying environment…")
                         applyAndroidDevPackForPlay()
                         verifyRuntimeSentinel()
@@ -2750,6 +2752,7 @@ class OnboardingActivity : AppCompatActivity() {
                     .putString("flux_gpu", gpuDetect.mode)
                     .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                     .apply()
+                GuestGpuConfig.applyToRootfs(this@OnboardingActivity)
 
                 enterSetupPhase("C", "Verifying environment…")
                 applyAndroidDevPackForPlay()

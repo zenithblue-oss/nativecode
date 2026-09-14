@@ -13,15 +13,19 @@ object ProotCommandBuilder {
         "export ANDROID_HOME=/opt/android-sdk ANDROID_SDK_ROOT=/opt/android-sdk; " +
             "export PATH=/opt/android-sdk/build-tools/36.1.0:/opt/android-sdk/platform-tools:\$PATH; "
 
+    /** Venus/Turnip env for login shells. /dev/dri EACCES is expected; vtest is the path. */
+    private const val GPU_ENV =
+        "[ -r /etc/profile.d/flux-gpu.sh ] && . /etc/profile.d/flux-gpu.sh; "
+
     private const val FLUX_INTERACTIVE_HOME =
-        GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
+        GIT_SAFE_DIRECTORY + GPU_ENV + "exec /bin/bash -l"
 
     private const val FLUX_INTERACTIVE_WORKDIR =
-        "mkdir -p -- \"\$1\" && cd -- \"\$1\" && " + GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
+        "mkdir -p -- \"\$1\" && cd -- \"\$1\" && " + GIT_SAFE_DIRECTORY + GPU_ENV + "exec /bin/bash -l"
 
-    private const val ROOT_INTERACTIVE_HOME = GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
+    private const val ROOT_INTERACTIVE_HOME = GIT_SAFE_DIRECTORY + GPU_ENV + "exec /bin/bash -l"
     private const val ROOT_INTERACTIVE_WORKDIR =
-        "mkdir -p -- \"\$1\" && cd -- \"\$1\" && " + GIT_SAFE_DIRECTORY + "exec /bin/bash -l"
+        "mkdir -p -- \"\$1\" && cd -- \"\$1\" && " + GIT_SAFE_DIRECTORY + GPU_ENV + "exec /bin/bash -l"
 
     private fun resolveDistro(ctx: Context): String {
         val alpaquita = File(
@@ -71,7 +75,8 @@ object ProotCommandBuilder {
         // Single-quote guest payload so host bash never expands $HOME/$PATH/etc.
         // Escape embedded single quotes: ' → '\''.
         val distro = resolveDistro(ctx)
-        val escaped = (ANDROID_DEV_ENV + shellCmd).replace("'", "'\\''")
+        HostServerController.ensureGuestGpu(ctx)
+        val escaped = (ANDROID_DEV_ENV + GPU_ENV + shellCmd).replace("'", "'\\''")
         val py = pythonCmd(ctx)
         val command =
             "exec $py $prootDistro login $distro $sharedTmpFlag --user $user -- " +
@@ -89,6 +94,7 @@ object ProotCommandBuilder {
         workDir: String? = null,
         useSharedTmp: Boolean = true
     ): Pair<Array<String>, HashMap<String, String>> {
+        HostServerController.ensureGuestGpu(ctx)
         val shell = TermuxHostPaths.libBash(ctx).absolutePath
         val sharedTmpFlag = if (useSharedTmp) "--shared-tmp" else ""
         val prootDistro = TermuxHostPaths.PROOT_DISTRO

@@ -57,19 +57,49 @@ pulseaudio --start --dl-search-path="$TERMUX_PREFIX/lib/pulseaudio/modules" \
   --exit-idle-time=-1 2>/dev/null || true
 pacmd load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1 >/dev/null 2>&1 || true
 
-# VirGL optional
-if command -v virgl_test_server_android >/dev/null; then
+# VirGL/Venus optional. Turnip does not need host vtest.
+CHROOT_GPU_MODE=venus
+CHROOT_GPU_BACKEND=""
+if [ -r "$CHROOT_PATH/etc/fluxlinux/gpu_backend" ]; then
+  CHROOT_GPU_BACKEND=$(tr -d '[:space:]' <"$CHROOT_PATH/etc/fluxlinux/gpu_backend")
+fi
+if [ -r "$CHROOT_PATH/etc/fluxlinux/gpu_mode" ]; then
+  CHROOT_GPU_MODE=$(tr -d '[:space:]' <"$CHROOT_PATH/etc/fluxlinux/gpu_mode")
+fi
+NEED_VTEST=1
+case "${CHROOT_GPU_BACKEND:-$CHROOT_GPU_MODE}" in
+  turnip|software|llvmpipe) NEED_VTEST=0 ;;
+esac
+if [ "$NEED_VTEST" = "1" ] && command -v virgl_test_server_android >/dev/null; then
   if [ -S "${TMPDIR}/.virgl_test" ]; then
-    echo "NativeCode: Reusing VirGL server"
+    echo "NativeCode: Reusing GPU vtest server"
   else
-    echo "NativeCode: Starting VirGL server..."
-    virgl_test_server_android --socket-path "$TERMUX_PREFIX/tmp/.virgl_test" >/dev/null 2>&1 &
+    VTEST_ARGS=(--socket-path "$TERMUX_PREFIX/tmp/.virgl_test")
+    HELP=$(virgl_test_server_android --help 2>&1 || true)
+    case "${CHROOT_GPU_BACKEND:-$CHROOT_GPU_MODE}" in
+      venus|zink-venus)
+        if printf '%s' "$HELP" | grep -q -- '--venus'; then
+          if printf '%s' "$HELP" | grep -q -- '--no-virgl'; then
+            VTEST_ARGS+=(--no-virgl --venus)
+          else
+            VTEST_ARGS+=(--venus)
+          fi
+        fi
+        echo "NativeCode: Starting Venus host server..."
+        ;;
+      *)
+        echo "NativeCode: Starting VirGL server..."
+        ;;
+    esac
+    virgl_test_server_android "${VTEST_ARGS[@]}" >/dev/null 2>&1 &
     sleep 2
   fi
-  test -S "${TMPDIR}/.virgl_test" && echo "NativeCode: VirGL socket ready" \
-    || echo "NativeCode: [WARN] VirGL socket not found"
+  test -S "${TMPDIR}/.virgl_test" && echo "NativeCode: GPU vtest socket ready" \
+    || echo "NativeCode: [WARN] GPU vtest socket not found"
+elif [ "$NEED_VTEST" = "0" ]; then
+  echo "NativeCode: Host vtest not required (GPU=${CHROOT_GPU_BACKEND:-$CHROOT_GPU_MODE})"
 else
-  echo "NativeCode: VirGL unavailable; software GL in guest"
+  echo "NativeCode: virgl_test_server_android unavailable"
 fi
 
 # Embedded termux-x11 (same as proot start_gui.sh)

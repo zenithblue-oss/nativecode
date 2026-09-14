@@ -118,16 +118,25 @@ su - $USERNAME -c '
   if [ -r /etc/fluxlinux/gpu_mode ]; then
     GPU_MODE=\$(tr -d \"[:space:]\" </etc/fluxlinux/gpu_mode)
   fi
-  case \"\$GPU_MODE\" in turnip|virgl) ;; *) GPU_MODE=virgl ;; esac
+  case \"\$GPU_MODE\" in turnip|venus|virgl|software) ;; *) GPU_MODE=venus ;; esac
   echo \"NativeCode(guest): GPU mode=\$GPU_MODE\"
 
-  if [ \"\$GPU_MODE\" = turnip ]; then
+  if [ -f /usr/local/lib/nativecode/gpu-backend.sh ]; then
+    . /usr/local/lib/nativecode/gpu-backend.sh
+    gpu_apply \"\$(gpu_map_mode_to_backend \"\$GPU_MODE\")\"
+  elif [ \"\$GPU_MODE\" = turnip ]; then
     export MESA_LOADER_DRIVER_OVERRIDE=zink
     export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
+    export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
     export TU_DEBUG=noconform
     export MESA_VK_WSI_DEBUG=sw
     export MESA_GL_VERSION_OVERRIDE=4.6
     export MESA_GLES_VERSION_OVERRIDE=3.2
+  elif [ \"\$GPU_MODE\" = venus ]; then
+    export VN_DEBUG=vtest
+    export GALLIUM_DRIVER=zink
+    export MESA_LOADER_DRIVER_OVERRIDE=zink
+    export VTEST_SOCKET_NAME=/mnt/host-tmp/.virgl_test
   elif [ \"\$GPU_MODE\" = virgl ] && [ -S /mnt/host-tmp/.virgl_test ]; then
     export GALLIUM_DRIVER=virpipe
   else

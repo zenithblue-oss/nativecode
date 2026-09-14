@@ -183,6 +183,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var hardwareScrollView: ScrollView
     private lateinit var vpuStatusBadge: TextView
     private lateinit var vpuSocDetailTv: TextView
+    private lateinit var gpuStatusBadge: TextView
+    private lateinit var gpuDetailTv: TextView
+    private lateinit var venusServerBadge: TextView
+    private lateinit var venusServerDetailTv: TextView
+    private lateinit var venusHostBlock: LinearLayout
+    private lateinit var hostServersBlurbTv: TextView
+    private lateinit var pulseServerBadge: TextView
+    private lateinit var pulseServerDetailTv: TextView
     private lateinit var vpuDecodersTv: TextView
     private lateinit var vpuEncodersTv: TextView
     private lateinit var bridgeStatusTv: TextView
@@ -5532,7 +5540,6 @@ class MainActivity : AppCompatActivity() {
                     "setup_alpine_family.sh" to "Create users and core configurations in guest.",
                     "setup_xfce4.sh" to "Install XFCE4 graphical desktop and themes in guest.",
                     "setup_customization_alpine.sh" to "Apply font, locales, and terminal enhancements in guest.",
-                    "setup_hw_accel_debian.sh" to "Configure GPU accel: Turnip (Snapdragon/Adreno) or VirGL (others).",
                     "setup_cli_tools.sh" to "Install Node.js/NVM and AI CLI tools (Aider, Claude, Cline) in guest."
                 )
                 for ((name, desc) in guestScripts) {
@@ -5927,6 +5934,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun runScriptInTerminal(scriptName: String, runMode: String = "proot") {
+        if (scriptName == "setup_hw_accel_debian.sh") {
+            Toast.makeText(
+                this,
+                "GPU is baked into the rootfs (Turnip on Adreno, Venus on Mali). No setup script.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         scriptInstallTerminalView.setTextSize(scriptFontSize)
         if (::scriptInstallTitleTv.isInitialized) {
             scriptInstallTitleTv.text = scriptRunnerTitle(scriptName, runMode)
@@ -16328,7 +16343,7 @@ class MainActivity : AppCompatActivity() {
         return settingsHubNavRow(
             iconRes = R.drawable.ic_tune_thick,
             title = "HARDWARE",
-            subtitle = "VPU acceleration & host IPC bridge",
+            subtitle = "GPU, VPU & host IPC",
             pageId = ID_HARDWARE
         )
     }
@@ -16382,12 +16397,113 @@ class MainActivity : AppCompatActivity() {
         pageLayout.addView(headerTitleRow)
 
         pageLayout.addView(TextView(this).apply {
-            text = "// HARDWARE VPU ACCELERATION & HOST AGENT BRIDGE"
+            text = "// GPU ACCEL + VPU + HOST AGENT BRIDGE"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
             setPadding(0, dp(4), 0, dp(12))
         })
+
+        pageLayout.addView(glassCard().apply {
+            val titleRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val cardTitle = TextView(this@MainActivity).apply {
+                text = "GPU ACCELERATION"
+                textSize = 14f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            }
+            gpuStatusBadge = textBadge("DETECT", NC.SURFACE_HIGHEST, NC.PRIMARY)
+            titleRow.addView(cardTitle)
+            titleRow.addView(gpuStatusBadge)
+            addView(titleRow)
+            gpuDetailTv = TextView(this@MainActivity).apply {
+                text = "GPU: Loading..."
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(6), 0, 0)
+            }
+            addView(gpuDetailTv)
+        })
+
+        pageLayout.addView(spacer(16))
+
+        pageLayout.addView(glassCard().apply {
+            addView(TextView(this@MainActivity).apply {
+                text = "HOST SERVERS"
+                textSize = 14f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, 0, 0, dp(4))
+            })
+            hostServersBlurbTv = TextView(this@MainActivity).apply {
+                text = "PulseAudio TCP (FluxLinux style). No root."
+                textSize = 10f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, 0, 0, dp(8))
+            }
+            addView(hostServersBlurbTv)
+
+            venusHostBlock = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+            val venusRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            venusRow.addView(TextView(this@MainActivity).apply {
+                text = "VENUS"
+                textSize = 12f
+                setTextColor(NC.PRIMARY_CON)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            })
+            venusServerBadge = textBadge("STOPPED", NC.SURFACE_HIGHEST, NC.ERROR)
+            venusRow.addView(venusServerBadge)
+            venusHostBlock.addView(venusRow)
+            venusServerDetailTv = TextView(this@MainActivity).apply {
+                text = "Venus: probing..."
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(4), 0, dp(6))
+            }
+            venusHostBlock.addView(venusServerDetailTv)
+            venusHostBlock.addView(hostServerButtonRow(HostServerController.Kind.VENUS))
+            addView(venusHostBlock)
+
+            val pulseRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(12), 0, 0)
+            }
+            pulseRow.addView(TextView(this@MainActivity).apply {
+                text = "PULSEAUDIO"
+                textSize = 12f
+                setTextColor(NC.PRIMARY_CON)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            })
+            pulseServerBadge = textBadge("STOPPED", NC.SURFACE_HIGHEST, NC.ERROR)
+            pulseRow.addView(pulseServerBadge)
+            addView(pulseRow)
+            pulseServerDetailTv = TextView(this@MainActivity).apply {
+                text = "PulseAudio: probing..."
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(4), 0, dp(6))
+            }
+            addView(pulseServerDetailTv)
+            addView(hostServerButtonRow(HostServerController.Kind.PULSE))
+        })
+
+        pageLayout.addView(spacer(16))
 
         // VPU Card
         pageLayout.addView(glassCard().apply {
@@ -16628,6 +16744,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshHardwarePage() {
+        val gpu = GpuRuntimeStatus.snapshot(this)
+        gpuStatusBadge.text = gpu.badge
+        gpuStatusBadge.setTextColor(
+            if (gpu.badge == "SOFTWARE" || gpu.badge == "UNAVAILABLE") NC.ERROR else NC.PRIMARY
+        )
+        gpuDetailTv.text = buildString {
+            append("GPU: ${gpu.gpuName}\n")
+            append("GL vendor: ${gpu.glVendor}\n")
+            append("OpenGL: ${gpu.glVersion}\n")
+            append("GLSL: ${gpu.glslVersion}\n")
+            append("Vulkan: ${gpu.vulkanVersion}\n")
+            append("Vendor: ${gpu.vendor}\n")
+            append("SoC: ${gpu.soc}\n")
+            append("Method: ${gpu.method}\n")
+            append("Backend: ${gpu.backend}\n")
+            if (gpu.lastProbe.isNotBlank() && gpu.lastProbe != gpu.backend) {
+                append("Last probe: ${gpu.lastProbe}\n")
+            }
+            append("Hint: ${gpu.modeHint}\n")
+            append("KGSL: ${if (gpu.kgsl) "yes /dev/kgsl-3d0" else "no"}\n")
+            if (!GpuAccelDetector.isTurnip()) {
+                append("Host vtest: ${if (gpu.hostSocket) "socket live" else "offline"}\n")
+                append("Venus server: ${gpu.venusServer}\n")
+            }
+            append("PulseAudio: ${gpu.pulseServer}\n")
+            append("ICD: ${gpu.icd}")
+        }
+        bindHostServerStatus()
+        android.util.Log.i(
+            "GpuRuntimeStatus",
+            "GPU=${gpu.gpuName} GL=${gpu.glVersion} VK=${gpu.vulkanVersion} method=${gpu.method}"
+        )
+
         val soc = "${Build.MANUFACTURER} ${Build.MODEL} (${Build.HARDWARE})"
         vpuSocDetailTv.text = "Device: $soc\nAndroid API: ${Build.VERSION.SDK_INT}"
 
@@ -16657,6 +16806,76 @@ class MainActivity : AppCompatActivity() {
                 bridgeStatusTv.text = "AF_UNIX Bridge Sockets:\n• Agent Bridge: @nativecode.agent.v1 ($agentStatus)\n• Media VPU Bridge: @nativecode.media.v1 ($mediaStatus)\n• Peer UID: ${android.os.Process.myUid()} (Security Enforced)"
             }
         }.start()
+    }
+
+    private fun hostServerButtonRow(kind: HostServerController.Kind): LinearLayout {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun btn(label: String, action: (Context) -> String): Button {
+            return Button(this).apply {
+                text = label
+                textSize = 11f
+                setTextColor(NC.PRIMARY)
+                background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
+                setOnClickListener {
+                    isEnabled = false
+                    Thread {
+                        val msg = try {
+                            action(this@MainActivity)
+                        } catch (e: Exception) {
+                            "${kind.name}: ${e.message}"
+                        }
+                        runOnUiThread {
+                            isEnabled = true
+                            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                            bindHostServerStatus()
+                            refreshHardwarePage()
+                        }
+                    }.start()
+                }
+            }
+        }
+        row.addView(btn("START") { HostServerController.start(it, kind) })
+        row.addView(btn("STOP") { HostServerController.stop(kind) })
+        row.addView(btn("RESTART") { HostServerController.restart(it, kind) })
+        return row
+    }
+
+    private fun bindHostServerStatus() {
+        if (!::pulseServerBadge.isInitialized) return
+        val turnip = GpuAccelDetector.isTurnip()
+        if (::venusHostBlock.isInitialized) {
+            venusHostBlock.visibility = if (turnip) View.GONE else View.VISIBLE
+        }
+        if (::hostServersBlurbTv.isInitialized) {
+            hostServersBlurbTv.text = if (turnip) {
+                "PulseAudio TCP (FluxLinux style). Venus is Mali-only; Adreno uses Turnip/KGSL."
+            } else {
+                "Venus vtest + PulseAudio TCP (FluxLinux style). No root."
+            }
+        }
+        val venus = HostServerController.status(HostServerController.Kind.VENUS)
+        val pulse = HostServerController.status(HostServerController.Kind.PULSE)
+        fun paint(badge: TextView, detail: TextView, st: HostServerController.Status, title: String) {
+            val label = when {
+                !st.binaryExists -> "MISSING"
+                st.running -> "RUNNING"
+                else -> "STOPPED"
+            }
+            badge.text = label
+            badge.setTextColor(
+                when (label) {
+                    "RUNNING" -> NC.PRIMARY
+                    "MISSING" -> NC.ERROR
+                    else -> NC.ON_SURF_VAR
+                }
+            )
+            detail.text = "$title: ${st.detail}"
+        }
+        if (!turnip && ::venusServerBadge.isInitialized) {
+            paint(venusServerBadge, venusServerDetailTv, venus, "Venus")
+        }
+        paint(pulseServerBadge, pulseServerDetailTv, pulse, "PulseAudio")
     }
 
     private fun probeLocalSocket(name: String): Boolean {

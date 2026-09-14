@@ -10,6 +10,9 @@ android {
         minSdk = 26
         buildConfigField("String", "COMMIT", "\"1.03.01\"")
         buildConfigField("String", "VERSION_NAME", "\"1.03.01\"")
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {

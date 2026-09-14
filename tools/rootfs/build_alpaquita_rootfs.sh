@@ -79,6 +79,7 @@ fi
 # Copy guest assembly: runs INSIDE the new rootfs
 ASSEMBLE="$WORK/assemble-inside.sh"
 cp "$SCRIPT_DIR/rootfs-common.sh" "$WORK/rootfs-common.sh"
+cp "$SCRIPT_DIR/gpu-backend.sh" "$WORK/gpu-backend.sh"
 cp "$SCRIPT_DIR/clean_rootfs.sh" "$WORK/clean_rootfs.sh"
 cp "$SCRIPT_DIR/verify_rootfs.sh" "$WORK/verify_rootfs.sh"
 [ ! -f "$SCRIPT_DIR/test_xfce_overlay.py" ] || cp "$SCRIPT_DIR/test_xfce_overlay.py" "$WORK/test_xfce_overlay.py"
@@ -119,6 +120,7 @@ printf '%s\n%s\n' "$ALPAQUITA_REPOS_CORE" "$ALPAQUITA_REPOS_UNIVERSE" > /etc/apk
 apk update
 # shellcheck disable=SC2046
 apk add --no-cache \$(cat /pkg-lists/base.pkgs) \$(cat /pkg-lists/dev.pkgs)
+apk add --no-cache mesa-vulkan-virtio vulkan-tools mesa-utils 2>/dev/null || true
 
 # flux user
 if ! id flux >/dev/null 2>&1; then
@@ -238,6 +240,18 @@ rm -rf /tmp/gh*
 mkdir -p /usr/local/lib/nativecode /etc/nativecode
 cp /pkg-lists/rootfs-common.sh /usr/local/lib/nativecode/rootfs-common.sh
 chmod 644 /usr/local/lib/nativecode/rootfs-common.sh
+if [ -f /pkg-lists/gpu-backend.sh ]; then
+    cp /pkg-lists/gpu-backend.sh /usr/local/lib/nativecode/gpu-backend.sh
+    chmod 644 /usr/local/lib/nativecode/gpu-backend.sh
+elif [ -f /rootfs-overlay/usr/local/lib/nativecode/gpu-backend.sh ]; then
+    cp /rootfs-overlay/usr/local/lib/nativecode/gpu-backend.sh /usr/local/lib/nativecode/gpu-backend.sh
+    chmod 644 /usr/local/lib/nativecode/gpu-backend.sh
+fi
+if [ -x /rootfs-overlay/usr/local/bin/gpu-launch ]; then
+    mkdir -p /usr/local/bin
+    cp /rootfs-overlay/usr/local/bin/gpu-launch /usr/local/bin/gpu-launch
+    chmod 755 /usr/local/bin/gpu-launch
+fi
 
 # AI CLIs as flux
 su -s /bin/sh flux -c '
@@ -355,7 +369,7 @@ log "           mount -t proc proc /rootfs/proc; \\"
 log "           mount -t sysfs sysfs /rootfs/sys; \\"
 log "           mount --bind /run /rootfs/run; \\"
 log "           mount --bind /dev/pts /rootfs/dev/pts; \\"
-log "           cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/; \\"
+log "           cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /host-work/gpu-backend.sh /rootfs/pkg-lists/; \\"
 log "           ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging/. /rootfs/opt-staging/); \\"
 log "           ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/); \\"
 log "           ([ ! -d /host-work/gui-staging ] || cp -a /host-work/gui-staging/. /rootfs/gui-staging/); \\"

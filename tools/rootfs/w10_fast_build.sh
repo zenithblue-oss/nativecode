@@ -187,7 +187,7 @@ docker run --rm --privileged --platform linux/arm64 \
         mount -t sysfs sysfs /rootfs/sys
         mount --bind /run /rootfs/run
         mount --bind /dev/pts /rootfs/dev/pts
-        cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /rootfs/pkg-lists/
+        cp /host-work/base.pkgs /host-work/dev.pkgs /host-work/rootfs-common.sh /host-work/gpu-backend.sh /rootfs/pkg-lists/
         if [ -d /host-work/opt-staging ]; then cp -a /host-work/opt-staging/. /rootfs/opt-staging/; fi
         if [ -d /host-work/xfce-staging ]; then cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/; fi
         if [ -d /host-work/gui-staging ]; then cp -a /host-work/gui-staging/. /rootfs/gui-staging/; fi

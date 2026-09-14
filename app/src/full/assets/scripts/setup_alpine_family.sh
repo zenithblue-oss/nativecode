@@ -287,8 +287,13 @@ fi
 
 mkdir -p /etc/fluxlinux
 if [ ! -s /etc/fluxlinux/gpu_mode ]; then
-    printf '%s\n' virgl > /etc/fluxlinux/gpu_mode
-    echo "FluxLinux: gpu_mode=virgl (first-paint; hw-accel may upgrade)"
+    _gpu="${FLUX_GPU:-venus}"
+    case "$_gpu" in
+        turnip|venus|virgl|software) ;;
+        *) _gpu=venus ;;
+    esac
+    printf '%s\n' "$_gpu" > /etc/fluxlinux/gpu_mode
+    echo "FluxLinux: gpu_mode=$_gpu (first-paint; F owns upgrades)"
 else
     echo "NativeCode: gpu_mode=$(tr -d '[:space:]' </etc/fluxlinux/gpu_mode) kept (F owns upgrades)"
 fi

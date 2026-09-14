@@ -30,6 +30,7 @@ PACKAGES = [
     "proot",
     "proot-distro",
     "pulseaudio",
+    "virglrenderer-android",
     "xkeyboard-config",
     
     # Core Libraries
@@ -143,6 +144,8 @@ def verify_bootstrap():
         "usr/bin/proot",
         "usr/bin/proot-distro",
         "usr/bin/pulseaudio",
+        "usr/bin/virgl_test_server_android",
+        "usr/opt/virglrenderer-android/libexec/virgl_render_server",
         "usr/bin/pkill",
         "usr/lib/pulseaudio/modules/module-native-protocol-tcp.so",
         "usr/libexec/termux-x11/loader.apk"
@@ -191,7 +194,7 @@ def copy_to_jni_libs():
         "usr/bin/proot": "libproot.so",
         "usr/bin/bash": "libbash.so",
         "usr/libexec/proot/loader": "libloader.so",
-        "usr/libexec/proot/loader32": "libloader32.so"
+        # loader32 is ELF32/4 KB — never copy into jniLibs (16 KB page-size APKs).
     }
     
     print("[*] Copying critical binaries to jniLibs...")
