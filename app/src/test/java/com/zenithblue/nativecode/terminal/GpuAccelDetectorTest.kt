@@ -52,9 +52,15 @@ class GpuAccelDetectorTest {
     @Test
     fun methodLabels() {
         assertEquals("Turnip KGSL (Zink)", GpuAccelDetector.methodLabel("turnip"))
+        assertEquals("PanVK (Kbase)", GpuAccelDetector.methodLabel("panvk"))
+        assertEquals("Zink over PanVK", GpuAccelDetector.methodLabel("panvk-zink"))
+        assertEquals("Panfrost (Gallium Kbase)", GpuAccelDetector.methodLabel("panfrost"))
         assertEquals("Venus (VirtIO Vulkan)", GpuAccelDetector.methodLabel("venus"))
         assertEquals("Zink over Venus", GpuAccelDetector.methodLabel("zink-venus"))
         assertEquals("TURNIP", GpuAccelDetector.badgeLabel("turnip"))
+        assertEquals("PANVK", GpuAccelDetector.badgeLabel("panvk"))
+        assertEquals("PANVK", GpuAccelDetector.badgeLabel("panvk-zink"))
+        assertEquals("PANFROST", GpuAccelDetector.badgeLabel("panfrost"))
         assertEquals("VENUS", GpuAccelDetector.badgeLabel("zink-venus"))
     }
 

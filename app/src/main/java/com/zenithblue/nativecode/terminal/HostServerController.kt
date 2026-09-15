@@ -73,18 +73,31 @@ object HostServerController {
     }
 
     /**
-     * Mali/Xclipse/PowerVR: guest Venus needs the host vtest server.
-     * Turnip/KGSL does not. Safe to call from terminal spawn (no-op if running).
+     * Ensure both Venus and PulseAudio servers are running by default.
+     */
+    fun ensureServers(ctx: Context) {
+        GuestGpuConfig.applyToRootfs(ctx)
+        if (binary(Kind.VENUS).isFile) {
+            try {
+                start(ctx, Kind.VENUS)
+            } catch (e: Exception) {
+                Log.w(TAG, "ensure Venus", e)
+            }
+        }
+        if (binary(Kind.PULSE).isFile) {
+            try {
+                start(ctx, Kind.PULSE)
+            } catch (e: Exception) {
+                Log.w(TAG, "ensure Pulse", e)
+            }
+        }
+    }
+
+    /**
+     * Backward-compatible alias for terminal spawn.
      */
     fun ensureGuestGpu(ctx: Context) {
-        GuestGpuConfig.applyToRootfs(ctx)
-        if (GpuAccelDetector.isTurnip()) return
-        if (!binary(Kind.VENUS).isFile) return
-        try {
-            start(ctx, Kind.VENUS)
-        } catch (e: Exception) {
-            Log.w(TAG, "ensure Venus", e)
-        }
+        ensureServers(ctx)
     }
 
     fun stop(kind: Kind): String {
@@ -219,7 +232,7 @@ object HostServerController {
             val env = pb.environment()
             env.remove("LD_PRELOAD")
             // PREFIX/lib shadows Android libEGL and breaks linker (Xzs_Construct).
-            env["LD_LIBRARY_PATH"] = "${TermuxHostPaths.PREFIX}/opt/virglrenderer-android/lib"
+            env["LD_LIBRARY_PATH"] = "/system/lib64:${TermuxHostPaths.PREFIX}/opt/virglrenderer-android/lib"
             pb.redirectErrorStream(true)
             val p = pb.start()
             val out = p.inputStream.bufferedReader().readText()
@@ -243,7 +256,7 @@ object HostServerController {
             env["LD_LIBRARY_PATH"] = TermuxHostPaths.LIB
         } else {
             // PREFIX/lib shadows Android libEGL/libvulkan and breaks vtest (Xzs_Construct).
-            env["LD_LIBRARY_PATH"] = "${TermuxHostPaths.PREFIX}/opt/virglrenderer-android/lib"
+            env["LD_LIBRARY_PATH"] = "/system/lib64:${TermuxHostPaths.PREFIX}/opt/virglrenderer-android/lib"
             val rs = File(TermuxHostPaths.PREFIX, "opt/virglrenderer-android/libexec/virgl_render_server")
             val rsAlt = File(TermuxHostPaths.PREFIX, "libexec/virgl_render_server")
             when {

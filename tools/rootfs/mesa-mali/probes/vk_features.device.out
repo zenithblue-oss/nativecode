@@ -1,0 +1,212 @@
+MESA: warning: panvk: unknown gpu_id (0xa8671030) or variant (0x4); continuing with conservative "Mali (unknown Valhall)" defaults — expect issues
+ICD VK_DRIVER_FILES=/opt/nativecode/panvk/icd.d/panvk_kbase.json
+ICD VK_ICD_FILENAMES=/opt/nativecode/panvk/icd.d/panvk_kbase.json
+vkCreateInstance=0
+
+DEVICE 0
+deviceName=Mali unknown 0xa8671030 MC6
+vendorID=0x13b5
+deviceID=0xa8671030
+deviceType=INTEGRATED_GPU (1)
+apiVersion=1.4.352
+driverVersion=0x6801063 (109056099)
+FEATURES_TRUE
+  robustBufferAccess
+  fullDrawIndexUint32
+  imageCubeArray
+  independentBlend
+  sampleRateShading
+  dualSrcBlend
+  logicOp
+  multiDrawIndirect
+  drawIndirectFirstInstance
+  depthClamp
+  depthBiasClamp
+  fillModeNonSolid
+  wideLines
+  largePoints
+  samplerAnisotropy
+  textureCompressionETC2
+  textureCompressionASTC_LDR
+  occlusionQueryPrecise
+  fragmentStoresAndAtomics
+  shaderImageGatherExtended
+  shaderStorageImageExtendedFormats
+  shaderStorageImageReadWithoutFormat
+  shaderStorageImageWriteWithoutFormat
+  shaderUniformBufferArrayDynamicIndexing
+  shaderSampledImageArrayDynamicIndexing
+  shaderStorageBufferArrayDynamicIndexing
+  shaderStorageImageArrayDynamicIndexing
+  shaderInt64
+  shaderInt16
+EXTENSION_COUNT=168
+EXTENSIONS
+  VK_KHR_8bit_storage spec=1
+  VK_KHR_16bit_storage spec=1
+  VK_KHR_bind_memory2 spec=1
+  VK_KHR_buffer_device_address spec=1
+  VK_KHR_calibrated_timestamps spec=1
+  VK_KHR_copy_commands2 spec=1
+  VK_KHR_create_renderpass2 spec=1
+  VK_KHR_dedicated_allocation spec=3
+  VK_KHR_depth_clamp_zero_one spec=1
+  VK_KHR_depth_stencil_resolve spec=1
+  VK_KHR_descriptor_update_template spec=1
+  VK_KHR_device_group spec=4
+  VK_KHR_draw_indirect_count spec=1
+  VK_KHR_driver_properties spec=1
+  VK_KHR_dynamic_rendering spec=1
+  VK_KHR_dynamic_rendering_local_read spec=1
+  VK_KHR_external_fence spec=1
+  VK_KHR_external_fence_fd spec=1
+  VK_KHR_external_memory spec=1
+  VK_KHR_external_memory_fd spec=1
+  VK_KHR_external_semaphore spec=1
+  VK_KHR_external_semaphore_fd spec=1
+  VK_KHR_format_feature_flags2 spec=2
+  VK_KHR_get_memory_requirements2 spec=1
+  VK_KHR_global_priority spec=1
+  VK_KHR_image_format_list spec=1
+  VK_KHR_imageless_framebuffer spec=1
+  VK_KHR_index_type_uint8 spec=1
+  VK_KHR_line_rasterization spec=1
+  VK_KHR_load_store_op_none spec=1
+  VK_KHR_maintenance1 spec=2
+  VK_KHR_maintenance2 spec=1
+  VK_KHR_maintenance3 spec=1
+  VK_KHR_maintenance4 spec=2
+  VK_KHR_maintenance5 spec=1
+  VK_KHR_maintenance6 spec=1
+  VK_KHR_maintenance7 spec=1
+  VK_KHR_maintenance8 spec=1
+  VK_KHR_maintenance9 spec=1
+  VK_KHR_map_memory2 spec=1
+  VK_KHR_multiview spec=1
+  VK_KHR_pipeline_binary spec=1
+  VK_KHR_pipeline_executable_properties spec=1
+  VK_KHR_pipeline_library spec=1
+  VK_KHR_present_id spec=1
+  VK_KHR_present_id2 spec=1
+  VK_KHR_present_wait spec=1
+  VK_KHR_present_wait2 spec=1
+  VK_KHR_push_descriptor spec=2
+  VK_KHR_relaxed_block_layout spec=1
+  VK_KHR_robustness2 spec=1
+  VK_KHR_sampler_mirror_clamp_to_edge spec=3
+  VK_KHR_sampler_ycbcr_conversion spec=14
+  VK_KHR_separate_depth_stencil_layouts spec=1
+  VK_KHR_shader_atomic_int64 spec=1
+  VK_KHR_shader_clock spec=1
+  VK_KHR_shader_draw_parameters spec=1
+  VK_KHR_shader_expect_assume spec=1
+  VK_KHR_shader_float16_int8 spec=1
+  VK_KHR_shader_float_controls spec=4
+  VK_KHR_shader_float_controls2 spec=1
+  VK_KHR_shader_integer_dot_product spec=1
+  VK_KHR_shader_maximal_reconvergence spec=1
+  VK_KHR_shader_non_semantic_info spec=1
+  VK_KHR_shader_quad_control spec=1
+  VK_KHR_shader_relaxed_extended_instruction spec=1
+  VK_KHR_shader_subgroup_extended_types spec=1
+  VK_KHR_shader_subgroup_rotate spec=2
+  VK_KHR_shader_subgroup_uniform_control_flow spec=1
+  VK_KHR_shader_terminate_invocation spec=1
+  VK_KHR_shader_untyped_pointers spec=1
+  VK_KHR_spirv_1_4 spec=1
+  VK_KHR_storage_buffer_storage_class spec=1
+  VK_KHR_swapchain spec=70
+  VK_KHR_swapchain_maintenance1 spec=1
+  VK_KHR_swapchain_mutable_format spec=1
+  VK_KHR_synchronization2 spec=1
+  VK_KHR_timeline_semaphore spec=2
+  VK_KHR_unified_image_layouts spec=1
+  VK_KHR_uniform_buffer_standard_layout spec=1
+  VK_KHR_variable_pointers spec=1
+  VK_KHR_vertex_attribute_divisor spec=1
+  VK_KHR_vulkan_memory_model spec=3
+  VK_KHR_zero_initialize_workgroup_memory spec=1
+  VK_EXT_4444_formats spec=1
+  VK_EXT_astc_decode_mode spec=1
+  VK_EXT_attachment_feedback_loop_dynamic_state spec=1
+  VK_EXT_attachment_feedback_loop_layout spec=2
+  VK_EXT_border_color_swizzle spec=1
+  VK_EXT_buffer_device_address spec=2
+  VK_EXT_calibrated_timestamps spec=2
+  VK_EXT_color_write_enable spec=1
+  VK_EXT_conditional_rendering spec=2
+  VK_EXT_custom_border_color spec=12
+  VK_EXT_depth_bias_control spec=1
+  VK_EXT_depth_clamp_control spec=1
+  VK_EXT_depth_clamp_zero_one spec=1
+  VK_EXT_depth_clip_control spec=1
+  VK_EXT_depth_clip_enable spec=1
+  VK_EXT_descriptor_indexing spec=2
+  VK_EXT_device_memory_report spec=2
+  VK_EXT_display_control spec=1
+  VK_EXT_dynamic_rendering_unused_attachments spec=1
+  VK_EXT_extended_dynamic_state spec=1
+  VK_EXT_extended_dynamic_state2 spec=1
+  VK_EXT_extended_dynamic_state3 spec=2
+  VK_EXT_external_memory_acquire_unmodified spec=1
+  VK_EXT_external_memory_dma_buf spec=1
+  VK_EXT_global_priority spec=2
+  VK_EXT_global_priority_query spec=1
+  VK_EXT_graphics_pipeline_library spec=1
+  VK_EXT_hdr_metadata spec=3
+  VK_EXT_host_image_copy spec=1
+  VK_EXT_host_query_reset spec=1
+  VK_EXT_image_2d_view_of_3d spec=1
+  VK_EXT_image_drm_format_modifier spec=2
+  VK_EXT_image_robustness spec=1
+  VK_EXT_image_view_min_lod spec=1
+  VK_EXT_index_type_uint8 spec=1
+  VK_EXT_inline_uniform_block spec=1
+  VK_EXT_legacy_dithering spec=2
+  VK_EXT_line_rasterization spec=1
+  VK_EXT_load_store_op_none spec=1
+  VK_EXT_map_memory_placed spec=1
+  VK_EXT_memory_budget spec=1
+  VK_EXT_multisampled_render_to_single_sampled spec=1
+  VK_EXT_mutable_descriptor_type spec=1
+  VK_EXT_nested_command_buffer spec=1
+  VK_EXT_non_seamless_cube_map spec=1
+  VK_EXT_physical_device_drm spec=1
+  VK_EXT_pipeline_creation_cache_control spec=3
+  VK_EXT_pipeline_creation_feedback spec=1
+  VK_EXT_pipeline_robustness spec=1
+  VK_EXT_present_timing spec=3
+  VK_EXT_primitive_topology_list_restart spec=1
+  VK_EXT_private_data spec=1
+  VK_EXT_provoking_vertex spec=1
+  VK_EXT_queue_family_foreign spec=1
+  VK_EXT_robustness2 spec=1
+  VK_EXT_sampler_filter_minmax spec=2
+  VK_EXT_scalar_block_layout spec=1
+  VK_EXT_separate_stencil_usage spec=1
+  VK_EXT_shader_atomic_float spec=1
+  VK_EXT_shader_demote_to_helper_invocation spec=1
+  VK_EXT_shader_module_identifier spec=1
+  VK_EXT_shader_replicated_composites spec=1
+  VK_EXT_shader_stencil_export spec=1
+  VK_EXT_shader_subgroup_ballot spec=1
+  VK_EXT_shader_subgroup_vote spec=1
+  VK_EXT_shader_uniform_buffer_unsized_array spec=1
+  VK_EXT_subgroup_size_control spec=2
+  VK_EXT_swapchain_maintenance1 spec=1
+  VK_EXT_texel_buffer_alignment spec=1
+  VK_EXT_texture_compression_astc_hdr spec=1
+  VK_EXT_tooling_info spec=1
+  VK_EXT_transform_feedback spec=1
+  VK_EXT_vertex_attribute_divisor spec=3
+  VK_EXT_vertex_input_dynamic_state spec=2
+  VK_EXT_ycbcr_2plane_444_formats spec=1
+  VK_EXT_ycbcr_image_arrays spec=1
+  VK_EXT_zero_initialize_device_memory spec=1
+  VK_ARM_scheduling_controls spec=2
+  VK_ARM_shader_core_builtins spec=2
+  VK_ARM_shader_core_properties spec=1
+  VK_GOOGLE_decorate_string spec=1
+  VK_GOOGLE_hlsl_functionality1 spec=1
+  VK_GOOGLE_user_type spec=1
+  VK_VALVE_mutable_descriptor_type spec=1

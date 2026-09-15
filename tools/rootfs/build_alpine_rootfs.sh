@@ -122,6 +122,7 @@ chmod 0440 /etc/sudoers.d/flux
 if [ -f /etc/sudoers ] && ! grep -qE '@includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null; then
     echo '@includedir /etc/sudoers.d' >> /etc/sudoers
 fi
+chmod 4755 /usr/bin/sudo 2>/dev/null || true
 # bwrap shim (proot-safe glycin)
 apk add --no-cache glycin-image-rs glycin-svg gdk-pixbuf 2>/dev/null || true
 if [ -x /usr/bin/bwrap ] && [ ! -e /usr/bin/bwrap.real ] && ! grep -q 'NativeCode proot' /usr/bin/bwrap 2>/dev/null; then

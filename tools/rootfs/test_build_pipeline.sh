@@ -206,6 +206,12 @@ COMPONENT_GH=1
 COMPONENT_DEV=0
 EOF
 touch "$DUMMY_FS/usr/local/lib/nativecode/rootfs-common.sh"
+touch "$DUMMY_FS/usr/local/lib/nativecode/gpu-backend.sh"
+touch "$DUMMY_FS/usr/local/bin/gpu-launch" "$DUMMY_FS/usr/local/bin/fastfetch"
+printf '%s\n' '#!/bin/sh' '# NativeCode PRoot sudo.' 'exec "$@"' > "$DUMMY_FS/usr/local/bin/sudo"
+chmod +x "$DUMMY_FS/usr/local/bin/gpu-launch" "$DUMMY_FS/usr/local/bin/fastfetch" "$DUMMY_FS/usr/local/bin/sudo"
+mkdir -p "$DUMMY_FS/etc/profile.d"
+touch "$DUMMY_FS/etc/profile.d/flux-gpu.sh"
 touch "$DUMMY_FS/usr/bin/startxfce4" && chmod +x "$DUMMY_FS/usr/bin/startxfce4"
 touch "$DUMMY_FS/usr/bin/Xvnc" && chmod +x "$DUMMY_FS/usr/bin/Xvnc"
 touch "$DUMMY_FS/home/flux/Pictures/Wallpapers/fluxlinux-dark.png"
@@ -568,5 +574,36 @@ echo "PASS: flux_install.sh succeeds when adjacent SHA256 matches"
 echo "== checking XFCE overlay panel structural contract =="
 python3 "$REPO_ROOT/tools/rootfs/test_xfce_overlay.py"
 echo "PASS: XFCE overlay panel contract validated"
+
+echo "== checking PRoot sudo wrapper overlay =="
+SUDO_WRAP="$REPO_ROOT/tools/rootfs/overlay/alpaquita/usr/local/bin/sudo"
+if [ ! -f "$SUDO_WRAP" ]; then
+    echo "FAIL: overlay sudo wrapper missing: $SUDO_WRAP" >&2
+    exit 1
+fi
+if ! grep -q 'NativeCode PRoot sudo' "$SUDO_WRAP"; then
+    echo "FAIL: overlay sudo wrapper missing PRoot shim marker" >&2
+    exit 1
+fi
+if ! grep -q 'exec "\$@"' "$SUDO_WRAP"; then
+    echo "FAIL: overlay sudo wrapper does not exec remaining argv" >&2
+    exit 1
+fi
+WRAP_TEST="$WORK/sudo-wrap-test"
+mkdir -p "$WRAP_TEST"
+cat > "$WRAP_TEST/id" <<'EOF'
+#!/bin/sh
+echo wrap-id
+EOF
+chmod +x "$WRAP_TEST/id"
+# Host /usr/bin/sudo is real setuid; force the PRoot exec path.
+sed 's|^REAL=/usr/bin/sudo$|REAL=/nonexistent|' "$SUDO_WRAP" > "$WRAP_TEST/sudo"
+chmod +x "$WRAP_TEST/sudo"
+OUT="$(PATH="$WRAP_TEST" "$WRAP_TEST/sudo" -n -E id)"
+if [ "$OUT" != "wrap-id" ]; then
+    echo "FAIL: sudo wrapper -n -E did not exec remaining argv (got '$OUT')" >&2
+    exit 1
+fi
+echo "PASS: PRoot sudo wrapper overlay contract"
 
 echo "BUILD-PIPELINE: ALL PASS"

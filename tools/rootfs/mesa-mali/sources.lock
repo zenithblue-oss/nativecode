@@ -1,0 +1,5 @@
+MESA_REPO=https://github.com/funnymdzz/mesa.git
+MESA_KBASE_COMMIT=034a7a94be54d71ff659d6564422eeef8e62c926
+UPSTREAM_REPO=https://gitlab.freedesktop.org/mesa/mesa.git
+PANFROST_V11_COMMIT=958205d63ec535eb0ab48aaaea98a193f44389d3
+PANVK_V11_COMMIT=c66177bdc90e06aa336357da2e4de0aec6d127d6

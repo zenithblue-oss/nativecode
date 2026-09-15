@@ -82,6 +82,84 @@ nc_runtime_dns_repair() {
     return 0
 }
 
+# PRoot: /data is nosuid and rootfs files are app-uid (guest sees 1000), so
+# real sudo always fails ownership/setuid checks. PATH-first wrapper execs.
+# Chroot: real /usr/bin/sudo is uid 0 + setuid; wrapper execs it.
+nc_runtime_sudo_repair() {
+    mkdir -p /etc/sudoers.d /usr/local/bin 2>/dev/null || true
+    echo "flux ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/flux
+    chmod 0440 /etc/sudoers.d/flux 2>/dev/null || true
+    if [ -f /etc/sudoers ] && ! grep -qE '@includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null; then
+        echo '@includedir /etc/sudoers.d' >> /etc/sudoers
+    fi
+    chmod 4755 /usr/bin/sudo 2>/dev/null || true
+    cat > /usr/local/bin/sudo <<'NC_SUDO_EOF'
+#!/bin/sh
+# NativeCode PRoot sudo.
+# Android /data is nosuid; extracted rootfs is app-uid (guest sees 1000).
+# Real sudo refuses:
+#   sudo: /etc/sudo.conf is owned by uid 1000, should be 0
+#   sudo: /usr/bin/sudo must be owned by uid 0 and have the setuid bit set
+# PRoot --change-id already maps the app UID to flux, so "escalate" is exec.
+# Chroot with real setuid /usr/bin/sudo is used unchanged.
+REAL=/usr/bin/sudo
+_self=$(readlink -f "$0" 2>/dev/null || echo "$0")
+_real=$(readlink -f "$REAL" 2>/dev/null || echo "$REAL")
+if [ "$_self" != "$_real" ] && [ -x "$REAL" ]; then
+    _owner=$(stat -c %u "$REAL" 2>/dev/null || echo "")
+    _mode=$(stat -c %a "$REAL" 2>/dev/null || echo "")
+    case "$_mode" in
+        4*|2*|6*)
+            if [ "$_owner" = "0" ]; then
+                exec "$REAL" "$@"
+            fi
+            ;;
+    esac
+fi
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --) shift; break ;;
+        -i|--login)
+            shift
+            exec "${SHELL:-/bin/bash}" -l "$@"
+            ;;
+        -s|--shell)
+            shift
+            exec "${SHELL:-/bin/bash}" "$@"
+            ;;
+        -n|-E|-H|-A|-K|-k|-l|-v|-b|-e|-f)
+            shift
+            ;;
+        --non-interactive|--preserve-env|--set-home|--askpass|--reset-timestamp|--list|--validate|--background|--edit|--stdin)
+            shift
+            ;;
+        --preserve-env=*|--prompt=*|--host=*|--user=*|--group=*|--other-user=*)
+            shift
+            ;;
+        -u|--user|-g|--group|-h|--host|-p|--prompt|-U|--other-user|-C|--close-from|-D|--chdir|-R|--chroot)
+            shift
+            [ $# -gt 0 ] && shift
+            ;;
+        -*)
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [ $# -eq 0 ]; then
+    exec "${SHELL:-/bin/bash}"
+fi
+
+exec "$@"
+NC_SUDO_EOF
+    chmod 755 /usr/local/bin/sudo 2>/dev/null || true
+    return 0
+}
+
 nc_runtime_machine_id() {
     if command -v dbus-uuidgen >/dev/null 2>&1; then
         dbus-uuidgen --ensure=/etc/machine-id 2>/dev/null || true

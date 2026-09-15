@@ -1,0 +1,64 @@
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 2bbd30a941b..0299130ed54 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -27,10 +27,10 @@
+  *  - The GPU address space is implicit (one per context), so vm_create /
+  *    vm_bind are thin wrappers that record the VAs assigned by the kernel.
+- *  - drmPrimeFDToHandle() does not work on a kbase fd; pan_kmod_bo_import()
+- *    will fail gracefully (returns NULL). dma-buf import / WSI is left for
+- *    future work (KBASE_IOCTL_MEM_IMPORT).
+- *  - Command submission (CSF queue groups / JM job atoms) is not wired up
+- *    yet; this backend currently only supports device enumeration and
+- *    memory management.
++ *  - drmPrimeFDToHandle() does not work on a kbase fd. Imports use
++ *    KBASE_IOCTL_MEM_IMPORT and shareable allocations use dma-heap.
++ *  - CSF submission uses userspace-owned queue rings: group create, queue
++ *    register/bind, USER_IO insert publication, queue kick, and KCPU CQS
++ *    fences. Gallium and PanVK must wrap their command streams in those
++ *    rings rather than issuing DRM_PANTHOR_IOCTL_GROUP_SUBMIT.
+  */
+@@ -498,6 +498,13 @@ int
+ kbase_kmod_csf_group_create(struct pan_kmod_dev *dev, uint32_t cs_queue_count,
+                             uint32_t *group_handle)
+ {
++   const struct kbase_kmod_dev *kbase_dev =
++      container_of(dev, const struct kbase_kmod_dev, base);
++
++   if (!kbase_dev->is_csf || !group_handle || !cs_queue_count ||
++       cs_queue_count > kbase_dev->csif_info.max_cs) {
++      errno = EINVAL;
++      return -1;
++   }
+    STATIC_ASSERT(sizeof(union kbase_ioctl_cs_queue_group_create_1_18) == 40);
+    STATIC_ASSERT(sizeof(union kbase_ioctl_cs_queue_group_create) == 112);
+@@ -684,6 +691,14 @@ kbase_kmod_csf_queue_bind(struct pan_kmod_dev *dev, uint32_t group_handle,
+                           uint32_t csi_index, uint64_t ringbuf_va,
+                           uint32_t ringbuf_size)
+ {
++   const struct kbase_kmod_dev *kbase_dev =
++      container_of(dev, const struct kbase_kmod_dev, base);
++
++   if (!kbase_dev->is_csf || !ringbuf_va || ringbuf_size < 4096 ||
++       !util_is_power_of_two_nonzero(ringbuf_size) ||
++       (ringbuf_va & (4096 - 1))) {
++      errno = EINVAL;
++      return NULL;
++   }
+    struct kbase_ioctl_cs_queue_register reg = {
+       .buffer_gpu_addr = ringbuf_va,
+       .buffer_size = ringbuf_size,
+@@ -745,6 +760,13 @@ int
+ kbase_kmod_csf_queue_kick(struct pan_kmod_dev *dev, uint64_t ringbuf_va)
+ {
++   const struct kbase_kmod_dev *kbase_dev =
++      container_of(dev, const struct kbase_kmod_dev, base);
++
++   if (!kbase_dev->is_csf || !ringbuf_va) {
++      errno = EINVAL;
++      return -1;
++   }
++
+    struct kbase_ioctl_cs_queue_kick kick = {
+       .buffer_gpu_addr = ringbuf_va,
+    };

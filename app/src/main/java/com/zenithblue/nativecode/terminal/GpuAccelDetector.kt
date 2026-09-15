@@ -109,6 +109,7 @@ object GpuAccelDetector {
         MODE_TURNIP -> "Turnip KGSL (Zink)"
         MODE_PANVK -> "PanVK (Kbase)"
         "panvk-zink" -> "Zink over PanVK"
+        "panfrost" -> "Panfrost (Gallium Kbase)"
         MODE_VENUS -> "Venus (VirtIO Vulkan)"
         MODE_VIRGL -> "VirGL (virpipe)"
         "zink-venus" -> "Zink over Venus"
@@ -120,6 +121,7 @@ object GpuAccelDetector {
     fun badgeLabel(backend: String): String = when (backend) {
         MODE_TURNIP -> "TURNIP"
         MODE_PANVK, "panvk-zink" -> "PANVK"
+        "panfrost" -> "PANFROST"
         MODE_VENUS, "zink-venus" -> "VENUS"
         MODE_VIRGL, "virgl-angle" -> "VIRGL"
         "llvmpipe", "software" -> "SOFTWARE"

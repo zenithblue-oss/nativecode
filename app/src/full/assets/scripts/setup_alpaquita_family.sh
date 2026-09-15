@@ -72,14 +72,18 @@ BWRAP_EOF
     fi
 fi
 
-# 4. Sudo NOPASSWD for flux
-mkdir -p /etc/sudoers.d
-echo "flux ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/flux
-chmod 0440 /etc/sudoers.d/flux
-if [ -f /etc/sudoers ] && ! grep -qE '@includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null; then
-    echo '@includedir /etc/sudoers.d' >> /etc/sudoers
+# 4. Sudo NOPASSWD for flux (PRoot: PATH-first wrapper; chroot: real setuid)
+if command -v nc_runtime_sudo_repair >/dev/null 2>&1; then
+    nc_runtime_sudo_repair
+else
+    mkdir -p /etc/sudoers.d /usr/local/bin
+    echo "flux ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/flux
+    chmod 0440 /etc/sudoers.d/flux
+    if [ -f /etc/sudoers ] && ! grep -qE '@includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null; then
+        echo '@includedir /etc/sudoers.d' >> /etc/sudoers
+    fi
+    chmod 4755 /usr/bin/sudo 2>/dev/null || true
 fi
-chmod 4755 /usr/bin/sudo 2>/dev/null || true
 
 # 5. VNC xstartup
 if id flux >/dev/null 2>&1; then

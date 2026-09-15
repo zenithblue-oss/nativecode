@@ -225,15 +225,18 @@ for g in wheel audio video netdev input; do
     addgroup flux "$g" 2>/dev/null || true
 done
 
-# 6. Sudo NOPASSWD
-mkdir -p /etc/sudoers.d
-echo "flux ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/flux
-chmod 0440 /etc/sudoers.d/flux
-# Alpine ships @includedir; re-assert if a minimal sudoers was replaced
-if [ -f /etc/sudoers ] && ! grep -qE '@includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null; then
-    echo '@includedir /etc/sudoers.d' >> /etc/sudoers
+# 6. Sudo NOPASSWD (PRoot: PATH-first wrapper; chroot: real setuid)
+if command -v nc_runtime_sudo_repair >/dev/null 2>&1; then
+    nc_runtime_sudo_repair
+else
+    mkdir -p /etc/sudoers.d /usr/local/bin
+    echo "flux ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/flux
+    chmod 0440 /etc/sudoers.d/flux
+    if [ -f /etc/sudoers ] && ! grep -qE '@includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null; then
+        echo '@includedir /etc/sudoers.d' >> /etc/sudoers
+    fi
+    chmod 4755 /usr/bin/sudo 2>/dev/null || true
 fi
-chmod 4755 /usr/bin/sudo 2>/dev/null || true
 
 # 7. Optional VNC xstartup parity with Debian family
 if id flux >/dev/null 2>&1; then

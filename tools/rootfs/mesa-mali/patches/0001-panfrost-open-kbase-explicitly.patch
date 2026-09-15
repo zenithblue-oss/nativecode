@@ -1,0 +1,96 @@
+diff --git a/src/gallium/drivers/panfrost/pan_public.h b/src/gallium/drivers/panfrost/pan_public.h
+index 6ea17a4f02d..502164fbcc5 100644
+--- a/src/gallium/drivers/panfrost/pan_public.h
++++ b/src/gallium/drivers/panfrost/pan_public.h
+@@ -18,6 +18,11 @@ panfrost_create_screen(int fd, const struct pipe_screen_config *config,
+                        struct renderonly *ro);
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++struct pipe_screen *
++panfrost_create_kbase_screen(const char *path,
++                             const struct pipe_screen_config *config);
++#endif
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/gallium/drivers/panfrost/pan_screen.c b/src/gallium/drivers/panfrost/pan_screen.c
+index fbee83a752a..36c37e49677 100644
+--- a/src/gallium/drivers/panfrost/pan_screen.c
++++ b/src/gallium/drivers/panfrost/pan_screen.c
+@@ -1018,9 +1018,10 @@ panfrost_get_device_luid(struct pipe_screen *pscreen, char *luid)
+ }
+ 
+-struct pipe_screen *
+-panfrost_create_screen(int fd, const struct pipe_screen_config *config,
+-                       struct renderonly *ro)
++static struct pipe_screen *
++panfrost_create_screen_common(int fd, const char *kbase_path,
++                              const struct pipe_screen_config *config,
++                              struct renderonly *ro)
+ {
+    /* Create the screen */
+    struct panfrost_screen *screen = rzalloc(NULL, struct panfrost_screen);
+@@ -1043,7 +1044,13 @@ panfrost_create_screen(int fd, const struct pipe_screen_config *config,
+ 
+    pan_trace_init();
+ 
+-   if (panfrost_open_device(screen, fd, dev)) {
++#ifdef HAVE_PAN_KMOD_KBASE
++   int open_ret = kbase_path
++                     ? panfrost_open_device_kbase(screen, kbase_path, dev)
++                     : panfrost_open_device(screen, fd, dev);
++#else
++   int open_ret = panfrost_open_device(screen, fd, dev);
++#endif
++   if (open_ret) {
+       ralloc_free(screen);
+       return NULL;
+    }
+@@ -1210,3 +1217,20 @@ panfrost_create_screen(int fd, const struct pipe_screen_config *config,
+ 
+    return &screen->base;
+ }
++
++struct pipe_screen *
++panfrost_create_screen(int fd, const struct pipe_screen_config *config,
++                       struct renderonly *ro)
++{
++   return panfrost_create_screen_common(fd, NULL, config, ro);
++}
++
++#ifdef HAVE_PAN_KMOD_KBASE
++struct pipe_screen *
++panfrost_create_kbase_screen(const char *path,
++                             const struct pipe_screen_config *config)
++{
++   return panfrost_create_screen_common(-1, path, config, NULL);
++}
++#endif
+diff --git a/src/gallium/winsys/panfrost/drm/panfrost_drm_winsys.c b/src/gallium/winsys/panfrost/drm/panfrost_drm_winsys.c
+index c5236a0ac45..667f018bc04 100644
+--- a/src/gallium/winsys/panfrost/drm/panfrost_drm_winsys.c
++++ b/src/gallium/winsys/panfrost/drm/panfrost_drm_winsys.c
+@@ -138,20 +138,12 @@ struct pipe_screen *
+ panfrost_kbase_screen_create(const char *path,
+                              const struct pipe_screen_config *config)
+ {
+-   /* Open the kbase device node.  panfrost_open_device() will detect that
+-    * drmGetVersion() fails on this fd and automatically retry with the
+-    * kbase backend. */
+-   int fd = open(path, O_RDWR | O_CLOEXEC);
+-   if (fd < 0) {
+-      fprintf(stderr, "panfrost: failed to open kbase device %s: %s\n",
+-              path, strerror(errno));
++   if (!path || strcmp(path, "/dev/mali0")) {
++      errno = EINVAL;
+       return NULL;
+    }
+ 
+-   /* The fd is consumed (or closed on failure) by panfrost_create_screen
+-    * via panfrost_open_device. */
+-   return panfrost_create_screen(fd, config, NULL);
++   /* panfrost_open_device_kbase() performs VERSION_CHECK before creating the
++    * explicit "kbase" pan_kmod device. No DRM discovery is involved. */
++   return panfrost_create_kbase_screen(path, config);
+ }
+ #endif /* HAVE_PAN_KMOD_KBASE */

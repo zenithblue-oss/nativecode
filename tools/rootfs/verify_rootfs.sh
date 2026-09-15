@@ -86,6 +86,11 @@ done
 echo "== desktop/gpu =="
 need /usr/local/lib/nativecode/gpu-backend.sh
 need /usr/local/bin/gpu-launch
+need /usr/local/bin/fastfetch
+need /usr/local/bin/sudo
+if [ -f "$ROOTFS/usr/local/bin/sudo" ]; then
+    grep -q 'NativeCode PRoot sudo' "$ROOTFS/usr/local/bin/sudo" || { echo "FAIL /usr/local/bin/sudo missing PRoot shim marker"; FAIL=1; }
+fi
 need /etc/profile.d/flux-gpu.sh
 need /usr/bin/startxfce4
 [ -x "$ROOTFS/usr/bin/Xtigervnc" ] || [ -x "$ROOTFS/usr/bin/Xvnc" ] || { echo "MISS tigervnc server"; FAIL=1; }

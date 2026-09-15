@@ -655,6 +655,7 @@ class MainActivity : AppCompatActivity() {
             ?: LinuxCommandBuilder.currentMethod
 
         executor.execute { LegacyProotDataMigrator.migrateIfNeeded(this) }
+        executor.execute { HostServerController.ensureServers(this) }
         if (BuildConfig.PLAY_STORE_BUILD &&
             !AndroidDevPackManager.isApplied(this) &&
             AndroidDevPackManager.resolveArchive(this) != null

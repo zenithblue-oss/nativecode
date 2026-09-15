@@ -11,6 +11,7 @@ GPU_BACKEND_FILE="$GPU_STATE_DIR/gpu_backend"
 GPU_METHOD_FILE="$GPU_STATE_DIR/gpu_method"
 GPU_PROBE_FILE="$GPU_STATE_DIR/gpu_last_probe"
 VTEST_SOCK="${VTEST_SOCKET_NAME:-/tmp/.virgl_test}"
+GPU_MESA_PREFIX="/opt/nativecode/mesa-mali"
 
 gpu_unset_env() {
     unset GALLIUM_DRIVER
@@ -25,6 +26,26 @@ gpu_unset_env() {
     unset MESA_GL_VERSION_OVERRIDE
     unset MESA_GLES_VERSION_OVERRIDE
     unset MESA_NO_ERROR
+    unset LIBGL_DRIVERS_PATH
+    if [ -n "${LD_PRELOAD:-}" ]; then
+        _np=""
+        _oldifs=$IFS
+        IFS=:
+        for _p in $LD_PRELOAD; do
+            [ -n "$_p" ] || continue
+            case "$_p" in
+                */kbase_shim.so) continue ;;
+            esac
+            _np="${_np:+$_np:}$_p"
+        done
+        IFS=$_oldifs
+        if [ -n "$_np" ]; then
+            export LD_PRELOAD="$_np"
+        else
+            unset LD_PRELOAD
+        fi
+        unset _np _oldifs _p
+    fi
 }
 
 gpu_find_icd() {
@@ -33,6 +54,8 @@ gpu_find_icd() {
     _dir="/usr/share/vulkan/icd.d"
     if [ "$_kind" = "panvk" ] || [ "$_kind" = "panfrost" ]; then
         for _c in \
+            "$GPU_MESA_PREFIX/share/vulkan/icd.d/panvk_kbase.json" \
+            "$GPU_MESA_PREFIX/share/vulkan/icd.d/panfrost_icd.aarch64.json" \
             /opt/nativecode/panvk/icd.d/panvk_kbase.json \
             /usr/share/vulkan/icd.d/panfrost_kbase_icd.aarch64.json \
             /usr/share/vulkan/icd.d/panfrost_icd.aarch64.json
@@ -64,11 +87,21 @@ gpu_mali_present() {
     [ -e /dev/mali0 ] || [ -e /dev/mali ]
 }
 
+gpu_kbase_shim() {
+    _shim=/opt/nativecode/panvk/lib/kbase_shim.so
+    [ -f "$_shim" ] || return 0
+    case ":${LD_PRELOAD:-}:" in
+        *:"$_shim":*) ;;
+        *) export LD_PRELOAD="${_shim}${LD_PRELOAD:+:$LD_PRELOAD}" ;;
+    esac
+}
+
 gpu_method_label() {
     case "$1" in
         turnip) printf '%s\n' "Turnip KGSL (Zink)" ;;
         panvk) printf '%s\n' "PanVK (Kbase)" ;;
         panvk-zink|zink-panvk) printf '%s\n' "Zink over PanVK" ;;
+        panfrost) printf '%s\n' "Panfrost (Kbase Gallium)" ;;
         venus) printf '%s\n' "Venus (VirtIO Vulkan)" ;;
         zink-venus) printf '%s\n' "Zink over Venus" ;;
         virgl-angle|virgl) printf '%s\n' "VirGL (virpipe)" ;;
@@ -85,6 +118,13 @@ gpu_apply() {
     _pv=$(gpu_find_icd panvk 2>/dev/null || true)
     _vn=$(gpu_find_icd virtio 2>/dev/null || true)
     export VTEST_SOCKET_NAME="$VTEST_SOCK"
+    if [ -d "$GPU_MESA_PREFIX/lib" ]; then
+        case ":${LD_LIBRARY_PATH:-}:" in
+            *:"$GPU_MESA_PREFIX/lib":*) ;;
+            *) export LD_LIBRARY_PATH="$GPU_MESA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+        esac
+        [ ! -d "$GPU_MESA_PREFIX/lib/dri" ] || export LIBGL_DRIVERS_PATH="$GPU_MESA_PREFIX/lib/dri"
+    fi
     case "$_be" in
         turnip)
             export MESA_LOADER_DRIVER_OVERRIDE=zink
@@ -96,9 +136,15 @@ gpu_apply() {
             export MESA_GLES_VERSION_OVERRIDE=3.2
             export MESA_NO_ERROR=1
             ;;
+        panfrost)
+            export GALLIUM_DRIVER=panfrost
+            export MESA_LOADER_DRIVER_OVERRIDE=panfrost
+            [ -n "$_pv" ] && export VK_DRIVER_FILES="$_pv" && export VK_ICD_FILENAMES="$_pv"
+            gpu_kbase_shim
+            ;;
         panvk)
             [ -n "$_pv" ] && export VK_DRIVER_FILES="$_pv" && export VK_ICD_FILENAMES="$_pv"
-            [ -f /opt/nativecode/panvk/lib/kbase_shim.so ] && export LD_PRELOAD="/opt/nativecode/panvk/lib/kbase_shim.so${LD_PRELOAD:+:$LD_PRELOAD}"
+            gpu_kbase_shim
             export WSI_X11_TERMUX=1
             export PANVK_KBASE_DRI3=raw
             ;;
@@ -106,7 +152,7 @@ gpu_apply() {
             export MESA_LOADER_DRIVER_OVERRIDE=zink
             export GALLIUM_DRIVER=zink
             [ -n "$_pv" ] && export VK_DRIVER_FILES="$_pv" && export VK_ICD_FILENAMES="$_pv"
-            [ -f /opt/nativecode/panvk/lib/kbase_shim.so ] && export LD_PRELOAD="/opt/nativecode/panvk/lib/kbase_shim.so${LD_PRELOAD:+:$LD_PRELOAD}"
+            gpu_kbase_shim
             export WSI_X11_TERMUX=1
             export PANVK_KBASE_DRI3=raw
             export MESA_VK_WSI_DEBUG=sw
@@ -219,6 +265,7 @@ gpu_probe_virgl() {
 gpu_map_mode_to_backend() {
     case "$1" in
         turnip) printf '%s\n' turnip ;;
+        panfrost) printf '%s\n' panfrost ;;
         panvk) printf '%s\n' panvk-zink ;;
         panvk-zink|zink-panvk) printf '%s\n' panvk-zink ;;
         venus) printf '%s\n' zink-venus ;;

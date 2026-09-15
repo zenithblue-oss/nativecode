@@ -38,6 +38,7 @@ import com.zenithblue.nativecode.onboarding.OnboardingIo
 import com.zenithblue.nativecode.onboarding.RootfsSource
 import com.zenithblue.nativecode.onboarding.RootfsSourceResolver
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
+import com.zenithblue.nativecode.terminal.HostServerController
 import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
 import com.zenithblue.nativecode.onboarding.OnboardingUiKit
 import com.zenithblue.nativecode.onboarding.SetupPhase
@@ -2638,6 +2639,8 @@ class OnboardingActivity : AppCompatActivity() {
 
                 // SSOT: rewrite residual com.termux paths in bootstrap text files
                 TermuxHostPaths.applyPackageToExtractedPrefix(filesDir, this@OnboardingActivity)
+                File(filesDir, "usr/bin").listFiles()?.forEach { it.setExecutable(true, false) }
+                File(filesDir, "usr/opt/virglrenderer-android/libexec").listFiles()?.forEach { it.setExecutable(true, false) }
 
                 File(varDir, "log/apt").mkdirs(); File(varDir, "lib/dpkg").mkdirs(); tmpDir.mkdirs()
 
@@ -3017,8 +3020,10 @@ class OnboardingActivity : AppCompatActivity() {
 
         File(filesDir, "setup_complete").createNewFile()
         getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit().putBoolean("onboarding_completed", true).apply()
+        HostServerController.ensureServers(this)
 
         val btn = primaryButton("Launch Environment", R.drawable.ic_arrow_right) {
+            HostServerController.ensureServers(this)
             val intent = Intent(this, MainActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             startActivity(intent)

@@ -13,6 +13,7 @@ ALPAQUITA_MINIROOTFS_SHA256="${ALPAQUITA_MINIROOTFS_SHA256_OVERRIDE:-$ALPAQUITA_
 WORK="${WORK:-/tmp/nc-rootfs-alpaquita}"
 OUT="${OUT:-$SCRIPT_DIR/out}"
 ROOTFS=""
+MESA_BUNDLE="${MESA_BUNDLE:-}"
 ASSEMBLE_ONLY=0
 SKIP_ANDROID=0
 
@@ -21,6 +22,7 @@ while [ $# -gt 0 ]; do
         --work) WORK="$2"; shift 2 ;;
         --out) OUT="$2"; shift 2 ;;
         --rootfs) ROOTFS="$2"; shift 2 ;;
+        --mesa-bundle) MESA_BUNDLE="$2"; shift 2 ;;
         --assemble-only) ASSEMBLE_ONLY=1; shift ;;
         --skip-android) SKIP_ANDROID=1; shift ;;
         --build-id) BUILD_ID="$2"; shift 2 ;;
@@ -108,6 +110,16 @@ if [ -d "$SCRIPT_DIR/overlay/alpaquita" ]; then
     cp -a "$SCRIPT_DIR/overlay/alpaquita/." "$WORK/rootfs-overlay/"
 fi
 
+mkdir -p "$WORK/mesa-staging"
+if [ -n "$MESA_BUNDLE" ]; then
+    [ -f "$MESA_BUNDLE/manifest.json" ] || {
+        echo "build-alpaquita-rootfs: ERROR: Mesa bundle lacks manifest.json: $MESA_BUNDLE" >&2
+        exit 1
+    }
+    python3 "$SCRIPT_DIR/mesa-mali/manifest.py" --verify "$MESA_BUNDLE"
+    cp -a "$MESA_BUNDLE/." "$WORK/mesa-staging/"
+fi
+
 cat > "$ASSEMBLE" <<ASSEMBLE_EOF
 #!/bin/sh
 set -eu
@@ -120,7 +132,7 @@ printf '%s\n%s\n' "$ALPAQUITA_REPOS_CORE" "$ALPAQUITA_REPOS_UNIVERSE" > /etc/apk
 apk update
 # shellcheck disable=SC2046
 apk add --no-cache \$(cat /pkg-lists/base.pkgs) \$(cat /pkg-lists/dev.pkgs)
-apk add --no-cache mesa-vulkan-virtio vulkan-tools mesa-utils 2>/dev/null || true
+apk add --no-cache mesa-vulkan-virtio vulkan-tools mesa-utils glmark2 2>/dev/null || true
 
 # flux user
 if ! id flux >/dev/null 2>&1; then
@@ -138,6 +150,7 @@ chmod 0440 /etc/sudoers.d/flux
 if [ -f /etc/sudoers ] && ! grep -qE '@includedir[[:space:]]+/etc/sudoers\.d' /etc/sudoers 2>/dev/null; then
     echo '@includedir /etc/sudoers.d' >> /etc/sudoers
 fi
+chmod 4755 /usr/bin/sudo 2>/dev/null || true
 
 # bwrap shim (proot-safe glycin)
 cat > /usr/bin/bwrap <<'BWRAP_EOF'
@@ -252,6 +265,23 @@ if [ -x /rootfs-overlay/usr/local/bin/gpu-launch ]; then
     cp /rootfs-overlay/usr/local/bin/gpu-launch /usr/local/bin/gpu-launch
     chmod 755 /usr/local/bin/gpu-launch
 fi
+if [ -x /rootfs-overlay/usr/local/bin/sudo ]; then
+    mkdir -p /usr/local/bin
+    cp /rootfs-overlay/usr/local/bin/sudo /usr/local/bin/sudo
+    chmod 755 /usr/local/bin/sudo
+fi
+if [ -x /rootfs-overlay/usr/local/bin/fastfetch ]; then
+    cp /rootfs-overlay/usr/local/bin/fastfetch /usr/local/bin/fastfetch
+    chmod 755 /usr/local/bin/fastfetch
+fi
+if [ -f /rootfs-overlay/usr/share/fastfetch/presets/termux.jsonc ]; then
+    mkdir -p /usr/share/fastfetch/presets
+    cp /rootfs-overlay/usr/share/fastfetch/presets/termux.jsonc /usr/share/fastfetch/presets/termux.jsonc
+fi
+if [ -f /mesa-staging/manifest.json ]; then
+    mkdir -p /opt/nativecode/mesa-mali
+    cp -a /mesa-staging/. /opt/nativecode/mesa-mali/
+fi
 
 # AI CLIs as flux
 su -s /bin/sh flux -c '
@@ -360,10 +390,10 @@ log "             umount /rootfs/run 2>/dev/null || true; \\"
 log "             umount /rootfs/sys 2>/dev/null || true; \\"
 log "             umount /rootfs/proc 2>/dev/null || true; \\"
 log "             umount /rootfs/dev 2>/dev/null || true; \\"
-log "             rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay; \\"
+log "             rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay /rootfs/mesa-staging; \\"
 log "           }; \\"
 log "           trap cleanup EXIT INT TERM; \\"
-log "           mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts; \\"
+log "           mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay /rootfs/mesa-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts; \\"
 log "           mount --bind /dev /rootfs/dev; \\"
 log "           mount -t proc proc /rootfs/proc; \\"
 log "           mount -t sysfs sysfs /rootfs/sys; \\"
@@ -374,6 +404,7 @@ log "           ([ ! -d /host-work/opt-staging ] || cp -a /host-work/opt-staging
 log "           ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-staging/. /rootfs/xfce-staging/); \\"
 log "           ([ ! -d /host-work/gui-staging ] || cp -a /host-work/gui-staging/. /rootfs/gui-staging/); \\"
 log "           ([ ! -d /host-work/rootfs-overlay ] || cp -a /host-work/rootfs-overlay/. /rootfs/rootfs-overlay/); \\"
+log "           ([ ! -d /host-work/mesa-staging ] || cp -a /host-work/mesa-staging/. /rootfs/mesa-staging/); \\"
 log "           cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh; \\"
 log "           chroot /rootfs /bin/sh /assemble.sh'"
 

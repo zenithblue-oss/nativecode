@@ -40,16 +40,30 @@ object GpuRuntimeStatus {
             .ifBlank { gpuMode }
             .ifBlank { detect.mode }
         val lastProbe = readTrim(File(rootfs, "etc/fluxlinux/gpu_last_probe"))
-        val method = when (gpuMode) {
+
+        val effectiveBackend = when {
+            lastProbe.startsWith("panvk") || lastProbe == "panfrost" -> lastProbe
+            backend.startsWith("panvk") || backend == "panfrost" -> backend
+            detect.mode == GpuAccelDetector.MODE_PANVK -> "panvk-zink"
+            backend.isNotBlank() && backend != "venus" && backend != "zink-venus" -> backend
+            gpuMode.isNotBlank() && gpuMode != "venus" -> gpuMode
+            backend.isNotBlank() -> backend
+            else -> detect.mode
+        }
+
+        val method = when (effectiveBackend) {
             "turnip" -> GpuAccelDetector.methodLabel("turnip")
-            "venus" -> GpuAccelDetector.methodLabel("zink-venus")
-            "virgl" -> GpuAccelDetector.methodLabel("virgl")
+            "panvk" -> GpuAccelDetector.methodLabel("panvk")
+            "panvk-zink" -> GpuAccelDetector.methodLabel("panvk-zink")
+            "panfrost" -> GpuAccelDetector.methodLabel("panfrost")
+            "venus", "zink-venus" -> GpuAccelDetector.methodLabel("zink-venus")
+            "virgl", "virgl-angle" -> GpuAccelDetector.methodLabel("virgl")
             else -> readTrim(File(rootfs, "etc/fluxlinux/gpu_method"))
-                .ifBlank { GpuAccelDetector.methodLabel(backend) }
+                .ifBlank { GpuAccelDetector.methodLabel(effectiveBackend) }
         }
         val vendor = readTrim(File(rootfs, "etc/fluxlinux/gpu_vendor"))
             .ifBlank { detect.vendorHint }
-        val icd = firstIcd(rootfs, backend, gpuMode.ifBlank { detect.mode })
+        val icd = firstIcd(rootfs, effectiveBackend, detect.mode)
         val soc = buildString {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val sm = Build.SOC_MODEL?.trim().orEmpty()
@@ -65,7 +79,7 @@ object GpuRuntimeStatus {
             glslVersion = gl.glslVersion,
             vulkanVersion = gl.vulkanVersion,
             modeHint = detect.mode,
-            backend = backend,
+            backend = effectiveBackend,
             method = method,
             kgsl = kgsl,
             hostSocket = hostSocket,
@@ -74,7 +88,7 @@ object GpuRuntimeStatus {
             lastProbe = lastProbe,
             icd = icd,
             soc = soc,
-            badge = GpuAccelDetector.badgeLabel(gpuMode.ifBlank { backend })
+            badge = GpuAccelDetector.badgeLabel(effectiveBackend)
         )
     }
 
@@ -95,10 +109,27 @@ object GpuRuntimeStatus {
         }
 
     private fun firstIcd(rootfs: File, backend: String, mode: String): String {
+        val panvkIcds = listOf(
+            File(rootfs, "opt/nativecode/panvk/icd.d/panvk_kbase.json"),
+            File(rootfs, "opt/nativecode/mesa-mali/share/vulkan/icd.d/panvk_kbase.json"),
+            File(rootfs, "usr/share/vulkan/icd.d/panfrost_kbase_icd.aarch64.json"),
+            File(rootfs, "usr/share/vulkan/icd.d/panfrost_icd.aarch64.json")
+        )
+        if (backend.contains("panvk") || backend.contains("panfrost") || mode == GpuAccelDetector.MODE_PANVK) {
+            val hit = panvkIcds.firstOrNull { it.isFile }
+            if (hit != null) {
+                return hit.absolutePath.removePrefix(rootfs.absolutePath)
+            }
+        }
+        val turnipOverlay = File(rootfs, "opt/nativecode-turnip/icd/freedreno_icd.aarch64.json")
+        if ((backend.contains("turnip") || mode == GpuAccelDetector.MODE_TURNIP) && turnipOverlay.isFile) {
+            return "/opt/nativecode-turnip/icd/freedreno_icd.aarch64.json"
+        }
         val dir = File(rootfs, "usr/share/vulkan/icd.d")
         val key = "$backend $mode"
         val needle = when {
-            key.contains("turnip") -> "freedreno"
+            key.contains("turnip") || key.contains("freedreno") -> "freedreno"
+            key.contains("panvk") || key.contains("panfrost") -> "pan"
             key.contains("venus") || key.contains("virtio") -> "virtio"
             else -> null
         }
@@ -107,9 +138,9 @@ object GpuRuntimeStatus {
                 ?.firstOrNull { it.name.contains(needle, ignoreCase = true) && it.name.endsWith(".json") }
                 ?.let { return "/usr/share/vulkan/icd.d/${it.name}" }
         }
-        val overlay = File(rootfs, "opt/nativecode-turnip/icd/freedreno_icd.aarch64.json")
-        if (backend == "turnip" && overlay.isFile) {
-            return "/opt/nativecode-turnip/icd/freedreno_icd.aarch64.json"
+        val panvkFallback = panvkIcds.firstOrNull { it.isFile }
+        if (panvkFallback != null) {
+            return panvkFallback.absolutePath.removePrefix(rootfs.absolutePath)
         }
         return "none"
     }

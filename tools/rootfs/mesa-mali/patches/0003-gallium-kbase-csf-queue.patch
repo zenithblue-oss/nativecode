@@ -1,0 +1,896 @@
+diff --git a/src/gallium/drivers/panfrost/pan_context.c b/src/gallium/drivers/panfrost/pan_context.c
+index 7cfc7f63e14..5082233f1e8 100644
+--- a/src/gallium/drivers/panfrost/pan_context.c
++++ b/src/gallium/drivers/panfrost/pan_context.c
+@@ -624,13 +624,15 @@ panfrost_destroy(struct pipe_context *pipe)
+ 
+    util_dynarray_fini(&panfrost->global_buffers);
+ 
+-   drmSyncobjDestroy(panfrost_device_fd(dev), panfrost->in_sync_obj);
++   if (panfrost->in_sync_obj)
++      drmSyncobjDestroy(panfrost_device_fd(dev), panfrost->in_sync_obj);
+    if (panfrost->in_sync_fd != -1) {
+       close(panfrost->in_sync_fd);
+       panfrost->in_sync_fd = -1;
+    }
+ 
+-   drmSyncobjDestroy(panfrost_device_fd(dev), panfrost->syncobj);
++   if (panfrost->syncobj)
++      drmSyncobjDestroy(panfrost_device_fd(dev), panfrost->syncobj);
+    ralloc_free(pipe);
+ }
+ 
+@@ -1072,11 +1074,16 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
+    /* Create a syncobj in a signaled state. Will be updated to point to the
+     * last queued job out_sync every time we submit a new job.
+     */
+-   ret = drmSyncobjCreate(panfrost_device_fd(dev), DRM_SYNCOBJ_CREATE_SIGNALED,
+-                          &ctx->syncobj);
+-   if (ret) {
+-      ralloc_free(ctx);
+-      return NULL;
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (!panfrost_device_is_kbase(dev))
++#endif
++   {
++      ret = drmSyncobjCreate(panfrost_device_fd(dev),
++                             DRM_SYNCOBJ_CREATE_SIGNALED, &ctx->syncobj);
++      if (ret) {
++         ralloc_free(ctx);
++         return NULL;
++      }
+    }
+ 
+    gallium->screen = screen;
+@@ -1178,8 +1185,13 @@ panfrost_create_context(struct pipe_screen *screen, void *priv, unsigned flags)
+ 
+    /* Sync object/FD used for NATIVE_FENCE_FD. */
+    ctx->in_sync_fd = -1;
+-   ret = drmSyncobjCreate(panfrost_device_fd(dev), 0, &ctx->in_sync_obj);
+-   assert(!ret);
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (!panfrost_device_is_kbase(dev))
++#endif
++   {
++      ret = drmSyncobjCreate(panfrost_device_fd(dev), 0, &ctx->in_sync_obj);
++      assert(!ret);
++   }
+ 
+    ctx->printf.bo =
+       panfrost_bo_create(dev, PAN_PRINTF_BUFFER_SIZE, 0, "Printf Buffer");
+diff --git a/src/gallium/drivers/panfrost/pan_csf.c b/src/gallium/drivers/panfrost/pan_csf.c
+index 3f830802f50..c7943d453d1 100644
+--- a/src/gallium/drivers/panfrost/pan_csf.c
++++ b/src/gallium/drivers/panfrost/pan_csf.c
+@@ -5,14 +5,25 @@
+  */
+ 
+ #include "decode.h"
++#include <errno.h>
+ 
+ #include "drm-uapi/panthor_drm.h"
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++#include <inttypes.h>
++#include <sys/mman.h>
++#include <unistd.h>
++#include "drm-uapi/mali_kbase_ioctl.h"
++#include "kmod/kbase_kmod.h"
++#include "util/os_time.h"
++#endif
++
+ #include "genxml/cs_builder.h"
+ 
+ #include "gen_macros.h"
+ #include "pan_cmdstream.h"
+ #include "pan_context.h"
++#include "pan_screen.h"
+ #include "pan_csf.h"
+ #include "pan_fb_preload.h"
+ #include "pan_job.h"
+@@ -23,6 +34,351 @@
+ #error "CSF helpers are only used for gen >= 10"
+ #endif
+ 
++static const struct drm_panthor_csif_info *
++csf_get_csif_props(const struct panfrost_device *dev)
++{
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev))
++      return kbase_kmod_get_csif_props(dev->kmod.dev);
++#endif
++   return panthor_kmod_get_csif_props(dev->kmod.dev);
++}
++
++static uint32_t
++csf_get_flush_id(const struct panfrost_device *dev)
++{
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev))
++      return kbase_kmod_get_flush_id(dev->kmod.dev);
++#endif
++   return panthor_kmod_get_flush_id(dev->kmod.dev);
++}
++
++#ifdef HAVE_PAN_KMOD_KBASE
++
++#define PANFROST_KBASE_RINGBUF_SIZE (64 * 1024)
++#define PANFROST_KBASE_RING_JOB_MAX_SIZE 512
++#define PANFROST_KBASE_WAIT_TIMEOUT_NS (10ll * 1000000000ll)
++
++static inline void
++panfrost_kbase_gpu_wmb(void)
++{
++#if defined(__aarch64__)
++   __asm__ volatile("dsb sy" ::: "memory");
++#else
++   __sync_synchronize();
++#endif
++}
++
++static void
++panfrost_kbase_cache_clean_range(const void *start, size_t size)
++{
++   if (!start || !size)
++      return;
++#if defined(__aarch64__)
++   uintptr_t p = (uintptr_t)start & ~(uintptr_t)63;
++   uintptr_t end = (uintptr_t)start + size;
++   for (; p < end; p += 64)
++      __asm__ volatile("dc cvac, %0" ::"r"(p) : "memory");
++#endif
++   panfrost_kbase_gpu_wmb();
++}
++
++static void
++panfrost_kbase_cache_invalidate_range(const void *start, size_t size)
++{
++   if (!start || !size)
++      return;
++#if defined(__aarch64__)
++   uintptr_t p = (uintptr_t)start & ~(uintptr_t)63;
++   uintptr_t end = (uintptr_t)start + size;
++   for (; p < end; p += 64)
++      __asm__ volatile("dc civac, %0" ::"r"(p) : "memory");
++#endif
++   panfrost_kbase_gpu_wmb();
++}
++
++static int
++panfrost_kbase_emit_call(struct panfrost_context *ctx, uint64_t stream_addr,
++                         uint32_t stream_size)
++{
++   struct panfrost_device *dev = pan_device(ctx->base.screen);
++   const struct drm_panthor_csif_info *csif_info = csf_get_csif_props(dev);
++   struct panfrost_csf_context *csf = &ctx->csf;
++   uint32_t offset = csf->kbase.insert % PANFROST_KBASE_RINGBUF_SIZE;
++
++   if (offset + PANFROST_KBASE_RING_JOB_MAX_SIZE > PANFROST_KBASE_RINGBUF_SIZE) {
++      memset((uint8_t *)csf->kbase.ring_bo->ptr.cpu + offset, 0,
++             PANFROST_KBASE_RINGBUF_SIZE - offset);
++      panfrost_kbase_cache_clean_range(
++         (uint8_t *)csf->kbase.ring_bo->ptr.cpu + offset,
++         PANFROST_KBASE_RINGBUF_SIZE - offset);
++      csf->kbase.insert += PANFROST_KBASE_RINGBUF_SIZE - offset;
++      offset = 0;
++   }
++
++   struct cs_buffer ring_buf = {
++      .cpu = (uint64_t *)((uint8_t *)csf->kbase.ring_bo->ptr.cpu + offset),
++      .gpu = csf->kbase.ring_bo->ptr.gpu + offset,
++      .capacity = PANFROST_KBASE_RING_JOB_MAX_SIZE / sizeof(uint64_t),
++   };
++   const struct cs_builder_conf conf = {
++      .nr_registers = csif_info->cs_reg_count,
++      .ls_sb_slot = 0,
++   };
++   struct cs_builder b;
++
++   cs_builder_init(&b, &conf, ring_buf);
++
++#if PAN_ARCH >= 11
++   cs_set_state_imm32(&b, MALI_CS_SET_STATE_TYPE_SB_SEL_ENDPOINT, 0);
++   cs_set_state_imm32(&b, MALI_CS_SET_STATE_TYPE_SB_MASK_WAIT, BITFIELD_BIT(0));
++   cs_set_state_imm32(&b, MALI_CS_SET_STATE_TYPE_SB_SEL_OTHER, PANFROST_SB_LS);
++   cs_set_state_imm32(&b, MALI_CS_SET_STATE_TYPE_SB_SEL_DEFERRED,
++                      PANFROST_SB_DEFERRED);
++   cs_set_state_imm32(&b, MALI_CS_SET_STATE_TYPE_SB_MASK_STREAM,
++                      BITFIELD_MASK(8) & ~BITFIELD_BIT(0));
++#else
++   cs_set_scoreboard_entry(&b, 0, 0);
++#endif
++
++   cs_req_res(&b, CS_COMPUTE_RES | CS_TILER_RES | CS_IDVS_RES | CS_FRAG_RES);
++
++   uint32_t reg = csif_info->cs_reg_count - 4;
++   struct cs_index addr64 = {
++      .type = CS_INDEX_REGISTER,
++      .size = 2,
++      .reg = reg,
++   };
++   struct cs_index val32 = {
++      .type = CS_INDEX_REGISTER,
++      .size = 1,
++      .reg = reg + 2,
++   };
++   struct cs_index val64 = {
++      .type = CS_INDEX_REGISTER,
++      .size = 2,
++      .reg = reg + 2,
++   };
++   uint64_t target = csf->kbase.seqno + 1;
++
++   if (csf->kbase.heap_ctx_va) {
++      cs_move64_to(&b, addr64, csf->kbase.heap_ctx_va);
++      cs_heap_set(&b, addr64);
++   }
++
++   if (stream_size) {
++      cs_move32_to(&b, val32, csf_get_flush_id(dev));
++      cs_flush_caches(&b, MALI_CS_FLUSH_MODE_CLEAN_AND_INVALIDATE,
++                      MALI_CS_FLUSH_MODE_CLEAN_AND_INVALIDATE,
++                      MALI_CS_OTHER_FLUSH_MODE_INVALIDATE, val32,
++                      cs_defer(0, PANFROST_SB_AUX));
++      cs_wait_slot(&b, PANFROST_SB_AUX);
++      cs_move64_to(&b, addr64, stream_addr);
++      cs_move32_to(&b, val32, stream_size);
++      cs_call(&b, addr64, val32);
++   }
++
++   cs_move64_to(&b, addr64, csf->kbase.sync_gpu);
++   cs_wait_slots(&b, BITFIELD_MASK(8));
++   cs_move64_to(&b, val64, target);
++   cs_store64(&b, val64, addr64, 16);
++   cs_wait_slot(&b, PANFROST_SB_LS);
++   cs_move64_to(&b, val64, 1);
++   cs_sync64_add(&b, true, MALI_CS_SYNC_SCOPE_SYSTEM, val64, addr64,
++                 cs_defer(0, PANFROST_SB_DEFERRED));
++   cs_error_barrier(&b);
++   cs_end(&b);
++
++   if (!cs_is_valid(&b))
++      return -1;
++
++   uint32_t entry_size = cs_root_chunk_size(&b);
++   uint32_t padded = ALIGN_POT(entry_size, 64);
++   if (padded != entry_size) {
++      memset((uint8_t *)csf->kbase.ring_bo->ptr.cpu + offset + entry_size, 0,
++             padded - entry_size);
++   }
++   panfrost_kbase_cache_clean_range(
++      (uint8_t *)csf->kbase.ring_bo->ptr.cpu + offset, padded);
++   csf->kbase.insert += padded;
++   csf->kbase.seqno = target;
++   return 0;
++}
++
++static int
++panfrost_kbase_publish_and_kick(struct panfrost_context *ctx)
++{
++   struct panfrost_device *dev = pan_device(ctx->base.screen);
++   uint8_t *input_page = (uint8_t *)ctx->csf.kbase.user_io + 4096;
++   uint8_t *output_page = (uint8_t *)ctx->csf.kbase.user_io + 8192;
++   volatile uint32_t *active =
++      (volatile uint32_t *)(output_page + CS_USER_IO_OUTPUT_CS_ACTIVE);
++
++   panfrost_kbase_gpu_wmb();
++   *(volatile uint64_t *)(input_page + CS_USER_IO_INPUT_CS_INSERT) =
++      ctx->csf.kbase.insert;
++   panfrost_kbase_gpu_wmb();
++   if (*active) {
++      *(volatile uint32_t *)ctx->csf.kbase.user_io = 1;
++      panfrost_kbase_gpu_wmb();
++      if (*active)
++         return 0;
++   }
++   return kbase_kmod_csf_queue_kick(dev->kmod.dev,
++                                    ctx->csf.kbase.ring_bo->ptr.gpu);
++}
++
++static int
++panfrost_kbase_wait_seqno(struct panfrost_context *ctx, uint64_t target)
++{
++   struct panfrost_device *dev = pan_device(ctx->base.screen);
++   volatile uint64_t *seq = ctx->csf.kbase.sync_cpu;
++   volatile uint64_t *ls_copy =
++      (volatile uint64_t *)((uint8_t *)ctx->csf.kbase.sync_cpu + 16);
++   int64_t start = os_time_get_nano();
++   uint64_t deadline = (uint64_t)start + PANFROST_KBASE_WAIT_TIMEOUT_NS;
++   int64_t last_kick = start;
++
++   while (true) {
++      panfrost_kbase_cache_invalidate_range(ctx->csf.kbase.sync_cpu, 64);
++      if (*seq >= target || *ls_copy >= target)
++         return 0;
++      if (kbase_kmod_csf_has_error(dev->kmod.dev)) {
++         mesa_loge("panfrost kbase: queue group error");
++         return -1;
++      }
++
++      int64_t now = os_time_get_nano();
++      if (now - last_kick > 500ll * 1000000ll) {
++         kbase_kmod_csf_queue_kick(dev->kmod.dev,
++                                   ctx->csf.kbase.ring_bo->ptr.gpu);
++         last_kick = now;
++      }
++      if ((uint64_t)now >= deadline) {
++         mesa_loge("panfrost kbase: wait timeout seqno %" PRIu64
++                   " target %" PRIu64,
++                   (uint64_t)*seq, target);
++         return -1;
++      }
++
++      int64_t remaining =
++         MIN2(deadline - (uint64_t)now, 20ull * 1000000ull);
++      int cqs = kbase_kmod_csf_wait_cqs64(dev->kmod.dev, ctx->csf.kbase.sync_gpu,
++                                          target - 1, remaining);
++      if (cqs < 0)
++         kbase_kmod_csf_wait_event(dev->kmod.dev, remaining);
++   }
++}
++
++static int
++panfrost_kbase_submit_cs(struct panfrost_context *ctx, uint64_t cs_start,
++                         uint32_t cs_size)
++{
++   int ret;
++
++   if (ctx->is_noop)
++      return 0;
++   ret = panfrost_kbase_emit_call(ctx, cs_start, cs_size);
++   if (ret)
++      return ret;
++   ret = panfrost_kbase_publish_and_kick(ctx);
++   if (ret)
++      return errno ? errno : ret;
++   return panfrost_kbase_wait_seqno(ctx, ctx->csf.kbase.seqno);
++}
++
++static void
++panfrost_kbase_destroy_queue(struct panfrost_context *ctx)
++{
++   struct panfrost_device *dev = pan_device(ctx->base.screen);
++
++   if (ctx->csf.kbase.user_io && ctx->csf.kbase.ring_bo) {
++      kbase_kmod_csf_queue_term(dev->kmod.dev, ctx->csf.kbase.ring_bo->ptr.gpu,
++                                ctx->csf.kbase.user_io);
++      ctx->csf.kbase.user_io = NULL;
++   }
++   if (ctx->csf.kbase.heap_ctx_va) {
++      kbase_kmod_csf_tiler_heap_destroy(dev->kmod.dev,
++                                        ctx->csf.kbase.heap_ctx_va);
++      ctx->csf.kbase.heap_ctx_va = 0;
++   }
++   if (ctx->csf.group_handle != UINT32_MAX) {
++      kbase_kmod_csf_group_destroy(dev->kmod.dev, ctx->csf.group_handle);
++      ctx->csf.group_handle = UINT32_MAX;
++   }
++   if (ctx->csf.kbase.sync_bo) {
++      pan_kmod_bo_put(ctx->csf.kbase.sync_bo);
++      ctx->csf.kbase.sync_bo = NULL;
++      ctx->csf.kbase.sync_cpu = NULL;
++      ctx->csf.kbase.sync_gpu = 0;
++   }
++   panfrost_bo_unreference(ctx->csf.kbase.ring_bo);
++   ctx->csf.kbase.ring_bo = NULL;
++}
++
++static int
++panfrost_kbase_create_queue(struct panfrost_context *ctx)
++{
++   struct panfrost_device *dev = pan_device(ctx->base.screen);
++
++   ctx->csf.group_handle = UINT32_MAX;
++   if (kbase_kmod_csf_group_create(dev->kmod.dev, 1, &ctx->csf.group_handle))
++      return -1;
++
++   ctx->csf.kbase.ring_bo =
++      panfrost_bo_create(dev, PANFROST_KBASE_RINGBUF_SIZE, 0, "Kbase CS ring");
++   if (!ctx->csf.kbase.ring_bo)
++      goto fail;
++
++   ctx->csf.kbase.user_io = kbase_kmod_csf_queue_bind(
++      dev->kmod.dev, ctx->csf.group_handle, 0, ctx->csf.kbase.ring_bo->ptr.gpu,
++      PANFROST_KBASE_RINGBUF_SIZE);
++   if (!ctx->csf.kbase.user_io)
++      goto fail;
++
++   ctx->csf.kbase.sync_bo = pan_kmod_bo_alloc(dev->kmod.dev, dev->kmod.vm, 4096,
++                                             PAN_KMOD_BO_FLAG_CSF_EVENT);
++   if (!ctx->csf.kbase.sync_bo)
++      goto fail;
++
++   ctx->csf.kbase.sync_cpu = pan_kmod_bo_mmap(
++      ctx->csf.kbase.sync_bo, PROT_READ | PROT_WRITE, MAP_SHARED, NULL);
++   if (ctx->csf.kbase.sync_cpu == MAP_FAILED) {
++      ctx->csf.kbase.sync_cpu = NULL;
++      goto fail;
++   }
++
++   struct pan_kmod_vm_op op = {
++      .type = PAN_KMOD_VM_OP_TYPE_MAP,
++      .va =
++         {
++            .start = PAN_KMOD_VM_MAP_AUTO_VA,
++            .size = 4096,
++         },
++      .map =
++         {
++            .bo = ctx->csf.kbase.sync_bo,
++            .bo_offset = 0,
++         },
++   };
++   if (pan_kmod_vm_bind(dev->kmod.vm, PAN_KMOD_VM_OP_MODE_IMMEDIATE, &op, 1))
++      goto fail;
++
++   ctx->csf.kbase.sync_gpu = op.va.start;
++   memset(ctx->csf.kbase.sync_cpu, 0, 4096);
++   panfrost_kbase_cache_clean_range(ctx->csf.kbase.sync_cpu, 4096);
++   ctx->csf.kbase.insert = 0;
++   ctx->csf.kbase.seqno = 0;
++   return 0;
++
++fail:
++   panfrost_kbase_destroy_queue(ctx);
++   return -1;
++}
++
++#endif /* HAVE_PAN_KMOD_KBASE */
++
+ static struct cs_buffer
+ csf_alloc_cs_buffer(void *cookie)
+ {
+@@ -269,7 +625,7 @@ csf_oom_handler_init(struct panfrost_context *ctx)
+    struct panfrost_bo *cs_bo = NULL, *reg_save_bo = NULL;
+    struct panfrost_device *dev = pan_device(ctx->base.screen);
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(dev->kmod.dev);
++      csf_get_csif_props(dev);
+ 
+    cs_bo =
+       panfrost_bo_create(dev, 4096, 0, "Temporary CS buffer");
+@@ -469,7 +825,7 @@ GENX(csf_init_batch)(struct panfrost_batch *batch)
+       return -1;
+ 
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(dev->kmod.dev);
++      csf_get_csif_props(dev);
+ 
+    const struct cs_builder_conf conf = {
+       .nr_registers = csif_info->cs_reg_count,
+@@ -518,7 +874,7 @@ csf_prepare_qsubmit(struct panfrost_context *ctx,
+       .queue_index = queue,
+       .stream_addr = cs_start,
+       .stream_size = cs_size,
+-      .latest_flush = panthor_kmod_get_flush_id(dev->kmod.dev),
++      .latest_flush = csf_get_flush_id(dev),
+       .syncs = DRM_PANTHOR_OBJ_ARRAY(sync_count, syncs),
+    };
+ }
+@@ -542,6 +898,16 @@ csf_submit_gsubmit(struct panfrost_context *ctx,
+    struct panfrost_device *dev = pan_device(ctx->base.screen);
+    int ret = 0;
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev)) {
++      const struct drm_panthor_queue_submit *qsubmit =
++         (const struct drm_panthor_queue_submit *)(uintptr_t)
++            gsubmit->queue_submits.array;
++      return panfrost_kbase_submit_cs(ctx, qsubmit->stream_addr,
++                                      qsubmit->stream_size);
++   }
++#endif
++
+    if (!ctx->is_noop) {
+       ret = pan_kmod_ioctl(panfrost_device_fd(dev),
+                            DRM_IOCTL_PANTHOR_GROUP_SUBMIT, gsubmit);
+@@ -787,6 +1153,17 @@ csf_sync_ctx_state(struct panfrost_context *ctx)
+    if (!ctx->csf.is_init)
+       return PIPE_NO_RESET;
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev)) {
++      if (kbase_kmod_csf_has_error(dev->kmod.dev)) {
++         update_reset_status(ctx, PIPE_GUILTY_CONTEXT_RESET);
++         return PIPE_GUILTY_CONTEXT_RESET;
++      }
++      update_reset_status(ctx, PIPE_NO_RESET);
++      return PIPE_NO_RESET;
++   }
++#endif
++
+    ret = pan_kmod_ioctl(panfrost_device_fd(dev),
+                         DRM_IOCTL_PANTHOR_GROUP_GET_STATE, &state);
+    if (ret) {
+@@ -852,7 +1229,7 @@ csf_submit_wait_and_dump(struct panfrost_batch *batch,
+       return;
+ 
+    /* Wait so we can get errors reported back */
+-   if (wait) {
++   if (wait && vm_sync_handle) {
+       ASSERTED int ret =
+          drmSyncobjTimelineWait(panfrost_device_fd(dev), &vm_sync_handle,
+                                 &vm_sync_signal_point, 1, INT64_MAX, 0, NULL);
+@@ -908,6 +1285,23 @@ GENX(csf_submit_batch)(struct panfrost_batch *batch)
+    uint32_t cs_size = cs_root_chunk_size(batch->csf.cs.builder);
+    struct panfrost_context *ctx = batch->ctx;
+    struct panfrost_device *dev = pan_device(ctx->base.screen);
++
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev)) {
++      struct drm_panthor_queue_submit qsubmit;
++      struct drm_panthor_group_submit gsubmit;
++
++      csf_prepare_qsubmit(ctx, &qsubmit, 0, cs_start, cs_size, NULL, 0);
++      csf_prepare_gsubmit(ctx, &gsubmit, &qsubmit, 1);
++      ret = csf_submit_gsubmit(ctx, &gsubmit);
++      if (ret)
++         csf_check_ctx_state_and_reinit(batch->ctx);
++      else
++         csf_submit_wait_and_dump(batch, &gsubmit, 0, 0);
++      return ret;
++   }
++#endif
++
+    uint32_t vm_sync_handle = panthor_kmod_vm_sync_handle(dev->kmod.vm);
+    struct util_dynarray syncops;
+ 
+@@ -1936,53 +2330,73 @@ GENX(csf_init_context)(struct panfrost_context *ctx)
+ 
+    struct panfrost_screen *screen = pan_screen(ctx->base.screen);
+    struct panfrost_device *dev = pan_device(ctx->base.screen);
+-   struct drm_panthor_queue_create qc[] = {{
+-      .priority = 1,
+-      .ringbuf_size = 64 * 1024,
+-   }};
+-
+-   struct drm_panthor_group_create gc = {
+-      .compute_core_mask = screen->compute_core_mask,
+-      .fragment_core_mask = screen->fragment_core_mask,
+-      .tiler_core_mask = 1,
+-      .max_compute_cores = util_bitcount64(screen->compute_core_mask),
+-      .max_fragment_cores = util_bitcount64(screen->fragment_core_mask),
+-      .max_tiler_cores = 1,
+-      .priority = get_panthor_group_priority(ctx),
+-      .queues = DRM_PANTHOR_OBJ_ARRAY(ARRAY_SIZE(qc), qc),
+-      .vm_id = pan_kmod_vm_handle(dev->kmod.vm),
+-   };
++   uint64_t heap_ctx_gpu_va = 0;
++   uint64_t first_heap_chunk_gpu_va = 0;
++   int ret;
+ 
+-   int ret =
+-      pan_kmod_ioctl(panfrost_device_fd(dev), DRM_IOCTL_PANTHOR_GROUP_CREATE,
+-                     &gc);
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev)) {
++      if (panfrost_kbase_create_queue(ctx))
++         goto err_group_create;
++
++      const uint32_t chunk_size = screen->csf_tiler_heap.chunk_size;
++      const uint32_t initial_chunks = screen->csf_tiler_heap.initial_chunks;
++      const uint32_t max_chunks = MAX2(screen->csf_tiler_heap.max_chunks, 200);
++      if (kbase_kmod_csf_tiler_heap_create(
++             dev->kmod.dev, chunk_size, initial_chunks, max_chunks, 65535, 0,
++             &heap_ctx_gpu_va, &first_heap_chunk_gpu_va))
++         goto err_tiler_heap;
++
++      ctx->csf.kbase.heap_ctx_va = heap_ctx_gpu_va;
++      ctx->csf.kbase.first_chunk_va = first_heap_chunk_gpu_va;
++      ctx->csf.heap.handle = 0;
++   } else
++#endif
++   {
++      struct drm_panthor_queue_create qc[] = {{
++         .priority = 1,
++         .ringbuf_size = 64 * 1024,
++      }};
++
++      struct drm_panthor_group_create gc = {
++         .compute_core_mask = screen->compute_core_mask,
++         .fragment_core_mask = screen->fragment_core_mask,
++         .tiler_core_mask = 1,
++         .max_compute_cores = util_bitcount64(screen->compute_core_mask),
++         .max_fragment_cores = util_bitcount64(screen->fragment_core_mask),
++         .max_tiler_cores = 1,
++         .priority = get_panthor_group_priority(ctx),
++         .queues = DRM_PANTHOR_OBJ_ARRAY(ARRAY_SIZE(qc), qc),
++         .vm_id = pan_kmod_vm_handle(dev->kmod.vm),
++      };
+ 
+-   if (ret)
+-      goto err_group_create;
++      ret = pan_kmod_ioctl(panfrost_device_fd(dev),
++                           DRM_IOCTL_PANTHOR_GROUP_CREATE, &gc);
++      if (ret)
++         goto err_group_create;
+ 
+-   ctx->csf.group_handle = gc.group_handle;
++      ctx->csf.group_handle = gc.group_handle;
++
++      struct drm_panthor_tiler_heap_create thc = {
++         .vm_id = pan_kmod_vm_handle(dev->kmod.vm),
++         .chunk_size = screen->csf_tiler_heap.chunk_size,
++         .initial_chunk_count = screen->csf_tiler_heap.initial_chunks,
++         .max_chunks = screen->csf_tiler_heap.max_chunks,
++         .target_in_flight = 65535,
++      };
++      ret = pan_kmod_ioctl(panfrost_device_fd(dev),
++                           DRM_IOCTL_PANTHOR_TILER_HEAP_CREATE, &thc);
++      if (ret)
++         goto err_tiler_heap;
++
++      ctx->csf.heap.handle = thc.handle;
++      heap_ctx_gpu_va = thc.tiler_heap_ctx_gpu_va;
++      first_heap_chunk_gpu_va = thc.first_heap_chunk_gpu_va;
++   }
+ 
+    struct drm_panthor_group_destroy gd = {
+       .group_handle = ctx->csf.group_handle,
+    };
+-
+-   /* Get tiler heap */
+-   struct drm_panthor_tiler_heap_create thc = {
+-      .vm_id = pan_kmod_vm_handle(dev->kmod.vm),
+-      .chunk_size = pan_screen(ctx->base.screen)->csf_tiler_heap.chunk_size,
+-      .initial_chunk_count =
+-         pan_screen(ctx->base.screen)->csf_tiler_heap.initial_chunks,
+-      .max_chunks = pan_screen(ctx->base.screen)->csf_tiler_heap.max_chunks,
+-      .target_in_flight = 65535,
+-   };
+-   ret = pan_kmod_ioctl(panfrost_device_fd(dev),
+-                        DRM_IOCTL_PANTHOR_TILER_HEAP_CREATE, &thc);
+-
+-   if (ret)
+-      goto err_tiler_heap;
+-
+-   ctx->csf.heap.handle = thc.handle;
+-
+    struct drm_panthor_tiler_heap_destroy thd = {
+       .handle = ctx->csf.heap.handle,
+    };
+@@ -1995,7 +2409,7 @@ GENX(csf_init_context)(struct panfrost_context *ctx)
+ 
+    pan_cast_and_pack(ctx->csf.heap.desc_bo->ptr.cpu, TILER_HEAP, heap) {
+       heap.size = pan_screen(ctx->base.screen)->csf_tiler_heap.chunk_size;
+-      heap.base = thc.first_heap_chunk_gpu_va;
++      heap.base = first_heap_chunk_gpu_va;
+       heap.bottom = heap.base + 64;
+       heap.top = heap.base + heap.size;
+    }
+@@ -2022,7 +2436,7 @@ GENX(csf_init_context)(struct panfrost_context *ctx)
+       .capacity = panfrost_bo_size(cs_bo) / sizeof(uint64_t),
+    };
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(dev->kmod.dev);
++      csf_get_csif_props(dev);
+    const struct cs_builder_conf bconf = {
+       .nr_registers = csif_info->cs_reg_count,
+       .nr_kernel_registers = MAX2(csif_info->unpreserved_cs_reg_count, 4),
+@@ -2031,7 +2445,7 @@ GENX(csf_init_context)(struct panfrost_context *ctx)
+    struct cs_builder b;
+    cs_builder_init(&b, &bconf, init_buffer);
+    struct cs_index heap = cs_reg64(&b, 72);
+-   cs_move64_to(&b, heap, thc.tiler_heap_ctx_gpu_va);
++   cs_move64_to(&b, heap, heap_ctx_gpu_va);
+    cs_heap_set(&b, heap);
+ 
+    struct cs_index addr_reg = cs_reg64(&b, 86);
+@@ -2072,9 +2486,14 @@ GENX(csf_init_context)(struct panfrost_context *ctx)
+       goto err_g_submit;
+ 
+    /* Wait before freeing the buffer. */
+-   ret = drmSyncobjWait(panfrost_device_fd(dev), &ctx->syncobj, 1, INT64_MAX, 0,
+-                        NULL);
+-   assert(!ret);
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (!panfrost_device_is_kbase(dev))
++#endif
++   {
++      ret = drmSyncobjWait(panfrost_device_fd(dev), &ctx->syncobj, 1, INT64_MAX,
++                           0, NULL);
++      assert(!ret);
++   }
+ 
+    panfrost_bo_unreference(cs_bo);
+ 
+@@ -2089,11 +2508,25 @@ err_tiler_heap_cs_bo:
+ err_tiler_heap_tmp_geom_bo:
+    panfrost_bo_unreference(ctx->csf.heap.desc_bo);
+ err_tiler_heap_desc_bo:
+-   pan_kmod_ioctl(panfrost_device_fd(dev),
+-                  DRM_IOCTL_PANTHOR_TILER_HEAP_DESTROY, &thd);
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev)) {
++      if (ctx->csf.kbase.heap_ctx_va) {
++         kbase_kmod_csf_tiler_heap_destroy(dev->kmod.dev,
++                                           ctx->csf.kbase.heap_ctx_va);
++         ctx->csf.kbase.heap_ctx_va = 0;
++      }
++   } else
++#endif
++      pan_kmod_ioctl(panfrost_device_fd(dev),
++                     DRM_IOCTL_PANTHOR_TILER_HEAP_DESTROY, &thd);
+ err_tiler_heap:
+-   pan_kmod_ioctl(panfrost_device_fd(dev), DRM_IOCTL_PANTHOR_GROUP_DESTROY,
+-                  &gd);
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev))
++      panfrost_kbase_destroy_queue(ctx);
++   else
++#endif
++      pan_kmod_ioctl(panfrost_device_fd(dev), DRM_IOCTL_PANTHOR_GROUP_DESTROY,
++                     &gd);
+ err_group_create:
+    return -1;
+ }
+@@ -2107,6 +2540,21 @@ GENX(csf_cleanup_context)(struct panfrost_context *ctx)
+       return;
+ 
+    struct panfrost_device *dev = pan_device(ctx->base.screen);
++
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev)) {
++      if (ctx->csf.kbase.seqno)
++         panfrost_kbase_wait_seqno(ctx, ctx->csf.kbase.seqno);
++      panfrost_bo_unreference(ctx->csf.tmp_geom_bo);
++      panfrost_bo_unreference(ctx->csf.heap.desc_bo);
++      panfrost_bo_unreference(ctx->csf.tiler_oom_handler.cs_bo);
++      panfrost_bo_unreference(ctx->csf.tiler_oom_handler.save_bo);
++      panfrost_kbase_destroy_queue(ctx);
++      ctx->csf.is_init = false;
++      return;
++   }
++#endif
++
+    struct drm_panthor_tiler_heap_destroy thd = {
+       .handle = ctx->csf.heap.handle,
+    };
+diff --git a/src/gallium/drivers/panfrost/pan_csf.h b/src/gallium/drivers/panfrost/pan_csf.h
+index a6399722e2b..46ef8be7928 100644
+--- a/src/gallium/drivers/panfrost/pan_csf.h
++++ b/src/gallium/drivers/panfrost/pan_csf.h
+@@ -11,6 +11,7 @@
+ #include "pan_bo.h"
+ #include "pan_desc.h"
+ #include "pan_mempool.h"
++#include "kmod/pan_kmod.h"
+ 
+ struct cs_builder;
+ struct cs_load_store_tracker;
+@@ -109,6 +110,20 @@ struct panfrost_csf_context {
+       struct panfrost_bo *save_bo;
+       uint32_t length;
+    } tiler_oom_handler;
++
++#ifdef HAVE_PAN_KMOD_KBASE
++   struct {
++      struct panfrost_bo *ring_bo;
++      struct pan_kmod_bo *sync_bo;
++      void *sync_cpu;
++      uint64_t sync_gpu;
++      void *user_io;
++      uint64_t insert;
++      uint64_t seqno;
++      uint64_t heap_ctx_va;
++      uint64_t first_chunk_va;
++   } kbase;
++#endif
+ };
+ 
+ #if defined(PAN_ARCH) && PAN_ARCH >= 10
+diff --git a/src/gallium/drivers/panfrost/pan_device.c b/src/gallium/drivers/panfrost/pan_device.c
+index cb515531298..046111b50b1 100644
+--- a/src/gallium/drivers/panfrost/pan_device.c
++++ b/src/gallium/drivers/panfrost/pan_device.c
+@@ -22,23 +22,15 @@
+ #include <stdlib.h>
+ #include "kmod/pan_kmod.h"
+ 
+-/* Command submission on kbase (CSF queue groups / JM job atoms) is not
+- * implemented yet: a GL context would fail or crash at creation time since
+- * the submission paths hardcode the panthor/panfrost DRM uAPIs.  Until that
+- * lands, refuse to expose a Gallium device on kbase so GL loaders cleanly
+- * fall back — Vulkan device enumeration through panvk is unaffected. */
++/* Gallium CSF now owns a persistent kbase queue ring. Keep the env knob
++ * only as an explicit opt-out. */
+ static bool
+ panfrost_gl_on_kbase_allowed(void)
+ {
+    const char *env = getenv("PAN_EXPERIMENTAL_KBASE_GL");
+-   if (env && env[0] == '1' && env[1] == '\0')
+-      return true;
+-
+-   mesa_logw("panfrost: found a kbase GPU, but OpenGL on kbase requires "
+-             "command submission support that is not implemented yet; not "
+-             "exposing a Gallium device (Vulkan enumeration via panvk still "
+-             "works). Set PAN_EXPERIMENTAL_KBASE_GL=1 to bypass.");
+-   return false;
++   if (env && env[0] == '0' && env[1] == '\0')
++      return false;
++   return true;
+ }
+ #endif
+ 
+diff --git a/src/gallium/drivers/panfrost/pan_device.h b/src/gallium/drivers/panfrost/pan_device.h
+index 72c91a268fe..ee8eea83475 100644
+--- a/src/gallium/drivers/panfrost/pan_device.h
++++ b/src/gallium/drivers/panfrost/pan_device.h
+@@ -26,6 +26,10 @@
+ 
+ #include "kmod/pan_kmod.h"
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++extern const struct pan_kmod_ops kbase_kmod_ops;
++#endif
++
+ #include <genxml/gen_macros.h>
+ 
+ #if defined(__cplusplus)
+@@ -161,6 +165,16 @@ struct panfrost_device {
+    struct panfrost_precomp_cache *precomp_cache;
+ };
+ 
++static inline bool
++panfrost_device_is_kbase(const struct panfrost_device *dev)
++{
++#ifdef HAVE_PAN_KMOD_KBASE
++   return dev->kmod.dev && dev->kmod.dev->ops == &kbase_kmod_ops;
++#else
++   return false;
++#endif
++}
++
+ static inline int
+ panfrost_device_fd(const struct panfrost_device *dev)
+ {
+diff --git a/src/gallium/drivers/panfrost/pan_fence.c b/src/gallium/drivers/panfrost/pan_fence.c
+index 25bdb43854f..ab9766d528d 100644
+--- a/src/gallium/drivers/panfrost/pan_fence.c
++++ b/src/gallium/drivers/panfrost/pan_fence.c
+@@ -24,7 +24,8 @@ panfrost_fence_reference(struct pipe_screen *pscreen,
+    struct pipe_fence_handle *old = *ptr;
+ 
+    if (pipe_reference(&old->reference, &fence->reference)) {
+-      drmSyncobjDestroy(panfrost_device_fd(dev), old->syncobj);
++      if (old->syncobj)
++         drmSyncobjDestroy(panfrost_device_fd(dev), old->syncobj);
+       free(old);
+    }
+ 
+@@ -38,7 +39,7 @@ panfrost_fence_finish(struct pipe_screen *pscreen, struct pipe_context *ctx,
+    struct panfrost_device *dev = pan_device(pscreen);
+    int ret;
+ 
+-   if (fence->signaled)
++   if (fence->signaled || !fence->syncobj)
+       return true;
+ 
+    uint64_t abs_timeout = os_time_get_absolute_timeout(timeout);
+@@ -58,6 +59,8 @@ panfrost_fence_get_fd(struct pipe_screen *screen, struct pipe_fence_handle *f)
+    struct panfrost_device *dev = pan_device(screen);
+    int fd = -1;
+ 
++   if (!f->syncobj)
++      return -1;
+    drmSyncobjExportSyncFile(panfrost_device_fd(dev), f->syncobj, &fd);
+    return fd;
+ }
+@@ -116,6 +119,17 @@ panfrost_fence_create(struct panfrost_context *ctx)
+     * (HandleToFD/FDToHandle just gives you another syncobj ID for the
+     * same syncobj).
+     */
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panfrost_device_is_kbase(dev)) {
++      struct pipe_fence_handle *f = calloc(1, sizeof(*f));
++      if (!f)
++         return NULL;
++      pipe_reference_init(&f->reference, 1);
++      f->signaled = true;
++      return f;
++   }
++#endif
++
+    ret = drmSyncobjExportSyncFile(panfrost_device_fd(dev), ctx->syncobj, &fd);
+    if (ret || fd == -1) {
+       mesa_loge("export failed\n");
