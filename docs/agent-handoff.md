@@ -1,3 +1,7 @@
+# NativeCode Agent Handoff
+
+> **LATEST GPU HANDOFF (2026-09-16)**: See [`docs/gpu-drivers-status-and-handoff.md`](gpu-drivers-status-and-handoff.md) for full status, diagnosis of Mali PanVK vs Adreno Turnip/Freedreno, and next steps for Desktop OpenGL 4.5/4.6.
+
 # XFCE Custom-Prefix Recovery Handoff
 
 Updated: 2026-07-15

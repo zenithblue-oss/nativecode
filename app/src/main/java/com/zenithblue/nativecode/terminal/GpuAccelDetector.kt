@@ -106,7 +106,7 @@ object GpuAccelDetector {
     }
 
     fun methodLabel(mode: String): String = when (mode) {
-        MODE_TURNIP -> "Turnip KGSL (Zink)"
+        MODE_TURNIP -> "Turnip Vulkan + Freedreno GL (KGSL)"
         MODE_PANVK -> "PanVK (Kbase)"
         "panvk-zink" -> "Zink over PanVK"
         "panfrost" -> "Panfrost (Gallium Kbase)"

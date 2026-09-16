@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/sources.lock"
+UPSTREAM_REPO="${UPSTREAM_REPO_OVERRIDE:-$UPSTREAM_REPO}"
 
 SYSROOT="${SYSROOT:?set SYSROOT to the extracted Alpaquita aarch64 rootfs}"
 WORK="${WORK:-$SCRIPT_DIR/work}"
@@ -27,10 +28,13 @@ for patch in "$SCRIPT_DIR"/patches/*.patch; do
     fi
 done
 git -C "$SOURCE" fetch origin "$MESA_KBASE_COMMIT" --depth=1
-git -C "$SOURCE" fetch "$UPSTREAM_REPO" "$PANFROST_V11_COMMIT" "$PANVK_V11_COMMIT" --depth=2
-git -C "$SOURCE" checkout --detach "$MESA_KBASE_COMMIT"
+git -C "$SOURCE" fetch "$UPSTREAM_REPO" \
+    "$PANFROST_V11_XML_COMMIT" "$PANFROST_V11_BUILD_COMMIT" \
+    "$PANFROST_V11_COMMIT" "$PANVK_V11_COMMIT" --depth=5
+git -C "$SOURCE" checkout --detach --force "$MESA_KBASE_COMMIT"
 git -C "$SOURCE" -c user.name=NativeCode -c user.email=build@nativecode.invalid \
-    cherry-pick "$PANFROST_V11_COMMIT" "$PANVK_V11_COMMIT"
+    cherry-pick "$PANFROST_V11_XML_COMMIT" "$PANFROST_V11_BUILD_COMMIT" \
+        "$PANFROST_V11_COMMIT" "$PANVK_V11_COMMIT"
 for patch in "$SCRIPT_DIR"/patches/*.patch; do
     git -C "$SOURCE" apply --recount --check "$patch"
     git -C "$SOURCE" apply --recount "$patch"
@@ -38,7 +42,7 @@ done
 grep -q "panfrost_versions = .*'11'" "$SOURCE/src/gallium/drivers/panfrost/meson.build"
 grep -q 'valhall_archs = \[9, 10, 11\]' "$SOURCE/src/panfrost/vulkan/meson.build"
 grep -q 'panfrost_kbase_screen_create' "$SOURCE/src/gallium/winsys/panfrost/drm/panfrost_drm_winsys.c"
-grep -q 'panfrost_open_device_kbase(screen, kbase_path, dev)' "$SOURCE/src/gallium/drivers/panfrost/pan_screen.c"
+grep -q 'panfrost_open_device_kbase' "$SOURCE/src/gallium/drivers/panfrost/pan_screen.c"
 PATCHSET_HASH="$({ sha256sum "$SCRIPT_DIR/sources.lock"; sha256sum "$SCRIPT_DIR"/patches/*.patch; } | sha256sum | cut -d' ' -f1)"
 echo "mesa-mali: prepared Kbase + official v11 patchset $PATCHSET_HASH"
 [ "$PREPARE_ONLY" = "0" ] || exit 0
@@ -62,11 +66,12 @@ meson setup "$WORK/build-target" "$SOURCE" \
     -Dpanfrost-kmds=kbase,panthor \
     -Dplatforms=x11 \
     -Degl=enabled -Dglx=dri -Dgles1=disabled -Dgles2=enabled \
-    -Dmesa-clc=system -Dprecomp-compiler=system
+    -Dmesa-clc=enabled -Dprecomp-compiler=enabled
 ninja -C "$WORK/build-target" -j "$JOBS"
 DESTDIR="$DESTDIR" ninja -C "$WORK/build-target" install
 
 BUNDLE="$DESTDIR/opt/nativecode/mesa-mali"
+install -Dm755 "$SCRIPT_DIR/probes/egl_offscreen.py" "$BUNDLE/bin/egl_offscreen.py"
 python3 "$SCRIPT_DIR/manifest.py" "$BUNDLE"
 python3 "$SCRIPT_DIR/manifest.py" --verify "$BUNDLE"
 find "$BUNDLE" -type f \( -name '*.so' -o -name '*.so.*' \) -exec file {} +

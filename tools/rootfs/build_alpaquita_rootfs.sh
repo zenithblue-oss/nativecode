@@ -14,6 +14,7 @@ WORK="${WORK:-/tmp/nc-rootfs-alpaquita}"
 OUT="${OUT:-$SCRIPT_DIR/out}"
 ROOTFS=""
 MESA_BUNDLE="${MESA_BUNDLE:-}"
+ADRENO_BUNDLE="${ADRENO_BUNDLE:-}"
 ASSEMBLE_ONLY=0
 SKIP_ANDROID=0
 
@@ -23,6 +24,7 @@ while [ $# -gt 0 ]; do
         --out) OUT="$2"; shift 2 ;;
         --rootfs) ROOTFS="$2"; shift 2 ;;
         --mesa-bundle) MESA_BUNDLE="$2"; shift 2 ;;
+        --adreno-bundle) ADRENO_BUNDLE="$2"; shift 2 ;;
         --assemble-only) ASSEMBLE_ONLY=1; shift ;;
         --skip-android) SKIP_ANDROID=1; shift ;;
         --build-id) BUILD_ID="$2"; shift 2 ;;
@@ -120,6 +122,21 @@ if [ -n "$MESA_BUNDLE" ]; then
     cp -a "$MESA_BUNDLE/." "$WORK/mesa-staging/"
 fi
 
+mkdir -p "$WORK/adreno-staging"
+if [ -n "$ADRENO_BUNDLE" ]; then
+    for required in \
+        lib/libvulkan_freedreno.so lib/dri/kgsl_dri.so lib/dri/msm_dri.so \
+        lib/libEGL_mesa.so.0 lib/libGLX_mesa.so.0 \
+        icd/freedreno_icd.aarch64.json source.env
+    do
+        [ -e "$ADRENO_BUNDLE/$required" ] || {
+            echo "build-alpaquita-rootfs: ERROR: Adreno bundle lacks $required: $ADRENO_BUNDLE" >&2
+            exit 1
+        }
+    done
+    cp -a "$ADRENO_BUNDLE/." "$WORK/adreno-staging/"
+fi
+
 cat > "$ASSEMBLE" <<ASSEMBLE_EOF
 #!/bin/sh
 set -eu
@@ -132,7 +149,13 @@ printf '%s\n%s\n' "$ALPAQUITA_REPOS_CORE" "$ALPAQUITA_REPOS_UNIVERSE" > /etc/apk
 apk update
 # shellcheck disable=SC2046
 apk add --no-cache \$(cat /pkg-lists/base.pkgs) \$(cat /pkg-lists/dev.pkgs)
-apk add --no-cache mesa-vulkan-virtio vulkan-tools mesa-utils glmark2 2>/dev/null || true
+apk add --no-cache mesa-egl mesa-gles mesa-vulkan-virtio llvm20-libs xcb-util-keysyms 2>/dev/null || true
+
+if [ -f /adreno-staging/icd/freedreno_icd.aarch64.json ]; then
+    guest_log "installing verified LFDev Mesa Adreno bundle"
+    mkdir -p /opt/nativecode-turnip
+    cp -a /adreno-staging/. /opt/nativecode-turnip/
+fi
 
 # flux user
 if ! id flux >/dev/null 2>&1; then
@@ -265,6 +288,12 @@ if [ -x /rootfs-overlay/usr/local/bin/gpu-launch ]; then
     cp /rootfs-overlay/usr/local/bin/gpu-launch /usr/local/bin/gpu-launch
     chmod 755 /usr/local/bin/gpu-launch
 fi
+for helper in mali-profile panfrost-kbase-test; do
+    if [ -x "/rootfs-overlay/usr/local/bin/$helper" ]; then
+        cp "/rootfs-overlay/usr/local/bin/$helper" "/usr/local/bin/$helper"
+        chmod 755 "/usr/local/bin/$helper"
+    fi
+done
 if [ -x /rootfs-overlay/usr/local/bin/sudo ]; then
     mkdir -p /usr/local/bin
     cp /rootfs-overlay/usr/local/bin/sudo /usr/local/bin/sudo
@@ -390,10 +419,10 @@ log "             umount /rootfs/run 2>/dev/null || true; \\"
 log "             umount /rootfs/sys 2>/dev/null || true; \\"
 log "             umount /rootfs/proc 2>/dev/null || true; \\"
 log "             umount /rootfs/dev 2>/dev/null || true; \\"
-log "             rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay /rootfs/mesa-staging; \\"
+log "             rm -rf /rootfs/assemble.sh /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay /rootfs/mesa-staging /rootfs/adreno-staging; \\"
 log "           }; \\"
 log "           trap cleanup EXIT INT TERM; \\"
-log "           mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay /rootfs/mesa-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts; \\"
+log "           mkdir -p /rootfs/pkg-lists /rootfs/opt-staging /rootfs/xfce-staging /rootfs/gui-staging /rootfs/rootfs-overlay /rootfs/mesa-staging /rootfs/adreno-staging /rootfs/dev /rootfs/proc /rootfs/sys /rootfs/run /rootfs/dev/pts; \\"
 log "           mount --bind /dev /rootfs/dev; \\"
 log "           mount -t proc proc /rootfs/proc; \\"
 log "           mount -t sysfs sysfs /rootfs/sys; \\"
@@ -405,6 +434,7 @@ log "           ([ ! -d /host-work/xfce-staging ] || cp -a /host-work/xfce-stagi
 log "           ([ ! -d /host-work/gui-staging ] || cp -a /host-work/gui-staging/. /rootfs/gui-staging/); \\"
 log "           ([ ! -d /host-work/rootfs-overlay ] || cp -a /host-work/rootfs-overlay/. /rootfs/rootfs-overlay/); \\"
 log "           ([ ! -d /host-work/mesa-staging ] || cp -a /host-work/mesa-staging/. /rootfs/mesa-staging/); \\"
+log "           ([ ! -d /host-work/adreno-staging ] || cp -a /host-work/adreno-staging/. /rootfs/adreno-staging/); \\"
 log "           cp /host-work/assemble-inside.sh /rootfs/assemble.sh && chmod +x /rootfs/assemble.sh; \\"
 log "           chroot /rootfs /bin/sh /assemble.sh'"
 

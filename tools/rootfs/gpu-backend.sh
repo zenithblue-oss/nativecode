@@ -12,6 +12,9 @@ GPU_METHOD_FILE="$GPU_STATE_DIR/gpu_method"
 GPU_PROBE_FILE="$GPU_STATE_DIR/gpu_last_probe"
 VTEST_SOCK="${VTEST_SOCKET_NAME:-/tmp/.virgl_test}"
 GPU_MESA_PREFIX="/opt/nativecode/mesa-mali"
+GPU_ADRENO_PREFIX="${GPU_ADRENO_PREFIX:-/opt/nativecode-turnip}"
+GPU_SYSTEM_ICD_DIR="${GPU_SYSTEM_ICD_DIR:-/usr/share/vulkan/icd.d}"
+GPU_MALI_PROFILE="${GPU_MALI_PROFILE:-/usr/local/bin/mali-profile}"
 
 gpu_unset_env() {
     unset GALLIUM_DRIVER
@@ -27,6 +30,20 @@ gpu_unset_env() {
     unset MESA_GLES_VERSION_OVERRIDE
     unset MESA_NO_ERROR
     unset LIBGL_DRIVERS_PATH
+    unset __EGL_VENDOR_LIBRARY_DIRS
+    if [ -n "${LD_LIBRARY_PATH:-}" ]; then
+        _lp=""
+        _oldifs=$IFS
+        IFS=:
+        for _p in $LD_LIBRARY_PATH; do
+            [ -n "$_p" ] || continue
+            [ "$_p" = "$GPU_ADRENO_PREFIX/lib" ] && continue
+            _lp="${_lp:+$_lp:}$_p"
+        done
+        IFS=$_oldifs
+        if [ -n "$_lp" ]; then export LD_LIBRARY_PATH="$_lp"; else unset LD_LIBRARY_PATH; fi
+        unset _lp _oldifs _p
+    fi
     if [ -n "${LD_PRELOAD:-}" ]; then
         _np=""
         _oldifs=$IFS
@@ -51,7 +68,7 @@ gpu_unset_env() {
 gpu_find_icd() {
     # arg: virtio|freedreno|panvk  → print first matching json
     _kind="$1"
-    _dir="/usr/share/vulkan/icd.d"
+    _dir="$GPU_SYSTEM_ICD_DIR"
     if [ "$_kind" = "panvk" ] || [ "$_kind" = "panfrost" ]; then
         for _c in \
             "$GPU_MESA_PREFIX/share/vulkan/icd.d/panvk_kbase.json" \
@@ -64,18 +81,18 @@ gpu_find_icd() {
         done
         return 1
     fi
-    [ -d "$_dir" ] || return 1
-    _hit=$(find "$_dir" -maxdepth 1 -type f -name "*${_kind}*.json" 2>/dev/null | head -n 1)
-    [ -n "$_hit" ] && [ -f "$_hit" ] && { printf '%s\n' "$_hit"; return 0; }
-    # opt overlay from lfdevs / NativeCode Turnip
+    # The pinned LFDev stack must remain coherent with its EGL/GLX/DRI libraries.
     if [ "$_kind" = "freedreno" ]; then
         for _c in \
-            /opt/nativecode-turnip/icd/freedreno_icd.aarch64.json \
+            "$GPU_ADRENO_PREFIX/icd/freedreno_icd.aarch64.json" \
             /usr/lib/aarch64-linux-gnu/GL/vulkan/icd.d/freedreno_icd.aarch64.json
         do
             [ -f "$_c" ] && { printf '%s\n' "$_c"; return 0; }
         done
     fi
+    [ -d "$_dir" ] || return 1
+    _hit=$(find "$_dir" -maxdepth 1 -type f -name "*${_kind}*.json" 2>/dev/null | head -n 1)
+    [ -n "$_hit" ] && [ -f "$_hit" ] && { printf '%s\n' "$_hit"; return 0; }
     return 1
 }
 
@@ -98,7 +115,7 @@ gpu_kbase_shim() {
 
 gpu_method_label() {
     case "$1" in
-        turnip) printf '%s\n' "Turnip KGSL (Zink)" ;;
+        turnip) printf '%s\n' "Turnip Vulkan + Freedreno GL (KGSL)" ;;
         panvk) printf '%s\n' "PanVK (Kbase)" ;;
         panvk-zink|zink-panvk) printf '%s\n' "Zink over PanVK" ;;
         panfrost) printf '%s\n' "Panfrost (Kbase Gallium)" ;;
@@ -114,21 +131,33 @@ gpu_apply() {
     # arg: turnip|panvk|panvk-zink|venus|zink-venus|virgl-angle|llvmpipe
     gpu_unset_env
     _be="$1"
+    if gpu_kgsl_present; then
+        case "$_be" in
+            panvk|panvk-zink|zink-panvk|panfrost)
+                if gpu_find_icd freedreno >/dev/null 2>&1; then
+                    _be=turnip
+                elif gpu_find_icd virtio >/dev/null 2>&1; then
+                    _be=zink-venus
+                elif [ -S "$VTEST_SOCK" ]; then
+                    _be=virgl-angle
+                else
+                    _be=llvmpipe
+                fi
+                ;;
+        esac
+    fi
     _fd=$(gpu_find_icd freedreno 2>/dev/null || true)
     _pv=$(gpu_find_icd panvk 2>/dev/null || true)
     _vn=$(gpu_find_icd virtio 2>/dev/null || true)
     export VTEST_SOCKET_NAME="$VTEST_SOCK"
-    if [ -d "$GPU_MESA_PREFIX/lib" ]; then
-        case ":${LD_LIBRARY_PATH:-}:" in
-            *:"$GPU_MESA_PREFIX/lib":*) ;;
-            *) export LD_LIBRARY_PATH="$GPU_MESA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
-        esac
-        [ ! -d "$GPU_MESA_PREFIX/lib/dri" ] || export LIBGL_DRIVERS_PATH="$GPU_MESA_PREFIX/lib/dri"
-    fi
     case "$_be" in
         turnip)
-            export MESA_LOADER_DRIVER_OVERRIDE=zink
-            export GALLIUM_DRIVER=zink
+            export MESA_LOADER_DRIVER_OVERRIDE=kgsl
+            export GALLIUM_DRIVER=freedreno
+            if [ -d "$GPU_ADRENO_PREFIX/lib" ]; then
+                export LD_LIBRARY_PATH="$GPU_ADRENO_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+                export LIBGL_DRIVERS_PATH="$GPU_ADRENO_PREFIX/lib/dri"
+            fi
             [ -n "$_fd" ] && export VK_DRIVER_FILES="$_fd" && export VK_ICD_FILENAMES="$_fd"
             export TU_DEBUG=noconform
             export MESA_VK_WSI_DEBUG=sw
@@ -137,6 +166,8 @@ gpu_apply() {
             export MESA_NO_ERROR=1
             ;;
         panfrost)
+            export LD_LIBRARY_PATH="$GPU_MESA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export LIBGL_DRIVERS_PATH="$GPU_MESA_PREFIX/lib/dri"
             export GALLIUM_DRIVER=panfrost
             export MESA_LOADER_DRIVER_OVERRIDE=panfrost
             [ -n "$_pv" ] && export VK_DRIVER_FILES="$_pv" && export VK_ICD_FILENAMES="$_pv"
@@ -193,18 +224,26 @@ gpu_renderer_is_soft() {
 gpu_probe_turnip() {
     gpu_kgsl_present || return 1
     _fd=$(gpu_find_icd freedreno) || return 1
-    command -v vulkaninfo >/dev/null 2>&1 || return 1
     gpu_unset_env
     export VK_DRIVER_FILES="$_fd"
     export VK_ICD_FILENAMES="$_fd"
     export TU_DEBUG=noconform
     export MESA_VK_WSI_DEBUG=sw
-    _out=$(vulkaninfo --summary 2>/dev/null || true)
-    gpu_renderer_is_soft "$_out" && return 1
-    printf '%s' "$_out" | grep -qiE 'adreno|turnip|freedreno|qualcomm'
+    if command -v vulkaninfo >/dev/null 2>&1; then
+        _out=$(vulkaninfo --summary 2>/dev/null || true)
+        gpu_renderer_is_soft "$_out" && return 1
+        printf '%s' "$_out" | grep -qiE 'adreno|turnip|freedreno|qualcomm'
+        return $?
+    fi
+    if [ -x /opt/nativecode/panvk/bin/vulkan_probe ]; then
+        /opt/nativecode/panvk/bin/vulkan_probe >/dev/null 2>&1
+        return $?
+    fi
+    return 0
 }
 
 gpu_probe_panvk() {
+    gpu_kgsl_present && return 1
     gpu_mali_present || return 1
     _pv=$(gpu_find_icd panvk) || return 1
     if [ -x /opt/nativecode/panvk/bin/nativecode-mali-probe ]; then
@@ -212,6 +251,14 @@ gpu_probe_panvk() {
         return $?
     fi
     return 0
+}
+
+gpu_probe_panfrost() {
+    gpu_mali_present || return 1
+    [ -x "$GPU_MALI_PROFILE" ] || return 1
+    [ -f "$GPU_MESA_PREFIX/lib/dri/panfrost_dri.so" ] || return 1
+    _profile=$($GPU_MALI_PROFILE 2>/dev/null) || return 1
+    printf '%s\n' "$_profile" | grep -q '^PROFILE_STATUS=\(WORKING\|DEFAULT_CANDIDATE\)$'
 }
 
 gpu_probe_venus() {
@@ -263,6 +310,18 @@ gpu_probe_virgl() {
 }
 
 gpu_map_mode_to_backend() {
+    if gpu_kgsl_present; then
+        case "$1" in
+            panvk|panvk-zink|zink-panvk|panfrost)
+                if gpu_find_icd freedreno >/dev/null 2>&1; then printf '%s\n' turnip
+                elif gpu_find_icd virtio >/dev/null 2>&1; then printf '%s\n' zink-venus
+                elif [ -S "$VTEST_SOCK" ]; then printf '%s\n' virgl-angle
+                else printf '%s\n' llvmpipe
+                fi
+                return 0
+                ;;
+        esac
+    fi
     case "$1" in
         turnip) printf '%s\n' turnip ;;
         panfrost) printf '%s\n' panfrost ;;
@@ -279,7 +338,7 @@ gpu_map_mode_to_backend() {
 gpu_read_backend() {
     if [ -r "$GPU_BACKEND_FILE" ]; then
         _b=$(tr -d '[:space:]' <"$GPU_BACKEND_FILE")
-        [ -n "$_b" ] && { printf '%s\n' "$_b"; return 0; }
+        [ -n "$_b" ] && { gpu_map_mode_to_backend "$_b"; return 0; }
     fi
     if [ -r "$GPU_MODE_FILE" ]; then
         _m=$(tr -d '[:space:]' <"$GPU_MODE_FILE")
@@ -314,7 +373,7 @@ gpu_auto_select() {
 }
 
 gpu_persist() {
-    _be="$1"
+    _be=$(gpu_map_mode_to_backend "$1")
     mkdir -p "$GPU_STATE_DIR"
     printf '%s\n' "$_be" > "$GPU_PROBE_FILE"
     chmod 644 "$GPU_PROBE_FILE" 2>/dev/null || true
@@ -335,7 +394,9 @@ gpu_diagnose() {
     echo "mali=$(gpu_mali_present && echo yes || echo no)"
     echo "vtest_socket=$VTEST_SOCK exists=$([ -S "$VTEST_SOCK" ] && echo yes || echo no)"
     echo "freedreno_icd=$(gpu_find_icd freedreno 2>/dev/null || echo none)"
+    echo "adreno_mesa=$([ -r "$GPU_ADRENO_PREFIX/source.env" ] && grep '^LFDEV_TAG=' "$GPU_ADRENO_PREFIX/source.env" | cut -d= -f2 || echo none)"
     echo "panvk_icd=$(gpu_find_icd panvk 2>/dev/null || echo none)"
+    echo "panfrost_validated=$(gpu_probe_panfrost && echo yes || echo no)"
     echo "virtio_icd=$(gpu_find_icd virtio 2>/dev/null || echo none)"
     echo "gpu_mode=$([ -r "$GPU_MODE_FILE" ] && tr -d '[:space:]' <"$GPU_MODE_FILE" || echo unset)"
     echo "gpu_vendor=$([ -r "$GPU_VENDOR_FILE" ] && tr -d '[:space:]' <"$GPU_VENDOR_FILE" || echo unset)"

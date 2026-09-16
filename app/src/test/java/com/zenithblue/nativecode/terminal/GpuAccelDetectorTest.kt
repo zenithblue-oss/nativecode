@@ -5,6 +5,14 @@ import org.junit.Test
 
 class GpuAccelDetectorTest {
     @Test
+    fun kgslStatusNeverReportsMaliDrivers() {
+        assertEquals("turnip", GpuRuntimeStatus.sanitizeBackend("panvk", kgsl = true))
+        assertEquals("turnip", GpuRuntimeStatus.sanitizeBackend("panvk-zink", kgsl = true))
+        assertEquals("turnip", GpuRuntimeStatus.sanitizeBackend("panfrost", kgsl = true))
+        assertEquals("panvk-zink", GpuRuntimeStatus.sanitizeBackend("panvk-zink", kgsl = false))
+    }
+
+    @Test
     fun kgslIsTurnipAdreno() {
         val d = GpuAccelDetector.classify("ro.hardware=qcom", kgslPresent = true)
         assertEquals(GpuAccelDetector.MODE_TURNIP, d.mode)
@@ -51,7 +59,7 @@ class GpuAccelDetectorTest {
 
     @Test
     fun methodLabels() {
-        assertEquals("Turnip KGSL (Zink)", GpuAccelDetector.methodLabel("turnip"))
+        assertEquals("Turnip Vulkan + Freedreno GL (KGSL)", GpuAccelDetector.methodLabel("turnip"))
         assertEquals("PanVK (Kbase)", GpuAccelDetector.methodLabel("panvk"))
         assertEquals("Zink over PanVK", GpuAccelDetector.methodLabel("panvk-zink"))
         assertEquals("Panfrost (Gallium Kbase)", GpuAccelDetector.methodLabel("panfrost"))

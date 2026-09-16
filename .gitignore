@@ -15,6 +15,8 @@ key.properties
 bootstrap.tar
 bootstrap_root/
 tools/rootfs/out/
+tools/rootfs/mesa-adreno/cache/
+tools/rootfs/mesa-adreno/out/
 *.tar.zst
 nativecode_android_dev/src/main/assets/*.tar.xz
 # NOTE (Play release): before ./gradlew bundleRelease, stage the prebuilt

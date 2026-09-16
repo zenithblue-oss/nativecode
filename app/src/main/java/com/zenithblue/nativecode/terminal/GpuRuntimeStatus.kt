@@ -30,7 +30,7 @@ object GpuRuntimeStatus {
     fun snapshot(ctx: Context): Snapshot {
         val detect = GpuAccelDetector.detect()
         val gl = HostGlInfo.query(ctx)
-        val kgsl = File("/dev/kgsl-3d0").exists()
+        val kgsl = detect.mode == GpuAccelDetector.MODE_TURNIP
         val venus = HostServerController.status(HostServerController.Kind.VENUS)
         val pulse = HostServerController.status(HostServerController.Kind.PULSE)
         val hostSocket = venus.running && File(TermuxHostPaths.TMPDIR, ".virgl_test").exists()
@@ -41,7 +41,7 @@ object GpuRuntimeStatus {
             .ifBlank { detect.mode }
         val lastProbe = readTrim(File(rootfs, "etc/fluxlinux/gpu_last_probe"))
 
-        val effectiveBackend = when {
+        val reportedBackend = when {
             lastProbe.startsWith("panvk") || lastProbe == "panfrost" -> lastProbe
             backend.startsWith("panvk") || backend == "panfrost" -> backend
             detect.mode == GpuAccelDetector.MODE_PANVK -> "panvk-zink"
@@ -50,6 +50,7 @@ object GpuRuntimeStatus {
             backend.isNotBlank() -> backend
             else -> detect.mode
         }
+        val effectiveBackend = sanitizeBackend(reportedBackend, kgsl)
 
         val method = when (effectiveBackend) {
             "turnip" -> GpuAccelDetector.methodLabel("turnip")
@@ -108,6 +109,13 @@ object GpuRuntimeStatus {
             ""
         }
 
+    internal fun sanitizeBackend(backend: String, kgsl: Boolean): String =
+        if (kgsl && (backend.startsWith("panvk") || backend == "panfrost")) {
+            GpuAccelDetector.MODE_TURNIP
+        } else {
+            backend
+        }
+
     private fun firstIcd(rootfs: File, backend: String, mode: String): String {
         val panvkIcds = listOf(
             File(rootfs, "opt/nativecode/panvk/icd.d/panvk_kbase.json"),
@@ -138,6 +146,7 @@ object GpuRuntimeStatus {
                 ?.firstOrNull { it.name.contains(needle, ignoreCase = true) && it.name.endsWith(".json") }
                 ?.let { return "/usr/share/vulkan/icd.d/${it.name}" }
         }
+        if (mode == GpuAccelDetector.MODE_TURNIP) return "none"
         val panvkFallback = panvkIcds.firstOrNull { it.isFile }
         if (panvkFallback != null) {
             return panvkFallback.absolutePath.removePrefix(rootfs.absolutePath)

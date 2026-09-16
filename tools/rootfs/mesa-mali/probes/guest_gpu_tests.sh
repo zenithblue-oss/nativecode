@@ -67,6 +67,10 @@ python3 /tmp/egl_offscreen.py 2>&1
 echo "zink_exit=$?"
 
 echo "=== DIRECT PANFROST (system dri, not mesa-mali) ==="
+if command -v panfrost-kbase-test >/dev/null 2>&1; then
+    panfrost-kbase-test
+    echo "panfrost_kbase_exit=$?"
+fi
 if [ -e /opt/nativecode/mesa-mali/lib/dri/panfrost_dri.so ]; then
     echo "mesa-mali panfrost_dri=PRESENT"
 elif [ -e /usr/lib/dri/panfrost_dri.so ]; then

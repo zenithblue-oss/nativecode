@@ -1,0 +1,5 @@
+LFDEV_REPO=https://github.com/lfdevs/mesa-for-android-container
+LFDEV_TAG=mesa-26.3.0-devel-20260824
+LFDEV_COMMIT=98f3d6229d61452cef80f8563af7c56ae599dc14
+LFDEV_ARTIFACT=mesa-for-android-container_26.3.0-devel-20260824_debian_trixie_arm64.tar.gz
+LFDEV_SHA256=c014cf66bdbff96417ee30d34f006cf51df64ae04893d599711b0b6b73b52ccf

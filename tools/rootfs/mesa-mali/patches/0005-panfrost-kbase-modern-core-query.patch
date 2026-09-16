@@ -1,0 +1,15 @@
+diff --git a/src/gallium/drivers/panfrost/pan_device.c b/src/gallium/drivers/panfrost/pan_device.c
+index 2a7daef7980..54f395d194a 100644
+--- a/src/gallium/drivers/panfrost/pan_device.c
++++ b/src/gallium/drivers/panfrost/pan_device.c
+@@ -95,8 +95,8 @@ panfrost_open_device(struct panfrost_screen *screen, int fd,
+    if (!dev->kmod.vm)
+       goto err_free_kmod_dev;
+ 
+-   dev->core_count =
+-      pan_query_core_count(&dev->kmod.dev->props, &dev->core_id_range);
++   dev->core_count = pan_query_core_count(&dev->kmod.dev->props);
++   dev->core_id_range = pan_query_core_id_range(&dev->kmod.dev->props);
+    dev->thread_tls_alloc = pan_query_thread_tls_alloc(&dev->kmod.dev->props);
+    dev->optimal_tib_size = pan_query_optimal_tib_size(dev->arch, dev->model);
+    dev->optimal_z_tib_size =
