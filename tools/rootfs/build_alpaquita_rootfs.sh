@@ -389,6 +389,60 @@ ANDROID_EOF
     chmod 644 /etc/profile.d/nativecode-android.sh
 fi
 
+# GPU ICD symlinks and auto-detect profile
+mkdir -p /usr/share/vulkan/icd.d /etc/profile.d /etc/bash
+if [ -f /opt/nativecode-turnip/share/vulkan/icd.d/freedreno_icd.aarch64.json ]; then
+    ln -sfn /opt/nativecode-turnip/share/vulkan/icd.d/freedreno_icd.aarch64.json /usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
+elif [ -f /opt/nativecode-turnip/icd/freedreno_icd.aarch64.json ]; then
+    ln -sfn /opt/nativecode-turnip/icd/freedreno_icd.aarch64.json /usr/share/vulkan/icd.d/freedreno_icd.aarch64.json
+fi
+if [ -f /opt/nativecode/panvk/icd.d/panvk_kbase.json ]; then
+    ln -sfn /opt/nativecode/panvk/icd.d/panvk_kbase.json /usr/share/vulkan/icd.d/panvk_kbase.json
+fi
+
+cat > /etc/profile.d/gpu-env.sh <<'GPU_ENV_EOF'
+#!/bin/sh
+if [ -e /dev/kgsl-3d0 ] || [ -e /dev/kgsl ]; then
+    export VK_DRIVER_FILES="/opt/nativecode-turnip/share/vulkan/icd.d/freedreno_icd.aarch64.json"
+    export VK_ICD_FILENAMES="$VK_DRIVER_FILES"
+    export TU_DEBUG=noconform
+    export MESA_VK_WSI_DEBUG=sw
+    export GALLIUM_DRIVER=freedreno
+    export MESA_LOADER_DRIVER_OVERRIDE=kgsl
+    if [ -d "/opt/nativecode-turnip/lib" ]; then
+        case ":${LD_LIBRARY_PATH:-}:" in
+            *:/opt/nativecode-turnip/lib:*) ;;
+            *) export LD_LIBRARY_PATH="/opt/nativecode-turnip/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+        esac
+        export LIBGL_DRIVERS_PATH="/opt/nativecode-turnip/lib/dri"
+    fi
+elif [ -e /dev/mali0 ] || [ -e /dev/mali ]; then
+    export VK_DRIVER_FILES="/opt/nativecode/panvk/icd.d/panvk_kbase.json"
+    export VK_ICD_FILENAMES="$VK_DRIVER_FILES"
+    _shim="/opt/nativecode/panvk/lib/kbase_shim.so"
+    if [ -f "$_shim" ]; then
+        case ":${LD_PRELOAD:-}:" in
+            *:"$_shim":*) ;;
+            *) export LD_PRELOAD="${_shim}${LD_PRELOAD:+:$LD_PRELOAD}" ;;
+        esac
+    fi
+    unset _shim
+    export WSI_X11_TERMUX=1
+    export PANVK_KBASE_DRI3=raw
+    export MESA_VK_WSI_DEBUG=sw
+    export GALLIUM_DRIVER=zink
+    export MESA_LOADER_DRIVER_OVERRIDE=zink
+fi
+GPU_ENV_EOF
+chmod 644 /etc/profile.d/gpu-env.sh
+cat > /etc/bash/gpu-env.sh <<'BASH_GPU_EOF'
+#!/bin/sh
+if [ -r /etc/profile.d/gpu-env.sh ]; then
+    . /etc/profile.d/gpu-env.sh
+fi
+BASH_GPU_EOF
+chmod 644 /etc/bash/gpu-env.sh
+
 guest_log "verifying all baked AI CLIs execute"
 su -s /bin/sh flux -c '
   export PATH="\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH"

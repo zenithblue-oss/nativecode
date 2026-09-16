@@ -84,6 +84,7 @@ gpu_find_icd() {
     # The pinned LFDev stack must remain coherent with its EGL/GLX/DRI libraries.
     if [ "$_kind" = "freedreno" ]; then
         for _c in \
+            "$GPU_ADRENO_PREFIX/share/vulkan/icd.d/freedreno_icd.aarch64.json" \
             "$GPU_ADRENO_PREFIX/icd/freedreno_icd.aarch64.json" \
             /usr/lib/aarch64-linux-gnu/GL/vulkan/icd.d/freedreno_icd.aarch64.json
         do

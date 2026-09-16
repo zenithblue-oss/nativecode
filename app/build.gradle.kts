@@ -33,8 +33,8 @@ android {
         applicationId = "com.zenithblue.nativecode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 11
-        versionName = "1.6.3"
+        versionCode = 12
+        versionName = "1.6.4"
         buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
         buildConfigField("String", "REPORT_ENDPOINT", "\"$nativeCodeReportUrl\"")
         // 16 KB page-size devices (Android 15+): never ship 32-bit or extra-ABI JNI.

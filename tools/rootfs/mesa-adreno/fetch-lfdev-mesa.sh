@@ -20,6 +20,10 @@ if [ -s "$NATIVE_BUNDLE" ]; then
     ln -sf libEGL.so.1 libEGL_mesa.so.0 2>/dev/null || true
     ln -sf libGL.so.1 libGLX_mesa.so.0 2>/dev/null || true
     cd - >/dev/null
+    mkdir -p "$OUT/icd"
+    if [ -f "$OUT/share/vulkan/icd.d/freedreno_icd.aarch64.json" ]; then
+        cp "$OUT/share/vulkan/icd.d/freedreno_icd.aarch64.json" "$OUT/icd/"
+    fi
 else
     mkdir -p "$CACHE"
     if [ ! -s "$ARCHIVE" ]; then
