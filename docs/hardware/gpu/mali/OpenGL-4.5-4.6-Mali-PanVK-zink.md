@@ -68,3 +68,32 @@ GL 3.3 data: `OpenGL-3.2-Mali-PanVK-zink.md` + `/tmp/gl33core.txt`.
    with ordinary configs.
 6. Early probe builds kept failing on GL enum typos — fixed by reading values
    from the installed `/usr/include/GL/glcorearb.h` instead of memory.
+
+---
+
+## Instructions for Running OpenGL on Mali (Poco X6 Pro / Dimensity 8300)
+
+### 1. Hardware Accelerated OpenGL via Zink over PanVK (Recommended)
+To run desktop OpenGL applications up to OpenGL 3.3 Core Profile and OpenGL ES 3.1:
+```bash
+# Sourced automatically via /etc/profile.d/gpu-env.sh
+export VK_DRIVER_FILES="/opt/nativecode/panvk/icd.d/panvk_kbase.json"
+export VK_ICD_FILENAMES="$VK_DRIVER_FILES"
+export LD_PRELOAD="/opt/nativecode/panvk/lib/kbase_shim.so${LD_PRELOAD:+:$LD_PRELOAD}"
+export WSI_X11_TERMUX=1
+export PANVK_KBASE_DRI3=raw
+export MESA_VK_WSI_DEBUG=sw
+export GALLIUM_DRIVER=zink
+export MESA_LOADER_DRIVER_OVERRIDE=zink
+
+# Or run via NativeCode launcher:
+gpu-launch --panvk-zink <command>
+```
+
+### 2. Overriding GL Version for 4.x Compatible Apps
+If an application or game strictly queries for OpenGL 4.5/4.6 and does not use unsupported geometry/tessellation stages:
+```bash
+export MESA_GL_VERSION_OVERRIDE=4.6
+export MESA_GLSL_VERSION_OVERRIDE=460
+gpu-launch --panvk-zink <command>
+```
