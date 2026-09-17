@@ -87,7 +87,7 @@ gsettings set org.gnome.desktop.session idle-delay 0
 
 ---
 
-## 4. Hardware GPU Acceleration Matrix
+## 6. Hardware GPU Acceleration Matrix
 
 ### OnePlus 13R (Adreno 750 / Snapdragon 8 Gen 3)
 ```bash
@@ -110,3 +110,34 @@ export WSI_X11_TERMUX=1
 export PANVK_KBASE_DRI3=raw
 export MESA_VK_WSI_DEBUG=sw
 ```
+
+---
+
+## 7. Screen Orientation & Auto-Resolution Findings (Preventing Landscape Bug)
+
+### Root Cause of Landscape Bug
+1. **Wlroots Default Mode**:
+   - In `wlroots/backend/x11/output.c`, `wlr_x11_output_create` originally initialized new outputs with:
+     ```c
+     wlr_output_state_set_custom_mode(&state, 1024, 768, 0);
+     ```
+   - When `mode` was omitted from `phoc.ini`, the compositor fell back to `1024x768` (width > height, 4:3 landscape ratio).
+2. **Phosh Monitor Classification**:
+   - Phosh's rotation engine (`rotateinfo.c`) calculates:
+     ```c
+     monitor_is_landscape = ((double)monitor->width / (double)monitor->height) > 1.0;
+     ```
+   - Because `1024 / 768 > 1.0`, Phosh identified the display as a landscape monitor, locked the UI into landscape mode, and restricted rendering to a 768px vertical band, leaving the rest of the physical phone display black.
+
+### Permanent Fix Applied in `libwlroots.so.12`
+`backend/x11/output.c` was patched to query the root X11 screen dimensions directly:
+```c
+uint32_t init_w = (x11->screen && x11->screen->width_in_pixels > 0) ? x11->screen->width_in_pixels : 1080;
+uint32_t init_h = (x11->screen && x11->screen->height_in_pixels > 0) ? x11->screen->height_in_pixels : 1920;
+wlr_output_state_set_custom_mode(&state, init_w, init_h, 0);
+```
+With this fix:
+- On OnePlus 13R, the output automatically initializes to `1264x2780` (portrait).
+- On Poco X6 Pro, the output automatically initializes to `1080x1920` or `1220x2712` (portrait).
+- `phoc.ini` no longer requires device-specific `mode = ...` entries, allowing dynamic full-screen adaptation across any phone model.
+
