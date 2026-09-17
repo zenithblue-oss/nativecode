@@ -80,14 +80,34 @@ gsettings set sm.puri.phosh favorites '[]'
 
 # Appearance & Lockscreen
 gsettings set org.gnome.desktop.interface icon-theme "Adwaita"
+gsettings set org.gnome.desktop.interface toolkit-accessibility false
 gsettings set org.gnome.desktop.lockdown disable-lock-screen true
 gsettings set org.gnome.desktop.screensaver lock-enabled false
 gsettings set org.gnome.desktop.session idle-delay 0
+
+# Desktop Background Wallpaper (Official GNOME 4K Adwaita Dark/Light)
+gsettings set org.gnome.desktop.background picture-uri 'file:///usr/local/share/backgrounds/gnome/adwaita-l.jpg'
+gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/local/share/backgrounds/gnome/adwaita-d.jpg'
+gsettings set org.gnome.desktop.background picture-options 'zoom'
 ```
 
 ---
 
-## 6. Hardware GPU Acceleration Matrix
+## 6. Background Service Pruning & Clean Teardown (Phase C)
+
+1. **Accessibility Bus Pruning (`at-spi`)**:
+   - Setting `toolkit-accessibility false` and exporting `NO_AT_BRIDGE=1` completely inhibits the launch of `at-spi-bus-launcher`, `at-spi2-registryd`, and its auxiliary dbus instance.
+2. **GNOME Image Thumbnailers (`glycin`)**:
+   - `glycin-svg` and `glycin-image-rs` are spawned dynamically on demand by libglycin.
+   - Teardown in `stop_gui.sh` explicitly terminates `glycin-svg`, `glycin-image-rs`, and `glycin` using iterative process killing.
+3. **Session Teardown Verification**:
+   - `stop_gui.sh` explicitly targets:
+     `phosh phoc wvkbd wvkbd-mobintl glycin-svg glycin-image-rs glycin at-spi-bus-launcher at-spi2-registryd xfce4-terminal xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon xfconfd`
+   - Verified on both OnePlus 13R and Poco X6 Pro: stopping session leaves exactly 0 residual graphical processes.
+
+---
+
+## 7. Hardware GPU Acceleration Matrix
 
 ### OnePlus 13R (Adreno 750 / Snapdragon 8 Gen 3)
 ```bash

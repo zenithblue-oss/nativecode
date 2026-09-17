@@ -49,39 +49,43 @@ The following exhaustive records have been produced and are tracked in the repos
    - Cleared mobile-only adaptive app filtering (`gsettings set sm.puri.phosh app-filter-mode '[]'`).
    - Cleared dock favorites (`gsettings set sm.puri.phosh favorites '[]'`) to show clean titles in the launcher grid.
    - Installed complete `Adwaita` icon theme into `/usr/share/icons/Adwaita` and compiled schemas.
+   - Provisioned official GNOME 4K Adwaita dark & light wallpapers (`adwaita-d.jpg`, `adwaita-l.jpg`) under `/usr/local/share/backgrounds/gnome/`, eliminating black screen backgrounds and configuring `picture-options 'zoom'`.
 
 ### B. Device Qualification Status
 1. **OnePlus 13R (Adreno 750 / Snapdragon 8 Gen 3)**:
-   - **Status**: **PASS (Locked 60 FPS, Edge-to-Edge, Touch & Gestures Qualified)**.
+   - **Status**: **PASS (Locked 60 FPS, Edge-to-Edge, Adwaita Dark Wallpaper, Clean Teardown Qualified)**.
    - UI scaling set to `scale = 2.5` in `phoc.ini` (`1264x2780` physical resolution).
+   - Official Adwaita Dark 4K wallpaper verified live and full-screen on device display.
    - Touch gestures verified: top shade pull-down, lockscreen PIN keypad, bottom home bar tap/swipe, app grid launch (`Terminal`), and carousel window switching.
-   - Idle power verified at ~1.24 W.
+   - Idle power verified at ~1.01 W to ~1.29 W.
+   - Verified 100% clean stop via `stop_gui.sh` leaving exactly 0 residual graphical processes.
 2. **Poco X6 Pro (Mali-G615 MC6 / MediaTek Dimensity 8300 Ultra)**:
-   - **Status**: **PASS (Edge-to-Edge Portrait, Full App Grid, Touch & App Launch Qualified)**.
-   - Successfully deployed portable bundle `packages/phosh-lite/` and installed runtime dependencies.
+   - **Status**: **PASS (Edge-to-Edge Portrait, Full App Grid, Adwaita Wallpaper, Clean Teardown Qualified)**.
    - Auto-detected native portrait display geometry via patched `libwlroots.so.12` without letterboxing.
+   - Official Adwaita Dark 4K wallpaper verified live and full-screen on device display.
    - Termux:X11 preferences configured: `displayResolutionMode: native`, `fullscreen: true`, `hideCutout: true`, `touchMode: 3`.
    - PanVK probed on hardware GPU (`vendorID: 0x13b5`, `deviceID: 0xa8671030`, Vulkan 1.4.352).
+   - Verified 100% clean stop via `stop_gui.sh` leaving exactly 0 residual graphical processes.
 
 ---
 
 ## 3. What Is Left (Actionable Tasks for Next Agent)
 
-The migration is now ready to move from mutable on-device testing to canonical rootfs repackaging and clean APK qualification.
+The migration has completed Phase C runtime daemon sanitization and wallpaper integration across both hardware platforms.
 
-### Task 1: Phase C — Service Pruning & Background Daemon Sanitization
-**Goal**: Ensure zero background CPU drain, no hanging dbus services, and no orphaned helper processes.
-1. Inspect process trees on both devices:
-   ```bash
-   ps aux | grep -E 'glycin|dbus|at-spi|sensor|geoclue'
-   ```
-2. Disable unnecessary background GLib / GNOME services that attempt to launch in PRoot:
-   - `glycin-svg` / `glycin-image-rs`: Ensure image loaders terminate immediately after thumbnailing and do not spin in seccomp loops (set `G_MESSAGES_DEBUG=""` and verify sandbox policy).
-   - Ensure `at-spi2-registryd` and `at-spi-bus-launcher` do not loop if accessibility is disabled:
-     ```bash
-     gsettings set org.gnome.desktop.interface toolkit-accessibility false
-     ```
-   - Verify that running `stop_gui.sh` leaves exactly 0 residual processes across both host and guest.
+### Task 1: Phase C — Service Pruning & Background Daemon Sanitization (**COMPLETED**)
+- **Findings & Root Causes**:
+  1. `glycin-svg` and `glycin-image-rs`: GTK4/GNOME out-of-process thumbnailers spawned via DBus sockets lingered indefinitely as orphans when previous desktop sessions closed.
+  2. `at-spi2-registryd` and `at-spi-bus-launcher`: Spawning unnecessary accessibility DBus daemons.
+  3. `stop_gui.sh` on devices lacked explicit coverage for `phosh`, `phoc`, `wvkbd-mobintl`, `glycin-*`, `at-spi*`, and `xfce4-terminal`.
+- **Fixes Applied & Verified**:
+  - Exported `NO_AT_BRIDGE=1` and configured `gsettings set org.gnome.desktop.interface toolkit-accessibility false` in `nativecode-desktop` and `00_mobi.Phosh.gschema.override`.
+  - Updated `stop_gui.sh` with explicit iteration over all desktop binaries (`phosh phoc wvkbd wvkbd-mobintl glycin-svg glycin-image-rs glycin at-spi-bus-launcher at-spi2-registryd xfce4-terminal xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon xfconfd`).
+  - Tested multiple launch-and-stop cycles on both OnePlus 13R and Poco X6 Pro; confirmed `ps -ef` reports **0 residual graphical/helper processes**.
+- **Wallpaper Integration**:
+  - Deployed official GNOME Adwaita 4K wallpapers (`adwaita-d.jpg` dark mode and `adwaita-l.jpg` light mode) to `/usr/local/share/backgrounds/gnome/`.
+  - Configured `org.gnome.desktop.background` keys (`picture-uri`, `picture-uri-dark`, `picture-options 'zoom'`) in compiled schemas and `nativecode-desktop`.
+  - Repacked into `packages/phosh-lite/phosh-lite-bundle.tar.gz` and automated via `packages/phosh-lite/install.sh`. Live visual verification confirmed on both OnePlus 13R and Poco X6 Pro displays.
 
 ---
 

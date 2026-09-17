@@ -25,7 +25,7 @@ echo "========================================"
 
 # Step 1: Kill Phosh, Phoc, XFCE & helper processes
 echo "[1/4] Stopping Phosh, Phoc & XFCE4 processes..."
-for proc in phosh phoc wvkbd glycin-svg glycin-image-rs glycin xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon xfconfd; do
+for proc in phosh phoc wvkbd wvkbd-mobintl glycin-svg glycin-image-rs glycin at-spi-bus-launcher at-spi2-registryd xfce4-terminal xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon xfconfd; do
     "$TB" pkill -9 "$proc" 2>/dev/null || true
     "$TB" pkill -9 -f "$proc" 2>/dev/null || true
 done

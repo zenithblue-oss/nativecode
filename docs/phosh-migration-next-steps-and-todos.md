@@ -73,20 +73,27 @@
 
 ---
 
-## 2. Phase C: Service Pruning & Resource Cleanup (Steps 10–11)
+## 2. Phase C: Service Pruning & Resource Cleanup (Steps 10–11) [COMPLETED]
 
 1. **Process Inspection**:
-   - Check `ps -ef` during a live Phosh session.
-   - Verify there are no runaway, hung, or looping D-Bus activation attempts.
+   - Live session process tree verified across OnePlus 13R and Poco X6 Pro.
+   - Identified and eradicated orphaned `glycin-svg`/`glycin-image-rs` processes.
+   - Suppressed `at-spi2-registryd` and `at-spi-bus-launcher` via `export NO_AT_BRIDGE=1` and `toolkit-accessibility false`.
 2. **Service Verification**:
-   - Ensure the session runs with only:
+   - Clean session runs strictly with:
+     - `termux-x11`
      - `dbus-daemon`
      - `phoc`
      - `phosh`
-     - `wvkbd`
-   - Confirm NetworkManager, ModemManager, and UPower daemons are not running (their presence is cleanly intercepted by `libncshims.so`).
-3. **Storage Hygiene**:
-   - Clean up temporary source build trees in `/tmp/` (`/tmp/phosh/build`, `/tmp/wlroots/build`, etc.) before freezing artifacts.
+     - `pulseaudio`
+     - `virgl_test_server_android`
+   - Verified zero background loops for NetworkManager, ModemManager, and UPower.
+3. **Clean Teardown**:
+   - Updated `stop_gui.sh` with explicit iteration across all Phosh/Phoc/wvkbd/glycin/at-spi binaries.
+   - Verified 0 residual processes remain upon session stop on both devices.
+4. **Wallpaper Provisioning**:
+   - Provisioned official GNOME 4K Adwaita dark (`adwaita-d.jpg`) and light (`adwaita-l.jpg`) wallpapers to eliminate black background.
+   - Configured `picture-options 'zoom'` permanently in `packages/phosh-lite/install.sh`, `nativecode-desktop`, and `00_mobi.Phosh.gschema.override`.
 
 ---
 
