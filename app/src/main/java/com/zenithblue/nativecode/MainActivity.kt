@@ -7931,8 +7931,8 @@ class MainActivity : AppCompatActivity() {
         val sectionSub = TextView(this).apply {
             text = when {
                 !xfceReady -> "Desktop runtime unavailable — reinstall the Linux Runtime."
-                methodNow == "chroot" -> "Termux X11 + XFCE4 inside Alpaquita (root)."
-                else -> "Termux X11 + XFCE4 graphical environment."
+                methodNow == "chroot" -> "Termux X11 + Phosh Mobile Shell inside Alpaquita (root)."
+                else -> "Termux X11 + Phosh Mobile Shell graphical environment."
             }
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
@@ -7948,7 +7948,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         startGuiBtn = TextView(this).apply {
-            text = "  START XFCE DESKTOP"
+            text = "  START PHOSH DESKTOP"
             textSize = 14f
             setTextColor(NC.ON_PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -13229,11 +13229,11 @@ class MainActivity : AppCompatActivity() {
         startGuiBtn.visibility = View.VISIBLE
         val installed = isXfceInstalled()
         if (installed) {
-            startGuiBtn.text = "  START XFCE DESKTOP"
+            startGuiBtn.text = "  START PHOSH DESKTOP"
             startGuiBtn.isEnabled = true
             startGuiBtn.alpha = 1f
         } else {
-            startGuiBtn.text = "  XFCE NOT INSTALLED"
+            startGuiBtn.text = "  PHOSH NOT INSTALLED"
             startGuiBtn.isEnabled = false
             startGuiBtn.alpha = 0.4f
         }

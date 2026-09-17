@@ -23,9 +23,12 @@ echo "========================================"
 echo "FluxLinux: Stopping GUI for $DISTRO"
 echo "========================================"
 
-# Step 1: Kill XFCE processes
-echo "[1/4] Stopping XFCE4 processes..."
-"$TB" pkill -9 -f "xfce4-session|xfwm4|xfdesktop|xfce4-panel|dbus-launch|dbus-daemon|xfconfd" 2>/dev/null || true
+# Step 1: Kill Phosh, Phoc, XFCE & helper processes
+echo "[1/4] Stopping Phosh, Phoc & XFCE4 processes..."
+for proc in phosh phoc wvkbd glycin-svg glycin-image-rs glycin xfce4-session xfwm4 xfdesktop xfce4-panel dbus-launch dbus-daemon xfconfd; do
+    "$TB" pkill -9 "$proc" 2>/dev/null || true
+    "$TB" pkill -9 -f "$proc" 2>/dev/null || true
+done
 
 # Step 2: Stop proot-distro sessions
 echo "[2/4] Killing proot sessions..."
