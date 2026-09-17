@@ -76,12 +76,12 @@
             android:visibility="visible">
 
             <ImageView
-                android:id="@+id/x11_image"
-                android:layout_width="130dp"
-                android:layout_height="130dp"
+                android:id="@+id/nc_logo_image"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
                 android:scaleType="fitCenter"
-                app:srcCompat="@drawable/ic_x11_icon"
-                android:contentDescription="X Logo"
+                android:src="@drawable/ic_nativecode_logo"
+                android:contentDescription="NativeCode Logo"
                 tools:ignore="HardcodedText" />
 
             <Space
@@ -96,53 +96,47 @@
                 android:gravity="center_horizontal|center_vertical"
                 android:text="@string/not_connected"
                 android:textColor="@color/nc_on_surface"
-                android:textSize="20sp"
+                android:textSize="18sp"
                 android:fontFamily="monospace" />
 
             <Space
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="40dp" />
+                android:minHeight="32dp" />
 
-            <Button
-                android:id="@+id/preferences_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/preferences_button_text"
-                android:textAllCaps="true"
-                android:textColor="@color/nc_on_surface"
-                android:background="@drawable/bg_nc_stub_btn"
-                android:fontFamily="monospace" />
-
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="10dp" />
-
-            <Button
-                android:id="@+id/help_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/help_button_text"
-                android:textAllCaps="true"
-                android:textColor="@color/nc_on_surface"
-                android:background="@drawable/bg_nc_stub_btn"
-                android:fontFamily="monospace" />
-
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="10dp" />
-
-            <Button
+            <LinearLayout
                 android:id="@+id/exit_button"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/exit_button_text"
-                android:textAllCaps="true"
-                android:textColor="@color/nc_on_surface"
+                android:layout_height="48dp"
+                android:minWidth="160dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
                 android:background="@drawable/bg_nc_stub_btn"
-                android:fontFamily="monospace" />
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_nc_exit"
+                    android:contentDescription="@string/exit_button_text" />
+
+                <Space
+                    android:layout_width="10dp"
+                    android:layout_height="1dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/exit_button_text"
+                    android:textAllCaps="true"
+                    android:textColor="@color/nc_on_surface"
+                    android:textSize="14sp"
+                    android:fontFamily="monospace" />
+            </LinearLayout>
         </LinearLayout>
 
 
