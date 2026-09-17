@@ -49,6 +49,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import com.zenithblue.nativecode.ui.BrutalistToggle as CustomBrutalistToggle
 import com.zenithblue.nativecode.onboarding.LegacyProotDataMigrator
 import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
@@ -181,6 +182,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var componentsScrollView: ScrollView
     /** Settings → Hardware & VPU Diagnostics. */
     private lateinit var hardwareScrollView: ScrollView
+    /** Settings → native X11 Settings page (modular x11 package). */
+    private lateinit var x11SettingsScrollView: ScrollView
+    private var x11SettingsPage: com.zenithblue.nativecode.x11.X11SettingsPage? = null
     private lateinit var vpuStatusBadge: TextView
     private lateinit var vpuSocDetailTv: TextView
     private lateinit var gpuStatusBadge: TextView
@@ -418,6 +422,7 @@ class MainActivity : AppCompatActivity() {
     private val ID_PRIVACY_POLICY = 22
     private val ID_COMPONENTS = 23
     private val ID_HARDWARE = 24
+    private val ID_X11_SETTINGS = 25
 
     private var fileViewerBackPage = ID_FILES
     private var diffViewerBackPage = ID_GIT
@@ -1027,6 +1032,9 @@ class MainActivity : AppCompatActivity() {
         if (::hardwareScrollView.isInitialized) {
             hardwareScrollView.visibility = View.GONE
         }
+        if (::x11SettingsScrollView.isInitialized) {
+            x11SettingsScrollView.visibility = View.GONE
+        }
         if (::prootSettingsScrollView.isInitialized) {
             prootSettingsScrollView.visibility = View.GONE
         }
@@ -1221,6 +1229,13 @@ class MainActivity : AppCompatActivity() {
                 }
                 refreshHardwarePage()
             }
+            ID_X11_SETTINGS -> {
+                if (::x11SettingsScrollView.isInitialized) {
+                    x11SettingsScrollView.visibility = View.VISIBLE
+                    x11SettingsScrollView.scrollTo(0, 0)
+                }
+                refreshX11SettingsPage()
+            }
             ID_SCRIPT_INSTALL -> {
                 if (::scriptInstallLayout.isInitialized) {
                     scriptInstallLayout.visibility = View.VISIBLE
@@ -1326,6 +1341,10 @@ class MainActivity : AppCompatActivity() {
         }
         if (::hardwareScrollView.isInitialized && hardwareScrollView.visibility == View.VISIBLE) {
             navigateBackFromSubpage(ID_HARDWARE, fallback = ID_SETTINGS)
+            return
+        }
+        if (::x11SettingsScrollView.isInitialized && x11SettingsScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_X11_SETTINGS, fallback = ID_SETTINGS)
             return
         }
         if (::componentsScrollView.isInitialized && componentsScrollView.visibility == View.VISIBLE) {
@@ -1464,7 +1483,7 @@ class MainActivity : AppCompatActivity() {
             id == ID_CHROOT_SETTINGS || id == ID_PROOT_SETTINGS ||
             id == ID_SOFTWARE_MANAGER || id == ID_MARKETPLACE || id == ID_APPS || id == ID_MP_INSTALLER ||
             id == ID_CLI_AUTH || id == ID_AI_SAFETY || id == ID_PRIVACY_POLICY || id == ID_COMPONENTS ||
-            id == ID_HARDWARE
+            id == ID_HARDWARE || id == ID_X11_SETTINGS
         ) {
             showGlobalNav = false
             showProjectNav = false
@@ -1956,6 +1975,7 @@ class MainActivity : AppCompatActivity() {
         buildPrivacyPolicyPage()
         buildHardwarePage()
         buildProotSettingsPage()
+        buildX11SettingsPage()
         if (!BuildConfig.PLAY_STORE_BUILD) buildChrootSettingsPage()
         buildSoftwareManagerPage()
         if (!BuildConfig.PLAY_STORE_BUILD) buildMarketplacePage()
@@ -1983,6 +2003,7 @@ class MainActivity : AppCompatActivity() {
         contentFrame.addView(componentsScrollView)
         contentFrame.addView(privacyPolicyScrollView)
         contentFrame.addView(hardwareScrollView)
+        contentFrame.addView(x11SettingsScrollView)
         contentFrame.addView(prootSettingsScrollView)
         if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(chrootSettingsScrollView)
         contentFrame.addView(softwareManagerScrollView)
@@ -4522,87 +4543,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildX11SettingsSectionButton(): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = NC.OUTLINE_VAR,
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 6,
-                cornerRadiusDp = 0
-            )
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            setOnClickListener {
-                try {
-                    val intent = Intent(this@MainActivity, Class.forName("com.termux.x11.LoriePreferences"))
-                    intent.action = Intent.ACTION_MAIN
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "X11 settings unavailable", Toast.LENGTH_SHORT).show()
-                }
-            }
+        return settingsHubNavRow(
+            iconRes = R.drawable.ic_display,
+            title = "X11 SETTINGS",
+            subtitle = "Display, pointer, keyboard, gestures",
+            pageId = ID_X11_SETTINGS
+        )
+    }
 
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.translationX = dp(4).toFloat()
-                        v.translationY = dp(4).toFloat()
-                        v.background = cyberBrutalistBg(
-                            fillColor = NC.SURFACE_LOW,
-                            strokeColor = NC.OUTLINE_VAR,
-                            shadowColor = NC.SHADOW_DARK,
-                            offsetDp = 2,
-                            cornerRadiusDp = 0
-                        )
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.translationX = 0f
-                        v.translationY = 0f
-                        v.background = cyberBrutalistBg(
-                            fillColor = NC.SURFACE_LOW,
-                            strokeColor = NC.OUTLINE_VAR,
-                            shadowColor = NC.SHADOW_DARK,
-                            offsetDp = 6,
-                            cornerRadiusDp = 0
-                        )
-                    }
-                }
-                false
-            }
-
-            val icon = ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.ic_display)
-                setColorFilter(NC.PRIMARY)
-                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { rightMargin = dp(12) }
-            }
-            val details = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            }
-            val name = TextView(this@MainActivity).apply {
-                text = "X11 SETTINGS"
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
-            }
-            val sub = TextView(this@MainActivity).apply {
-                text = "Display, pointer, keyboard, extra keys"
-                textSize = 11f
-                setTextColor(NC.ON_SURF_VAR)
-                typeface = Typeface.MONOSPACE
-            }
-            details.addView(name)
-            details.addView(sub)
-            val arrow = ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.ic_chevron_right)
-                setColorFilter(NC.PRIMARY)
-                layoutParams = LinearLayout.LayoutParams(dp(20), dp(20))
-            }
-            addView(icon)
-            addView(details)
-            addView(arrow)
+    private fun buildX11SettingsPage() {
+        x11SettingsPage = com.zenithblue.nativecode.x11.X11SettingsPage(this) {
+            navigateBackFromSubpage(ID_X11_SETTINGS)
         }
+        x11SettingsScrollView = x11SettingsPage!!.view
+    }
+
+    private fun refreshX11SettingsPage() {
+        x11SettingsPage?.refresh()
     }
 
     private fun buildSoftwareManagerSectionButton(): View {
@@ -21061,99 +21018,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     
-    private class CustomBrutalistToggle(
-        context: Context,
-        initialChecked: Boolean = false,
-        private val onCheckedChange: ((Boolean) -> Unit)? = null
-    ) : LinearLayout(context) {
-
-        var isChecked: Boolean = initialChecked
-            set(value) {
-                field = value
-                updateState(animate = false)
-            }
-
-        private val trackView = FrameLayout(context)
-        private val thumbView = View(context)
-
-        init {
-            orientation = HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            isClickable = true
-            isFocusable = true
-
-            val trackWidth = dp(46)
-            val trackHeight = dp(24)
-            val thumbSize = dp(18)
-            val margin = dp(3)
-
-            trackView.layoutParams = LayoutParams(trackWidth, trackHeight)
-            
-            val thumbParams = FrameLayout.LayoutParams(thumbSize, thumbSize).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                leftMargin = margin
-            }
-            thumbView.layoutParams = thumbParams
-
-            trackView.addView(thumbView)
-            addView(trackView)
-
-            updateState(animate = false)
-
-            setOnClickListener {
-                isChecked = !isChecked
-                updateState(animate = true)
-                onCheckedChange?.invoke(isChecked)
-            }
-        }
-
-        private fun updateState(animate: Boolean) {
-            val trackWidth = dp(46)
-            val thumbSize = dp(18)
-            val margin = dp(3)
-
-            val trackColor = if (isChecked) Color.parseColor("#3DDC84") else Color.parseColor("#1E1E1E")
-            val trackBorder = if (isChecked) Color.parseColor("#3DDC84") else Color.parseColor("#333333")
-            val thumbColor = if (isChecked) Color.parseColor("#0A0A0A") else Color.parseColor("#A0A0A0")
-
-            trackView.background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(trackColor)
-                setStroke(dp(2), trackBorder)
-                cornerRadius = 0f
-            }
-
-            thumbView.background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(thumbColor)
-                cornerRadius = 0f
-            }
-
-            val targetMargin = if (isChecked) {
-                trackWidth - thumbSize - margin
-            } else {
-                margin
-            }
-
-            val params = thumbView.layoutParams as FrameLayout.LayoutParams
-            if (animate) {
-                val anim = ValueAnimator.ofInt(params.leftMargin, targetMargin)
-                anim.duration = 150
-                anim.addUpdateListener { va ->
-                    params.leftMargin = va.animatedValue as Int
-                    thumbView.layoutParams = params
-                }
-                anim.start()
-            } else {
-                params.leftMargin = targetMargin
-                thumbView.layoutParams = params
-            }
-        }
-
-        private fun dp(dpValue: Int): Int {
-            return (dpValue * context.resources.displayMetrics.density).toInt()
-        }
-    }
+    // CustomBrutalistToggle is imported as an alias of the shared ui.BrutalistToggle.
 
     private class TerminalScanlineDrawable(
         private val bgColor: Int = Color.parseColor("#131313"),

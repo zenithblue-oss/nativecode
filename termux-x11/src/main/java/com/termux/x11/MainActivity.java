@@ -170,9 +170,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.main_activity);
 
         frm = findViewById(R.id.frame);
+        // Disconnected stub: SETTINGS opens the native X11 settings page,
+        // EXIT returns to the NativeCode settings hub (EXTRA_TARGET_PAGE is
+        // consumed by MainActivity.handleIntent in both cold and warm start).
+        View settingsBtn = findViewById(R.id.settings_button);
+        if (settingsBtn != null) {
+            settingsBtn.setOnClickListener((l) -> openNativePage(25));
+        }
         View exitBtn = findViewById(R.id.exit_button);
         if (exitBtn != null) {
-            exitBtn.setOnClickListener((l) -> finish());
+            exitBtn.setOnClickListener((l) -> openNativePage(5));
         }
 
         LorieView lorieView = findViewById(R.id.lorieView);
@@ -560,6 +567,21 @@ public class MainActivity extends AppCompatActivity {
             handler.postDelayed(this::tryConnect, 250);
         }
         return false;
+    }
+
+    /** Open a NativeCode MainActivity page from the disconnected stub. */
+    void openNativePage(int pageId) {
+        try {
+            Intent intent = new Intent();
+            intent.setClassName(getPackageName(), "com.zenithblue.nativecode.MainActivity");
+            intent.putExtra("EXTRA_TARGET_PAGE", pageId);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "openNativePage failed", e);
+        } finally {
+            finish();
+        }
     }
 
     void onPreferencesChanged(String key) {
