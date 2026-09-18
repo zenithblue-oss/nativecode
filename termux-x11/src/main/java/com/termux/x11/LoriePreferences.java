@@ -812,14 +812,21 @@ public class LoriePreferences extends AppCompatActivity implements PreferenceFra
          * Already-customized values (not stock) are left alone.
          */
         private static void migrateProductDefaultsOnce(SharedPreferences sp) {
-            final String flag = "nc_x11_product_defaults_v1";
+            final String flag = "nc_x11_product_defaults_v2";
             if (sp.getBoolean(flag, false))
                 return;
             SharedPreferences.Editor e = sp.edit();
-            // scaled @ 120%
+            // native resolution
             if (!sp.contains("displayResolutionMode")
-                    || "native".equals(sp.getString("displayResolutionMode", "native")))
-                e.putString("displayResolutionMode", "scaled");
+                    || "scaled".equals(sp.getString("displayResolutionMode", "")))
+                e.putString("displayResolutionMode", "native");
+            if (!sp.contains("fullscreen"))
+                e.putBoolean("fullscreen", true);
+            if (!sp.contains("hideCutout"))
+                e.putBoolean("hideCutout", true);
+            if (!sp.contains("touchMode")
+                    || "1".equals(sp.getString("touchMode", "")))
+                e.putString("touchMode", "3");
             if (!sp.contains("displayScale") || sp.getInt("displayScale", 100) == 100)
                 e.putInt("displayScale", 120);
             // extra keys OFF

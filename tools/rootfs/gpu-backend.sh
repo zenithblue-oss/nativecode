@@ -84,9 +84,8 @@ gpu_find_icd() {
     # The pinned LFDev stack must remain coherent with its EGL/GLX/DRI libraries.
     if [ "$_kind" = "freedreno" ]; then
         for _c in \
-            "$GPU_ADRENO_PREFIX/share/vulkan/icd.d/freedreno_icd.aarch64.json" \
-            "$GPU_ADRENO_PREFIX/icd/freedreno_icd.aarch64.json" \
-            /usr/lib/aarch64-linux-gnu/GL/vulkan/icd.d/freedreno_icd.aarch64.json
+            /usr/share/vulkan/icd.d/freedreno_icd.aarch64.json \
+            "$GPU_ADRENO_PREFIX/share/vulkan/icd.d/freedreno_icd.aarch64.json"
         do
             [ -f "$_c" ] && { printf '%s\n' "$_c"; return 0; }
         done
@@ -153,12 +152,8 @@ gpu_apply() {
     export VTEST_SOCKET_NAME="$VTEST_SOCK"
     case "$_be" in
         turnip)
-            export MESA_LOADER_DRIVER_OVERRIDE=kgsl
-            export GALLIUM_DRIVER=freedreno
-            if [ -d "$GPU_ADRENO_PREFIX/lib" ]; then
-                export LD_LIBRARY_PATH="$GPU_ADRENO_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-                export LIBGL_DRIVERS_PATH="$GPU_ADRENO_PREFIX/lib/dri"
-            fi
+            export MESA_LOADER_DRIVER_OVERRIDE=zink
+            export GALLIUM_DRIVER=zink
             [ -n "$_fd" ] && export VK_DRIVER_FILES="$_fd" && export VK_ICD_FILENAMES="$_fd"
             export TU_DEBUG=noconform
             export MESA_VK_WSI_DEBUG=sw

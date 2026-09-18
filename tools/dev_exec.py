@@ -18,12 +18,27 @@ def run_op13r(cmd):
 
 def run_poco(cmd):
     # Run in Poco guest container via proot login
+    p_uid = subprocess.run([
+        "adb", "-s", "Y5WWBMJVOZSK4HU8", "shell",
+        "dumpsys package com.zenithblue.nativecode | grep userId= | head -n 1"
+    ], capture_output=True, text=True)
+    uid_str = p_uid.stdout.strip().split("=")[-1] if "=" in p_uid.stdout else "10333"
+    app_user = f"u0_a{int(uid_str) - 10000}" if uid_str.isdigit() and int(uid_str) >= 10000 else "u0_a333"
+
+    p_lib = subprocess.run([
+        "adb", "-s", "Y5WWBMJVOZSK4HU8", "shell",
+        "su -c 'ls -d /data/app/*/*com.zenithblue.nativecode*/lib/arm64 2>/dev/null | head -n 1'"
+    ], capture_output=True, text=True)
+    lib_dir = p_lib.stdout.strip()
+    if not lib_dir:
+        lib_dir = "/data/data/com.zenithblue.nativecode/lib"
+    
     proot_cmd = (
         "TERMUX_APP__PACKAGE_NAME=com.zenithblue.nativecode "
         "TERMUX__PREFIX=/data/data/com.zenithblue.nativecode/files/usr "
         "TERMUX_VERSION=flux-host "
-        "PD_PROOT_BIN=/data/app/~~jaDx-XL46EEnL37_E5rFUw==/com.zenithblue.nativecode-cF9lP4BnTaF_sUznq6G3xg==/lib/arm64/libproot.so "
-        "PROOT_LOADER=/data/app/~~jaDx-XL46EEnL37_E5rFUw==/com.zenithblue.nativecode-cF9lP4BnTaF_sUznq6G3xg==/lib/arm64/libloader.so "
+        f"PD_PROOT_BIN={lib_dir}/libproot.so "
+        f"PROOT_LOADER={lib_dir}/libloader.so "
         "LD_LIBRARY_PATH=/data/data/com.zenithblue.nativecode/files/usr/lib "
         "PATH=/data/data/com.zenithblue.nativecode/files/usr/bin:/system/bin "
         "/system/bin/linker64 /data/data/com.zenithblue.nativecode/files/usr/bin/python "
@@ -31,7 +46,7 @@ def run_poco(cmd):
     )
     p = subprocess.run([
         "adb", "-s", "Y5WWBMJVOZSK4HU8", "shell",
-        f"su -c 'su u0_a332 -c \"{proot_cmd}\"'"
+        f"su -c 'su {app_user} -c \"{proot_cmd}\"'"
     ], input=cmd.encode("utf-8"), capture_output=True)
     return p.returncode, p.stdout.decode("utf-8", errors="replace"), p.stderr.decode("utf-8", errors="replace")
 

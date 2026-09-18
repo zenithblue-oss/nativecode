@@ -107,7 +107,7 @@ object X11Prefs {
 
     val BOOL_DEFAULTS = mapOf(
         ADJUST_RESOLUTION to false, DISPLAY_STRETCH to false, RESEED to true,
-        PIP to false, FULLSCREEN to false, HIDE_CUTOUT to false, KEEP_SCREEN_ON to true,
+        PIP to false, FULLSCREEN to true, HIDE_CUTOUT to true, KEEP_SCREEN_ON to true,
         SCALE_TOUCHPAD to true, STYLUS_CLICK_OVERRIDE to false, STYLUS_IS_MOUSE to false,
         STYLUS_BUTTON_MOD to false, SHOW_MOUSE_HELPER to false, POINTER_CAPTURE to false,
         TAP_TO_MOVE to false, IGNORE_GAMEPAD to false, SHOW_ADDITIONAL_KBD to false,
@@ -117,9 +117,9 @@ object X11Prefs {
     )
 
     val STRING_DEFAULTS = mapOf(
-        DISPLAY_MODE to "scaled", DISPLAY_EXACT to "1280x1024",
+        DISPLAY_MODE to "native", DISPLAY_EXACT to "1280x1024",
         DISPLAY_CUSTOM to "1280x1024", DISPLAY_FILTERING to "nearest",
-        FORCE_ORIENTATION to "auto", TOUCH_MODE to "1", TRANSFORM_POINTER to "no",
+        FORCE_ORIENTATION to "auto", TOUCH_MODE to "3", TRANSFORM_POINTER to "no",
         SWIPE_UP to "no action", SWIPE_DOWN to "toggle additional key bar",
         VOLUME_UP to "no action", VOLUME_DOWN to "no action",
         BACK_BUTTON to "return to app", NOTIF_TAP to "open preferences",
@@ -132,25 +132,55 @@ object X11Prefs {
     )
 
     fun prefs(ctx: Context): SharedPreferences =
-        // Same file PreferenceManager.getDefaultSharedPreferences(ctx) uses —
-        // the store PrefsProto reads. Avoids adding the preference lib to app.
         ctx.getSharedPreferences("${ctx.packageName}_preferences", Context.MODE_PRIVATE)
 
-    fun getBool(ctx: Context, key: String): Boolean =
-        prefs(ctx).getBoolean(key, BOOL_DEFAULTS[key] ?: false)
+    fun getBool(ctx: Context, key: String): Boolean {
+        val sp = prefs(ctx)
+        if (key == FULLSCREEN || key == HIDE_CUTOUT) {
+            if (!sp.contains(key)) {
+                sp.edit().putBoolean(key, true).apply()
+                return true
+            }
+        }
+        return sp.getBoolean(key, BOOL_DEFAULTS[key] ?: false)
+    }
 
-    fun getString(ctx: Context, key: String): String =
-        prefs(ctx).getString(key, STRING_DEFAULTS[key]) ?: (STRING_DEFAULTS[key] ?: "")
+    fun getString(ctx: Context, key: String): String {
+        val sp = prefs(ctx)
+        if (key == DISPLAY_MODE) {
+            val v = sp.getString(key, null)
+            if (v == null || v == "scaled") {
+                sp.edit().putString(key, "native").apply()
+                return "native"
+            }
+        }
+        if (key == TOUCH_MODE) {
+            val v = sp.getString(key, null)
+            if (v == null || v == "1") {
+                sp.edit().putString(key, "3").apply()
+                return "3"
+            }
+        }
+        return sp.getString(key, STRING_DEFAULTS[key]) ?: (STRING_DEFAULTS[key] ?: "")
+    }
 
     fun getInt(ctx: Context, key: String): Int =
         prefs(ctx).getInt(key, INT_DEFAULTS[key] ?: 0)
 
     /**
-     * Write one preference through the X11 receiver. Values are strings on
-     * the wire: booleans as "true"/"false", ints as decimal, lists accept
-     * entry labels or values (receiver resolves both).
+     * Write one preference both synchronously to SharedPreferences and through
+     * the X11 broadcast receiver so the UI, disk, and live session stay in sync.
      */
     fun put(ctx: Context, key: String, value: String) {
+        val sp = prefs(ctx)
+        val editor = sp.edit()
+        when (key) {
+            in BOOL_DEFAULTS.keys -> editor.putBoolean(key, value.toBoolean())
+            in INT_DEFAULTS.keys -> editor.putInt(key, value.toIntOrNull() ?: INT_DEFAULTS[key] ?: 0)
+            else -> editor.putString(key, value)
+        }
+        editor.commit()
+
         val intent = Intent(ACTION_CHANGE).apply {
             setPackage(ctx.packageName)
             putExtra(key, value)

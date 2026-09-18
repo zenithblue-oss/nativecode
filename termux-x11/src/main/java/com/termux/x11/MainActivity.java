@@ -187,6 +187,13 @@ public class MainActivity extends AppCompatActivity {
 
         setupChromeCluster();
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                this::goToNativeCodeHome
+            );
+        }
+
         mInputHandler = new TouchInputHandler(this, new InputEventSender(lorieView));
         mLorieKeyListener = (v, k, e) -> {
             InputDevice dev = e.getDevice();
@@ -786,6 +793,8 @@ public class MainActivity extends AppCompatActivity {
         try {
             Intent intent = new Intent(this, Class.forName("com.zenithblue.nativecode.MainActivity"));
             intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            intent.putExtra("EXTRA_TARGET_PAGE", 5);
+            intent.putExtra("target_page", 5);
             startActivity(intent);
         } catch (Exception e) {
             Log.e("MainActivity", "Failed to launch NativeCode MainActivity", e);

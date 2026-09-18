@@ -76,7 +76,7 @@ import com.zenithblue.nativecode.git.*
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     // ── Views ──────────────────────────────────────────────────────────────────
     private lateinit var rootLayout: LinearLayout
@@ -185,6 +185,9 @@ class MainActivity : AppCompatActivity() {
     /** Settings → native X11 Settings page (modular x11 package). */
     private lateinit var x11SettingsScrollView: ScrollView
     private var x11SettingsPage: com.zenithblue.nativecode.x11.X11SettingsPage? = null
+    /** PRoot Home file navigation page. */
+    private lateinit var prootFilesScrollView: ScrollView
+    private var prootFilesPage: com.zenithblue.nativecode.proot.ProotFilesPage? = null
     private lateinit var vpuStatusBadge: TextView
     private lateinit var vpuSocDetailTv: TextView
     private lateinit var gpuStatusBadge: TextView
@@ -423,6 +426,7 @@ class MainActivity : AppCompatActivity() {
     private val ID_COMPONENTS = 23
     private val ID_HARDWARE = 24
     private val ID_X11_SETTINGS = 25
+    private val ID_PROOT_FILES = 26
 
     private var fileViewerBackPage = ID_FILES
     private var diffViewerBackPage = ID_GIT
@@ -779,8 +783,16 @@ class MainActivity : AppCompatActivity() {
         handleIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        NativeCodeBridge.agentUiDelegate = this
+    }
+
     override fun onPause() {
         super.onPause()
+        if (NativeCodeBridge.agentUiDelegate === this) {
+            NativeCodeBridge.agentUiDelegate = null
+        }
         getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
             .putString("active_project_name", activeProjectName)
             .putString("active_project_path", activeProjectPath)
@@ -848,7 +860,11 @@ class MainActivity : AppCompatActivity() {
             if (projName != null) {
                 activeProjectName = projName
             }
-            val targetPage = it.getIntExtra("EXTRA_TARGET_PAGE", -1)
+            val targetPage = if (it.hasExtra("EXTRA_TARGET_PAGE")) {
+                it.getIntExtra("EXTRA_TARGET_PAGE", -1)
+            } else {
+                it.getIntExtra("target_page", -1)
+            }
             if (targetPage != -1) {
                 navigateToPage(targetPage)
             }
@@ -856,6 +872,19 @@ class MainActivity : AppCompatActivity() {
             if (createTerm != null) {
                 createNewTerminalSession(createTerm)
                 navigateToPage(ID_TERMINAL)
+            }
+            val agentApkPath = it.getStringExtra("EXTRA_AGENT_INSTALL_APK")
+            if (!agentApkPath.isNullOrBlank()) {
+                val apkFile = File(agentApkPath)
+                val title = it.getStringExtra("EXTRA_AGENT_TITLE")
+                val message = it.getStringExtra("EXTRA_AGENT_MESSAGE")
+                showAgentInstallApkDialog(apkFile, title, message)
+            }
+            val agentOpenUrl = it.getStringExtra("EXTRA_AGENT_OPEN_LINK_URL")
+            if (!agentOpenUrl.isNullOrBlank()) {
+                val title = it.getStringExtra("EXTRA_AGENT_TITLE")
+                val message = it.getStringExtra("EXTRA_AGENT_MESSAGE")
+                showAgentOpenLinkDialog(agentOpenUrl, title, message)
             }
         }
     }
@@ -1038,6 +1067,9 @@ class MainActivity : AppCompatActivity() {
         if (::prootSettingsScrollView.isInitialized) {
             prootSettingsScrollView.visibility = View.GONE
         }
+        if (::prootFilesScrollView.isInitialized) {
+            prootFilesScrollView.visibility = View.GONE
+        }
         if (::chrootSettingsScrollView.isInitialized) {
             chrootSettingsScrollView.visibility = View.GONE
         }
@@ -1159,6 +1191,13 @@ class MainActivity : AppCompatActivity() {
                 }
                 applyCachedProotInfo()
                 refreshProotSettingsCard(force = false)
+            }
+            ID_PROOT_FILES -> {
+                if (::prootFilesScrollView.isInitialized) {
+                    prootFilesScrollView.visibility = View.VISIBLE
+                    prootFilesScrollView.scrollTo(0, 0)
+                }
+                prootFilesPage?.refresh()
             }
             ID_CHROOT_SETTINGS -> if (!BuildConfig.PLAY_STORE_BUILD) {
                 if (::chrootSettingsScrollView.isInitialized) {
@@ -1362,6 +1401,13 @@ class MainActivity : AppCompatActivity() {
         }
         if (::scriptsScrollView.isInitialized && scriptsScrollView.visibility == View.VISIBLE) {
             navigateBackFromSubpage(ID_SCRIPTS, fallback = ID_SETTINGS)
+            return
+        }
+        if (::prootFilesScrollView.isInitialized && prootFilesScrollView.visibility == View.VISIBLE) {
+            if (prootFilesPage?.handleBack() == true) {
+                return
+            }
+            navigateBackFromSubpage(ID_PROOT_FILES, fallback = ID_PROOT_SETTINGS)
             return
         }
         if (::prootSettingsScrollView.isInitialized && prootSettingsScrollView.visibility == View.VISIBLE) {
@@ -1975,6 +2021,7 @@ class MainActivity : AppCompatActivity() {
         buildPrivacyPolicyPage()
         buildHardwarePage()
         buildProotSettingsPage()
+        buildProotFilesPage()
         buildX11SettingsPage()
         if (!BuildConfig.PLAY_STORE_BUILD) buildChrootSettingsPage()
         buildSoftwareManagerPage()
@@ -2005,6 +2052,7 @@ class MainActivity : AppCompatActivity() {
         contentFrame.addView(hardwareScrollView)
         contentFrame.addView(x11SettingsScrollView)
         contentFrame.addView(prootSettingsScrollView)
+        contentFrame.addView(prootFilesScrollView)
         if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(chrootSettingsScrollView)
         contentFrame.addView(softwareManagerScrollView)
         if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(marketplaceScrollView)
@@ -4336,17 +4384,16 @@ class MainActivity : AppCompatActivity() {
         settingsHubLayout.addView(buildGuiLaunchCard())
         settingsHubLayout.addView(spacer(16))
 
-        if (BuildConfig.PLAY_STORE_BUILD) {
-            settingsHubLayout.addView(
-                settingsHubNavRow(
-                    iconRes = R.drawable.ic_download,
-                    title = "COMPONENTS",
-                    subtitle = "Linux runtime · Android SDK 36",
-                    pageId = ID_COMPONENTS
-                )
+        // Components card (Play-delivered / bundled Linux runtime & SDK)
+        settingsHubLayout.addView(
+            settingsHubNavRow(
+                iconRes = R.drawable.ic_download,
+                title = "COMPONENTS",
+                subtitle = "Linux runtime · Android SDK 36",
+                pageId = ID_COMPONENTS
             )
-            settingsHubLayout.addView(spacer(16))
-        }
+        )
+        settingsHubLayout.addView(spacer(16))
 
         // Terminal Settings card
         settingsHubLayout.addView(buildTerminalSettingsCard())
@@ -4530,8 +4577,8 @@ class MainActivity : AppCompatActivity() {
                 typeface = Typeface.DEFAULT_BOLD
             })
             addView(TextView(this@MainActivity).apply {
-                val xfce = File(rootfs, "usr/bin/startxfce4").isFile
-                text = if (xfce) "READY · PRoot · XFCE4" else "NOT INSTALLED · complete onboarding"
+                val phosh = File(rootfs, "usr/local/bin/phoc").exists() || File(rootfs, "usr/local/bin/nativecode-desktop").exists() || File(rootfs, "usr/bin/startxfce4").exists()
+                text = if (phosh) "READY · PRoot · Phosh Desktop" else "NOT INSTALLED · complete onboarding"
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -4560,6 +4607,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshX11SettingsPage() {
         x11SettingsPage?.refresh()
+    }
+
+    private fun buildProotFilesPage() {
+        prootFilesPage = com.zenithblue.nativecode.proot.ProotFilesPage(
+            ctx = this,
+            onBack = { navigateBackFromSubpage(ID_PROOT_FILES, fallback = ID_PROOT_SETTINGS) },
+            onOpenFile = { file -> showFileViewer(file.absolutePath, ID_PROOT_FILES) }
+        )
+        prootFilesScrollView = prootFilesPage!!.view
     }
 
     private fun buildSoftwareManagerSectionButton(): View {
@@ -6302,6 +6358,9 @@ class MainActivity : AppCompatActivity() {
         if (::prootSettingsScrollView.isInitialized) {
             prootSettingsScrollView.visibility = View.GONE
         }
+        if (::prootFilesScrollView.isInitialized) {
+            prootFilesScrollView.visibility = View.GONE
+        }
         if (::chrootSettingsScrollView.isInitialized) {
             chrootSettingsScrollView.visibility = View.GONE
         }
@@ -6351,6 +6410,7 @@ class MainActivity : AppCompatActivity() {
             ID_PROJECT_WORKSPACE,
             ID_PROJECT_GIT_DIFF,
             ID_PROJECT_SETTINGS,
+            ID_PROOT_FILES,
             ID_FILES -> fileViewerBackPage
             else -> ID_PROJECT_DIR_TREE
         }
@@ -6388,7 +6448,7 @@ class MainActivity : AppCompatActivity() {
         // Sticky chrome (fixed at top)
         fileViewerPathTv?.text = "// $relativePathStr"
         (fileViewerStickyHeader.findViewWithTag<TextView>("copy_path_btn"))?.setOnClickListener {
-            copyToClipboard("File Path", targetFile.absolutePath)
+            copyToClipboard("File Path", relativePathStr)
         }
 
         if (!::fileViewerContentHost.isInitialized) return
@@ -6999,6 +7059,377 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun showOpenLinkAlert(url: String, title: String?, message: String?): Boolean {
+        if (isFinishing || isDestroyed) return false
+        runOnUiThread {
+            showAgentOpenLinkDialog(url, title, message)
+        }
+        return true
+    }
+
+    override fun showInstallApkAlert(apkFile: File, title: String?, message: String?): Boolean {
+        if (isFinishing || isDestroyed) return false
+        runOnUiThread {
+            showAgentInstallApkDialog(apkFile, title, message)
+        }
+        return true
+    }
+
+    private fun showAgentOpenLinkDialog(url: String, title: String?, message: String?) {
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
+        dialog.setCancelable(true)
+
+        val scrim = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#CC0A0A0A"))
+            layoutParams = ViewGroup.LayoutParams(MATCH, MATCH)
+            setOnClickListener { dialog.dismiss() }
+        }
+
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOW,
+                strokeColor = NC.PRIMARY,
+                shadowColor = NC.SHADOW_GREEN,
+                offsetDp = 6,
+                cornerRadiusDp = 0,
+                rightFaceColor = NC.BORDER
+            )
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            layoutParams = FrameLayout.LayoutParams(MATCH, WRAP).apply {
+                gravity = Gravity.CENTER
+                leftMargin = dp(24)
+                rightMargin = dp(24)
+            }
+            isClickable = true
+        }
+
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(12))
+        }
+        titleRow.addView(TextView(this).apply {
+            text = "LINK"
+            textSize = 10f
+            setTextColor(Color.parseColor("#0A0A0A"))
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(NC.PRIMARY)
+            }
+            setPadding(dp(6), dp(2), dp(6), dp(2))
+            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(8) }
+        })
+        titleRow.addView(TextView(this).apply {
+            text = title?.takeIf { it.isNotBlank() } ?: "AGENT: OPEN LINK"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        })
+        card.addView(titleRow)
+
+        card.addView(View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, dp(1)).apply { bottomMargin = dp(14) }
+            setBackgroundColor(NC.OUTLINE_VAR)
+        })
+
+        if (!message.isNullOrBlank()) {
+            card.addView(TextView(this).apply {
+                text = message
+                textSize = 13f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setLineSpacing(dp(2).toFloat(), 1.15f)
+                setPadding(0, 0, 0, dp(12))
+            })
+        }
+
+        val urlBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 3, 0)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(20) }
+        }
+        val urlTv = TextView(this).apply {
+            text = url
+            textSize = 12f
+            setTextColor(NC.PRIMARY)
+            typeface = Typeface.MONOSPACE
+            setTextIsSelectable(true)
+        }
+        urlBox.addView(urlTv)
+        card.addView(urlBox)
+
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val dismissBtn = TextView(this).apply {
+            text = "DISMISS"
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setTextColor(NC.ON_SURF_VAR)
+            gravity = Gravity.CENTER
+            background = cyberBrutalistBg(NC.SURFACE_LOW, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
+            setOnClickListener { dialog.dismiss() }
+        }
+
+        val copyBtn = TextView(this).apply {
+            text = "COPY"
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setTextColor(NC.PRIMARY)
+            gravity = Gravity.CENTER
+            background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
+            setOnClickListener {
+                val clip = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clip?.setPrimaryClip(ClipData.newPlainText("URL", url))
+                Toast.makeText(this@MainActivity, "URL copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        val openBtn = TextView(this).apply {
+            text = "OPEN BROWSER"
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setTextColor(Color.parseColor("#0A0A0A"))
+            gravity = Gravity.CENTER
+            background = cyberBrutalistBg(NC.PRIMARY, NC.BORDER, NC.SHADOW_GREEN, 4, 0)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1.4f)
+            setOnClickListener {
+                dialog.dismiss()
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                try {
+                    startActivity(Intent.createChooser(intent, "Open with"))
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "No browser found: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        btnRow.addView(dismissBtn)
+        btnRow.addView(copyBtn)
+        btnRow.addView(openBtn)
+        card.addView(btnRow)
+
+        scrim.addView(card)
+        dialog.setContentView(scrim)
+        dialog.show()
+    }
+
+    private fun showAgentInstallApkDialog(file: File, title: String?, message: String?) {
+        val pm = packageManager
+        val pkgInfo = try { pm.getPackageArchiveInfo(file.absolutePath, 0) } catch (_: Exception) { null }
+        var appLabel = file.name
+        var pkgName = "Package Archive"
+        var verStr = "v1.0"
+        var iconDrawable: Drawable? = null
+
+        pkgInfo?.applicationInfo?.let { appInfo ->
+            appInfo.sourceDir = file.absolutePath
+            appInfo.publicSourceDir = file.absolutePath
+            appLabel = try { appInfo.loadLabel(pm).toString() } catch (_: Exception) { file.name }
+            pkgName = pkgInfo.packageName ?: ""
+            verStr = "v${pkgInfo.versionName ?: "1.0"}"
+            iconDrawable = try { appInfo.loadIcon(pm) } catch (_: Exception) { null }
+        }
+
+        val targetSdk = pkgInfo?.applicationInfo?.targetSdkVersion ?: 0
+        val oldSdkWarn = if (targetSdk in 1 until 23) {
+            "\n\nThis APK targets SDK $targetSdk. Android 14+ will refuse to install it."
+        } else {
+            ""
+        }
+
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
+        dialog.setCancelable(true)
+
+        val scrim = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#CC0A0A0A"))
+            layoutParams = ViewGroup.LayoutParams(MATCH, MATCH)
+            setOnClickListener { dialog.dismiss() }
+        }
+
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOW,
+                strokeColor = NC.PRIMARY,
+                shadowColor = NC.SHADOW_GREEN,
+                offsetDp = 6,
+                cornerRadiusDp = 0,
+                rightFaceColor = NC.BORDER
+            )
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            layoutParams = FrameLayout.LayoutParams(MATCH, WRAP).apply {
+                gravity = Gravity.CENTER
+                leftMargin = dp(24)
+                rightMargin = dp(24)
+            }
+            isClickable = true
+        }
+
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(12))
+        }
+        titleRow.addView(TextView(this).apply {
+            text = "APK"
+            textSize = 10f
+            setTextColor(Color.parseColor("#0A0A0A"))
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(NC.PRIMARY)
+            }
+            setPadding(dp(6), dp(2), dp(6), dp(2))
+            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(8) }
+        })
+        titleRow.addView(TextView(this).apply {
+            text = title?.takeIf { it.isNotBlank() } ?: "AGENT: INSTALL APK"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        })
+        card.addView(titleRow)
+
+        card.addView(View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, dp(1)).apply { bottomMargin = dp(14) }
+            setBackgroundColor(NC.OUTLINE_VAR)
+        })
+
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(12))
+        }
+        val iconIv = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).apply { rightMargin = dp(12) }
+            if (iconDrawable != null) {
+                setImageDrawable(iconDrawable)
+            } else {
+                setImageResource(R.drawable.ic_extension)
+                setColorFilter(NC.PRIMARY)
+            }
+        }
+        val infoCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        }
+        infoCol.addView(TextView(this).apply {
+            text = appLabel
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        infoCol.addView(TextView(this).apply {
+            text = "$pkgName • $verStr\n${formatFileSize(file.length())}"
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+        })
+        headerRow.addView(iconIv)
+        headerRow.addView(infoCol)
+        card.addView(headerRow)
+
+        if (!message.isNullOrBlank()) {
+            card.addView(TextView(this).apply {
+                text = message
+                textSize = 13f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setLineSpacing(dp(2).toFloat(), 1.15f)
+                setPadding(0, 0, 0, dp(8))
+            })
+        }
+
+        card.addView(TextView(this).apply {
+            text = "NativeCode cannot install APKs directly. Saves a copy to Downloads, then tap the file to install.$oldSdkWarn"
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, 0, 0, dp(16))
+        })
+
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val dismissBtn = TextView(this).apply {
+            text = "DISMISS"
+            textSize = 11f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setTextColor(NC.ON_SURF_VAR)
+            gravity = Gravity.CENTER
+            background = cyberBrutalistBg(NC.SURFACE_LOW, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
+            setOnClickListener { dialog.dismiss() }
+        }
+
+        val shareBtn = TextView(this).apply {
+            text = "SHARE"
+            textSize = 11f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setTextColor(NC.PRIMARY)
+            gravity = Gravity.CENTER
+            background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
+            setOnClickListener {
+                dialog.dismiss()
+                shareApkFromProject(file)
+            }
+        }
+
+        val saveOpenBtn = TextView(this).apply {
+            text = "SAVE & OPEN"
+            textSize = 11f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setTextColor(Color.parseColor("#0A0A0A"))
+            gravity = Gravity.CENTER
+            background = cyberBrutalistBg(NC.PRIMARY, NC.BORDER, NC.SHADOW_GREEN, 4, 0)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1.4f)
+            setOnClickListener {
+                dialog.dismiss()
+                exportApkToDownloads(file)
+            }
+        }
+
+        btnRow.addView(dismissBtn)
+        btnRow.addView(shareBtn)
+        btnRow.addView(saveOpenBtn)
+        card.addView(btnRow)
+
+        scrim.addView(card)
+        dialog.setContentView(scrim)
+        dialog.show()
+    }
+
     /**
      * Play-safe APK handoff: copy to Downloads / share sheet.
      * Never ACTION_VIEW package-archive or PackageInstaller from this process.
@@ -7336,12 +7767,8 @@ class MainActivity : AppCompatActivity() {
         val webView = android.webkit.WebView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             setBackgroundColor(NC.BG)
-            settings.javaScriptEnabled = false
-            settings.domStorageEnabled = false
-            settings.allowFileAccess = false
-            settings.allowContentAccess = false
-            settings.blockNetworkLoads = true
-            // Let WebView scroll its own content (fixed chrome above)
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
             isVerticalScrollBarEnabled = true
             val html = buildObsidianMarkdownHtml(mdContent)
             loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
@@ -7377,7 +7804,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildObsidianMarkdownHtml(rawMd: String): String {
-        val safeMd = android.text.TextUtils.htmlEncode(rawMd)
+        val htmlBody = markdownToHtml(rawMd)
         return """
             <!DOCTYPE html>
             <html>
@@ -7393,26 +7820,272 @@ class MainActivity : AppCompatActivity() {
                 margin: 0;
                 word-wrap: break-word;
               }
+              h1, h2, h3, h4, h5, h6 {
+                color: #60f99e;
+                font-family: monospace, sans-serif;
+                border-bottom: 1px solid #3c4a3f;
+                padding-bottom: 6px;
+                margin-top: 24px;
+                margin-bottom: 12px;
+              }
+              h1 { font-size: 1.5em; }
+              h2 { font-size: 1.3em; }
+              h3 { font-size: 1.1em; }
+              a { color: #60f99e; text-decoration: none; font-weight: 500; }
+              a:hover { text-decoration: underline; }
+              code {
+                background-color: #201f1f;
+                color: #60f99e;
+                font-family: monospace;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.9em;
+              }
               pre {
                 background-color: #0e0e0e;
                 border: 1px solid #3c4a3f;
                 padding: 12px;
-                border-radius: 0;
+                border-radius: 4px;
                 overflow-x: auto;
                 max-width: 100%;
               }
+              pre code {
+                background: transparent;
+                padding: 0;
                 color: #e5e2e1;
                 font-family: monospace;
-                white-space: pre-wrap;
-                word-break: break-word;
+              }
+              blockquote {
+                border-left: 3px solid #60f99e;
+                margin: 12px 0;
+                padding: 6px 14px;
+                color: #bbcbbc;
+                background: #1c1b1b;
+              }
+              ul, ol {
+                padding-left: 24px;
+                margin: 12px 0;
+              }
+              li {
+                margin-bottom: 6px;
+              }
+              p {
+                margin: 8px 0;
+              }
+              hr {
+                border: none;
+                border-top: 1px solid #3c4a3f;
+                margin: 20px 0;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 16px 0;
+                background: #1c1b1b;
+                overflow-x: auto;
+                display: block;
+              }
+              th, td {
+                border: 1px solid #3c4a3f;
+                padding: 8px 12px;
+                text-align: left;
+              }
+              th {
+                background-color: #201f1f;
+                color: #60f99e;
+                font-family: monospace;
+              }
+              del {
+                color: #8c8c8c;
               }
             </style>
             </head>
             <body>
-              <pre>$safeMd</pre>
+              $htmlBody
             </body>
             </html>
         """.trimIndent()
+    }
+
+    private fun markdownToHtml(md: String): String {
+        val lines = md.lines()
+        val out = StringBuilder()
+        var inCodeBlock = false
+        val codeBlockContent = StringBuilder()
+        var inList = false
+        var listType = ""
+        var inBlockquote = false
+        var inTable = false
+        val tableLines = mutableListOf<String>()
+
+        fun closeList() {
+            if (inList) {
+                out.append("</$listType>\n")
+                inList = false
+                listType = ""
+            }
+        }
+
+        fun closeBlockquote() {
+            if (inBlockquote) {
+                out.append("</blockquote>\n")
+                inBlockquote = false
+            }
+        }
+
+        fun flushTable() {
+            if (tableLines.size >= 2) {
+                out.append("<table>\n")
+                var isHeader = true
+                for (tLine in tableLines) {
+                    val trimmed = tLine.trim()
+                    if (trimmed.contains("---")) {
+                        isHeader = false
+                        continue
+                    }
+                    val parts = trimmed.split('|').map { it.trim() }
+                    val cells = parts.filterIndexed { idx, _ -> idx > 0 && idx < parts.size - 1 }
+                    val tag = if (isHeader) "th" else "td"
+                    out.append("<tr>")
+                    for (cell in cells) {
+                        out.append("<$tag>").append(parseInlineMarkdown(cell)).append("</$tag>")
+                    }
+                    out.append("</tr>\n")
+                }
+                out.append("</table>\n")
+            }
+            tableLines.clear()
+            inTable = false
+        }
+
+        for (line in lines) {
+            val trimmed = line.trim()
+
+            if (trimmed.startsWith("```")) {
+                if (inCodeBlock) {
+                    out.append("<pre><code>")
+                        .append(android.text.TextUtils.htmlEncode(codeBlockContent.toString()))
+                        .append("</code></pre>\n")
+                    inCodeBlock = false
+                    codeBlockContent.clear()
+                } else {
+                    closeList()
+                    closeBlockquote()
+                    if (inTable) flushTable()
+                    inCodeBlock = true
+                }
+                continue
+            }
+            if (inCodeBlock) {
+                codeBlockContent.append(line).append("\n")
+                continue
+            }
+
+            if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+                closeList()
+                closeBlockquote()
+                inTable = true
+                tableLines.add(trimmed)
+                continue
+            } else if (inTable) {
+                flushTable()
+            }
+
+            if (trimmed.isEmpty()) {
+                closeList()
+                closeBlockquote()
+                continue
+            }
+
+            if (trimmed == "---" || trimmed == "***" || trimmed == "___") {
+                closeList()
+                closeBlockquote()
+                out.append("<hr>\n")
+                continue
+            }
+
+            if (trimmed.startsWith("#")) {
+                closeList()
+                closeBlockquote()
+                val level = trimmed.takeWhile { it == '#' }.length.coerceIn(1, 6)
+                val text = trimmed.drop(level).trim()
+                val id = text.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]+"), "-").trim('-')
+                out.append("<h$level id=\"$id\">").append(parseInlineMarkdown(text)).append("</h$level>\n")
+                continue
+            }
+
+            if (trimmed.startsWith(">")) {
+                closeList()
+                if (!inBlockquote) {
+                    out.append("<blockquote>")
+                    inBlockquote = true
+                } else {
+                    out.append("<br>")
+                }
+                val text = trimmed.removePrefix(">").trim()
+                out.append(parseInlineMarkdown(text))
+                continue
+            } else {
+                closeBlockquote()
+            }
+
+            val ulMatch = Regex("""^[-*+]\s+(.*)$""").matchEntire(trimmed)
+            if (ulMatch != null) {
+                if (!inList || listType != "ul") {
+                    closeList()
+                    out.append("<ul>\n")
+                    inList = true
+                    listType = "ul"
+                }
+                out.append("<li>").append(parseInlineMarkdown(ulMatch.groupValues[1])).append("</li>\n")
+                continue
+            }
+
+            val olMatch = Regex("""^\d+\.\s+(.*)$""").matchEntire(trimmed)
+            if (olMatch != null) {
+                if (!inList || listType != "ol") {
+                    closeList()
+                    out.append("<ol>\n")
+                    inList = true
+                    listType = "ol"
+                }
+                out.append("<li>").append(parseInlineMarkdown(olMatch.groupValues[1])).append("</li>\n")
+                continue
+            }
+
+            closeList()
+            out.append("<p>").append(parseInlineMarkdown(trimmed)).append("</p>\n")
+        }
+
+        if (inCodeBlock) {
+            out.append("<pre><code>")
+                .append(android.text.TextUtils.htmlEncode(codeBlockContent.toString()))
+                .append("</code></pre>\n")
+        }
+        closeList()
+        closeBlockquote()
+        if (inTable) flushTable()
+
+        return out.toString()
+    }
+
+    private fun parseInlineMarkdown(raw: String): String {
+        var s = android.text.TextUtils.htmlEncode(raw)
+
+        s = s.replace(Regex("""!\[([^\]]*)\]\(([^)]+)\)""")) { m ->
+            "<img src=\"${m.groupValues[2]}\" alt=\"${m.groupValues[1]}\" />"
+        }
+        s = s.replace(Regex("""\[([^\]]+)\]\(([^)]+)\)""")) { m ->
+            "<a href=\"${m.groupValues[2]}\">${m.groupValues[1]}</a>"
+        }
+        s = s.replace(Regex("""\*\*([^*]+)\*\*""")) { "<strong>${it.groupValues[1]}</strong>" }
+        s = s.replace(Regex("""__([^_]+)__""")) { "<strong>${it.groupValues[1]}</strong>" }
+        s = s.replace(Regex("""\*([^*]+)\*""")) { "<em>${it.groupValues[1]}</em>" }
+        s = s.replace(Regex("""_([^_]+)_""")) { "<em>${it.groupValues[1]}</em>" }
+        s = s.replace(Regex("""~~([^~]+)~~""")) { "<del>${it.groupValues[1]}</del>" }
+        s = s.replace(Regex("""`([^`]+)`""")) { "<code>${it.groupValues[1]}</code>" }
+
+        return s
     }
 
     private fun showDiffViewer(name: String, backPage: Int = ID_GIT) {
@@ -7962,17 +8635,14 @@ class MainActivity : AppCompatActivity() {
 
         stopGuiBtn = dangerButton("  STOP XFCE DESKTOP") {
             guiUserStopping = true
+            setGuiStopBusy()
             stopGui()
-            stopGuiBtn.isEnabled = false
-            stopGuiBtn.alpha = 0.5f
-            // Keep VIEW LOGS beside disabled STOP while stop runs; hide after delay
-            if (::displayBtn.isInitialized) {
-                displayBtn.visibility = View.GONE
-            }
             mainHandler.postDelayed({
-                guiUserStopping = false
-                setGuiCardIdle()
-            }, 5000)
+                if (guiUserStopping) {
+                    guiUserStopping = false
+                    setGuiCardIdle()
+                }
+            }, 6000)
         }
         stopGuiBtn.isEnabled = false
         stopGuiBtn.alpha = 0.5f
@@ -8986,6 +9656,18 @@ class MainActivity : AppCompatActivity() {
         }
         pathRow.addView(prootPathTv)
         card.addView(pathRow)
+
+        val browseFilesBtn = primaryButton("BROWSE HOME FILES") {
+            if (pageStack.isEmpty() || pageStack.peek() != ID_PROOT_FILES) {
+                pageStack.push(ID_PROOT_FILES)
+            }
+            navigateToPage(ID_PROOT_FILES)
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                topMargin = dp(12)
+            }
+        }
+        card.addView(browseFilesBtn)
 
         applyCachedProotInfo()
         refreshProotSettingsCard(force = false)
@@ -13165,17 +13847,38 @@ class MainActivity : AppCompatActivity() {
         if (::startGuiBtn.isInitialized) {
             startGuiBtn.isEnabled = false
             startGuiBtn.alpha = 0.5f
+            startGuiBtn.text = "  STARTING..."
+        }
+    }
+
+    /** Set STOP busy state with immediate feedback on UI. */
+    private fun setGuiStopBusy() {
+        if (::stopGuiBtn.isInitialized) {
+            stopGuiBtn.isEnabled = false
+            stopGuiBtn.alpha = 0.5f
+            stopGuiBtn.text = "  STOPPING..."
+        }
+        if (::displayBtn.isInitialized) {
+            displayBtn.visibility = View.GONE
         }
     }
 
     private fun isXfceInstalled(): Boolean {
         val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
-        return if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
-            File(ChrootCommandBuilder.CHROOT_PATH, "usr/bin/startxfce4").exists()
+        val checkDirs = if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+            listOf(File(ChrootCommandBuilder.CHROOT_PATH))
         } else {
-            File(ProjectPathResolver.prootRootfsDir(this), "usr/bin/startxfce4").exists() ||
-                File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpaquita/rootfs/usr/bin/startxfce4").exists() ||
-                File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpine/rootfs/usr/bin/startxfce4").exists()
+            listOf(
+                ProjectPathResolver.prootRootfsDir(this),
+                File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpaquita/rootfs"),
+                File(TermuxHostPaths.PREFIX, "var/lib/proot-distro/containers/alpine/rootfs")
+            )
+        }
+        return checkDirs.any { root ->
+            File(root, "usr/local/bin/phoc").exists() ||
+                File(root, "usr/local/bin/nativecode-desktop").exists() ||
+                File(root, "usr/bin/startxfce4").exists() ||
+                File(root, "usr/local/bin/startxfce4").exists()
         }
     }
 
@@ -13270,19 +13973,7 @@ class MainActivity : AppCompatActivity() {
     /** Start XFCE: proot → start_gui.sh; chroot → start_gui_chroot.sh (host X11 + root DE). */
     private fun startGui() {
         ensurePostNotificationsPermission()
-        ensureBootstrapExtracted()
-        deployScripts()
         acquireDesktopFgs()
-
-        val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
-        if (method == "chroot" && !ProjectPathResolver.isChrootInstalled()) {
-            Toast.makeText(
-                this,
-                "Chroot not installed. Settings → Chroot Settings or Onboarding.",
-                Toast.LENGTH_LONG
-            ).show()
-            // Still attempt stream so VIEW LOGS can capture script preflight text
-        }
 
         // Streamed capture, NOT runScriptInTerminal: GUI is long-lived so it must
         // never hold isScriptRunning (marketplace/back/other scripts stay free).
@@ -13290,55 +13981,78 @@ class MainActivity : AppCompatActivity() {
         guiUserStopping = false
         guiDesktopRunning = false
         guiX11Launched = false
-        val scriptName = if (method == "chroot") "start_gui_chroot.sh" else "start_gui.sh"
-        val script = File(TermuxHostPaths.HOME, scriptName)
-        if (!script.isFile) {
-            guiLogHeader("START", scriptName, method)
-            guiLogAppend("ERROR: missing host script ${script.absolutePath} (deployScripts failed?)")
-            Toast.makeText(this, "GUI script missing — check VIEW LOGS after fix", Toast.LENGTH_LONG).show()
-            setGuiCardIdle()
-            releaseDesktopFgs()
-            return
-        }
-        Log.i("GUI", "startGui method=$method script=${script.absolutePath}")
-        guiLogHeader("START", scriptName, method)
-        val supportLib = File(TermuxHostPaths.LIB, "libandroid-support.so")
-        if (!supportLib.isFile) {
-            guiLogAppend("WARN: missing ${supportLib.absolutePath} — libbash may fail to link; re-run host setup")
-        }
 
-        guiShellJob = ShellCommandRunner.runStreamedCancelable(
-            this,
-            guiHostScriptArgs(scriptName),
-            onLine = { line ->
-                guiLogAppend(line)
-                // First real script output → STOP + VIEW LOGS (healthy enough)
-                onGuiStreamHealthyLine()
-            },
-            onDone = { code ->
-                guiLogAppend("[exit $code]")
-                when {
-                    // Cancelled by user STOP — stop click owns 5s flip
-                    code == -1 || guiUserStopping -> { /* leave card */ }
-                    code != 0 -> {
-                        Toast.makeText(
-                            this,
-                            "Desktop start failed (exit $code) — opening log",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        revertGuiCardToStart()
-                        // Fail path: still open log page if we captured anything
-                        if (guiLogFile().length() > 0L && !isScriptRunning) {
-                            openGuiLogPage()
-                        }
-                    }
-                    else -> {
-                        // Clean desktop exit (session ended)
-                        revertGuiCardToStart()
-                    }
+        executor.execute {
+            ensureBootstrapExtracted()
+            deployScripts()
+
+            val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
+            if (method == "chroot" && !ProjectPathResolver.isChrootInstalled()) {
+                mainHandler.post {
+                    Toast.makeText(
+                        this,
+                        "Chroot not installed. Settings → Chroot Settings or Onboarding.",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
-        )
+
+            val scriptName = if (method == "chroot") "start_gui_chroot.sh" else "start_gui.sh"
+            val script = File(TermuxHostPaths.HOME, scriptName)
+            if (!script.isFile) {
+                guiLogHeader("START", scriptName, method)
+                guiLogAppend("ERROR: missing host script ${script.absolutePath} (deployScripts failed?)")
+                mainHandler.post {
+                    Toast.makeText(this, "GUI script missing — check VIEW LOGS after fix", Toast.LENGTH_LONG).show()
+                    setGuiCardIdle()
+                    releaseDesktopFgs()
+                }
+                return@execute
+            }
+            Log.i("GUI", "startGui method=$method script=${script.absolutePath}")
+            guiLogHeader("START", scriptName, method)
+            val supportLib = File(TermuxHostPaths.LIB, "libandroid-support.so")
+            if (!supportLib.isFile) {
+                guiLogAppend("WARN: missing ${supportLib.absolutePath} — libbash may fail to link; re-run host setup")
+            }
+
+            val args = guiHostScriptArgs(scriptName)
+            mainHandler.post {
+                if (guiUserStopping) return@post
+                guiShellJob = ShellCommandRunner.runStreamedCancelable(
+                    this,
+                    args,
+                    onLine = { line ->
+                        guiLogAppend(line)
+                        // First real script output → STOP + VIEW LOGS (healthy enough)
+                        onGuiStreamHealthyLine()
+                    },
+                    onDone = { code ->
+                        guiLogAppend("[exit $code]")
+                        when {
+                            // Cancelled by user STOP — stop click owns flip
+                            code == -1 || guiUserStopping -> { /* leave card */ }
+                            code != 0 -> {
+                                Toast.makeText(
+                                    this,
+                                    "Desktop start failed (exit $code) — opening log",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                revertGuiCardToStart()
+                                // Fail path: still open log page if we captured anything
+                                if (guiLogFile().length() > 0L && !isScriptRunning) {
+                                    openGuiLogPage()
+                                }
+                            }
+                            else -> {
+                                // Clean desktop exit (session ended)
+                                revertGuiCardToStart()
+                            }
+                        }
+                    }
+                )
+            }
+        }
         // X11 opens from onGuiStreamHealthyLine (first script output) — not blind 500ms
     }
 
@@ -13349,24 +14063,35 @@ class MainActivity : AppCompatActivity() {
         sendBroadcast(stopBroadcast)
         releaseDesktopFgs()
 
-        deployScripts()
         guiShellJob?.cancel()
-        val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
-        val scriptName = if (method == "chroot") "stop_gui_chroot.sh" else "stop_gui.sh"
-        Log.i("GUI", "stopGui method=$method script=${File(TermuxHostPaths.HOME, scriptName).absolutePath}")
-        guiLogHeader("STOP", scriptName, method)
-        guiShellJob = ShellCommandRunner.runStreamedCancelable(
-            this,
-            guiHostScriptArgs(scriptName),
-            onLine = { line ->
-                guiLogAppend(line)
-                // Stop phase: keep VIEW LOGS beside STOP
-                onGuiStreamHealthyLine()
-            },
-            onDone = { code ->
-                guiLogAppend("[exit $code]")
+
+        executor.execute {
+            deployScripts()
+            val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
+            val scriptName = if (method == "chroot") "stop_gui_chroot.sh" else "stop_gui.sh"
+            val script = File(TermuxHostPaths.HOME, scriptName)
+            Log.i("GUI", "stopGui method=$method script=${script.absolutePath}")
+            guiLogHeader("STOP", scriptName, method)
+            val args = guiHostScriptArgs(scriptName)
+
+            mainHandler.post {
+                guiShellJob = ShellCommandRunner.runStreamedCancelable(
+                    this,
+                    args,
+                    onLine = { line ->
+                        guiLogAppend(line)
+                        if (!guiUserStopping) {
+                            onGuiStreamHealthyLine()
+                        }
+                    },
+                    onDone = { code ->
+                        guiLogAppend("[exit $code]")
+                        guiUserStopping = false
+                        setGuiCardIdle()
+                    }
+                )
             }
-        )
+        }
     }
 
     /** Start stream failed → card back to START (not stuck on STOP). */
@@ -13600,6 +14325,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        if (NativeCodeBridge.agentUiDelegate === this) {
+            NativeCodeBridge.agentUiDelegate = null
+        }
         ghAuthSession?.cancel()
         dismissGithubAuthOverlay()
         super.onDestroy()
@@ -15376,6 +16104,11 @@ class MainActivity : AppCompatActivity() {
         if (::projectGithubInput.isInitialized) {
             projectGithubInput.setText(repo.url)
         }
+        val repoName = repo.nameWithOwner.substringAfterLast('/').removeSuffix(".git").trim()
+        if (::projectNameInput.isInitialized && repoName.isNotEmpty()) {
+            projectNameInput.setText(repoName)
+            projectNameInput.setSelection(repoName.length)
+        }
         closeGithubRepoPanel()
         // clear search so next open shows full list
         ghRepoSearchInput?.setText("")
@@ -16689,6 +17422,107 @@ class MainActivity : AppCompatActivity() {
             btnRow2.addView(benchDecBtn)
             btnRow2.addView(benchEncBtn)
             addView(btnRow2)
+
+            val btnRow3 = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(8), 0, 0)
+            }
+
+            val testOpenLinkBtn = Button(this@MainActivity).apply {
+                text = "TEST OPEN LINK"
+                textSize = 11f
+                setTextColor(NC.PRIMARY)
+                background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
+                setOnClickListener {
+                    bridgeLogTv.text = "Testing @nativecode.agent.v1 open_link..."
+                    Thread {
+                        try {
+                            val sock = connectAgentSocket()
+                            val req = JSONObject().apply {
+                                put("v", 1)
+                                put("cmd", "open_link")
+                                put("url", "http://localhost:8080")
+                                put("title", "TEST AGENT LINK")
+                                put("message", "Dev server ready at http://localhost:8080")
+                            }
+                            AgentBridgeProtocol.writeControlString(sock.outputStream, req.toString())
+                            val respStr = AgentBridgeProtocol.readControlString(sock.inputStream)
+                            val resp = JSONObject(respStr)
+                            sock.close()
+
+                            runOnUiThread {
+                                if (resp.optBoolean("ok", false)) {
+                                    bridgeLogTv.text = "Agent Open Link: OK (${resp.optString("url")})"
+                                } else {
+                                    bridgeLogTv.text = "Agent Open Link Failed: ${resp.optString("error")}"
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                bridgeLogTv.text = "Agent Open Link Error: ${e.message}"
+                            }
+                        }
+                    }.start()
+                }
+            }
+
+            val testInstallApkBtn = Button(this@MainActivity).apply {
+                text = "TEST INSTALL APK"
+                textSize = 11f
+                setTextColor(NC.PRIMARY)
+                background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+                setOnClickListener {
+                    bridgeLogTv.text = "Testing @nativecode.agent.v1 install_apk..."
+                    Thread {
+                        try {
+                            var apkTarget = File(filesDir, "home/test_app.apk")
+                            if (!apkTarget.exists()) {
+                                val altApk = File(TermuxHostPaths.LOADER_APK)
+                                if (altApk.exists()) {
+                                    apkTarget = altApk
+                                } else {
+                                    apkTarget = File(cacheDir, "agent_preview_test.apk")
+                                    if (!apkTarget.exists()) {
+                                        apkTarget.writeBytes(ByteArray(1024))
+                                    }
+                                }
+                            }
+
+                            val sock = connectAgentSocket()
+                            val req = JSONObject().apply {
+                                put("v", 1)
+                                put("cmd", "install_apk")
+                                put("path", apkTarget.absolutePath)
+                                put("title", "TEST AGENT APK")
+                                put("message", "Background build completed. Test install:")
+                            }
+                            AgentBridgeProtocol.writeControlString(sock.outputStream, req.toString())
+                            val respStr = AgentBridgeProtocol.readControlString(sock.inputStream)
+                            val resp = JSONObject(respStr)
+                            sock.close()
+
+                            runOnUiThread {
+                                if (resp.optBoolean("ok", false)) {
+                                    val name = resp.optString("app_label", apkTarget.name)
+                                    bridgeLogTv.text = "Agent Install APK: OK ($name)"
+                                } else {
+                                    bridgeLogTv.text = "Agent Install APK Failed: ${resp.optString("error")}"
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                bridgeLogTv.text = "Agent Install APK Error: ${e.message}"
+                            }
+                        }
+                    }.start()
+                }
+            }
+
+            btnRow3.addView(testOpenLinkBtn)
+            btnRow3.addView(testInstallApkBtn)
+            addView(btnRow3)
 
             bridgeLogTv = TextView(this@MainActivity).apply {
                 text = "Bridge status: Ready"
@@ -18532,7 +19366,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 setOnLongClickListener {
-                    copyToClipboard("File Path", file.absolutePath)
+                    copyToClipboard("File Path", relPath)
                     true
                 }
                 setOnTouchListener { v, event ->
@@ -18578,7 +19412,7 @@ class MainActivity : AppCompatActivity() {
                 background = roundedBg(NC.SURFACE_VAR, NC.BORDER, dp(4))
                 setPadding(dp(8), dp(4), dp(8), dp(4))
                 setOnClickListener {
-                    copyToClipboard("File Path", file.absolutePath)
+                    copyToClipboard("File Path", relPath)
                 }
             }
 
@@ -18637,7 +19471,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 setOnLongClickListener {
-                    copyToClipboard("File Path", file.absolutePath)
+                    val projectHost = activeProjectHostDir()
+                    val rel = if (file.absolutePath.startsWith(projectHost.absolutePath)) {
+                        file.absolutePath.removePrefix(projectHost.absolutePath).trimStart('/')
+                    } else {
+                        file.name
+                    }
+                    copyToClipboard("File Path", rel)
                     true
                 }
                 setOnTouchListener { v, event ->

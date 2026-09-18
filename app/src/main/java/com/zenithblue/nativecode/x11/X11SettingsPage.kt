@@ -36,6 +36,24 @@ class X11SettingsPage(
         setPadding(ctx.dp(16), ctx.dp(16), ctx.dp(16), ctx.dp(16))
     }
 
+    // Conditionally visible rows depending on selected options
+    private var displayScaleRow: View? = null
+    private var displayExactRow: View? = null
+    private var displayCustomRow: View? = null
+    private var adjustResolutionRow: View? = null
+    private var displayStretchRow: View? = null
+
+    private var scaleTouchpadRow: View? = null
+    private var mouseHelperRow: View? = null
+    private var tapToMoveRow: View? = null
+    private var stylusButtonModRow: View? = null
+    private var transformPointerRow: View? = null
+    private var pointerSpeedRow: View? = null
+
+    private var adjustHeightEkRow: View? = null
+    private var termuxEkBehaviourRow: View? = null
+    private var opacityEkRow: View? = null
+
     init {
         view.addView(body)
         body.addView(header())
@@ -44,9 +62,41 @@ class X11SettingsPage(
         body.addView(touchCard())
         body.addView(keyboardCard())
         body.addView(gesturesCard())
+        updateVisibility()
     }
 
-    fun refresh() = refreshRows(body)
+    fun refresh() {
+        refreshRows(body)
+        updateVisibility()
+    }
+
+    private fun updateVisibility() {
+        val mode = X11Prefs.getString(ctx, X11Prefs.DISPLAY_MODE)
+        displayScaleRow?.visibility = if (mode == "scaled") View.VISIBLE else View.GONE
+        displayExactRow?.visibility = if (mode == "exact") View.VISIBLE else View.GONE
+        displayCustomRow?.visibility = if (mode == "custom") View.VISIBLE else View.GONE
+        val stretchAllowed = mode == "exact" || mode == "custom"
+        adjustResolutionRow?.visibility = if (stretchAllowed) View.VISIBLE else View.GONE
+        displayStretchRow?.visibility = if (stretchAllowed) View.VISIBLE else View.GONE
+
+        val touch = X11Prefs.getString(ctx, X11Prefs.TOUCH_MODE)
+        val isTrackpad = touch == "1"
+        scaleTouchpadRow?.visibility = if (isTrackpad && mode != "native") View.VISIBLE else View.GONE
+        mouseHelperRow?.visibility = if (isTrackpad) View.VISIBLE else View.GONE
+        tapToMoveRow?.visibility = if (isTrackpad) View.VISIBLE else View.GONE
+
+        val stylusOverride = X11Prefs.getBool(ctx, X11Prefs.STYLUS_CLICK_OVERRIDE)
+        stylusButtonModRow?.visibility = if (stylusOverride) View.VISIBLE else View.GONE
+
+        val pointerCapture = X11Prefs.getBool(ctx, X11Prefs.POINTER_CAPTURE)
+        transformPointerRow?.visibility = if (pointerCapture) View.VISIBLE else View.GONE
+        pointerSpeedRow?.visibility = if (pointerCapture) View.VISIBLE else View.GONE
+
+        val showEk = X11Prefs.getBool(ctx, X11Prefs.SHOW_ADDITIONAL_KBD)
+        adjustHeightEkRow?.visibility = if (showEk) View.VISIBLE else View.GONE
+        termuxEkBehaviourRow?.visibility = if (showEk) View.VISIBLE else View.GONE
+        opacityEkRow?.visibility = if (showEk) View.VISIBLE else View.GONE
+    }
 
     // Header
 
@@ -116,16 +166,19 @@ class X11SettingsPage(
             currentValue = { X11Prefs.getString(c, X11Prefs.DISPLAY_MODE) },
             valueOf = { X11Prefs.DISPLAY_MODES[it] },
             indexOf = { X11Prefs.DISPLAY_MODES.indexOf(it) },
-            set = { X11Prefs.put(c, X11Prefs.DISPLAY_MODE, it) }
+            set = {
+                X11Prefs.put(c, X11Prefs.DISPLAY_MODE, it)
+                updateVisibility()
+            }
         ))
-        addView(c.seekRow(
+        displayScaleRow = c.seekRow(
             title = "Display scale, %",
             min = 30, max = 300, step = 10,
             get = { X11Prefs.getInt(c, X11Prefs.DISPLAY_SCALE) },
             set = { X11Prefs.putInt(c, X11Prefs.DISPLAY_SCALE, it) },
             format = { "$it" }
-        ))
-        addView(c.listRow(
+        ).also { addView(it) }
+        displayExactRow = c.listRow(
             title = "Display resolution (exact)",
             getSummary = { X11Prefs.getString(c, X11Prefs.DISPLAY_EXACT) },
             entries = X11Prefs.EXACT_RESOLUTIONS,
@@ -133,15 +186,15 @@ class X11SettingsPage(
             valueOf = { X11Prefs.EXACT_RESOLUTIONS[it] },
             indexOf = { X11Prefs.EXACT_RESOLUTIONS.indexOf(it) },
             set = { X11Prefs.put(c, X11Prefs.DISPLAY_EXACT, it) }
-        ))
-        addView(c.textRow(
+        ).also { addView(it) }
+        displayCustomRow = c.textRow(
             title = "Display resolution (custom)",
             summary = X11Prefs.getString(c, X11Prefs.DISPLAY_CUSTOM),
             get = { X11Prefs.getString(c, X11Prefs.DISPLAY_CUSTOM) },
             validate = { X11Prefs.isCustomResolutionValid(it) },
             set = { X11Prefs.put(c, X11Prefs.DISPLAY_CUSTOM, it) },
             errorText = "Use WIDTHxHEIGHT, e.g. 1280x1024"
-        ))
+        ).also { addView(it) }
         addView(c.listRow(
             title = "Display filtering mode",
             getSummary = { X11Prefs.getString(c, X11Prefs.DISPLAY_FILTERING) },
@@ -151,18 +204,18 @@ class X11SettingsPage(
             indexOf = { X11Prefs.FILTERING_MODES.indexOf(it) },
             set = { X11Prefs.put(c, X11Prefs.DISPLAY_FILTERING, it) }
         ))
-        addView(c.switchRow(
+        adjustResolutionRow = c.switchRow(
             title = "Adjust the set resolution to fit screen orientation",
             summary = "Requires display resolution mode to be exact or custom",
             get = { X11Prefs.getBool(c, X11Prefs.ADJUST_RESOLUTION) },
             set = { X11Prefs.putBool(c, X11Prefs.ADJUST_RESOLUTION, it) }
-        ))
-        addView(c.switchRow(
+        ).also { addView(it) }
+        displayStretchRow = c.switchRow(
             title = "Stretch to fit display",
             summary = "Requires display resolution mode to be exact or custom",
             get = { X11Prefs.getBool(c, X11Prefs.DISPLAY_STRETCH) },
             set = { X11Prefs.putBool(c, X11Prefs.DISPLAY_STRETCH, it) }
-        ))
+        ).also { addView(it) }
     }
 
     private fun windowCard(): LinearLayout = ctx.sectionCard().apply {
@@ -219,19 +272,25 @@ class X11SettingsPage(
             currentValue = { X11Prefs.getString(c, X11Prefs.TOUCH_MODE) },
             valueOf = { X11Prefs.TOUCH_VALUES[it] },
             indexOf = { X11Prefs.TOUCH_VALUES.indexOf(it) },
-            set = { X11Prefs.put(c, X11Prefs.TOUCH_MODE, it) }
+            set = {
+                X11Prefs.put(c, X11Prefs.TOUCH_MODE, it)
+                updateVisibility()
+            }
         ))
-        addView(c.switchRow(
+        scaleTouchpadRow = c.switchRow(
             title = "Apply display scale factor to touchpad",
             summary = "Scale touchpad motion with the display scale",
             get = { X11Prefs.getBool(c, X11Prefs.SCALE_TOUCHPAD) },
             set = { X11Prefs.putBool(c, X11Prefs.SCALE_TOUCHPAD, it) }
-        ))
+        ).also { addView(it) }
         addView(c.switchRow(
             title = "Show stylus click options",
             summary = "Stylus touch override: left, middle or right click",
             get = { X11Prefs.getBool(c, X11Prefs.STYLUS_CLICK_OVERRIDE) },
-            set = { X11Prefs.putBool(c, X11Prefs.STYLUS_CLICK_OVERRIDE, it) }
+            set = {
+                X11Prefs.putBool(c, X11Prefs.STYLUS_CLICK_OVERRIDE, it)
+                updateVisibility()
+            }
         ))
         addView(c.switchRow(
             title = "Enable stylus mouse mode",
@@ -239,25 +298,28 @@ class X11SettingsPage(
             get = { X11Prefs.getBool(c, X11Prefs.STYLUS_IS_MOUSE) },
             set = { X11Prefs.putBool(c, X11Prefs.STYLUS_IS_MOUSE, it) }
         ))
-        addView(c.switchRow(
+        stylusButtonModRow = c.switchRow(
             title = "Stylus button contact modifier",
             summary = "Send right/middle click only while the stylus button is pressed",
             get = { X11Prefs.getBool(c, X11Prefs.STYLUS_BUTTON_MOD) },
             set = { X11Prefs.putBool(c, X11Prefs.STYLUS_BUTTON_MOD, it) }
-        ))
-        addView(c.switchRow(
+        ).also { addView(it) }
+        mouseHelperRow = c.switchRow(
             title = "Show mouse click helper overlay",
             summary = "Onscreen mouse buttons usable with touchpad",
             get = { X11Prefs.getBool(c, X11Prefs.SHOW_MOUSE_HELPER) },
             set = { X11Prefs.putBool(c, X11Prefs.SHOW_MOUSE_HELPER, it) }
-        ))
+        ).also { addView(it) }
         addView(c.switchRow(
             title = "Capture external pointer devices",
             summary = "Intercept all hardware pointer events when possible",
             get = { X11Prefs.getBool(c, X11Prefs.POINTER_CAPTURE) },
-            set = { X11Prefs.putBool(c, X11Prefs.POINTER_CAPTURE, it) }
+            set = {
+                X11Prefs.putBool(c, X11Prefs.POINTER_CAPTURE, it)
+                updateVisibility()
+            }
         ))
-        addView(c.listRow(
+        transformPointerRow = c.listRow(
             title = "Transform captured pointer movements",
             getSummary = { X11Prefs.transformLabel(X11Prefs.getString(c, X11Prefs.TRANSFORM_POINTER)) },
             entries = X11Prefs.TRANSFORM_ENTRIES,
@@ -265,20 +327,20 @@ class X11SettingsPage(
             valueOf = { X11Prefs.TRANSFORM_VALUES[it] },
             indexOf = { X11Prefs.TRANSFORM_VALUES.indexOf(it) },
             set = { X11Prefs.put(c, X11Prefs.TRANSFORM_POINTER, it) }
-        ))
-        addView(c.seekRow(
+        ).also { addView(it) }
+        pointerSpeedRow = c.seekRow(
             title = "Captured pointer speed factor, %",
             min = 1, max = 300, step = 1,
             get = { X11Prefs.getInt(c, X11Prefs.POINTER_SPEED) },
             set = { X11Prefs.putInt(c, X11Prefs.POINTER_SPEED, it) },
             format = { "$it" }
-        ))
-        addView(c.switchRow(
+        ).also { addView(it) }
+        tapToMoveRow = c.switchRow(
             title = "Enable tap-to-move for touchpads",
             summary = "Tap gestures move the pointer on touchpads",
             get = { X11Prefs.getBool(c, X11Prefs.TAP_TO_MOVE) },
             set = { X11Prefs.putBool(c, X11Prefs.TAP_TO_MOVE, it) }
-        ))
+        ).also { addView(it) }
         addView(c.switchRow(
             title = "Ignore gamepad input events",
             summary = "Prevent gamepad and joystick events reaching the X server",
@@ -294,7 +356,10 @@ class X11SettingsPage(
             title = "Show additional keyboard",
             summary = "Show keyboard with additional keys (CTRL, ALT, ESC, arrows)",
             get = { X11Prefs.getBool(c, X11Prefs.SHOW_ADDITIONAL_KBD) },
-            set = { X11Prefs.putBool(c, X11Prefs.SHOW_ADDITIONAL_KBD, it) }
+            set = {
+                X11Prefs.putBool(c, X11Prefs.SHOW_ADDITIONAL_KBD, it)
+                updateVisibility()
+            }
         ))
         addView(c.switchRow(
             title = "Show IME with external keyboard",
@@ -332,25 +397,25 @@ class X11SettingsPage(
             get = { X11Prefs.getBool(c, X11Prefs.CLIPBOARD) },
             set = { X11Prefs.putBool(c, X11Prefs.CLIPBOARD, it) }
         ))
-        addView(c.switchRow(
+        adjustHeightEkRow = c.switchRow(
             title = "Adjust display height for extra keys bar",
             summary = "May cause screen flickering during toggling",
             get = { X11Prefs.getBool(c, X11Prefs.ADJUST_HEIGHT_EK) },
             set = { X11Prefs.putBool(c, X11Prefs.ADJUST_HEIGHT_EK, it) }
-        ))
-        addView(c.switchRow(
+        ).also { addView(it) }
+        termuxEkBehaviourRow = c.switchRow(
             title = "Deactivate special keys after each keypress",
             summary = "Use long-tap to lock special keys",
             get = { X11Prefs.getBool(c, X11Prefs.TERMUX_EK_BEHAVIOUR) },
             set = { X11Prefs.putBool(c, X11Prefs.TERMUX_EK_BEHAVIOUR, it) }
-        ))
-        addView(c.seekRow(
+        ).also { addView(it) }
+        opacityEkRow = c.seekRow(
             title = "Opacity of extra keys bar, %",
             min = 1, max = 100, step = 1,
             get = { X11Prefs.getInt(c, X11Prefs.OPACITY_EK_BAR) },
             set = { X11Prefs.putInt(c, X11Prefs.OPACITY_EK_BAR, it) },
             format = { "$it" }
-        ))
+        ).also { addView(it) }
     }
 
     private fun actionRow(

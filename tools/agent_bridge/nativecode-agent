@@ -113,6 +113,28 @@ def main():
     # telemetry
     subparsers.add_parser("telemetry", help="Query host battery, thermals, and memory")
 
+    # open-link
+    open_link_p = subparsers.add_parser("open-link", help="Request host app to show link alert / open in default browser")
+    open_link_p.add_argument("--url", required=True, help="URL to open (e.g. http://localhost:3000)")
+    open_link_p.add_argument("--title", default="Agent Web Link", help="Dialog / notification title")
+    open_link_p.add_argument("--message", default="", help="Message text")
+
+    open_url_p = subparsers.add_parser("open-url", help="Alias for open-link")
+    open_url_p.add_argument("--url", required=True, help="URL to open (e.g. http://localhost:3000)")
+    open_url_p.add_argument("--title", default="Agent Web Link", help="Dialog / notification title")
+    open_url_p.add_argument("--message", default="", help="Message text")
+
+    # install-apk
+    install_apk_p = subparsers.add_parser("install-apk", help="Request host app to show APK install / export card")
+    install_apk_p.add_argument("--path", required=True, help="Path to APK file")
+    install_apk_p.add_argument("--title", default="Install APK", help="Dialog / notification title")
+    install_apk_p.add_argument("--message", default="", help="Message text")
+
+    open_apk_p = subparsers.add_parser("open-apk", help="Alias for install-apk")
+    open_apk_p.add_argument("--path", required=True, help="Path to APK file")
+    open_apk_p.add_argument("--title", default="Install APK", help="Dialog / notification title")
+    open_apk_p.add_argument("--message", default="", help="Message text")
+
     args = parser.parse_args()
     sock = connect_agent_socket(args.socket, args.host_uid)
 
@@ -146,6 +168,22 @@ def main():
             }
         elif args.cmd == "telemetry":
             req = {"v": 1, "cmd": "telemetry"}
+        elif args.cmd in ("open-link", "open-url"):
+            req = {
+                "v": 1,
+                "cmd": "open_link",
+                "url": args.url,
+                "title": args.title,
+                "message": args.message
+            }
+        elif args.cmd in ("install-apk", "open-apk"):
+            req = {
+                "v": 1,
+                "cmd": "install_apk",
+                "path": args.path,
+                "title": args.title,
+                "message": args.message
+            }
         else:
             sys.exit(1)
 

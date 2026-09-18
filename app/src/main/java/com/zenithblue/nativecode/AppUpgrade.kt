@@ -68,7 +68,7 @@ object AppUpgrade {
      */
     fun migrate(ctx: Context, from: Int, to: Int) {
         restageAllHostScripts(ctx)
-        if (!BuildConfig.PLAY_STORE_BUILD) ChrootCommandBuilder.ensureLauncherScript(ctx)
+        ChrootCommandBuilder.ensureLauncherScript(ctx)
         TermuxHostPaths.writeHostEnvFile(ctx.filesDir)
         if (File(ctx.filesDir, "usr/lib/libtermux-exec.so").exists()) {
             TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir)

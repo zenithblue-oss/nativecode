@@ -102,43 +102,60 @@ if [ "$DISTRO" = "alpaquita" ]; then
     need /usr/lib/libdisplay-info.so.3
 fi
 
-echo "== XFCE baked configuration overlay =="
-need /home/flux/.config/xfce4/helpers.rc
-need /home/flux/.config/xfce4/terminal/terminalrc
-need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
-need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
-need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml
-need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
+DESKTOP="$(grep '^DESKTOP=' "$ROOTFS/etc/nativecode/rootfs-release" 2>/dev/null | cut -d= -f2 || true)"
+if [ "$DESKTOP" = "phosh" ]; then
+    echo "== Phosh-Lite baked configuration overlay =="
+    need /usr/local/bin/phoc
+    need /usr/local/bin/phosh
+    need /usr/local/bin/phosh-session
+    need /usr/local/bin/wvkbd-mobintl
+    need /usr/local/bin/nativecode-desktop
+    need /usr/local/libexec/phosh
+    need /usr/local/lib64/libwlroots.so.12
+    need /usr/local/share/phosh/phoc.ini
+    need /usr/share/icons/Adwaita
+    need /usr/local/share/backgrounds/gnome/adwaita-d.jpg
+    need /usr/local/share/backgrounds/gnome/adwaita-l.jpg
+    need /usr/local/share/glib-2.0/schemas/gschemas.compiled
+else
+    echo "== XFCE baked configuration overlay =="
+    need /home/flux/.config/xfce4/helpers.rc
+    need /home/flux/.config/xfce4/terminal/terminalrc
+    need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+    need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
+    need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml
+    need /home/flux/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
 
-XCONF="$ROOTFS/home/flux/.config/xfce4/xfconf/xfce-perchannel-xml"
-if [ -f "$XCONF/xsettings.xml" ]; then
-    grep -q 'ThemeName.*Space-transparency' "$XCONF/xsettings.xml" || { echo "FAIL xsettings ThemeName Space-transparency"; FAIL=1; }
-    grep -q 'IconThemeName.*Papirus-Dark' "$XCONF/xsettings.xml" || { echo "FAIL xsettings IconThemeName Papirus-Dark"; FAIL=1; }
-    grep -q 'CursorThemeName.*Vimix-white-cursors' "$XCONF/xsettings.xml" || { echo "FAIL xsettings CursorThemeName Vimix-white-cursors"; FAIL=1; }
-fi
-if [ -f "$XCONF/xfwm4.xml" ]; then
-    grep -q 'theme.*Space-transparency' "$XCONF/xfwm4.xml" || { echo "FAIL xfwm4 theme Space-transparency"; FAIL=1; }
-fi
-if [ -f "$XCONF/xfce4-desktop.xml" ]; then
-    grep -q 'fluxlinux-dark.png' "$XCONF/xfce4-desktop.xml" || { echo "FAIL xfce4-desktop wallpaper fluxlinux-dark.png"; FAIL=1; }
-fi
-if [ -f "$ROOTFS/home/flux/.config/xfce4/helpers.rc" ]; then
-    grep -q '^TerminalEmulator=xfce4-terminal$' "$ROOTFS/home/flux/.config/xfce4/helpers.rc" || { echo "FAIL helpers.rc TerminalEmulator=xfce4-terminal"; FAIL=1; }
-fi
-if [ -f "$XCONF/xfce4-panel.xml" ]; then
-    PY_VALIDATOR=""
-    for cand in "$DIR/test_xfce_overlay.py" "$DIR/tools/rootfs/test_xfce_overlay.py" "${REPO_ROOT:-}/tools/rootfs/test_xfce_overlay.py" "$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null)/tools/rootfs/test_xfce_overlay.py" "/home/user/repos/NC-PLAY/tools/rootfs/test_xfce_overlay.py"; do
-        if [ -n "$cand" ] && [ -f "$cand" ]; then
-            PY_VALIDATOR="$cand"
-            break
+    XCONF="$ROOTFS/home/flux/.config/xfce4/xfconf/xfce-perchannel-xml"
+    if [ -f "$XCONF/xsettings.xml" ]; then
+        grep -q 'ThemeName.*Space-transparency' "$XCONF/xsettings.xml" || { echo "FAIL xsettings ThemeName Space-transparency"; FAIL=1; }
+        grep -q 'IconThemeName.*Papirus-Dark' "$XCONF/xsettings.xml" || { echo "FAIL xsettings IconThemeName Papirus-Dark"; FAIL=1; }
+        grep -q 'CursorThemeName.*Vimix-white-cursors' "$XCONF/xsettings.xml" || { echo "FAIL xsettings CursorThemeName Vimix-white-cursors"; FAIL=1; }
+    fi
+    if [ -f "$XCONF/xfwm4.xml" ]; then
+        grep -q 'theme.*Space-transparency' "$XCONF/xfwm4.xml" || { echo "FAIL xfwm4 theme Space-transparency"; FAIL=1; }
+    fi
+    if [ -f "$XCONF/xfce4-desktop.xml" ]; then
+        grep -q 'fluxlinux-dark.png' "$XCONF/xfce4-desktop.xml" || { echo "FAIL xfce4-desktop wallpaper fluxlinux-dark.png"; FAIL=1; }
+    fi
+    if [ -f "$ROOTFS/home/flux/.config/xfce4/helpers.rc" ]; then
+        grep -q '^TerminalEmulator=xfce4-terminal$' "$ROOTFS/home/flux/.config/xfce4/helpers.rc" || { echo "FAIL helpers.rc TerminalEmulator=xfce4-terminal"; FAIL=1; }
+    fi
+    if [ -f "$XCONF/xfce4-panel.xml" ]; then
+        PY_VALIDATOR=""
+        for cand in "$DIR/test_xfce_overlay.py" "$DIR/tools/rootfs/test_xfce_overlay.py" "${REPO_ROOT:-}/tools/rootfs/test_xfce_overlay.py" "$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null)/tools/rootfs/test_xfce_overlay.py" "/home/user/repos/NC-PLAY/tools/rootfs/test_xfce_overlay.py"; do
+            if [ -n "$cand" ] && [ -f "$cand" ]; then
+                PY_VALIDATOR="$cand"
+                break
+            fi
+        done
+        if [ -n "$PY_VALIDATOR" ]; then
+            python3 "$PY_VALIDATOR" "$XCONF/xfce4-panel.xml" || { echo "FAIL xfce4-panel overlay structural contract"; FAIL=1; }
+            echo "panel CONFIG CONTRACT PASS"
+        else
+            echo "FAIL test_xfce_overlay.py not found"
+            FAIL=1
         fi
-    done
-    if [ -n "$PY_VALIDATOR" ]; then
-        python3 "$PY_VALIDATOR" "$XCONF/xfce4-panel.xml" || { echo "FAIL xfce4-panel overlay structural contract"; FAIL=1; }
-        echo "panel CONFIG CONTRACT PASS"
-    else
-        echo "FAIL test_xfce_overlay.py not found"
-        FAIL=1
     fi
 fi
 
@@ -157,13 +174,19 @@ if [ "$(uname -m)" = "aarch64" ] && [ -x "$ROOTFS/bin/sh" ] && [ -x "$ROOTFS/hom
 fi
 
 echo "== customization assets (COMPONENT_G=1) =="
-[ -d "$ROOTFS/usr/share/themes/Space-transparency" ] || { echo "MISS G theme Space-transparency"; FAIL=1; }
-[ -d "$ROOTFS/usr/share/themes/Space-light" ] || { echo "MISS G theme Space-light"; FAIL=1; }
-[ -d "$ROOTFS/usr/share/icons/Papirus-Dark" ] || { echo "MISS G icon Papirus-Dark"; FAIL=1; }
-[ -d "$ROOTFS/usr/share/icons/Vimix-white-cursors" ] || { echo "MISS G cursor Vimix-white"; FAIL=1; }
-[ -d "$ROOTFS/usr/share/icons/Vimix-cursors" ] || { echo "MISS G cursor Vimix"; FAIL=1; }
-[ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-dark.png" ] || { echo "MISS G wallpaper fluxlinux-dark.png"; FAIL=1; }
-[ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-light.png" ] || { echo "MISS G wallpaper fluxlinux-light.png"; FAIL=1; }
+if [ "$DESKTOP" = "phosh" ]; then
+    [ -d "$ROOTFS/usr/share/icons/Adwaita" ] || { echo "MISS G icon Adwaita"; FAIL=1; }
+    [ -f "$ROOTFS/usr/local/share/backgrounds/gnome/adwaita-d.jpg" ] || { echo "MISS G wallpaper adwaita-d.jpg"; FAIL=1; }
+    [ -f "$ROOTFS/usr/local/share/backgrounds/gnome/adwaita-l.jpg" ] || { echo "MISS G wallpaper adwaita-l.jpg"; FAIL=1; }
+else
+    [ -d "$ROOTFS/usr/share/themes/Space-transparency" ] || { echo "MISS G theme Space-transparency"; FAIL=1; }
+    [ -d "$ROOTFS/usr/share/themes/Space-light" ] || { echo "MISS G theme Space-light"; FAIL=1; }
+    [ -d "$ROOTFS/usr/share/icons/Papirus-Dark" ] || { echo "MISS G icon Papirus-Dark"; FAIL=1; }
+    [ -d "$ROOTFS/usr/share/icons/Vimix-white-cursors" ] || { echo "MISS G cursor Vimix-white"; FAIL=1; }
+    [ -d "$ROOTFS/usr/share/icons/Vimix-cursors" ] || { echo "MISS G cursor Vimix"; FAIL=1; }
+    [ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-dark.png" ] || { echo "MISS G wallpaper fluxlinux-dark.png"; FAIL=1; }
+    [ -f "$ROOTFS/home/flux/Pictures/Wallpapers/fluxlinux-light.png" ] || { echo "MISS G wallpaper fluxlinux-light.png"; FAIL=1; }
+fi
 [ -f "$ROOTFS/home/flux/.oh-my-zsh/oh-my-zsh.sh" ] || [ -f "$ROOTFS/home/flux/.oh-my-zsh/ohmyzsh.sh" ] || { echo "MISS G oh-my-zsh"; FAIL=1; }
 [ -f "$ROOTFS/home/flux/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ] || { echo "MISS G plugin file zsh-autosuggestions.zsh"; FAIL=1; }
 [ -f "$ROOTFS/home/flux/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ] || { echo "MISS G plugin file zsh-syntax-highlighting.zsh"; FAIL=1; }

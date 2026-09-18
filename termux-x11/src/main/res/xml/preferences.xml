@@ -6,7 +6,7 @@
     <PreferenceScreen app:key="main" app:title="@string/lorie_pref_main">
 
         <PreferenceCategory app:key="cat_output" app:title="@string/lorie_pref_output" app:iconSpaceReserved="false">
-            <ListPreference app:key="displayResolutionMode" app:defaultValue="scaled" app:entries="@array/displayResolutionVariants" app:entryValues="@array/displayResolutionVariants" />
+            <ListPreference app:key="displayResolutionMode" app:defaultValue="native" app:entries="@array/displayResolutionVariants" app:entryValues="@array/displayResolutionVariants" />
             <SeekBarPreference app:key="displayScale" app:defaultValue="120" app:min="30" android:max="300" app:seekBarIncrement="10" app:showSeekBarValue="true" app:updatesContinuously="true" />
             <ListPreference app:key="displayResolutionExact" app:defaultValue="1280x1024" app:entries="@array/displayResolution" app:entryValues="@array/displayResolution" tools:ignore="DuplicateSpeakableTextCheck" />
             <EditTextPreference app:key="displayResolutionCustom" app:defaultValue="1280x1024" app:useSimpleSummaryProvider="true" />
@@ -15,9 +15,9 @@
             <com.termux.x11.NcSwitchPreference app:key="displayStretch" app:defaultValue="false" />
             <com.termux.x11.NcSwitchPreference app:key="Reseed" app:defaultValue="true" />
             <com.termux.x11.NcSwitchPreference app:key="PIP" app:defaultValue="false" />
-            <com.termux.x11.NcSwitchPreference app:key="fullscreen" app:defaultValue="false" />
+            <com.termux.x11.NcSwitchPreference app:key="fullscreen" app:defaultValue="true" />
             <ListPreference app:key="forceOrientation" app:defaultValue="auto" app:entries="@array/forceOrientationVariants" app:entryValues="@array/forceOrientationVariants" />
-            <com.termux.x11.NcSwitchPreference app:key="hideCutout" app:defaultValue="false" />
+            <com.termux.x11.NcSwitchPreference app:key="hideCutout" app:defaultValue="true" />
             <com.termux.x11.NcSwitchPreference app:defaultValue="true" app:key="keepScreenOn" />
         </PreferenceCategory>
 

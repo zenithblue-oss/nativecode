@@ -32,6 +32,7 @@ if [ "$LEAK" = "1" ]; then echo "clean_rootfs: credential leak — refusing to a
 rm -rf \
     "$ROOTFS/etc/machine-id" "$ROOTFS/var/lib/dbus/machine-id" \
     "$ROOTFS/tmp/"* "$ROOTFS/var/tmp/"* "$ROOTFS/var/cache/apk/"* \
+    "$ROOTFS/var/cache/ldconfig/"* \
     "$ROOTFS/root/.cache" "$ROOTFS/home/flux/.cache" \
     "$ROOTFS/root/.npm" "$ROOTFS/home/flux/.npm" \
     "$ROOTFS/root/.bash_history" "$ROOTFS/home/flux/.bash_history" 2>/dev/null || true

@@ -2846,9 +2846,18 @@ class OnboardingActivity : AppCompatActivity() {
         check(File(rootfsDir, "bin/bash").exists() || File(rootfsDir, "usr/bin/bash").exists()) { "Sentinel check failed: bash not found" }
         check(File(rootfsDir, "usr/bin/git").exists() || File(rootfsDir, "usr/local/bin/git").exists()) { "Sentinel check failed: git not found" }
         check(File(rootfsDir, "usr/local/bin/gh").exists() || File(rootfsDir, "usr/bin/gh").exists()) { "Sentinel check failed: gh not found" }
-        check(File(rootfsDir, "usr/bin/startxfce4").exists()) { "Sentinel check failed: startxfce4 not found" }
-        check(File(rootfsDir, "usr/bin/xfce4-panel").exists()) { "Sentinel check failed: xfce4-panel not found" }
-        check(File(rootfsDir, "usr/bin/xfce4-terminal").exists()) { "Sentinel check failed: xfce4-terminal not found" }
+        check(
+            File(rootfsDir, "usr/local/bin/nativecode-desktop").exists() ||
+            File(rootfsDir, "usr/bin/startxfce4").exists()
+        ) { "Sentinel check failed: desktop launcher not found" }
+        check(
+            File(rootfsDir, "usr/local/bin/phoc").exists() ||
+            File(rootfsDir, "usr/bin/xfce4-panel").exists()
+        ) { "Sentinel check failed: desktop compositor not found" }
+        check(
+            File(rootfsDir, "usr/bin/xfce4-terminal").exists() ||
+            File(rootfsDir, "usr/local/bin/wvkbd-mobintl").exists()
+        ) { "Sentinel check failed: terminal/keyboard not found" }
         check(
             File(rootfsDir, "home/flux/.local/bin/opencode").exists() ||
             File(rootfsDir, "usr/local/bin/opencode").exists() ||

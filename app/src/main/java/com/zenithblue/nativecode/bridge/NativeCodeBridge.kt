@@ -19,6 +19,16 @@ object NativeCodeBridge {
     @Volatile
     private var agentServer: AgentBridgeServer? = null
 
+    @Volatile
+    private var pendingUiDelegate: AgentBridgeServer.UiDelegate? = null
+
+    var agentUiDelegate: AgentBridgeServer.UiDelegate?
+        get() = agentServer?.uiDelegate ?: pendingUiDelegate
+        set(value) {
+            pendingUiDelegate = value
+            agentServer?.uiDelegate = value
+        }
+
     @Synchronized
     fun start(context: Context) {
         val appContext = context.applicationContext
@@ -32,7 +42,10 @@ object NativeCodeBridge {
         }
         if (agentServer == null) {
             try {
-                agentServer = AgentBridgeServer(appContext).apply { start() }
+                agentServer = AgentBridgeServer(appContext).apply {
+                    uiDelegate = pendingUiDelegate
+                    start()
+                }
                 Log.i(TAG, "AgentBridgeServer started")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start AgentBridgeServer", e)

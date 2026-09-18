@@ -4,12 +4,14 @@ import android.Manifest
 import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.LocalServerSocket
 import android.net.LocalSocket
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -30,12 +32,37 @@ class AgentBridgeServer(
     private val context: Context
 ) : AutoCloseable {
 
+    interface UiDelegate {
+        fun showOpenLinkAlert(url: String, title: String?, message: String?): Boolean
+        fun showInstallApkAlert(apkFile: File, title: String?, message: String?): Boolean
+    }
+
     companion object {
         private const val TAG = "AgentBridgeServer"
         const val PRIMARY_SOCKET_NAME = "nativecode.agent.v1"
         const val SOCKET_NAME_PREFIX = "nativecode.agent.v1."
         const val NOTIFICATION_CHANNEL_ID = "agent_notifications"
         const val NOTIFICATION_CHANNEL_NAME = "Agent Alerts & Progress"
+
+        fun resolveApkFile(context: Context, path: String): File? {
+            val f = File(path)
+            if (f.isAbsolute && f.isFile && f.exists()) return f
+
+            val guestResolved = com.zenithblue.nativecode.terminal.ProjectPathResolver.resolve(context, path)
+            if (guestResolved.isFile && guestResolved.exists()) return guestResolved
+
+            val homeFile = File(context.filesDir, "home/$path")
+            if (homeFile.isFile && homeFile.exists()) return homeFile
+
+            val appFile = File(context.filesDir, path)
+            if (appFile.isFile && appFile.exists()) return appFile
+
+            val prootDir = com.zenithblue.nativecode.terminal.ProjectPathResolver.prootRootfsDir(context)
+            val prootFile = File(prootDir, path.removePrefix("/"))
+            if (prootFile.isFile && prootFile.exists()) return prootFile
+
+            return null
+        }
     }
 
     private val isRunning = AtomicBoolean(false)
@@ -49,9 +76,13 @@ class AgentBridgeServer(
 
     val socketName: String get() = boundSocketName
 
+    @Volatile
+    var uiDelegate: UiDelegate? = null
+
     // Rate limiters
     private val notificationLimiter = AgentBridgeProtocol.TokenBucket(capacity = 5.0, refillRatePerSecond = 5.0)
     private val toastLimiter = AgentBridgeProtocol.TokenBucket(capacity = 1.0, refillRatePerSecond = 0.5)
+    private val dialogLimiter = AgentBridgeProtocol.TokenBucket(capacity = 3.0, refillRatePerSecond = 1.0)
 
     fun start() {
         if (isRunning.getAndSet(true)) return
@@ -179,6 +210,73 @@ class AgentBridgeServer(
                         response.put("ok", true)
                         response.put("telemetry", collectTelemetry())
                     }
+                    "open_link", "open_url" -> {
+                        if (!dialogLimiter.tryAcquire()) {
+                            response.put("ok", false)
+                            response.put("error", "Rate limit exceeded for link alerts (max 1/sec)")
+                        } else {
+                            val url = request.optString("url", "").trim()
+                            if (url.isEmpty()) {
+                                response.put("ok", false)
+                                response.put("error", "Missing or empty 'url' parameter")
+                            } else {
+                                val title = request.optString("title", "Agent Web Link").ifBlank { "Agent Web Link" }
+                                val message = request.optString("message", "")
+                                val shown = uiDelegate?.showOpenLinkAlert(url, title, message) == true
+                                if (!shown) {
+                                    postOpenLinkNotification(url, title, message)
+                                    response.put("notified", true)
+                                } else {
+                                    response.put("alert_shown", true)
+                                }
+                                response.put("ok", true)
+                                response.put("url", url)
+                            }
+                        }
+                    }
+                    "install_apk", "open_apk" -> {
+                        if (!dialogLimiter.tryAcquire()) {
+                            response.put("ok", false)
+                            response.put("error", "Rate limit exceeded for APK alerts (max 1/sec)")
+                        } else {
+                            val path = request.optString("path", "").trim()
+                            if (path.isEmpty()) {
+                                response.put("ok", false)
+                                response.put("error", "Missing or empty 'path' parameter")
+                            } else {
+                                val apkFile = resolveApkFile(context, path)
+                                if (apkFile == null || !apkFile.exists() || !apkFile.isFile) {
+                                    response.put("ok", false)
+                                    response.put("error", "APK file not found: $path")
+                                } else {
+                                    val title = request.optString("title", "Install APK").ifBlank { "Install APK" }
+                                    val message = request.optString("message", "")
+                                    val pm = context.packageManager
+                                    val pkgInfo = try { pm.getPackageArchiveInfo(apkFile.absolutePath, 0) } catch (_: Exception) { null }
+                                    val pkgName = pkgInfo?.packageName ?: ""
+                                    val verName = pkgInfo?.versionName ?: "1.0"
+                                    val appLabel = pkgInfo?.applicationInfo?.let { appInfo ->
+                                        appInfo.sourceDir = apkFile.absolutePath
+                                        appInfo.publicSourceDir = apkFile.absolutePath
+                                        try { appInfo.loadLabel(pm).toString() } catch (_: Exception) { apkFile.name }
+                                    } ?: apkFile.name
+
+                                    val shown = uiDelegate?.showInstallApkAlert(apkFile, title, message) == true
+                                    if (!shown) {
+                                        postInstallApkNotification(apkFile, appLabel, pkgName, verName, title, message)
+                                        response.put("notified", true)
+                                    } else {
+                                        response.put("alert_shown", true)
+                                    }
+                                    response.put("ok", true)
+                                    response.put("path", apkFile.absolutePath)
+                                    response.put("app_label", appLabel)
+                                    response.put("package_name", pkgName)
+                                    response.put("version_name", verName)
+                                }
+                            }
+                        }
+                    }
                     else -> {
                         response.put("ok", false)
                         response.put("error", "Unknown command: $cmd")
@@ -268,6 +366,71 @@ class AgentBridgeServer(
 
         mgr.notify(tag, id, builder.build())
         return Pair(true, "OK")
+    }
+
+    private fun postOpenLinkNotification(url: String, title: String, message: String) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) return
+        }
+        val viewIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            System.currentTimeMillis().toInt(),
+            viewIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notif = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(if (message.isNotBlank()) message else url)
+            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .build()
+        val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        mgr?.notify("agent_open_link", 1003, notif)
+    }
+
+    private fun postInstallApkNotification(
+        apkFile: File,
+        appLabel: String,
+        pkgName: String,
+        verName: String,
+        title: String,
+        message: String
+    ) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) return
+        }
+        val launchIntent = Intent().apply {
+            setClassName(context.packageName, "com.zenithblue.nativecode.MainActivity")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            putExtra("EXTRA_AGENT_INSTALL_APK", apkFile.absolutePath)
+            putExtra("EXTRA_AGENT_TITLE", title)
+            putExtra("EXTRA_AGENT_MESSAGE", message)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            System.currentTimeMillis().toInt(),
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notif = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("Install APK: $appLabel")
+            .setContentText(if (message.isNotBlank()) message else "Build finished ($pkgName v$verName). Tap to view and install.")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .build()
+        val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        mgr?.notify("agent_install_apk", 1004, notif)
     }
 
     private fun showToast(text: String) {

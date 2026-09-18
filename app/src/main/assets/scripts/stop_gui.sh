@@ -46,7 +46,10 @@ echo "[3/4] Stopping Termux X11..."
 "$TB" pkill -9 -f "termux-x11" 2>/dev/null || true
 "$TB" pkill -9 -f "app_process.*termux-x11" 2>/dev/null || true
 "$TB" pkill -9 -f "Xwayland" 2>/dev/null || true
-"$TB" rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X11-unix/X0" "$TMPDIR/.virgl_test" 2>/dev/null || true
+for _p in $("$TB" pidof termux-x11 2>/dev/null); do
+    "$TB" kill -9 "$_p" 2>/dev/null || true
+done
+"$TB" rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X11-unix/X0" "/tmp/.X0-lock" "/tmp/.X11-unix/X0" "$TMPDIR/.virgl_test" 2>/dev/null || true
 
 # Step 4: Stop PulseAudio & VirGL
 echo "[4/4] Stopping PulseAudio and VirGL..."

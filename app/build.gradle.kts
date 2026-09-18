@@ -35,28 +35,12 @@ android {
         targetSdk = 37
         versionCode = 12
         versionName = "1.6.4"
+        buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
         buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
         buildConfigField("String", "REPORT_ENDPOINT", "\"$nativeCodeReportUrl\"")
         // 16 KB page-size devices (Android 15+): never ship 32-bit or extra-ABI JNI.
         ndk {
             abiFilters += "arm64-v8a"
-        }
-    }
-
-    flavorDimensions += "store"
-    productFlavors {
-        create("play") {
-            dimension = "store"
-            buildConfigField("boolean", "PLAY_STORE_BUILD", "true")
-            // Play-delivered runtime/SDK packs are ARM64-only. Keeping the base app
-            // ARM64-only also avoids shipping legacy Termux binaries for unsupported ABIs.
-            ndk {
-                abiFilters += "arm64-v8a"
-            }
-        }
-        create("full") {
-            dimension = "store"
-            buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
         }
     }
 
@@ -123,6 +107,14 @@ android {
         noCompress += listOf("xz", "tar", "gz", "zst")
     }
 
+    sourceSets {
+        getByName("debug") {
+            assets.srcDirs(
+                "../nativecode_android_dev/src/main/assets"
+            )
+        }
+    }
+
     assetPacks += listOf(":nativecode_runtime", ":nativecode_android_dev")
 
     lint {
@@ -170,7 +162,6 @@ tasks.register<Exec>("checkJni16kbAlignment") {
         "python3",
         rootProject.file("scripts/check_elf_16k.py").absolutePath,
         file("src/main/jniLibs").absolutePath,
-        file("src/full/jniLibs").absolutePath,
         file("../termux-x11/src/main/jniLibs/arm64-v8a").absolutePath,
         file("libs/terminal-emulator-v0.118.0-16k.aar").absolutePath
     )

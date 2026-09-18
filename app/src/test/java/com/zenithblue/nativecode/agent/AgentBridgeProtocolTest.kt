@@ -35,4 +35,28 @@ class AgentBridgeProtocolTest {
         assertTrue(bucket.tryAcquire(1.0))
         assertFalse(bucket.tryAcquire(1.0))
     }
+
+    @Test
+    fun testOpenLinkPayloadRoundTrip() {
+        val out = ByteArrayOutputStream()
+        val original = """{"v":1,"cmd":"open_link","url":"http://localhost:3000","title":"Web Preview","message":"Running"}"""
+
+        AgentBridgeProtocol.writeControlString(out, original)
+        val bytes = out.toByteArray()
+
+        val parsed = AgentBridgeProtocol.readControlString(ByteArrayInputStream(bytes))
+        assertEquals(original, parsed)
+    }
+
+    @Test
+    fun testInstallApkPayloadRoundTrip() {
+        val out = ByteArrayOutputStream()
+        val original = """{"v":1,"cmd":"install_apk","path":"/home/flux/app-debug.apk","title":"Install","message":"Ready"}"""
+
+        AgentBridgeProtocol.writeControlString(out, original)
+        val bytes = out.toByteArray()
+
+        val parsed = AgentBridgeProtocol.readControlString(ByteArrayInputStream(bytes))
+        assertEquals(original, parsed)
+    }
 }

@@ -122,13 +122,30 @@ echo "FluxLinux: Checking termux-x11 server..."
 export XDG_RUNTIME_DIR="$TMPDIR"
 export DISPLAY=:0
 
-# Idempotency: reuse existing server if alive with valid socket
+# Configure Termux:X11 preferences for Phosh (native resolution, fullscreen, direct touch)
+/system/bin/am broadcast -a com.termux.x11.CHANGE_PREFERENCE -p "$PKG" \
+  --es displayResolutionMode native \
+  --ez fullscreen true \
+  --ez hideCutout true \
+  --es touchMode 3 >/dev/null 2>&1 || true
+
+# Idempotency: reuse existing server if alive with valid socket, or clean stale process
 X11_RUNNING=false
-if "$TB" pidof termux-x11 >/dev/null 2>&1 && [ -S "$TMPDIR/.X11-unix/X0" ]; then
-  X11_RUNNING=true
-  echo "FluxLinux: Reusing existing termux-x11 server (PID=$("$TB" pidof termux-x11))"
-else
-  "$TB" rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X11-unix/X0" 2>/dev/null || true
+if "$TB" pidof termux-x11 >/dev/null 2>&1; then
+  if [ -S "$TMPDIR/.X11-unix/X0" ] || [ -S "/tmp/.X11-unix/X0" ]; then
+    X11_RUNNING=true
+    echo "FluxLinux: Reusing existing termux-x11 server (PID=$("$TB" pidof termux-x11))"
+  else
+    echo "FluxLinux: Terminating stale termux-x11 server without active socket..."
+    for _p in $("$TB" pidof termux-x11); do
+      "$TB" kill -9 "$_p" 2>/dev/null || true
+    done
+    "$TB" sleep 0.5
+  fi
+fi
+
+if ! $X11_RUNNING; then
+  "$TB" rm -f "$TMPDIR/.X0-lock" "$TMPDIR/.X11-unix/X0" "/tmp/.X0-lock" "/tmp/.X11-unix/X0" 2>/dev/null || true
 fi
 
 # Fix Android 14 SecurityException for writable dex files (loader.apk must be read-only)
@@ -209,19 +226,19 @@ echo "FluxLinux: Launching X11 display activity..."
 "$TB" sleep 1
 
 # Check if desktop session is already running
-if "$TB" pidof xfce4-session >/dev/null 2>&1; then
-  echo "FluxLinux: Active xfce4-session already running; display activity refreshed"
+if "$TB" pidof phosh >/dev/null 2>&1 || "$TB" pidof phoc >/dev/null 2>&1 || "$TB" pidof xfce4-session >/dev/null 2>&1; then
+  echo "FluxLinux: Active desktop session already running; display activity refreshed"
   exit 0
 fi
 
 # Verify guest setup
 ROOTFS="$TERMUX_PREFIX/var/lib/proot-distro/containers/$DISTRO/rootfs"
-if [ ! -f "$ROOTFS/usr/bin/startxfce4" ]; then
-  echo "FluxLinux: [ERROR] XFCE setup incomplete (startxfce4 missing in $DISTRO rootfs)." >&2
+if [ ! -f "$ROOTFS/usr/local/bin/nativecode-desktop" ] && [ ! -f "$ROOTFS/usr/bin/startxfce4" ]; then
+  echo "FluxLinux: [ERROR] Desktop setup incomplete (nativecode-desktop missing in $DISTRO rootfs)." >&2
   exit 1
 fi
 
-echo "FluxLinux: startxfce4=READY"
+echo "FluxLinux: Desktop launcher=READY"
 
 # Guest GPU mode from launch hint or /etc/fluxlinux/gpu_mode
 GPU_HINT="${2:-}"
@@ -264,8 +281,8 @@ else
       export VTEST_SOCKET_NAME=/tmp/.virgl_test
       export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-      if pidof xfce4-session >/dev/null 2>&1; then
-        echo "FluxLinux: xfce4-session already active in guest"
+      if pidof phosh >/dev/null 2>&1 || pidof phoc >/dev/null 2>&1 || pidof xfce4-session >/dev/null 2>&1; then
+        echo "FluxLinux: Desktop session already active in guest"
         exit 0
       fi
 
@@ -338,8 +355,11 @@ else
         eval $(dbus-launch --sh-syntax)
       fi
 
-      xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
-      exec startxfce4
+      if [ -x /usr/local/bin/nativecode-desktop ]; then
+        exec /usr/local/bin/nativecode-desktop
+      else
+        exec startxfce4
+      fi
     '
   GUEST_EXIT=$?
   if [ $GUEST_EXIT -ne 0 ]; then

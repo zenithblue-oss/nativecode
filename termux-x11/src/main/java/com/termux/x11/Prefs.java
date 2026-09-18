@@ -4,7 +4,7 @@ import android.content.Context;
 import com.termux.x11.utils.TermuxX11ExtraKeys;
 
 public class Prefs extends LoriePreferences.PrefsProto {
-  public final ListPreference displayResolutionMode = new ListPreference("displayResolutionMode", "scaled", R.array.displayResolutionVariants, R.array.displayResolutionVariants);
+  public final ListPreference displayResolutionMode = new ListPreference("displayResolutionMode", "native", R.array.displayResolutionVariants, R.array.displayResolutionVariants);
   public final IntPreference displayScale = new IntPreference("displayScale", 120);
   public final ListPreference displayResolutionExact = new ListPreference("displayResolutionExact", "1280x1024", R.array.displayResolution, R.array.displayResolution);
   public final StringPreference displayResolutionCustom = new StringPreference("displayResolutionCustom", "1280x1024");
@@ -13,11 +13,11 @@ public class Prefs extends LoriePreferences.PrefsProto {
   public final BooleanPreference displayStretch = new BooleanPreference("displayStretch", false);
   public final BooleanPreference Reseed = new BooleanPreference("Reseed", true);
   public final BooleanPreference PIP = new BooleanPreference("PIP", false);
-  public final BooleanPreference fullscreen = new BooleanPreference("fullscreen", false);
+  public final BooleanPreference fullscreen = new BooleanPreference("fullscreen", true);
   public final ListPreference forceOrientation = new ListPreference("forceOrientation", "auto", R.array.forceOrientationVariants, R.array.forceOrientationVariants);
-  public final BooleanPreference hideCutout = new BooleanPreference("hideCutout", false);
+  public final BooleanPreference hideCutout = new BooleanPreference("hideCutout", true);
   public final BooleanPreference keepScreenOn = new BooleanPreference("keepScreenOn", true);
-  public final ListPreference touchMode = new ListPreference("touchMode", "1", R.array.touchscreenInputModesEntries, R.array.touchscreenInputModesValues);
+  public final ListPreference touchMode = new ListPreference("touchMode", "3", R.array.touchscreenInputModesEntries, R.array.touchscreenInputModesValues);
   public final BooleanPreference scaleTouchpad = new BooleanPreference("scaleTouchpad", true);
   public final BooleanPreference showStylusClickOverride = new BooleanPreference("showStylusClickOverride", false);
   public final BooleanPreference stylusIsMouse = new BooleanPreference("stylusIsMouse", false);

@@ -2,6 +2,7 @@ package com.zenithblue.nativecode.onboarding
 
 import android.content.Context
 import android.util.Log
+import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.terminal.HostCommandBuilder
 import com.zenithblue.nativecode.terminal.TermuxHostPaths
 import java.io.File
@@ -27,8 +28,39 @@ object AndroidDevPackManager {
         val dir = PlayAssetDeliveryManager.getInstalledPackLocation(
             context,
             PlayAssetDeliveryManager.PACK_ANDROID_DEV
-        ) ?: return null
-        return File(dir, ARCHIVE_NAME).takeIf { it.isFile && it.length() > 2L * 1024L * 1024L }
+        )
+        if (dir != null) {
+            val f = File(dir, ARCHIVE_NAME)
+            if (f.isFile && f.length() > 2L * 1024L * 1024L) return f
+        }
+        if (BuildConfig.DEBUG) {
+            val localCandidates = listOf(
+                File(context.filesDir, "assets/$ARCHIVE_NAME"),
+                File(context.filesDir, ARCHIVE_NAME),
+                File("/data/local/tmp", ARCHIVE_NAME),
+                File("/sdcard/Download", ARCHIVE_NAME),
+                File("/storage/emulated/0/Download", ARCHIVE_NAME)
+            )
+            for (c in localCandidates) {
+                if (c.isFile && c.length() > 2L * 1024L * 1024L) return c
+            }
+            try {
+                val list = context.assets.list("") ?: emptyArray()
+                if (ARCHIVE_NAME in list) {
+                    val dest = File(context.filesDir, "assets/$ARCHIVE_NAME")
+                    if (!dest.isFile || dest.length() < 2L * 1024L * 1024L) {
+                        dest.parentFile?.mkdirs()
+                        context.assets.open(ARCHIVE_NAME).use { input ->
+                            dest.outputStream().use { output -> input.copyTo(output) }
+                        }
+                    }
+                    if (dest.isFile && dest.length() > 2L * 1024L * 1024L) return dest
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Bundled debug asset resolve failed: ${e.message}")
+            }
+        }
+        return null
     }
 
     fun isApplied(context: Context): Boolean {

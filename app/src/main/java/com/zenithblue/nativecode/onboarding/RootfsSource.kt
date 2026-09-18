@@ -46,7 +46,7 @@ sealed interface RootfsSource {
 
 object RootfsSourceResolver {
     private const val TAG = "RootfsSourceResolver"
-        const val PINNED_ALPAQUITA_SHA256 = "832c4cc03d83227cdcde577491deeda94a036e8cb8d07d2e3f74c6cb24ecdeda"
+    const val PINNED_ALPAQUITA_SHA256 = "209b7d4b92367cf46e5a7b6c03ca3fbf49e2a2428963429d71566dcb6ac9bb11"
     const val ALPAQUITA_NAME = "alpaquita_rootfs.tar.zst"
     const val ALPAQUITA_SHA_NAME = "alpaquita_rootfs.tar.zst.sha256"
 
@@ -77,13 +77,16 @@ object RootfsSourceResolver {
 
             for (candidate in localCandidates) {
                 if (candidate.isFile && candidate.length() > 2L * 1024L * 1024L && candidate.canRead()) {
+                    if (!verifyArchiveAgainstPin(candidate)) {
+                        Log.w(TAG, "Ignoring candidate ${candidate.absolutePath}: SHA-256 does not match pin")
+                        continue
+                    }
                     val shaFile = File(candidate.parentFile, ALPAQUITA_SHA_NAME)
-                    val sha = pinnedShaOrWarn(shaFile, candidate.absolutePath)
                     Log.i(TAG, "Resolved LocalFile rootfs (DEBUG only): ${candidate.absolutePath} (${candidate.length()} bytes)")
                     return RootfsSource.LocalFile(
                         archive = candidate,
                         checksum = if (shaFile.isFile) shaFile else null,
-                        expectedSha256 = sha,
+                        expectedSha256 = PINNED_ALPAQUITA_SHA256,
                         distro = "alpaquita"
                     )
                 }
