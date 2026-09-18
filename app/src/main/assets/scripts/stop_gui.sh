@@ -34,6 +34,15 @@ done
 echo "[2/4] Killing proot sessions..."
 "$TB" pkill -9 -f "proot-distro" 2>/dev/null || true
 "$TB" pkill -9 -f "proot" 2>/dev/null || true
+"$TB" pkill -9 -f "libproot.so" 2>/dev/null || true
+
+# Clean up any orphaned child shells with PPID 1
+for _pid in $("$TB" pgrep -f "bash|zsh" 2>/dev/null); do
+    _ppid=$("$TB" awk '{print $4}' "/proc/$_pid/stat" 2>/dev/null)
+    if [ "$_ppid" = "1" ]; then
+        "$TB" kill -9 "$_pid" 2>/dev/null || true
+    fi
+done
 
 # Step 3: Stop Termux X11 server
 echo "[3/4] Stopping Termux X11..."
