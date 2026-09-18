@@ -1,5 +1,10 @@
 package com.zenithblue.nativecode.media
 
+import android.content.Context
+import android.os.Environment
+import com.zenithblue.nativecode.BuildConfig
+import com.zenithblue.nativecode.terminal.ChrootCommandBuilder
+import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -100,19 +105,122 @@ object MediaBridgeProtocol {
     }
 
     /**
+     * Default list of roots permitted for media decode inputs and encode outputs.
+     */
+    fun defaultAllowedRoots(context: Context): List<File> {
+        val roots = mutableListOf<File>(
+            context.filesDir,
+            context.cacheDir
+        )
+        val ext = Environment.getExternalStorageDirectory()
+        if (ext != null) roots.add(ext)
+        val emulated = File("/storage/emulated/0")
+        if (emulated.exists()) roots.add(emulated)
+        val sdcard = File("/sdcard")
+        if (sdcard.exists()) roots.add(sdcard)
+
+        try {
+            context.getExternalFilesDirs(null).filterNotNull().forEach { roots.add(it) }
+            context.externalCacheDirs.filterNotNull().forEach { roots.add(it) }
+        } catch (_: Throwable) {}
+
+        if (!BuildConfig.PLAY_STORE_BUILD) {
+            roots.add(File(ChrootCommandBuilder.CHROOT_PATH))
+        }
+        return roots
+    }
+
+    /**
+     * Resolves a guest path (/home/flux/..., /tmp/..., /sdcard/..., or relative)
+     * to the corresponding File on the Android host filesystem.
+     */
+    fun resolveGuestPath(context: Context, requestedPath: String, mustExist: Boolean): File? {
+        if (requestedPath.isBlank() || requestedPath.contains("\u0000")) return null
+        val f = File(requestedPath)
+        if (mustExist && f.isAbsolute && f.isFile && f.exists()) return f
+
+        val prootDir = ProjectPathResolver.prootRootfsDir(context)
+
+        // Handle guest /tmp paths (mapped to usr/tmp under --shared-tmp)
+        if (requestedPath.startsWith("/tmp/")) {
+            val relTmp = requestedPath.removePrefix("/tmp/")
+            val sharedTmp = File(context.filesDir, "usr/tmp/$relTmp")
+            if (mustExist) {
+                if (sharedTmp.isFile && sharedTmp.exists()) return sharedTmp
+                val prootTmp = File(prootDir, "tmp/$relTmp")
+                if (prootTmp.isFile && prootTmp.exists()) return prootTmp
+            } else {
+                return sharedTmp
+            }
+        }
+
+        // Handle /sdcard/ and /storage/emulated/0/
+        if (requestedPath.startsWith("/sdcard/")) {
+            val relSd = requestedPath.removePrefix("/sdcard/")
+            val emulatedFile = File("/storage/emulated/0", relSd)
+            if (mustExist) {
+                if (emulatedFile.isFile && emulatedFile.exists()) return emulatedFile
+                val sdFile = File("/sdcard", relSd)
+                if (sdFile.isFile && sdFile.exists()) return sdFile
+            } else {
+                return emulatedFile
+            }
+        }
+
+        if (requestedPath.startsWith("/storage/emulated/0/")) {
+            val emulatedFile = File(requestedPath)
+            if (!mustExist || (emulatedFile.isFile && emulatedFile.exists())) {
+                return emulatedFile
+            }
+        }
+
+        // Handle /data/local/tmp/
+        if (requestedPath.startsWith("/data/local/tmp/")) {
+            val relLocal = requestedPath.removePrefix("/data/local/tmp/")
+            val hostTmp = File(context.filesDir, "usr/tmp/$relLocal")
+            if (!mustExist || (hostTmp.isFile && hostTmp.exists())) {
+                return hostTmp
+            }
+        }
+
+        // Handle /home/... or other guest absolute paths
+        if (requestedPath.startsWith("/")) {
+            val relRoot = requestedPath.removePrefix("/")
+            val prootFile = File(prootDir, relRoot)
+            if (mustExist) {
+                if (prootFile.isFile && prootFile.exists()) return prootFile
+                val guestResolved = ProjectPathResolver.resolve(context, requestedPath)
+                if (guestResolved.isFile && guestResolved.exists()) return guestResolved
+                if (f.isFile && f.exists()) return f
+            } else {
+                return prootFile
+            }
+        } else {
+            // Relative path -> resolve in /home/flux/
+            val prootHome = File(prootDir, "home/flux/$requestedPath")
+            if (mustExist) {
+                if (prootHome.isFile && prootHome.exists()) return prootHome
+                val guestResolved = ProjectPathResolver.resolve(context, requestedPath)
+                if (guestResolved.isFile && guestResolved.exists()) return guestResolved
+            } else {
+                return prootHome
+            }
+        }
+
+        return if (mustExist) null else f
+    }
+
+    /**
      * Path security validation: ensures the target file is inside allowed
      * app storage paths and does not escape via ".." or symlinks.
      */
-    fun isPathAllowed(requestedPath: String, allowedRoots: List<File>): Boolean {
-        if (requestedPath.isBlank() || requestedPath.contains("\u0000")) return false
-        val file = File(requestedPath)
+    fun isPathAllowed(targetFile: File, allowedRoots: List<File>): Boolean {
         val canonical = try {
-            file.canonicalFile
+            targetFile.canonicalFile
         } catch (e: Exception) {
             return false
         }
 
-        // Must match at least one allowed root
         return allowedRoots.any { root ->
             try {
                 val rootCanon = root.canonicalFile
@@ -121,5 +229,10 @@ object MediaBridgeProtocol {
                 false
             }
         }
+    }
+
+    fun isPathAllowed(requestedPath: String, allowedRoots: List<File>): Boolean {
+        if (requestedPath.isBlank() || requestedPath.contains("\u0000")) return false
+        return isPathAllowed(File(requestedPath), allowedRoots)
     }
 }

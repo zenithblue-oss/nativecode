@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""
+nativecode_media_client: CLI helper to communicate with NativeCode MediaBridgeServer
+via AF_UNIX abstract namespace.
+"""
+
+import argparse
+import json
+import os
+import socket
+import struct
+import sys
+
+RENDEZVOUS_PATHS = [
+    "/run/nativecode_bridge.json",
+    "/data/data/com.zenithblue.nativecode/files/run/nativecode_bridge.json",
+    os.path.expanduser("~/.nativecode_bridge.json")
+]
+
+def find_rendezvous():
+    for p in RENDEZVOUS_PATHS:
+        if os.path.exists(p):
+            try:
+                with open(p, "r") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+    return None
+
+def connect_media_socket(override_socket=None, override_uid=None):
+    candidates = []
+    if override_socket:
+        candidates.append(override_socket)
+    if override_uid:
+        candidates.append(f"@nativecode.media.v1.{override_uid}")
+
+    # Primary well-known abstract socket
+    candidates.append("@nativecode.media.v1")
+
+    rendezvous = find_rendezvous()
+    if rendezvous and "media_socket" in rendezvous:
+        candidates.append(rendezvous["media_socket"])
+    if rendezvous and "host_uid" in rendezvous:
+        candidates.append(f"@nativecode.media.v1.{rendezvous['host_uid']}")
+
+    for sock_name in candidates:
+        if sock_name.startswith("@"):
+            addr = "\0" + sock_name[1:]
+        elif sock_name.startswith("\0"):
+            addr = sock_name
+        else:
+            addr = sock_name
+
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            s.connect(addr)
+            return s
+        except Exception:
+            s.close()
+
+    sys.stderr.write("Error: Could not connect to NativeCode media bridge. Is NativeCode running?\n")
+    sys.exit(1)
+
+def recv_exact(sock, n):
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ConnectionError("Server closed connection prematurely")
+        buf.extend(chunk)
+    return bytes(buf)
+
+def send_request(sock, req_dict):
+    data = json.dumps(req_dict).encode("utf-8")
+    header = struct.pack(">I", len(data))
+    sock.sendall(header + data)
+
+    # Read length prefix
+    resp_header = recv_exact(sock, 4)
+    resp_len = struct.unpack(">I", resp_header)[0]
+    resp_data = recv_exact(sock, resp_len)
+    return json.loads(resp_data.decode("utf-8"))
+
+def main():
+    parser = argparse.ArgumentParser(description="NativeCode MediaBridge Client")
+    parser.add_argument("--socket", help="Override abstract socket name (e.g. @nativecode.media.v1.10123)")
+    parser.add_argument("--host-uid", type=int, help="Override host app UID")
+
+    subparsers = parser.add_subparsers(dest="cmd", required=True)
+    subparsers.add_parser("ping", help="Ping the MediaBridge server")
+    subparsers.add_parser("capabilities", help="Query hardware video codec capabilities")
+
+    bench_p = subparsers.add_parser("benchmark_file", help="Run hardware decode benchmark on file")
+    bench_p.add_argument("--path", required=True, help="Absolute path to video file")
+    bench_p.add_argument("--mode", default="buffer", choices=["buffer", "surface"], help="Output mode (buffer or surface)")
+    bench_p.add_argument("--mime", default="video/avc", help="MIME type")
+
+    bench_e = subparsers.add_parser("benchmark_encode", help="Run hardware encode benchmark")
+    bench_e.add_argument("--width", type=int, default=1280, help="Frame width (default: 1280)")
+    bench_e.add_argument("--height", type=int, default=720, help="Frame height (default: 720)")
+    bench_e.add_argument("--frames", type=int, default=150, help="Frame count (default: 150)")
+    bench_e.add_argument("--fps", type=int, default=30, help="Frames per second (default: 30)")
+    bench_e.add_argument("--bitrate", type=int, default=4000000, help="Bitrate in bps (default: 4000000)")
+    bench_e.add_argument("--mime", default="video/avc", help="MIME type (video/avc or video/hevc)")
+    bench_e.add_argument("--output", default="", help="Optional output MP4 path on host")
+
+    stream_e = subparsers.add_parser("encode_stream", help="Stream raw YUV bytes into hardware encoder to produce MP4")
+    stream_e.add_argument("--output", required=True, help="Output MP4 path on host")
+    stream_e.add_argument("--width", type=int, required=True, help="Frame width")
+    stream_e.add_argument("--height", type=int, required=True, help="Frame height")
+    stream_e.add_argument("--fps", type=int, default=30, help="Frames per second")
+    stream_e.add_argument("--bitrate", type=int, default=4000000, help="Bitrate in bps")
+    stream_e.add_argument("--mime", default="video/avc", help="MIME type")
+    stream_e.add_argument("--input-file", default="-", help="Input raw YUV file or '-' for stdin")
+
+    args = parser.parse_args()
+    sock = connect_media_socket(args.socket, args.host_uid)
+
+    try:
+        if args.cmd == "ping":
+            req = {"v": 1, "cmd": "ping"}
+            resp = send_request(sock, req)
+            print(json.dumps(resp, indent=2))
+        elif args.cmd == "capabilities":
+            req = {"v": 1, "cmd": "capabilities"}
+            resp = send_request(sock, req)
+            print(json.dumps(resp, indent=2))
+        elif args.cmd == "benchmark_file":
+            file_path = os.path.abspath(os.path.expanduser(args.path))
+            if not os.path.exists(file_path):
+                print(json.dumps({"v": 1, "ok": False, "error": f"Input video file not found: {args.path}"}, indent=2))
+                sys.exit(1)
+            req = {
+                "v": 1,
+                "cmd": "benchmark_file",
+                "path": file_path,
+                "mode": args.mode,
+                "mime": args.mime
+            }
+            resp = send_request(sock, req)
+            print(json.dumps(resp, indent=2))
+        elif args.cmd == "benchmark_encode":
+            out_path = os.path.abspath(os.path.expanduser(args.output)) if args.output else ""
+            req = {
+                "v": 1,
+                "cmd": "benchmark_encode",
+                "width": args.width,
+                "height": args.height,
+                "frames": args.frames,
+                "fps": args.fps,
+                "bitrate": args.bitrate,
+                "mime": args.mime,
+                "output_path": out_path
+            }
+            resp = send_request(sock, req)
+            print(json.dumps(resp, indent=2))
+        elif args.cmd == "encode_stream":
+            if args.input_file != "-":
+                inp_file = os.path.expanduser(args.input_file)
+                if not os.path.exists(inp_file):
+                    print(json.dumps({"v": 1, "ok": False, "error": f"Input file not found: {args.input_file}"}, indent=2))
+                    sys.exit(1)
+            out_path = os.path.abspath(os.path.expanduser(args.output))
+            req = {
+                "v": 1,
+                "cmd": "encode_stream",
+                "output_path": out_path,
+                "width": args.width,
+                "height": args.height,
+                "fps": args.fps,
+                "bitrate": args.bitrate,
+                "mime": args.mime
+            }
+            # Send initial control frame
+            data = json.dumps(req).encode("utf-8")
+            sock.sendall(struct.pack(">I", len(data)) + data)
+
+            # Wait for ready signal
+            resp_hdr = recv_exact(sock, 4)
+            ready_resp = json.loads(recv_exact(sock, struct.unpack(">I", resp_hdr)[0]).decode("utf-8"))
+            if not ready_resp.get("ok", False):
+                print(json.dumps(ready_resp, indent=2))
+                sys.exit(1)
+
+            # Stream raw YUV
+            in_f = sys.stdin.buffer if args.input_file == "-" else open(args.input_file, "rb")
+            try:
+                while True:
+                    chunk = in_f.read(65536)
+                    if not chunk:
+                        break
+                    sock.sendall(chunk)
+            finally:
+                if in_f != sys.stdin.buffer:
+                    in_f.close()
+
+            # Signal EOF by shutting down socket write direction
+            sock.shutdown(socket.SHUT_WR)
+
+            # Receive final benchmark and encode stats
+            final_hdr = recv_exact(sock, 4)
+            resp = json.loads(recv_exact(sock, struct.unpack(">I", final_hdr)[0]).decode("utf-8"))
+            print(json.dumps(resp, indent=2))
+        else:
+            sys.exit(1)
+
+        if not resp.get("ok", False):
+            sys.exit(1)
+    finally:
+        sock.close()
+
+if __name__ == "__main__":
+    main()

@@ -56,7 +56,7 @@ nativecode-agent install-apk \
   --title "Build Complete" \
   --message "app-debug.apk built in 14.2s"
 ```
-- **Behavior:** Resolves relative and absolute paths, parses APK metadata, stages the APK to Android MediaStore `Downloads`, and presents an in-app card with **SAVE & OPEN** (launches Android Package Installer) and **SHARE** sheet actions. Subject to the **Single Active Alert Rule**.
+- **Behavior:** Resolves guest paths (`/home/flux/...`, relative paths), `/tmp/...` (shared tmp), and external storage (`/sdcard/...`). Validates non-empty file (>100 bytes) and valid package manifest. Stages the APK to Android MediaStore `Downloads`, and presents an in-app card with **SAVE & OPEN** (launches Android Package Installer) and **SHARE** sheet actions. Subject to the **Single Active Alert Rule**.
 - **Alias:** `nativecode-agent open-apk`
 
 ### 2.3 Dismiss / Cancel On-Screen Alert (`dismiss-alert`)
@@ -78,7 +78,7 @@ nativecode-agent notify \
 ```
 - `--priority`: `high`, `default`, or `low`.
 - `--id`: Optional integer notification ID (default: `1001`).
-- `--ongoing`: `true` or `false` (for ongoing background processes).
+- `--ongoing`: Bare flag `--ongoing` or `--ongoing true|false` (for ongoing background processes).
 
 ### 2.5 System Toasts (`toast`)
 Display lightweight, non-blocking on-screen status updates on Android:
@@ -96,6 +96,12 @@ Output schema:
 {
   "v": 1,
   "ok": true,
+  "battery_percent": 78,
+  "is_charging": true,
+  "thermal_status": "NONE",
+  "avail_mem_mb": 4120,
+  "total_mem_mb": 7331,
+  "low_memory": false,
   "telemetry": {
     "battery": {
       "level": 78,
@@ -110,10 +116,14 @@ Output schema:
     "power": {
       "power_save_mode": false,
       "interactive": true
+    },
+    "thermal": {
+      "status": "NONE"
     }
   }
 }
 ```
+*Note: Flat keys (`battery_percent`, `avail_mem_mb`, etc.) and the structured `telemetry` object are both present for script and agent compatibility.*
 *Tip: If `battery.temperature_c` > 42.0°C or `memory.low_memory` is true, reduce build concurrency (e.g. `make -j2` instead of `-j8`).*
 
 ### 2.7 Background Task Progress (`status`)

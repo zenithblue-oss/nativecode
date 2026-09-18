@@ -49,7 +49,7 @@ nativecode-agent notify \
 - `--message`: Primary body text.
 - `--priority`: `high`, `default`, or `low`.
 - `--id`: Optional notification ID (default: 1001).
-- `--ongoing`: Make non-dismissible ongoing notification (`true`/`false`).
+- `--ongoing`: Set non-dismissible ongoing notification (bare flag `--ongoing` or `--ongoing true|false`).
 
 ### 3. Display Android Toast
 ```bash
@@ -65,10 +65,16 @@ Output:
 {
   "v": 1,
   "ok": true,
+  "battery_percent": 81,
+  "is_charging": false,
+  "thermal_status": "NONE",
+  "avail_mem_mb": 3412,
+  "total_mem_mb": 7331,
+  "low_memory": false,
   "telemetry": {
     "battery": {
-      "level": 48,
-      "charging": true,
+      "level": 81,
+      "charging": false,
       "temperature_c": 32.4
     },
     "memory": {
@@ -79,10 +85,14 @@ Output:
     "power": {
       "power_save_mode": false,
       "interactive": true
+    },
+    "thermal": {
+      "status": "NONE"
     }
   }
 }
 ```
+*Note: Flat keys (`battery_percent`, `avail_mem_mb`, etc.) and the structured `telemetry` object are both populated for compatibility.*
 
 ### 5. Task Progress & Status
 ```bash
@@ -120,8 +130,11 @@ nativecode-agent install-apk \
   --title "Install APK" \
   --message "Gradle assembleDebug completed successfully"
 ```
-- Resolves guest relative paths, guest home paths, and host storage paths.
-- Inspects APK manifest metadata (`packageName`, `versionName`, application icon, label, file size).
+- Supported paths:
+  - Guest relative and absolute paths (`app/build/...apk`, `/home/flux/app.apk`).
+  - Guest temporary directory (`/tmp/...apk`, mapped to host shared tmp).
+  - External storage (`/sdcard/...`, `/storage/emulated/0/...`).
+- Validates file exists, non-empty (>100 bytes), and has a valid Android package manifest.
 - Subject to the **Single Active Alert Rule** (returns `alert_already_active` if another alert is already on screen).
 - Displays an in-app Cyber-brutalist card:
   - **SAVE & OPEN:** Follows Play Store policy guidelines by staging to MediaStore `Downloads` and opening Downloads for native user-initiated installation (no ADB required).

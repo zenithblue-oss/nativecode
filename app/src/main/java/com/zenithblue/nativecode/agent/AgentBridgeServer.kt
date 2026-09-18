@@ -50,6 +50,30 @@ class AgentBridgeServer(
             val f = File(path)
             if (f.isAbsolute && f.isFile && f.exists()) return f
 
+            // Handle guest /tmp paths (mapped to usr/tmp under --shared-tmp)
+            if (path.startsWith("/tmp/")) {
+                val relTmp = path.removePrefix("/tmp/")
+                val sharedTmp = File(context.filesDir, "usr/tmp/$relTmp")
+                if (sharedTmp.isFile && sharedTmp.exists()) return sharedTmp
+                val prootDir = com.zenithblue.nativecode.terminal.ProjectPathResolver.prootRootfsDir(context)
+                val prootTmp = File(prootDir, "tmp/$relTmp")
+                if (prootTmp.isFile && prootTmp.exists()) return prootTmp
+            }
+
+            // Handle /sdcard/ and /storage/emulated/0/
+            if (path.startsWith("/sdcard/")) {
+                val relSd = path.removePrefix("/sdcard/")
+                val sdFile = File("/storage/emulated/0", relSd)
+                if (sdFile.isFile && sdFile.exists()) return sdFile
+                val altSd = File("/sdcard", relSd)
+                if (altSd.isFile && altSd.exists()) return altSd
+            }
+
+            if (path.startsWith("/storage/emulated/0/")) {
+                val emulatedFile = File(path)
+                if (emulatedFile.isFile && emulatedFile.exists()) return emulatedFile
+            }
+
             val guestResolved = com.zenithblue.nativecode.terminal.ProjectPathResolver.resolve(context, path)
             if (guestResolved.isFile && guestResolved.exists()) return guestResolved
 
@@ -258,31 +282,39 @@ class AgentBridgeServer(
                                 if (apkFile == null || !apkFile.exists() || !apkFile.isFile) {
                                     response.put("ok", false)
                                     response.put("error", "APK file not found: $path")
+                                } else if (apkFile.length() < 100L) {
+                                    response.put("ok", false)
+                                    response.put("error", "Invalid APK file (size too small or empty): $path")
                                 } else {
-                                    val title = request.optString("title", "Install APK").ifBlank { "Install APK" }
-                                    val message = request.optString("message", "")
                                     val pm = context.packageManager
                                     val pkgInfo = try { pm.getPackageArchiveInfo(apkFile.absolutePath, 0) } catch (_: Exception) { null }
                                     val pkgName = pkgInfo?.packageName ?: ""
-                                    val verName = pkgInfo?.versionName ?: "1.0"
-                                    val appLabel = pkgInfo?.applicationInfo?.let { appInfo ->
-                                        appInfo.sourceDir = apkFile.absolutePath
-                                        appInfo.publicSourceDir = apkFile.absolutePath
-                                        try { appInfo.loadLabel(pm).toString() } catch (_: Exception) { apkFile.name }
-                                    } ?: apkFile.name
-
-                                    val shown = uiDelegate?.showInstallApkAlert(apkFile, title, message) == true
-                                    if (!shown) {
-                                        postInstallApkNotification(apkFile, appLabel, pkgName, verName, title, message)
-                                        response.put("notified", true)
+                                    if (pkgName.isBlank()) {
+                                        response.put("ok", false)
+                                        response.put("error", "Invalid or corrupted APK file (no valid package manifest found): $path")
                                     } else {
-                                        response.put("alert_shown", true)
+                                        val title = request.optString("title", "Install APK").ifBlank { "Install APK" }
+                                        val message = request.optString("message", "")
+                                        val verName = pkgInfo?.versionName ?: "1.0"
+                                        val appLabel = pkgInfo?.applicationInfo?.let { appInfo ->
+                                            appInfo.sourceDir = apkFile.absolutePath
+                                            appInfo.publicSourceDir = apkFile.absolutePath
+                                            try { appInfo.loadLabel(pm).toString() } catch (_: Exception) { apkFile.name }
+                                        } ?: apkFile.name
+
+                                        val shown = uiDelegate?.showInstallApkAlert(apkFile, title, message) == true
+                                        if (!shown) {
+                                            postInstallApkNotification(apkFile, appLabel, pkgName, verName, title, message)
+                                            response.put("notified", true)
+                                        } else {
+                                            response.put("alert_shown", true)
+                                        }
+                                        response.put("ok", true)
+                                        response.put("path", apkFile.absolutePath)
+                                        response.put("app_label", appLabel)
+                                        response.put("package_name", pkgName)
+                                        response.put("version_name", verName)
                                     }
-                                    response.put("ok", true)
-                                    response.put("path", apkFile.absolutePath)
-                                    response.put("app_label", appLabel)
-                                    response.put("package_name", pkgName)
-                                    response.put("version_name", verName)
                                 }
                             }
                         }
@@ -464,24 +496,32 @@ class AgentBridgeServer(
     private fun collectTelemetry(): JSONObject {
         val root = JSONObject()
 
+        var batteryPercent = -1
+        var isCharging = false
+        var tempC: Double? = null
+
         // Battery
         val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         if (batteryIntent != null) {
             val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
             val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
             val status = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            val temp = batteryIntent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
+            if (temp > 0) {
+                tempC = temp / 10.0
+            }
+            isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                 status == BatteryManager.BATTERY_STATUS_FULL
 
-            root.put("battery_percent", if (scale > 0) (level * 100) / scale else level)
-            root.put("is_charging", isCharging)
+            batteryPercent = if (scale > 0) (level * 100) / scale else level
         }
 
         // Thermals
+        var thermalStr = "UNKNOWN"
         if (Build.VERSION.SDK_INT >= 29) {
             val powerMgr = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
             val thermalStatus = powerMgr?.currentThermalStatus ?: -1
-            val thermalStr = when (thermalStatus) {
+            thermalStr = when (thermalStatus) {
                 PowerManager.THERMAL_STATUS_NONE -> "NONE"
                 PowerManager.THERMAL_STATUS_LIGHT -> "LIGHT"
                 PowerManager.THERMAL_STATUS_MODERATE -> "MODERATE"
@@ -491,17 +531,55 @@ class AgentBridgeServer(
                 PowerManager.THERMAL_STATUS_SHUTDOWN -> "SHUTDOWN"
                 else -> "UNKNOWN"
             }
-            root.put("thermal_status", thermalStr)
         }
 
         // Memory
+        var availMb = -1L
+        var totalMb = -1L
+        var lowMem = false
         val actMgr = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         if (actMgr != null) {
             val memInfo = ActivityManager.MemoryInfo()
             actMgr.getMemoryInfo(memInfo)
-            root.put("avail_mem_mb", memInfo.availMem / (1024 * 1024))
-            root.put("low_memory", memInfo.lowMemory)
+            availMb = memInfo.availMem / (1024 * 1024)
+            totalMb = memInfo.totalMem / (1024 * 1024)
+            lowMem = memInfo.lowMemory
         }
+
+        // Power
+        val powerMgr = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val isPowerSave = powerMgr?.isPowerSaveMode ?: false
+        val isInteractive = if (Build.VERSION.SDK_INT >= 20) powerMgr?.isInteractive ?: true else true
+
+        // Flat keys (legacy & script compat)
+        root.put("battery_percent", batteryPercent)
+        root.put("is_charging", isCharging)
+        root.put("thermal_status", thermalStr)
+        root.put("avail_mem_mb", availMb)
+        root.put("total_mem_mb", totalMb)
+        root.put("low_memory", lowMem)
+
+        // Nested telemetry object (matches documentation and schema)
+        val telemetryObj = JSONObject().apply {
+            put("battery", JSONObject().apply {
+                put("level", batteryPercent)
+                put("charging", isCharging)
+                if (tempC != null) put("temperature_c", tempC)
+            })
+            put("memory", JSONObject().apply {
+                put("avail_mb", availMb)
+                put("total_mb", totalMb)
+                put("low_memory", lowMem)
+            })
+            put("power", JSONObject().apply {
+                put("power_save_mode", isPowerSave)
+                put("interactive", isInteractive)
+            })
+            put("thermal", JSONObject().apply {
+                put("status", thermalStr)
+            })
+        }
+        root.put("telemetry", telemetryObj)
 
         return root
     }

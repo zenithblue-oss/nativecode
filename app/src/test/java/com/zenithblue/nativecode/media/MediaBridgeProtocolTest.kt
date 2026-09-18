@@ -70,9 +70,13 @@ class MediaBridgeProtocolTest {
         val allowedRoots = listOf(root)
 
         assertTrue(MediaBridgeProtocol.isPathAllowed(inside.absolutePath, allowedRoots))
+        assertTrue(MediaBridgeProtocol.isPathAllowed(inside, allowedRoots))
         assertFalse(MediaBridgeProtocol.isPathAllowed(outside.absolutePath, allowedRoots))
+        assertFalse(MediaBridgeProtocol.isPathAllowed(outside, allowedRoots))
         assertFalse(MediaBridgeProtocol.isPathAllowed(File(root, "../secret.txt").absolutePath, allowedRoots))
+        assertFalse(MediaBridgeProtocol.isPathAllowed(File(root, "../secret.txt"), allowedRoots))
         assertFalse(MediaBridgeProtocol.isPathAllowed("/system/bin/sh", allowedRoots))
+        assertFalse(MediaBridgeProtocol.isPathAllowed(File("/system/bin/sh"), allowedRoots))
         assertFalse(MediaBridgeProtocol.isPathAllowed("", allowedRoots))
     }
 }

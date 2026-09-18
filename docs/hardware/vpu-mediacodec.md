@@ -33,10 +33,10 @@ Returns JSON containing device SoC, Android API level, supported resolutions (72
 ### 2. Hardware VPU File Decode Benchmark
 ```bash
 nativecode-media benchmark_file \
-  --path /data/data/com.zenithblue.nativecode/files/home/test_1080p30.mp4 \
+  --path "/home/flux/test_1080p30.mp4" \
   --mode surface
 ```
-- `--path`: Absolute host path to MP4/MKV video.
+- `--path`: Video file path (guest `/home/flux/...`, `/tmp/...`, `/sdcard/...`, or relative path).
 - `--mode`: `surface` (zero-copy `ImageReader` drain, ~204 FPS) or `buffer` (bytebuffer discard).
 - `--mime`: Target MIME (default: `video/avc`).
 
@@ -48,9 +48,9 @@ nativecode-media benchmark_encode \
   --frames 150 \
   --fps 30 \
   --bitrate 4000000 \
-  --output /data/data/com.zenithblue.nativecode/cache/encoded.mp4
+  --output "/home/flux/encoded.mp4"
 ```
-Synthesizes moving YUV patterns, feeds hardware MediaCodec encoder (`c2.mtk.avc.encoder`), and muxes to an MP4 container.
+Synthesizes moving YUV patterns, feeds hardware MediaCodec encoder (`c2.mtk.avc.encoder` or `c2.qti.avc.encoder`), and muxes to an MP4 container.
 
 ### 4. Live FFmpeg to Host VPU Streaming Encode
 Pipes raw YUV frames from PRoot FFmpeg into the hardware VPU encoder:
@@ -61,11 +61,22 @@ ffmpeg -f lavfi -i testsrc=duration=5:size=1280x720:rate=30 -pix_fmt nv12 -f raw
     --height 720 \
     --fps 30 \
     --bitrate 4000000 \
-    --output /data/data/com.zenithblue.nativecode/cache/stream_encoded.mp4
+    --output "/home/flux/stream_encoded.mp4"
 ```
 - Raw frames travel over Linux abstract socket kernel buffer.
 - MediaCodec hardware encoder writes compressed NALUs into `MediaMuxer`.
-- Verified at **162.7 FPS (5.4x realtime)** on MediaTek Dimensity 8300-Ultra.
+- Verified at **162.7 FPS (5.4x realtime)** on MediaTek Dimensity 8300-Ultra and hardware encoding on Snapdragon 8 Gen 3.
+
+---
+
+## Allowed Paths & Guest Path Resolution
+
+The host MediaBridge automatically resolves guest-relative and container paths to host storage:
+- **Guest Home & Workspaces:** `/home/flux/...`, `~/...`, and relative paths resolve inside the PRoot rootfs.
+- **Guest Tmp:** `/tmp/...` resolves to the shared host tmp directory (`$PREFIX/tmp/`).
+- **External Storage / Downloads:** `/sdcard/...` and `/storage/emulated/0/...` resolve to Android shared user storage.
+- **Host App Sandbox:** `/data/data/com.zenithblue.nativecode/...` paths are permitted.
+- **Security:** Arbitrary paths outside app sandbox and external storage (e.g. `/system`, `/vendor`, `/data/system`) are rejected with `Path traversal or unauthorized path rejected`.
 
 ---
 

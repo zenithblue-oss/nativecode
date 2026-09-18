@@ -12,12 +12,7 @@ import org.json.JSONObject
 
 class MediaBridgeServer(
     private val context: Context,
-    private val allowedRoots: List<File> = listOf(
-        context.filesDir,
-        context.cacheDir,
-        File(context.filesDir, "usr"),
-        File(context.filesDir, "home")
-    )
+    private val allowedRoots: List<File> = MediaBridgeProtocol.defaultAllowedRoots(context)
 ) : AutoCloseable {
 
     companion object {
@@ -125,11 +120,14 @@ class MediaBridgeServer(
                             MediaCodecDecodeBenchmark.OutputMode.BUFFER_DISCARD
                         }
 
-                        if (!MediaBridgeProtocol.isPathAllowed(path, allowedRoots)) {
+                        val targetFile = MediaBridgeProtocol.resolveGuestPath(context, path, mustExist = true)
+                        if (targetFile == null || !targetFile.exists() || !targetFile.isFile) {
+                            response.put("ok", false)
+                            response.put("error", "Input video file not found: $path")
+                        } else if (!MediaBridgeProtocol.isPathAllowed(targetFile, allowedRoots)) {
                             response.put("ok", false)
                             response.put("error", "Path traversal or unauthorized path rejected: $path")
                         } else {
-                            val targetFile = File(path)
                             val bench = MediaCodecDecodeBenchmark.runDecode(targetFile, mode)
                             response.put("ok", bench.error == null)
                             if (bench.error != null) {
@@ -158,13 +156,14 @@ class MediaBridgeServer(
                         val outputPath = request.optString("output_path", "")
 
                         val outputFile = if (outputPath.isNotEmpty()) {
-                            if (!MediaBridgeProtocol.isPathAllowed(outputPath, allowedRoots)) {
+                            val resolved = MediaBridgeProtocol.resolveGuestPath(context, outputPath, mustExist = false)
+                            if (resolved == null || !MediaBridgeProtocol.isPathAllowed(resolved, allowedRoots)) {
                                 response.put("ok", false)
                                 response.put("error", "Path traversal or unauthorized path rejected: $outputPath")
                                 MediaBridgeProtocol.writeControlFrame(output, response)
                                 continue
                             }
-                            File(outputPath)
+                            resolved
                         } else {
                             null
                         }
@@ -204,7 +203,13 @@ class MediaBridgeServer(
                         val mime = request.optString("mime", "video/avc")
                         val outputPath = request.optString("output_path", "")
 
-                        if (outputPath.isEmpty() || !MediaBridgeProtocol.isPathAllowed(outputPath, allowedRoots)) {
+                        val outputFile = if (outputPath.isNotEmpty()) {
+                            MediaBridgeProtocol.resolveGuestPath(context, outputPath, mustExist = false)
+                        } else {
+                            null
+                        }
+
+                        if (outputFile == null || !MediaBridgeProtocol.isPathAllowed(outputFile, allowedRoots)) {
                             response.put("ok", false)
                             response.put("error", "Invalid or unauthorized output_path: $outputPath")
                             MediaBridgeProtocol.writeControlFrame(output, response)
@@ -222,7 +227,7 @@ class MediaBridgeServer(
                         // Stream raw YUV from socket into MediaCodec encoder
                         val bench = MediaCodecEncodeBenchmark.runEncodeStream(
                             rawInputStream = input,
-                            outputFile = File(outputPath),
+                            outputFile = outputFile,
                             width = width,
                             height = height,
                             fps = fps,

@@ -131,6 +131,9 @@ object MediaCodecEncodeBenchmark {
             val frameSize = width * height * 3 / 2
             val rawPatternBuffer = ByteArray(frameSize)
 
+            var emptyDrainCount = 0
+            val maxEmptyDrain = 50
+
             while (!outputEosReached) {
                 // Feed input frames
                 if (!inputEosSignaled) {
@@ -184,6 +187,7 @@ object MediaCodecEncodeBenchmark {
                 val outputBufIndex = codec.dequeueOutputBuffer(bufferInfo, timeoutUs)
                 when {
                     outputBufIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        emptyDrainCount = 0
                         if (muxer != null && !muxerStarted) {
                             videoTrackIndex = muxer.addTrack(codec.outputFormat)
                             muxer.start()
@@ -191,9 +195,15 @@ object MediaCodecEncodeBenchmark {
                         }
                     }
                     outputBufIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                        // Wait for next output
+                        if (inputEosSignaled) {
+                            emptyDrainCount++
+                            if (emptyDrainCount >= maxEmptyDrain) {
+                                outputEosReached = true
+                            }
+                        }
                     }
                     outputBufIndex >= 0 -> {
+                        emptyDrainCount = 0
                         if (firstFrameTime == null) {
                             firstFrameTime = SystemClock.elapsedRealtime()
                         }
@@ -349,6 +359,9 @@ object MediaCodecEncodeBenchmark {
             val frameBytes = width * height * 3 / 2
             val frameBuffer = ByteArray(frameBytes)
 
+            var emptyDrainCount = 0
+            val maxEmptyDrain = 50
+
             while (!outputEosReached) {
                 if (!inputEosSignaled) {
                     val inputBufIndex = codec.dequeueInputBuffer(timeoutUs)
@@ -387,14 +400,23 @@ object MediaCodecEncodeBenchmark {
                 val outputBufIndex = codec.dequeueOutputBuffer(bufferInfo, timeoutUs)
                 when {
                     outputBufIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        emptyDrainCount = 0
                         if (!muxerStarted) {
                             videoTrackIndex = muxer.addTrack(codec.outputFormat)
                             muxer.start()
                             muxerStarted = true
                         }
                     }
-                    outputBufIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {}
+                    outputBufIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
+                        if (inputEosSignaled) {
+                            emptyDrainCount++
+                            if (emptyDrainCount >= maxEmptyDrain) {
+                                outputEosReached = true
+                            }
+                        }
+                    }
                     outputBufIndex >= 0 -> {
+                        emptyDrainCount = 0
                         if (firstFrameTime == null) {
                             firstFrameTime = SystemClock.elapsedRealtime()
                         }

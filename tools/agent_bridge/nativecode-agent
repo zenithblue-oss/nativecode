@@ -98,7 +98,12 @@ def main():
     notify_p.add_argument("--id", type=int, default=1001, help="Notification ID")
     notify_p.add_argument("--tag", default="agent_task", help="Notification tag")
     notify_p.add_argument("--priority", default="default", choices=["default", "high", "low"])
-    notify_p.add_argument("--ongoing", action="store_true", help="Set ongoing notification")
+    def parse_bool_or_flag(v):
+        if isinstance(v, bool):
+            return v
+        return str(v).strip().lower() not in ("false", "0", "no", "off")
+
+    notify_p.add_argument("--ongoing", nargs="?", const=True, default=False, type=parse_bool_or_flag, help="Set ongoing notification (flag or true/false)")
 
     # status
     status_p = subparsers.add_parser("status", help="Update ongoing task status in notification shade")
@@ -182,10 +187,17 @@ def main():
                 "message": args.message
             }
         elif args.cmd in ("install-apk", "open-apk"):
+            apk_path = os.path.abspath(os.path.expanduser(args.path))
+            if not os.path.exists(apk_path):
+                print(json.dumps({"v": 1, "ok": False, "error": f"APK file not found: {args.path}"}, indent=2))
+                sys.exit(1)
+            if os.path.getsize(apk_path) < 100:
+                print(json.dumps({"v": 1, "ok": False, "error": f"Invalid APK file (size too small or empty): {args.path}"}, indent=2))
+                sys.exit(1)
             req = {
                 "v": 1,
                 "cmd": "install_apk",
-                "path": args.path,
+                "path": apk_path,
                 "title": args.title,
                 "message": args.message
             }

@@ -126,16 +126,21 @@ def main():
             resp = send_request(sock, req)
             print(json.dumps(resp, indent=2))
         elif args.cmd == "benchmark_file":
+            file_path = os.path.abspath(os.path.expanduser(args.path))
+            if not os.path.exists(file_path):
+                print(json.dumps({"v": 1, "ok": False, "error": f"Input video file not found: {args.path}"}, indent=2))
+                sys.exit(1)
             req = {
                 "v": 1,
                 "cmd": "benchmark_file",
-                "path": args.path,
+                "path": file_path,
                 "mode": args.mode,
                 "mime": args.mime
             }
             resp = send_request(sock, req)
             print(json.dumps(resp, indent=2))
         elif args.cmd == "benchmark_encode":
+            out_path = os.path.abspath(os.path.expanduser(args.output)) if args.output else ""
             req = {
                 "v": 1,
                 "cmd": "benchmark_encode",
@@ -145,15 +150,21 @@ def main():
                 "fps": args.fps,
                 "bitrate": args.bitrate,
                 "mime": args.mime,
-                "output_path": args.output
+                "output_path": out_path
             }
             resp = send_request(sock, req)
             print(json.dumps(resp, indent=2))
         elif args.cmd == "encode_stream":
+            if args.input_file != "-":
+                inp_file = os.path.expanduser(args.input_file)
+                if not os.path.exists(inp_file):
+                    print(json.dumps({"v": 1, "ok": False, "error": f"Input file not found: {args.input_file}"}, indent=2))
+                    sys.exit(1)
+            out_path = os.path.abspath(os.path.expanduser(args.output))
             req = {
                 "v": 1,
                 "cmd": "encode_stream",
-                "output_path": args.output,
+                "output_path": out_path,
                 "width": args.width,
                 "height": args.height,
                 "fps": args.fps,

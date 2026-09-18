@@ -91,7 +91,7 @@ export NATIVECODE_GPU_LAUNCH="/usr/local/bin/gpu-launch"
                 profileScript.setExecutable(true, false)
             }
 
-            // System CLI binary: update /usr/local/bin/nativecode-agent if asset present
+            // System CLI binaries: update /usr/local/bin/nativecode-agent and /usr/local/bin/nativecode-media if assets present
             val localBinDir = File(rootfs, "usr/local/bin")
             if (localBinDir.isDirectory || localBinDir.mkdirs()) {
                 val agentScript = File(localBinDir, "nativecode-agent")
@@ -99,6 +99,13 @@ export NATIVECODE_GPU_LAUNCH="/usr/local/bin/gpu-launch"
                 if (scriptContent.isNotBlank()) {
                     writeIfChanged(agentScript, scriptContent)
                     agentScript.setExecutable(true, false)
+                }
+
+                val mediaScript = File(localBinDir, "nativecode-media")
+                val mediaContent = readAssetOrFallback(context, "agents/nativecode-media", "")
+                if (mediaContent.isNotBlank()) {
+                    writeIfChanged(mediaScript, mediaContent)
+                    mediaScript.setExecutable(true, false)
                 }
             }
 
