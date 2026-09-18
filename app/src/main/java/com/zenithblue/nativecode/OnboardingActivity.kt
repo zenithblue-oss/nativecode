@@ -2071,16 +2071,18 @@ class OnboardingActivity : AppCompatActivity() {
     private fun prootSetupPhases(): List<SetupPhase> {
         return listOf(
             SetupPhase("A", "Preparing NativeCode host…", 10),
-            SetupPhase("B", "Installing prebuilt Linux runtime…", 85),
-            SetupPhase("C", "Verifying environment…", 5)
+            SetupPhase("B", "Installing prebuilt Linux runtime…", 75),
+            SetupPhase("C", "Deploying AI agent guidelines & hardware bridge…", 10),
+            SetupPhase("D", "Verifying environment…", 5)
         )
     }
 
     private fun chrootSetupPhases(): List<SetupPhase> {
         return listOf(
             SetupPhase("R0", "Checking root access…", 10),
-            SetupPhase("R1", "Installing prebuilt Linux runtime (chroot)…", 85),
-            SetupPhase("R2", "Verifying environment…", 5)
+            SetupPhase("R1", "Installing prebuilt Linux runtime (chroot)…", 75),
+            SetupPhase("R2", "Deploying AI agent guidelines & hardware bridge…", 10),
+            SetupPhase("R3", "Verifying environment…", 5)
         )
     }
 
@@ -2556,7 +2558,12 @@ class OnboardingActivity : AppCompatActivity() {
                                 .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                                 .apply()
                             AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "chroot", true)
+                            enterSetupPhase("R2", "Deploying AI agent guidelines & hardware bridge…")
+                            updateBaseStatus("[CHROOT] Deploying AI agent guidelines & hardware bridge…")
+                            appendSetupLog(">>> Copying agent guidelines and tool configs into chroot…\n")
                             AgentConfigInstaller.install(this@OnboardingActivity)
+                            setSetupPhaseFraction(1f, "Agent guidelines deployed")
+                            enterSetupPhase("R3", "Verifying environment…")
                             finishChrootBaseSetup()
                         } else {
                             updateBaseStatus("[CHROOT] Distro extraction failed (exit $code).")
@@ -2666,7 +2673,10 @@ class OnboardingActivity : AppCompatActivity() {
                             .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                             .apply()
                         GuestGpuConfig.applyToRootfs(this@OnboardingActivity)
-                        enterSetupPhase("C", "Verifying environment…")
+                        enterSetupPhase("C", "Deploying AI agent guidelines & hardware bridge…")
+                        AgentConfigInstaller.install(this@OnboardingActivity)
+                        setSetupPhaseFraction(1f, "Agent guidelines and hardware bridge configured")
+                        enterSetupPhase("D", "Verifying environment…")
                         applyAndroidDevPackForPlay()
                         verifyRuntimeSentinel()
                         LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
@@ -2759,10 +2769,15 @@ class OnboardingActivity : AppCompatActivity() {
                     .apply()
                 GuestGpuConfig.applyToRootfs(this@OnboardingActivity)
 
-                enterSetupPhase("C", "Verifying environment…")
-                updateBaseStatus("C. Configuring AI agent environments and hardware bridge…")
-                appendSetupLog(">>> Deploying AI agent guidelines and hardware bridge configs…\n")
+                enterSetupPhase("C", "Deploying AI agent guidelines & hardware bridge…")
+                updateBaseStatus("C. Deploying AI agent guidelines & hardware bridge…")
+                appendSetupLog(">>> Copying agent guidelines (AGENTS.md, CLAUDE.md) and tool configs…\n")
                 AgentConfigInstaller.install(this@OnboardingActivity)
+                appendSetupLog(">>> Agent configs deployed to /home/flux, /root, and CLI tools (opencode, codex, agy, claude, grok, qwen, kiro).\n")
+                setSetupPhaseFraction(1f, "Agent guidelines and hardware bridge configured")
+
+                enterSetupPhase("D", "Verifying environment…")
+                updateBaseStatus("D. Verifying environment…")
                 applyAndroidDevPackForPlay()
                 verifyRuntimeSentinel()
 
