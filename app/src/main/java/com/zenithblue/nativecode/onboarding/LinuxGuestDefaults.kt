@@ -40,6 +40,7 @@ object LinuxGuestDefaults {
             installFontAlias(rootfs)
             renameLegacyHostProfile(rootfs)
             pinXfceTerminalFont(rootfs)
+            AgentConfigInstaller.install(context)
             true
         }.onFailure {
             Log.w(TAG, "Could not apply Linux guest defaults: ${it.message}", it)

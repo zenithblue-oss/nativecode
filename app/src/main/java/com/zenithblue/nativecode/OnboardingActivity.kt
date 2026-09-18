@@ -32,6 +32,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.setPadding
 import android.system.Os
 import com.zenithblue.nativecode.cliauth.AiCliProvisionState
+import com.zenithblue.nativecode.onboarding.AgentConfigInstaller
 import com.zenithblue.nativecode.onboarding.LegacyProotDataMigrator
 import com.zenithblue.nativecode.onboarding.LinuxGuestDefaults
 import com.zenithblue.nativecode.onboarding.OnboardingIo
@@ -2555,6 +2556,7 @@ class OnboardingActivity : AppCompatActivity() {
                                 .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                                 .apply()
                             AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "chroot", true)
+                            AgentConfigInstaller.install(this@OnboardingActivity)
                             finishChrootBaseSetup()
                         } else {
                             updateBaseStatus("[CHROOT] Distro extraction failed (exit $code).")
@@ -2758,6 +2760,9 @@ class OnboardingActivity : AppCompatActivity() {
                 GuestGpuConfig.applyToRootfs(this@OnboardingActivity)
 
                 enterSetupPhase("C", "Verifying environment…")
+                updateBaseStatus("C. Configuring AI agent environments and hardware bridge…")
+                appendSetupLog(">>> Deploying AI agent guidelines and hardware bridge configs…\n")
+                AgentConfigInstaller.install(this@OnboardingActivity)
                 applyAndroidDevPackForPlay()
                 verifyRuntimeSentinel()
 
