@@ -99,7 +99,7 @@ class BackgroundService : Service() {
                 "NativeCode Desktop Session",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Shows while XFCE / graphical desktop is running"
+                description = "Shows while Phosh / graphical desktop is running"
                 setShowBadge(false)
             }
         )
@@ -124,7 +124,7 @@ class BackgroundService : Service() {
         const val EXTRA_TEXT = "TEXT"
         const val EXTRA_TAP_ONBOARDING = "TAP_ONBOARDING"
         const val TITLE_DESKTOP = "NativeCode — Desktop Session"
-        const val TEXT_DESKTOP = "XFCE / GUI host services are active. Open app to stop."
+        const val TEXT_DESKTOP = "Phosh / GUI host services are active. Open app to stop."
         const val TITLE_INSTALL = "NativeCode — Environment Setup"
         const val TEXT_INSTALL =
             "Alpaquita Linux installation is running. Keep this notification until setup finishes."

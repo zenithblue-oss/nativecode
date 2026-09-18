@@ -4,23 +4,26 @@ import android.content.Context
 import android.util.Log
 import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.terminal.HostCommandBuilder
+import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import com.zenithblue.nativecode.terminal.TermuxHostPaths
 import java.io.File
 import java.security.MessageDigest
 
-/** Installs the Play-delivered Android SDK 36 overlay into the Alpaquita PRoot. */
+/** Installs the Play-delivered Android SDK 36 overlay into the Linux PRoot. */
 object AndroidDevPackManager {
     private const val TAG = "AndroidDevPack"
     const val ARCHIVE_NAME = "nativecode_android_dev.tar.xz"
     const val SHA_NAME = "$ARCHIVE_NAME.sha256"
     const val PINNED_SHA256 = "f4d4aad5b8f78cd68b0254718626576c547ca187cb5c682faaa8b2e0fbc10a2d"
 
-    private const val ROOTFS_REL = "usr/var/lib/proot-distro/containers/alpaquita/rootfs"
     private const val PLATFORM_REL = "opt/android-sdk/platforms/android-36/android.jar"
     private const val AAPT2_REL = "opt/android-sdk/build-tools/36.1.0/aapt2"
     private const val MARKER_REL = "etc/nativecode/android-dev-pack.sha256"
     private const val AAPT2_OVERRIDE =
         "android.aapt2FromMavenOverride=/opt/android-sdk/build-tools/36.1.0/aapt2"
+
+    private const val PREFS_NAME = "nativecode_android_sdk"
+    private const val KEY_APPLIED = "sdk_applied"
 
     data class ApplyResult(val success: Boolean, val message: String)
 
@@ -33,57 +36,73 @@ object AndroidDevPackManager {
             val f = File(dir, ARCHIVE_NAME)
             if (f.isFile && f.length() > 2L * 1024L * 1024L) return f
         }
-        if (BuildConfig.DEBUG) {
-            val localCandidates = listOf(
-                File(context.filesDir, "assets/$ARCHIVE_NAME"),
-                File(context.filesDir, ARCHIVE_NAME),
-                File("/data/local/tmp", ARCHIVE_NAME),
-                File("/sdcard/Download", ARCHIVE_NAME),
-                File("/storage/emulated/0/Download", ARCHIVE_NAME)
-            )
-            for (c in localCandidates) {
-                if (c.isFile && c.length() > 2L * 1024L * 1024L) return c
-            }
-            try {
-                val list = context.assets.list("") ?: emptyArray()
-                if (ARCHIVE_NAME in list) {
-                    val dest = File(context.filesDir, "assets/$ARCHIVE_NAME")
-                    if (!dest.isFile || dest.length() < 2L * 1024L * 1024L) {
-                        dest.parentFile?.mkdirs()
-                        context.assets.open(ARCHIVE_NAME).use { input ->
-                            dest.outputStream().use { output -> input.copyTo(output) }
-                        }
+
+        val localCandidates = listOf(
+            File(context.filesDir, "assets/$ARCHIVE_NAME"),
+            File(context.filesDir, ARCHIVE_NAME),
+            File("/data/local/tmp", ARCHIVE_NAME),
+            File("/sdcard/Download", ARCHIVE_NAME),
+            File("/storage/emulated/0/Download", ARCHIVE_NAME)
+        )
+        for (c in localCandidates) {
+            if (c.isFile && c.length() > 2L * 1024L * 1024L) return c
+        }
+
+        try {
+            val list = context.assets.list("") ?: emptyArray()
+            if (ARCHIVE_NAME in list) {
+                val dest = File(context.filesDir, "assets/$ARCHIVE_NAME")
+                if (!dest.isFile || dest.length() < 2L * 1024L * 1024L) {
+                    dest.parentFile?.mkdirs()
+                    context.assets.open(ARCHIVE_NAME).use { input ->
+                        dest.outputStream().use { output -> input.copyTo(output) }
                     }
-                    if (dest.isFile && dest.length() > 2L * 1024L * 1024L) return dest
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Bundled debug asset resolve failed: ${e.message}")
+                if (dest.isFile && dest.length() > 2L * 1024L * 1024L) return dest
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Bundled asset resolve failed: ${e.message}")
         }
         return null
     }
 
     fun isApplied(context: Context): Boolean {
-        val root = File(context.filesDir, ROOTFS_REL)
+        val root = ProjectPathResolver.prootRootfsDir(context)
         val platform = File(root, PLATFORM_REL)
         val aapt2 = File(root, AAPT2_REL)
+        if (aapt2.isFile && !aapt2.canExecute()) {
+            runCatching { aapt2.setExecutable(true, false) }
+        }
         val marker = File(root, MARKER_REL)
         val markerSha = runCatching { marker.readText().trim() }.getOrDefault("")
-        return platform.isFile && platform.length() > 1_000_000L &&
-            aapt2.isFile && aapt2.length() > 1_000_000L && aapt2.canExecute() &&
+
+        val filesPresent = platform.isFile && platform.length() > 1_000_000L &&
+            aapt2.isFile && aapt2.length() > 1_000_000L
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_APPLIED, false) && filesPresent) {
+            return true
+        }
+
+        val verified = filesPresent &&
             marker.isFile && markerSha.equals(PINNED_SHA256, ignoreCase = true)
+
+        if (verified) {
+            prefs.edit().putBoolean(KEY_APPLIED, true).apply()
+        }
+        return verified
     }
 
-    fun applyAvailablePack(context: Context): ApplyResult {
-        if (isApplied(context)) return ApplyResult(true, "Android SDK 36 ready")
+    fun applyAvailablePack(context: Context, force: Boolean = false): ApplyResult {
+        if (!force && isApplied(context)) return ApplyResult(true, "Android SDK 36 ready")
         val archive = resolveArchive(context)
             ?: return ApplyResult(false, "Android SDK asset pack is not downloaded")
         if (!verifyArchive(archive)) {
             return ApplyResult(false, "Android SDK asset checksum mismatch")
         }
 
-        val root = File(context.filesDir, ROOTFS_REL)
-        if (!root.isDirectory) return ApplyResult(false, "Install the Alpaquita runtime first")
+        val root = ProjectPathResolver.prootRootfsDir(context)
+        if (!root.isDirectory) return ApplyResult(false, "Install the Linux runtime first")
 
         val tar = "${TermuxHostPaths.BIN}/tar"
         val xz = "${TermuxHostPaths.BIN}/xz"
@@ -107,8 +126,9 @@ object AndroidDevPackManager {
 
         val platform = File(root, PLATFORM_REL)
         val aapt2 = File(root, AAPT2_REL)
+        runCatching { aapt2.setExecutable(true, false) }
         if (!platform.isFile || platform.length() <= 1_000_000L ||
-            !aapt2.isFile || aapt2.length() <= 1_000_000L || !aapt2.canExecute()
+            !aapt2.isFile || aapt2.length() <= 1_000_000L
         ) {
             return ApplyResult(false, "Android SDK verification failed after extraction")
         }
@@ -118,6 +138,13 @@ object AndroidDevPackManager {
             parentFile?.mkdirs()
             writeText("$PINNED_SHA256\n")
         }
+
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_APPLIED, true)
+            .putLong("applied_timestamp", System.currentTimeMillis())
+            .apply()
+
         return ApplyResult(true, "Android SDK 36 + ARM64 aapt2 ready")
     }
 

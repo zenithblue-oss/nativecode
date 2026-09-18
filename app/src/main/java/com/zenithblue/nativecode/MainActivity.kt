@@ -878,27 +878,38 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun updateAppTerminalService() {
-        ensurePostNotificationsPermission()
-        TerminalService.updateService(
-            this,
-            appCount = sessionsList.size,
-            projectCount = workspaceSessions.size,
-            projectName = activeProjectName,
-            projectPath = activeProjectPath,
-            targetPage = 3
-        )
+        syncTerminalServices()
     }
 
     private fun updateProjectTerminalService() {
+        syncTerminalServices()
+    }
+
+    private fun syncTerminalServices() {
         ensurePostNotificationsPermission()
-        TerminalService.updateService(
-            this,
-            appCount = sessionsList.size,
-            projectCount = workspaceSessions.size,
-            projectName = activeProjectName,
-            projectPath = activeProjectPath,
-            targetPage = 10
-        )
+        val appCount = sessionsList.count { it.isRunning }
+        saveActiveProjectSessions()
+
+        val projectList = ArrayList<TerminalService.ProjectState>()
+        val allProjects = getProjects()
+        for ((path, sessions) in projectSessionsMap) {
+            val runningSessions = sessions.filter { it.isRunning }
+            if (runningSessions.isNotEmpty()) {
+                val name = allProjects.find { it.path == path }?.name
+                    ?: if (path == activeProjectPath && activeProjectName.isNotEmpty()) activeProjectName else File(path).name
+                val tabs = projectTabNamesMap[path] ?: emptyList()
+                projectList.add(
+                    TerminalService.ProjectState(
+                        name = name,
+                        path = path,
+                        sessionCount = runningSessions.size,
+                        tabNames = tabs
+                    )
+                )
+            }
+        }
+
+        TerminalService.syncState(this, appCount = appCount, projects = projectList)
     }
 
     // ── Unified Navigation & Switcher ────────────────────────────────────────
@@ -1224,6 +1235,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             ID_COMPONENTS -> {
                 if (::componentsScrollView.isInitialized) {
                     componentsScrollView.visibility = View.VISIBLE
+                    refreshAndroidSdkPackCard()
                 }
             }
             ID_PRIVACY_POLICY -> {
@@ -4323,8 +4335,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             visibility = View.GONE
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(80))
             setBackgroundColor(NC.BG)
         }
         settingsHubLayout = LinearLayout(this).apply {
@@ -4429,6 +4439,26 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(buildSettingsVersionFooter())
     }
 
+    private var sdkStatusTv: TextView? = null
+    private var sdkActionBtn: TextView? = null
+
+    private fun refreshAndroidSdkPackCard() {
+        val applied = AndroidDevPackManager.isApplied(this)
+        val archive = AndroidDevPackManager.resolveArchive(this)
+        sdkStatusTv?.text = when {
+            applied -> "READY · Platform 36 · ARM64 aapt2 36.1.0"
+            archive != null -> "PACK READY · apply to Alpaquita"
+            else -> "OPTIONAL PLAY ASSET PACK · ~76 MB download"
+        }
+        sdkActionBtn?.text = when {
+            applied -> "REAPPLY SDK"
+            archive != null -> "APPLY SDK"
+            else -> "DOWNLOAD SDK"
+        }
+        sdkActionBtn?.isEnabled = true
+        sdkActionBtn?.alpha = 1f
+    }
+
     private fun buildAndroidSdkPackCard(): View {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -4447,12 +4477,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
         })
+        val applied = AndroidDevPackManager.isApplied(this)
+        val archive = AndroidDevPackManager.resolveArchive(this)
         val status = TextView(this).apply {
             text = when {
-                AndroidDevPackManager.isApplied(this@MainActivity) ->
-                    "READY · Platform 36 · ARM64 aapt2 36.1.0"
-                AndroidDevPackManager.resolveArchive(this@MainActivity) != null ->
-                    "PACK READY · apply to Alpaquita"
+                applied -> "READY · Platform 36 · ARM64 aapt2 36.1.0"
+                archive != null -> "PACK READY · apply to Alpaquita"
                 else -> "OPTIONAL PLAY ASSET PACK · ~76 MB download"
             }
             textSize = 11f
@@ -4460,32 +4490,38 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             typeface = Typeface.MONOSPACE
             setPadding(0, dp(6), 0, dp(10))
         }
+        sdkStatusTv = status
         card.addView(status)
 
         val action = primaryButton(
-            if (AndroidDevPackManager.resolveArchive(this) != null) "APPLY SDK" else "DOWNLOAD SDK"
+            when {
+                applied -> "REAPPLY SDK"
+                archive != null -> "APPLY SDK"
+                else -> "DOWNLOAD SDK"
+            }
         ) {}
+        sdkActionBtn = action
         action.setOnClickListener {
             action.isEnabled = false
             action.alpha = 0.5f
 
-            fun applyPack() {
-                status.text = "Verifying and applying SDK overlay…"
+            fun applyPack(force: Boolean) {
+                status.text = if (force) "Re-verifying and applying SDK overlay…" else "Verifying and applying SDK overlay…"
                 executor.execute {
-                    val result = AndroidDevPackManager.applyAvailablePack(this@MainActivity)
+                    val result = AndroidDevPackManager.applyAvailablePack(this@MainActivity, force = force)
                     runOnUiThread {
                         status.text = result.message
-                        action.isEnabled = !result.success
-                        action.alpha = if (result.success) 0.5f else 1f
+                        action.isEnabled = true
+                        action.alpha = 1f
                         if (result.success) {
-                            action.text = "SDK READY"
+                            action.text = "REAPPLY SDK"
                         }
                     }
                 }
             }
 
             if (AndroidDevPackManager.resolveArchive(this) != null) {
-                applyPack()
+                applyPack(force = AndroidDevPackManager.isApplied(this))
             } else {
                 status.text = "Requesting nativecode_android_dev from Google Play…"
                 var listener: AssetPackStateUpdateListener? = null
@@ -4502,7 +4538,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                             status.text = "SDK transferring ${state.percentage}%"
                         is PlayAssetDeliveryManager.DownloadState.Completed -> {
                             listener?.let { PlayAssetDeliveryManager.unregisterListener(this, it) }
-                            applyPack()
+                            applyPack(force = true)
                         }
                         is PlayAssetDeliveryManager.DownloadState.WaitingForWifi ->
                             status.text = "Waiting for Wi-Fi approval…"
@@ -4531,8 +4567,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         componentsScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             visibility = View.GONE
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(80))
             setBackgroundColor(NC.BG)
         }
         val page = LinearLayout(this).apply {
@@ -5316,7 +5350,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(8), 0, dp(16))
+            setPadding(0, dp(8), 0, 0)
 
             val versionTv = TextView(this@MainActivity).apply {
                 text = "VERSION ${BuildConfig.VERSION_NAME} (BUILD ${BuildConfig.VERSION_CODE})"
@@ -8607,12 +8641,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         startGuiBtn = TextView(this).apply {
-            text = "  START PHOSH DESKTOP"
+            text = "START PHOSH DESKTOP"
             textSize = 14f
             setTextColor(NC.ON_PRIMARY)
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
             gravity = Gravity.CENTER
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_play_thick, 0, 0, 0)
+            compoundDrawablePadding = dp(8)
+            setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(NC.ON_PRIMARY))
             background = cyberBrutalistBg(
                 fillColor = NC.PRIMARY_CON,
                 strokeColor = NC.OUTLINE_VAR,
@@ -8662,7 +8699,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         startGuiBtn.alpha = 0.5f
         startGuiBtn.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
 
-        stopGuiBtn = dangerButton("  STOP XFCE DESKTOP") {
+        stopGuiBtn = dangerButton("STOP PHOSH DESKTOP") {
             guiUserStopping = true
             setGuiStopBusy()
             stopGui()
@@ -8672,6 +8709,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     setGuiCardIdle()
                 }
             }, 6000)
+        }.apply {
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_stop_thick, 0, 0, 0)
+            compoundDrawablePadding = dp(8)
+            setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(Color.WHITE))
         }
         stopGuiBtn.isEnabled = false
         stopGuiBtn.alpha = 0.5f
@@ -9482,8 +9523,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         prootSettingsScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             visibility = View.GONE
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(80))
             setBackgroundColor(NC.BG)
         }
         val pageLayout = LinearLayout(this).apply {
@@ -11411,8 +11450,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         softwareManagerScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             visibility = View.GONE
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(80))
             setBackgroundColor(NC.BG)
         }
         softwareManagerBody = LinearLayout(this).apply {
@@ -13876,7 +13913,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (::startGuiBtn.isInitialized) {
             startGuiBtn.isEnabled = false
             startGuiBtn.alpha = 0.5f
-            startGuiBtn.text = "  STARTING..."
+            startGuiBtn.text = "STARTING..."
         }
     }
 
@@ -13885,7 +13922,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (::stopGuiBtn.isInitialized) {
             stopGuiBtn.isEnabled = false
             stopGuiBtn.alpha = 0.5f
-            stopGuiBtn.text = "  STOPPING..."
+            stopGuiBtn.text = "STOPPING..."
         }
         if (::displayBtn.isInitialized) {
             displayBtn.visibility = View.GONE
@@ -13918,11 +13955,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         startGuiBtn.visibility = View.VISIBLE
         val installed = isXfceInstalled()
         if (installed) {
-            startGuiBtn.text = "  START PHOSH DESKTOP"
+            startGuiBtn.text = "START PHOSH DESKTOP"
             startGuiBtn.isEnabled = true
             startGuiBtn.alpha = 1f
         } else {
-            startGuiBtn.text = "  PHOSH NOT INSTALLED"
+            startGuiBtn.text = "PHOSH NOT INSTALLED"
             startGuiBtn.isEnabled = false
             startGuiBtn.alpha = 0.4f
         }
@@ -13930,6 +13967,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopGuiBtn.visibility = View.GONE
         stopGuiBtn.isEnabled = false
         stopGuiBtn.alpha = 0.5f
+        stopGuiBtn.text = "STOP PHOSH DESKTOP"
         if (::viewLogsBtn.isInitialized) {
             viewLogsBtn.visibility = View.GONE
             viewLogsBtn.isEnabled = false
@@ -13948,6 +13986,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopGuiBtn.visibility = View.VISIBLE
         stopGuiBtn.isEnabled = true
         stopGuiBtn.alpha = 1f
+        stopGuiBtn.text = "STOP PHOSH DESKTOP"
         stopGuiBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         if (::viewLogsBtn.isInitialized) {
             if (showLogs) {
@@ -14768,28 +14807,73 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 ellipsize = android.text.TextUtils.TruncateAt.END
             }
 
-            val methodTag = TextView(this@MainActivity).apply {
-                text = if (method == "chroot") "CHROOT" else "PROOT"
-                textSize = 10f
-                setTextColor(if (method == "chroot") NC.TERTIARY else NC.PRIMARY)
-                typeface = Typeface.MONOSPACE
-                gravity = Gravity.CENTER
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    setColor(NC.SURFACE_LOWEST)
-                    setStroke(dp(1), if (method == "chroot") NC.TERTIARY else Color.parseColor("#3360F99E"))
-                }
-                setPadding(dp(6), dp(2), dp(6), dp(2))
+            val tagsRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
                 layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
                     topMargin = dp(8)
                     gravity = Gravity.CENTER_HORIZONTAL
                 }
             }
 
+            if (method == "chroot") {
+                val methodTag = TextView(this@MainActivity).apply {
+                    text = "CHROOT"
+                    textSize = 10f
+                    setTextColor(NC.TERTIARY)
+                    typeface = Typeface.MONOSPACE
+                    gravity = Gravity.CENTER
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(NC.SURFACE_LOWEST)
+                        setStroke(dp(1), NC.TERTIARY)
+                    }
+                    setPadding(dp(6), dp(2), dp(6), dp(2))
+                }
+                tagsRow.addView(methodTag)
+            }
+
+            val openCount = projectSessionsMap[path]?.count { it.isRunning } ?: 0
+            if (openCount > 0) {
+                val activeBadge = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(NC.SURFACE_LOWEST)
+                        setStroke(dp(1), NC.PRIMARY)
+                    }
+                    setPadding(dp(6), dp(2), dp(6), dp(2))
+                    layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
+                        if (tagsRow.childCount > 0) leftMargin = dp(6)
+                    }
+
+                    val termIcon = ImageView(this@MainActivity).apply {
+                        setImageResource(R.drawable.ic_terminal)
+                        setColorFilter(NC.PRIMARY)
+                        layoutParams = LinearLayout.LayoutParams(dp(12), dp(12)).apply {
+                            rightMargin = dp(4)
+                        }
+                    }
+                    val countTv = TextView(this@MainActivity).apply {
+                        text = "$openCount"
+                        textSize = 10f
+                        setTextColor(NC.PRIMARY)
+                        typeface = Typeface.MONOSPACE
+                        gravity = Gravity.CENTER
+                    }
+                    addView(termIcon)
+                    addView(countTv)
+                }
+                tagsRow.addView(activeBadge)
+            }
+
             addView(iconContainer)
             addView(titleTv)
             addView(timeTv)
-            addView(methodTag)
+            if (tagsRow.childCount > 0) {
+                addView(tagsRow)
+            }
 
             setOnTouchListener { v, event ->
                 when (event.action) {
@@ -16348,8 +16432,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         cliAuthScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             visibility = View.GONE
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(80))
             setBackgroundColor(NC.BG)
         }
         val pageLayout = LinearLayout(this).apply {
@@ -16415,8 +16497,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         })
 
         val openTermBtn = primaryButton("OPEN TERMINAL") {
-            navigateBackFromSubpage(ID_CLI_AUTH)
             createNewTerminalSession("shell")
+            if (pageStack.isEmpty() || pageStack.peek() != ID_TERMINAL) {
+                pageStack.push(ID_TERMINAL)
+            }
+            navigateToPage(ID_TERMINAL)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(14) }
             textSize = 13f
@@ -16466,8 +16551,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             })
             val openBtn = secondaryButton("OPEN") {
-                navigateBackFromSubpage(ID_CLI_AUTH)
                 createNewTerminalSession(tool.sessionType)
+                if (pageStack.isEmpty() || pageStack.peek() != ID_TERMINAL) {
+                    pageStack.push(ID_TERMINAL)
+                }
+                navigateToPage(ID_TERMINAL)
             }.apply {
                 layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
                 textSize = 11f
@@ -16499,8 +16587,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         aiSafetyScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             visibility = View.GONE
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(80))
             setBackgroundColor(NC.BG)
         }
         val pageLayout = LinearLayout(this).apply {
@@ -16814,8 +16900,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         privacyPolicyScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             visibility = View.GONE
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(80))
             setBackgroundColor(NC.BG)
             isVerticalScrollBarEnabled = true
         }
@@ -17017,8 +17101,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         hardwareScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             visibility = View.GONE
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(80))
             setBackgroundColor(NC.BG)
             isVerticalScrollBarEnabled = true
         }
@@ -19978,7 +20060,21 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             executor = executor,
             onSessionFinishedCallback = { session ->
                 mainHandler.post {
-                    closeWorkspaceTab(workspaceSessions.indexOf(session))
+                    if (workspaceSessions.contains(session)) {
+                        closeWorkspaceTab(workspaceSessions.indexOf(session))
+                    } else {
+                        for ((pPath, sList) in projectSessionsMap) {
+                            val idx = sList.indexOf(session)
+                            if (idx >= 0) {
+                                sList.removeAt(idx)
+                                projectTabNamesMap[pPath]?.let { tList ->
+                                    if (idx < tList.size) tList.removeAt(idx)
+                                }
+                                break
+                            }
+                        }
+                        syncTerminalServices()
+                    }
                 }
             }
         )
@@ -19996,9 +20092,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun saveActiveProjectSessions() {
-        projectSessionsMap[activeProjectPath] = ArrayList(workspaceSessions)
-        projectTabNamesMap[activeProjectPath] = ArrayList(workspaceTabNames)
-        projectActiveTabIndexMap[activeProjectPath] = activeWorkspaceTabIndex
+        if (activeProjectPath.isNotEmpty()) {
+            projectSessionsMap[activeProjectPath] = ArrayList(workspaceSessions)
+            projectTabNamesMap[activeProjectPath] = ArrayList(workspaceTabNames)
+            projectActiveTabIndexMap[activeProjectPath] = activeWorkspaceTabIndex
+        }
     }
 
     private fun switchWorkspaceTab(index: Int) {
@@ -20907,19 +21005,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         val projMethod = projectGitMethod()
         val settingsMethodBadge = TextView(this).apply {
-            text = if (projMethod == "chroot") "CHROOT" else "PROOT"
+            text = "CHROOT"
             textSize = 9f
-            setTextColor(if (projMethod == "chroot") NC.TERTIARY else NC.PRIMARY)
+            setTextColor(NC.TERTIARY)
             typeface = Typeface.MONOSPACE
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 setColor(NC.SURFACE_LOWEST)
-                setStroke(
-                    dp(1),
-                    if (projMethod == "chroot") NC.TERTIARY else Color.parseColor("#3360F99E")
-                )
+                setStroke(dp(1), NC.TERTIARY)
             }
             setPadding(dp(6), dp(2), dp(6), dp(2))
+            visibility = if (projMethod == "chroot") View.VISIBLE else View.GONE
         }
         settingsHeaderRow.addView(settingsHeaderTitle)
         settingsHeaderRow.addView(settingsHeaderSub)
@@ -21433,16 +21529,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         val projMethod = projectGitMethod()
         val methodBadge = TextView(this).apply {
-            text = if (projMethod == "chroot") "CHROOT" else "PROOT"
+            text = "CHROOT"
             textSize = 9f
-            setTextColor(if (projMethod == "chroot") NC.TERTIARY else NC.PRIMARY)
+            setTextColor(NC.TERTIARY)
             typeface = Typeface.MONOSPACE
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 setColor(NC.SURFACE_LOWEST)
-                setStroke(dp(1), if (projMethod == "chroot") NC.TERTIARY else Color.parseColor("#3360F99E"))
+                setStroke(dp(1), NC.TERTIARY)
             }
             setPadding(dp(6), dp(2), dp(6), dp(2))
+            visibility = if (projMethod == "chroot") View.VISIBLE else View.GONE
         }
         gitHeaderRow.addView(gitHeaderTitle)
         gitHeaderRow.addView(gitHeaderSub)
