@@ -61,6 +61,7 @@ import android.view.KeyEvent
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
 import com.zenithblue.nativecode.terminal.*
+import com.zenithblue.nativecode.terminal.ui.*
 import com.zenithblue.nativecode.marketplace.*
 import com.zenithblue.nativecode.github.*
 import com.zenithblue.nativecode.bridge.NativeCodeBridge
@@ -75,6 +76,8 @@ import com.zenithblue.nativecode.cliauth.*
 import com.zenithblue.nativecode.git.*
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
+
+typealias ModifierState = TerminalModifierState
 
 class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
@@ -556,38 +559,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var workspaceKeyboardToolbar: LinearLayout
     private lateinit var terminalKeyboardToolbar: LinearLayout
 
-    private data class ModifierState(
-        var ctrlActive: Boolean = false, var ctrlLocked: Boolean = false,
-        var altActive: Boolean = false,  var altLocked: Boolean = false,
-        var shiftActive: Boolean = false, var shiftLocked: Boolean = false,
-        var onStateChanged: (() -> Unit)? = null
-    ) {
-        fun readCtrl(autoReadSetFalse: Boolean = true): Boolean {
-            if (!ctrlActive) return false
-            if (autoReadSetFalse && !ctrlLocked) {
-                ctrlActive = false
-                onStateChanged?.invoke()
-            }
-            return true
-        }
-        fun readAlt(autoReadSetFalse: Boolean = true): Boolean {
-            if (!altActive) return false
-            if (autoReadSetFalse && !altLocked) {
-                altActive = false
-                onStateChanged?.invoke()
-            }
-            return true
-        }
-        fun readShift(autoReadSetFalse: Boolean = true): Boolean {
-            if (!shiftActive) return false
-            if (autoReadSetFalse && !shiftLocked) {
-                shiftActive = false
-                onStateChanged?.invoke()
-            }
-            return true
-        }
-        fun readFn(autoReadSetFalse: Boolean = true): Boolean = false
-    }
     private val termModState = ModifierState()
     private val wsModState   = ModifierState()
 
@@ -2169,8 +2140,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun ensureBootstrapExtracted() {
         val termuxExecFile = File(filesDir, "usr/lib/libtermux-exec.so")
         if (termuxExecFile.exists()) {
-            // Already extracted — still re-apply SSOT package rewrite + host env
-            TermuxHostPaths.applyPackageToExtractedPrefix(filesDir)
+            val marker = File(filesDir, "usr/etc/.paths_rewritten")
+            if (!marker.exists()) {
+                TermuxHostPaths.applyPackageToExtractedPrefix(filesDir)
+            }
             return
         }
 
@@ -2184,7 +2157,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             assets.open("bootstrap.tar").use { input ->
                 extractTarStream(input, filesDir)
             }
-            TermuxHostPaths.applyPackageToExtractedPrefix(filesDir)
+            TermuxHostPaths.applyPackageToExtractedPrefix(filesDir, force = true)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -4145,6 +4118,23 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         var fRowVisible = false
         val fnBtn = makeToolbarKeyBtn("Fn", marginRight = 0, height = dp(44), exactWidth = keyWidth)
         row2.addView(fnBtn)
+
+        val copyAllBtn = makeToolbarKeyBtn("COPY", marginRight = 0, height = dp(44), exactWidth = (keyWidth * 1.3).toInt()).apply {
+            setTextColor(NC.PRIMARY)
+            setOnClickListener {
+                TerminalScrollViewHelper.copyTranscript(this@MainActivity, sessionRef())
+            }
+        }
+        row2.addView(copyAllBtn)
+
+        val scrollBtn = makeToolbarKeyBtn("SCROLL", marginRight = 0, height = dp(44), exactWidth = (keyWidth * 1.4).toInt()).apply {
+            setTextColor(NC.PRIMARY)
+            setOnClickListener {
+                val customTf = try { Typeface.createFromAsset(assets, "fonts/font.ttf") } catch (_: Exception) { null }
+                TerminalScrollViewHelper.showScrollViewDialog(this@MainActivity, sessionRef(), customTf)
+            }
+        }
+        row2.addView(scrollBtn)
 
         // F-keys row (hidden by default)
         val fRow = LinearLayout(this).apply {
@@ -7707,12 +7697,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     /** Full transcript of a terminal session (scrollback + screen), trimmed. */
+    /** Full transcript of a terminal session (scrollback + screen), trimmed. */
     private fun transcriptOf(session: TerminalSession?): String =
-        try {
-            session?.emulator?.screen?.getTranscriptText()?.trim().orEmpty()
-        } catch (_: Exception) {
-            ""
-        }
+        TerminalScrollViewHelper.transcriptOf(session)
 
     /** COPY on the script-install top bar — works for any script run + desktop log cat. */
     private fun copyScriptInstallTranscript() {
@@ -14285,53 +14272,22 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             Log.e("Terminal", "Failed to set custom typeface", e)
         }
 
-        viewClient = object : TerminalViewClient {
-            override fun onScale(scale: Float): Float {
-                if (scale < 0.9f || scale > 1.1f) {
-                    val nextSize = (termFontSize * scale).toInt()
-                    setGlobalTerminalZoom(nextSize)
-                    return 1.0f
-                }
-                return scale
+        viewClient = NativeCodeTerminalViewClient(
+            context = this,
+            terminalViewRef = { if (::terminalView.isInitialized) terminalView else null },
+            modState = termModState,
+            onScaleChanged = { scale ->
+                val nextSize = (termFontSize * scale).toInt()
+                setGlobalTerminalZoom(nextSize)
             }
-            override fun onSingleTapUp(e: MotionEvent) {
-                terminalView.requestFocus()
-                val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.showSoftInput(terminalView, InputMethodManager.SHOW_IMPLICIT)
-            }
-            override fun shouldBackButtonBeMappedToEscape(): Boolean = false
-            override fun shouldEnforceCharBasedInput(): Boolean      = false
-            override fun shouldUseCtrlSpaceWorkaround(): Boolean      = false
-            override fun isTerminalViewSelected(): Boolean            = true
-            override fun copyModeChanged(active: Boolean) {}
-            override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent, session: TerminalSession): Boolean = false
-            override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean = false
-            override fun onLongPress(e: MotionEvent): Boolean = false
-            override fun readControlKey(): Boolean = termModState.readCtrl(true)
-            override fun readAltKey(): Boolean     = termModState.readAlt(true)
-            override fun readShiftKey(): Boolean   = termModState.readShift(true)
-            override fun readFnKey(): Boolean      = termModState.readFn(true)
-            override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
-            override fun onEmulatorSet() {}
-            override fun logError(tag: String, message: String)   {}
-            override fun logWarn(tag: String, message: String)    {}
-            override fun logInfo(tag: String, message: String)    {}
-            override fun logDebug(tag: String, message: String)   {}
-            override fun logVerbose(tag: String, message: String) {}
-            override fun logStackTraceWithMessage(tag: String, message: String, e: Exception) {}
-            override fun logStackTrace(tag: String, e: Exception) {}
-        }
+        )
 
-        sessionClient = object : TerminalSessionClient {
-            override fun onTextChanged(session: TerminalSession) {
-                if (session == terminalSession) {
-                    terminalView.onScreenUpdated()
-                }
-            }
-            override fun onTitleChanged(session: TerminalSession)   {}
-            override fun onSessionFinished(session: TerminalSession) {
-                val transcript = try { session.emulator?.screen?.transcriptText } catch (e: Exception) { e.message }
-                Log.d("Terminal", "Session finished: ${session.exitStatus} transcript: $transcript")
+        sessionClient = NativeCodeTerminalSessionClient(
+            context = this,
+            terminalViewRef = { if (::terminalView.isInitialized) terminalView else null },
+            activeSessionRef = { terminalSession },
+            executor = executor,
+            onSessionFinishedCallback = { session ->
                 mainHandler.post {
                     val idx = sessionsList.indexOf(session)
                     if (idx != -1) {
@@ -14339,29 +14295,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     }
                 }
             }
-            override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("", text))
-            }
-            override fun onPasteTextFromClipboard(session: TerminalSession) {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(this@MainActivity)?.toString() ?: return
-                executor.execute {
-                    session.emulator?.paste(text) ?: session.write(text)
-                }
-            }
-            override fun onBell(session: TerminalSession)           {}
-            override fun onColorsChanged(session: TerminalSession)  {}
-            override fun onTerminalCursorStateChange(state: Boolean){}
-            override fun getTerminalCursorStyle(): Int? = 1
-            override fun logError(tag: String, message: String)   { Log.e(tag, message) }
-            override fun logWarn(tag: String, message: String)    { Log.w(tag, message) }
-            override fun logInfo(tag: String, message: String)    { Log.i(tag, message) }
-            override fun logDebug(tag: String, message: String)   { Log.d(tag, message) }
-            override fun logVerbose(tag: String, message: String) { Log.v(tag, message) }
-            override fun logStackTraceWithMessage(tag: String, message: String, e: java.lang.Exception) { Log.e(tag, message, e) }
-            override fun logStackTrace(tag: String, e: java.lang.Exception) { Log.e(tag, "Stacktrace", e) }
-        }
+        )
 
         terminalView.setTerminalViewClient(viewClient)
     }
@@ -14386,20 +14320,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     override fun onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo?) {
         super.onCreateContextMenu(menu, v, menuInfo)
         if (v === terminalView || v === workspaceTerminalView) {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            menu.add(Menu.NONE, 101, Menu.NONE, "Paste").isEnabled = clipboard.hasPrimaryClip()
+            TerminalContextMenuHelper.onCreateContextMenu(this, menu, v)
         }
     }
 
     override fun onContextItemSelected(item: MenuItem): Boolean {
         val tv = if (terminalView.hasFocus()) terminalView else workspaceTerminalView
-        return when (item.itemId) {
-            101 -> {
-                tv.getCurrentSession()?.onPasteTextFromClipboard()
-                true
-            }
-            else -> super.onContextItemSelected(item)
+        val session = tv.getCurrentSession()
+        val customTf = try { Typeface.createFromAsset(assets, "fonts/font.ttf") } catch (_: Exception) { null }
+        if (TerminalContextMenuHelper.onContextItemSelected(this, item, tv, session, customTf)) {
+            return true
         }
+        return super.onContextItemSelected(item)
     }
 
     override fun onContextMenuClosed(menu: Menu) {
@@ -20039,41 +19971,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
 
-        val sessionClient = object : TerminalSessionClient {
-            override fun onTextChanged(session: TerminalSession) {
-                if (workspaceSessions.indexOf(session) == activeWorkspaceTabIndex) {
-                    workspaceTerminalView.onScreenUpdated()
-                }
-            }
-            override fun onTitleChanged(session: TerminalSession) {}
-            override fun onSessionFinished(session: TerminalSession) {
+        val sessionClient = NativeCodeTerminalSessionClient(
+            context = this,
+            terminalViewRef = { if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null },
+            activeSessionRef = { workspaceSessions.getOrNull(activeWorkspaceTabIndex) },
+            executor = executor,
+            onSessionFinishedCallback = { session ->
                 mainHandler.post {
                     closeWorkspaceTab(workspaceSessions.indexOf(session))
                 }
             }
-            override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("", text))
-            }
-            override fun onPasteTextFromClipboard(session: TerminalSession) {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(this@MainActivity)?.toString() ?: return
-                executor.execute {
-                    session.emulator?.paste(text) ?: session.write(text)
-                }
-            }
-            override fun onBell(session: TerminalSession) {}
-            override fun onColorsChanged(session: TerminalSession) {}
-            override fun onTerminalCursorStateChange(state: Boolean) {}
-            override fun getTerminalCursorStyle(): Int? = 1
-            override fun logError(tag: String, message: String) { Log.e(tag, message) }
-            override fun logWarn(tag: String, message: String) { Log.w(tag, message) }
-            override fun logInfo(tag: String, message: String) { Log.i(tag, message) }
-            override fun logDebug(tag: String, message: String) { Log.d(tag, message) }
-            override fun logVerbose(tag: String, message: String) { Log.v(tag, message) }
-            override fun logStackTraceWithMessage(tag: String, message: String, e: java.lang.Exception) { Log.e(tag, message, e) }
-            override fun logStackTrace(tag: String, e: java.lang.Exception) { Log.e(tag, "Stacktrace", e) }
-        }
+        )
 
         val sessionExec = LinuxCommandBuilder.sessionExec(this, args, method = method)
         val sessionArgs = LinuxCommandBuilder.sessionArgs(this, args, method = method)
@@ -20486,42 +20394,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             workspaceTerminalView.setTypeface(tf)
         } catch (e: Exception) {}
         
-        val workspaceViewClient = object : TerminalViewClient {
-            override fun onScale(scale: Float): Float {
-                if (scale < 0.9f || scale > 1.1f) {
-                    val nextSize = (workspaceFontSize * scale).toInt()
-                    setGlobalTerminalZoom(nextSize)
-                    return 1.0f
-                }
-                return scale
+        val workspaceViewClient = NativeCodeTerminalViewClient(
+            context = this,
+            terminalViewRef = { if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null },
+            modState = wsModState,
+            onScaleChanged = { scale ->
+                val nextSize = (workspaceFontSize * scale).toInt()
+                setGlobalTerminalZoom(nextSize)
             }
-            override fun onSingleTapUp(e: MotionEvent) {
-                workspaceTerminalView.requestFocus()
-                val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.showSoftInput(workspaceTerminalView, InputMethodManager.SHOW_IMPLICIT)
-            }
-            override fun shouldBackButtonBeMappedToEscape(): Boolean = false
-            override fun shouldEnforceCharBasedInput(): Boolean      = false
-            override fun shouldUseCtrlSpaceWorkaround(): Boolean      = false
-            override fun isTerminalViewSelected(): Boolean            = true
-            override fun copyModeChanged(active: Boolean) {}
-            override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent, session: TerminalSession): Boolean = false
-            override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean = false
-            override fun onLongPress(e: MotionEvent): Boolean = false
-            override fun readControlKey(): Boolean = wsModState.readCtrl(true)
-            override fun readAltKey(): Boolean     = wsModState.readAlt(true)
-            override fun readShiftKey(): Boolean   = wsModState.readShift(true)
-            override fun readFnKey(): Boolean      = wsModState.readFn(true)
-            override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
-            override fun onEmulatorSet() {}
-            override fun logError(tag: String, message: String)   {}
-            override fun logWarn(tag: String, message: String)    {}
-            override fun logInfo(tag: String, message: String)    {}
-            override fun logDebug(tag: String, message: String)   {}
-            override fun logVerbose(tag: String, message: String) {}
-            override fun logStackTraceWithMessage(tag: String, message: String, e: Exception) {}
-            override fun logStackTrace(tag: String, e: Exception) {}
-        }
+        )
         workspaceTerminalView.setTerminalViewClient(workspaceViewClient)
         termViewContainer.addView(workspaceTerminalView)
         termViewContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->

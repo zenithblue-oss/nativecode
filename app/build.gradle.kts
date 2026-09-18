@@ -140,11 +140,13 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.activity:activity-compose:1.8.2")
 
-    // Keep the upstream app/view/shared APIs, but replace terminal-emulator's
-    // legacy JNI artifact with an API-identical, ARM64/16 KB-patched local AAR.
+    // Keep the upstream app/shared APIs, but replace terminal-emulator and
+    // terminal-view with local modules.
     implementation("com.github.termux:termux-app:v0.118.0") {
         exclude(group = "com.github.termux.termux-app", module = "terminal-emulator")
+        exclude(group = "com.github.termux.termux-app", module = "terminal-view")
     }
+    implementation(project(":terminal-view"))
     implementation(files("libs/terminal-emulator-v0.118.0-16k.aar"))
     // Fix listenable future conflict
     implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")

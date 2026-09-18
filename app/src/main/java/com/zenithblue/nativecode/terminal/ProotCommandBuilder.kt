@@ -75,7 +75,6 @@ object ProotCommandBuilder {
         // Single-quote guest payload so host bash never expands $HOME/$PATH/etc.
         // Escape embedded single quotes: ' → '\''.
         val distro = resolveDistro(ctx)
-        HostServerController.ensureGuestGpu(ctx)
         val escaped = (ANDROID_DEV_ENV + GPU_ENV + shellCmd).replace("'", "'\\''")
         val py = pythonCmd(ctx)
         val command =

@@ -32,6 +32,21 @@ object HostServerController {
     @Volatile
     private var pulseProcess: Process? = null
 
+    private val bgExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "host-server-controller-bg").apply { isDaemon = true }
+    }
+
+    @Volatile
+    private var cachedVenusStatus: Pair<Long, Status>? = null
+    @Volatile
+    private var cachedPulseStatus: Pair<Long, Status>? = null
+    private const val STATUS_CACHE_TTL_MS = 5000L
+
+    fun invalidateStatusCache() {
+        cachedVenusStatus = null
+        cachedPulseStatus = null
+    }
+
     fun binary(kind: Kind): File = when (kind) {
         Kind.VENUS -> File(TermuxHostPaths.BIN, "virgl_test_server_android")
         Kind.PULSE -> File(TermuxHostPaths.BIN, "pulseaudio")
@@ -44,7 +59,17 @@ object HostServerController {
         Kind.PULSE -> "pulseaudio"
     }
 
-    fun status(kind: Kind): Status {
+    fun status(kind: Kind, forceRefresh: Boolean = false): Status {
+        val now = System.currentTimeMillis()
+        if (!forceRefresh) {
+            val cached = when (kind) {
+                Kind.VENUS -> cachedVenusStatus
+                Kind.PULSE -> cachedPulseStatus
+            }
+            if (cached != null && (now - cached.first) < STATUS_CACHE_TTL_MS) {
+                return cached.second
+            }
+        }
         val bin = binary(kind)
         val pids = findPids(processName(kind))
         val running = pids.isNotEmpty() || (kind == Kind.VENUS && venusProcess?.isAlive == true)
@@ -57,25 +82,43 @@ object HostServerController {
             running -> "running pid=${pids.joinToString(",")}"
             else -> "stopped"
         }
-        return Status(kind, bin.isFile, running, detail)
+        val st = Status(kind, bin.isFile, running, detail)
+        when (kind) {
+            Kind.VENUS -> cachedVenusStatus = now to st
+            Kind.PULSE -> cachedPulseStatus = now to st
+        }
+        return st
     }
 
     fun start(ctx: Context, kind: Kind): String {
-        val st = status(kind)
+        val st = status(kind, forceRefresh = true)
         if (!st.binaryExists) return "${label(kind)}: binary missing (rebuild bootstrap)"
         if (st.running) return "${label(kind)}: already ${st.detail}"
         File(TermuxHostPaths.TMPDIR).mkdirs()
         File(TermuxHostPaths.HOME, ".pulse").mkdirs()
-        return when (kind) {
+        val result = when (kind) {
             Kind.VENUS -> startVenus(ctx)
             Kind.PULSE -> startPulse(ctx)
         }
+        invalidateStatusCache()
+        return result
     }
 
     /**
      * Ensure both Venus and PulseAudio servers are running by default.
+     * Runs asynchronously on a background executor by default to keep the UI thread responsive.
      */
-    fun ensureServers(ctx: Context) {
+    fun ensureServers(ctx: Context, async: Boolean = true) {
+        if (async) {
+            bgExecutor.execute {
+                runEnsureServers(ctx)
+            }
+        } else {
+            runEnsureServers(ctx)
+        }
+    }
+
+    private fun runEnsureServers(ctx: Context) {
         GuestGpuConfig.applyToRootfs(ctx)
         if (binary(Kind.VENUS).isFile) {
             try {
@@ -94,13 +137,14 @@ object HostServerController {
     }
 
     /**
-     * Backward-compatible alias for terminal spawn.
+     * Backward-compatible alias for terminal spawn. Non-blocking async.
      */
     fun ensureGuestGpu(ctx: Context) {
-        ensureServers(ctx)
+        ensureServers(ctx, async = true)
     }
 
     fun stop(kind: Kind): String {
+        invalidateStatusCache()
         if (kind == Kind.VENUS) {
             try {
                 venusProcess?.destroy()

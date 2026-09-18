@@ -4,11 +4,10 @@ plugins {
 
 android {
     namespace = "com.termux.view"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
-        targetSdk = 36
     }
 
     compileOptions {
@@ -19,5 +18,5 @@ android {
 
 dependencies {
     implementation("androidx.annotation:annotation:1.7.1")
-    api(project(":modules:termux-app:terminal-emulator"))
+    compileOnly(files("${rootProject.projectDir}/app/libs/terminal-emulator-v0.118.0-16k.aar"))
 }

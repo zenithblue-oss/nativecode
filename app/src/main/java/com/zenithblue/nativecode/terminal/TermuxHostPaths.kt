@@ -110,9 +110,16 @@ object TermuxHostPaths {
      * After bootstrap extract (and before host setup): rewrite residual
      * `/data/data/com.termux/...` text under the prefix, then write host env file.
      *
+     * Guarded by a persistent sentinel file (`usr/etc/.paths_rewritten`) to avoid
+     * walking thousands of files on every terminal session launch.
+     *
      * @return number of files rewritten
      */
-    fun applyPackageToExtractedPrefix(filesDir: File, ctx: Context? = null): Int {
+    fun applyPackageToExtractedPrefix(filesDir: File, ctx: Context? = null, force: Boolean = false): Int {
+        val sentinel = File(filesDir, "usr/etc/.paths_rewritten")
+        if (!force && sentinel.exists()) {
+            return 0
+        }
         var rewritten = 0
         val roots = listOf(
             File(filesDir, "usr/bin"),
@@ -144,6 +151,10 @@ object TermuxHostPaths {
             }
         }
         writeHostEnvFile(filesDir, ctx)
+        try {
+            sentinel.parentFile?.mkdirs()
+            sentinel.createNewFile()
+        } catch (_: Exception) {}
         if (rewritten > 0) {
             Log.i(TAG, "rewrote $rewritten file(s): $STOCK_DATA_ROOT → $DATA_ROOT")
         }

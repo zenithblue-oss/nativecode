@@ -71,7 +71,7 @@ object AppUpgrade {
         ChrootCommandBuilder.ensureLauncherScript(ctx)
         TermuxHostPaths.writeHostEnvFile(ctx.filesDir)
         if (File(ctx.filesDir, "usr/lib/libtermux-exec.so").exists()) {
-            TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir)
+            TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir, force = true)
         }
         runVersionMigrations(from, to)
     }

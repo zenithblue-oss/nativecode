@@ -80,4 +80,7 @@ public interface TerminalViewClient {
 
     void logStackTrace(String tag, Exception e);
 
+    default void onCopyAllTextToClipboard(TerminalSession session) {}
+
+    default void onOpenScrollView(TerminalSession session) {}
 }

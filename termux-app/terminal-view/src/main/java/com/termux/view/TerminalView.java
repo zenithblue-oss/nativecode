@@ -34,6 +34,8 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.widget.Scroller;
 
+import com.termux.terminal.TerminalBuffer;
+
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
@@ -450,10 +452,10 @@ public final class TerminalView extends View {
         int rowsInHistory = mEmulator.getScreen().getActiveTranscriptRows();
         if (mTopRow < -rowsInHistory) mTopRow = -rowsInHistory;
 
+        int rowShift = mEmulator.getScrollCounter();
         boolean skipScrolling = false;
         if (isSelectingText()) {
             // Do not scroll when selecting text.
-            int rowShift = mEmulator.getScrollCounter();
             if (-mTopRow + rowShift > rowsInHistory) {
                 // .. unless we're hitting the end of history transcript, in which
                 // case we abort text selection and scroll to end.
@@ -465,8 +467,8 @@ public final class TerminalView extends View {
             }
         }
 
-        if (!skipScrolling && mTopRow != 0) {
-            // Scroll down if not already there.
+        if (!skipScrolling && rowShift > 0 && mTopRow != 0) {
+            // Scroll down only if new lines actually arrived and we are not selecting
             if (mTopRow < -3) {
                 // Awaken scroll bars only if scrolling a noticeable amount
                 // - we do not want visible scroll bars during normal typing
@@ -561,14 +563,23 @@ public final class TerminalView extends View {
         for (int i = 0; i < amount; i++) {
             if (mEmulator.isMouseTrackingActive()) {
                 sendMouseEventCode(event, up ? TerminalEmulator.MOUSE_WHEELUP_BUTTON : TerminalEmulator.MOUSE_WHEELDOWN_BUTTON, true);
+                if (isSelectingText()) {
+                    decrementYTextSelectionCursors(up ? -1 : 1);
+                }
             } else if (mEmulator.isAlternateBufferActive()) {
                 // Send up and down key events for scrolling, which is what some terminals do to make scroll work in
                 // e.g. less, which shifts to the alt screen without mouse handling.
                 handleKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
+                if (isSelectingText()) {
+                    decrementYTextSelectionCursors(up ? -1 : 1);
+                }
             } else {
                 mTopRow = Math.min(0, Math.max(-(mEmulator.getScreen().getActiveTranscriptRows()), mTopRow + (up ? -1 : 1)));
                 if (!awakenScrollBars()) invalidate();
             }
+        }
+        if (isSelectingText()) {
+            renderTextSelection();
         }
     }
 
@@ -970,7 +981,7 @@ public final class TerminalView extends View {
         int newRows = Math.max(4, (viewHeight - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing);
 
         if (mEmulator == null || (newColumns != mEmulator.mColumns || newRows != mEmulator.mRows)) {
-            mTermSession.updateSize(newColumns, newRows, (int) mRenderer.getFontWidth(), mRenderer.getFontLineSpacing());
+            mTermSession.updateSize(newColumns, newRows);
             mEmulator = mTermSession.getEmulator();
             mClient.onEmulatorSet();
 
@@ -1011,11 +1022,36 @@ public final class TerminalView extends View {
     }
 
     public int getCursorX(float x) {
-        return (int) (x / mRenderer.mFontWidth);
+        float width = (mRenderer != null && mRenderer.mFontWidth > 0) ? mRenderer.mFontWidth : 20f;
+        return (int) (x / width);
     }
 
     public int getCursorY(float y) {
-        return (int) (((y - 40) / mRenderer.mFontLineSpacing) + mTopRow);
+        int offset = (mRenderer != null) ? mRenderer.mFontLineSpacingAndAscent : 0;
+        int spacing = (mRenderer != null && mRenderer.mFontLineSpacing > 0) ? mRenderer.mFontLineSpacing : 40;
+        return (int) (((y - offset) / spacing) + mTopRow);
+    }
+
+    public void selectAll() {
+        if (mEmulator == null) return;
+        TerminalBuffer screen = mEmulator.getScreen();
+        int activeTranscript = screen.getActiveTranscriptRows();
+        getTextSelectionCursorController().setSelection(
+            0, -activeTranscript,
+            mEmulator.mColumns - 1, mEmulator.mRows - 1
+        );
+        mClient.copyModeChanged(isSelectingText());
+        invalidate();
+    }
+
+    public void selectVisibleText() {
+        if (mEmulator == null) return;
+        getTextSelectionCursorController().setSelection(
+            0, mTopRow,
+            mEmulator.mColumns - 1, mTopRow + mEmulator.mRows - 1
+        );
+        mClient.copyModeChanged(isSelectingText());
+        invalidate();
     }
 
     public int getPointX(int cx) {

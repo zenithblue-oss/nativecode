@@ -34,6 +34,8 @@ public class TextSelectionCursorController implements CursorController {
     public final int ACTION_COPY = 1;
     public final int ACTION_PASTE = 2;
     public final int ACTION_MORE = 3;
+    public final int ACTION_COPY_ALL = 4;
+    public final int ACTION_SCROLLVIEW = 5;
 
     public TextSelectionCursorController(TerminalView terminalView) {
         this.terminalView = terminalView;
@@ -116,6 +118,8 @@ public class TextSelectionCursorController implements CursorController {
 
                 ClipboardManager clipboard = (ClipboardManager) terminalView.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
                 menu.add(Menu.NONE, ACTION_COPY, Menu.NONE, R.string.copy_text).setShowAsAction(show);
+                menu.add(Menu.NONE, ACTION_COPY_ALL, Menu.NONE, "Copy All").setShowAsAction(show);
+                menu.add(Menu.NONE, ACTION_SCROLLVIEW, Menu.NONE, "ScrollView").setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_PASTE, Menu.NONE, R.string.paste_text).setEnabled(clipboard != null && clipboard.hasPrimaryClip()).setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_MORE, Menu.NONE, R.string.text_selection_more);
                 return true;
@@ -138,6 +142,18 @@ public class TextSelectionCursorController implements CursorController {
                         String selectedText = getSelectedText();
                         terminalView.mTermSession.onCopyTextToClipboard(selectedText);
                         terminalView.stopTextSelectionMode();
+                        break;
+                    case ACTION_COPY_ALL:
+                        terminalView.stopTextSelectionMode();
+                        if (terminalView.mClient != null) {
+                            terminalView.mClient.onCopyAllTextToClipboard(terminalView.mTermSession);
+                        }
+                        break;
+                    case ACTION_SCROLLVIEW:
+                        terminalView.stopTextSelectionMode();
+                        if (terminalView.mClient != null) {
+                            terminalView.mClient.onOpenScrollView(terminalView.mTermSession);
+                        }
                         break;
                     case ACTION_PASTE:
                         terminalView.stopTextSelectionMode();
@@ -201,12 +217,28 @@ public class TextSelectionCursorController implements CursorController {
                 int terminalBottom = terminalView.getBottom();
                 int top = y1 + mHandleHeight;
                 int bottom = y2 + mHandleHeight;
+                if (top < 0) top = 0;
+                if (bottom < 0) bottom = 0;
                 if (top > terminalBottom) top = terminalBottom;
                 if (bottom > terminalBottom) bottom = terminalBottom;
 
                 outRect.set(x1, top, x2, bottom);
             }
         }, ActionMode.TYPE_FLOATING);
+    }
+
+    public void setSelection(int x1, int y1, int x2, int y2) {
+        mSelX1 = x1;
+        mSelY1 = y1;
+        mSelX2 = x2;
+        mSelY2 = y2;
+        mStartHandle.positionAtCursor(mSelX1, mSelY1, true);
+        mEndHandle.positionAtCursor(mSelX2 + 1, mSelY2, true);
+
+        setActionModeCallBacks();
+        mShowStartTime = System.currentTimeMillis();
+        mIsSelectingText = true;
+        render();
     }
 
     @Override
@@ -238,12 +270,12 @@ public class TextSelectionCursorController implements CursorController {
             if (!terminalView.mEmulator.isAlternateBufferActive()) {
                 int topRow = terminalView.getTopRow();
 
-                if (mSelY1 <= topRow) {
+                if (mSelY1 <= topRow + 1) {
                     topRow--;
                     if (topRow < -scrollRows) {
                         topRow = -scrollRows;
                     }
-                } else if (mSelY1 >= topRow + terminalView.mEmulator.mRows) {
+                } else if (mSelY1 >= topRow + terminalView.mEmulator.mRows - 1) {
                     topRow++;
                     if (topRow > 0) {
                         topRow = 0;
@@ -278,12 +310,12 @@ public class TextSelectionCursorController implements CursorController {
             if (!terminalView.mEmulator.isAlternateBufferActive()) {
                 int topRow = terminalView.getTopRow();
 
-                if (mSelY2 <= topRow) {
+                if (mSelY2 <= topRow + 1) {
                     topRow--;
                     if (topRow < -scrollRows) {
                         topRow = -scrollRows;
                     }
-                } else if (mSelY2 >= topRow + terminalView.mEmulator.mRows) {
+                } else if (mSelY2 >= topRow + terminalView.mEmulator.mRows - 1) {
                     topRow++;
                     if (topRow > 0) {
                         topRow = 0;
