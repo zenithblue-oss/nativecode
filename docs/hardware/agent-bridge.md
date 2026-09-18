@@ -100,7 +100,16 @@ nativecode-agent open-link \
   --title "Web Preview" \
   --message "Vite server listening on port 3000"
 ```
-- Displays an in-app Cyber-brutalist alert card with direct "OPEN BROWSER", "COPY", and "DISMISS" actions.
+- Displays an in-app Cyber-brutalist alert card with translucent dimming over the active workspace/terminal, with direct "OPEN BROWSER", "COPY", and "DISMISS" actions.
+- **Single Active Alert Rule:** Exactly one on-screen alert (link preview or APK install) may be active at any time. If an alert is already displayed, subsequent calls return:
+  ```json
+  {
+    "v": 1,
+    "ok": false,
+    "error": "alert_already_active",
+    "message": "An alert is already active on screen. Dismiss it first with 'nativecode-agent dismiss-alert' or wait for the user to close it."
+  }
+  ```
 - If the host app is running in the background, posts a notification that opens the link directly in the Android browser.
 - Alias: `nativecode-agent open-url`
 
@@ -113,8 +122,33 @@ nativecode-agent install-apk \
 ```
 - Resolves guest relative paths, guest home paths, and host storage paths.
 - Inspects APK manifest metadata (`packageName`, `versionName`, application icon, label, file size).
+- Subject to the **Single Active Alert Rule** (returns `alert_already_active` if another alert is already on screen).
 - Displays an in-app Cyber-brutalist card:
   - **SAVE & OPEN:** Follows Play Store policy guidelines by staging to MediaStore `Downloads` and opening Downloads for native user-initiated installation (no ADB required).
   - **SHARE:** Opens Android system share sheet.
   - **DISMISS:** Closes alert.
 - Alias: `nativecode-agent open-apk`
+
+### 8. Dismiss / Cancel On-Screen Alert
+```bash
+nativecode-agent dismiss-alert
+```
+- Remotely dismisses any active on-screen alert card (web preview or APK install) without user touch.
+- Output:
+  ```json
+  {
+    "v": 1,
+    "ok": true,
+    "dismissed": true
+  }
+  ```
+- If no alert is currently showing:
+  ```json
+  {
+    "v": 1,
+    "ok": true,
+    "dismissed": false,
+    "message": "No active alert on screen to dismiss"
+  }
+  ```
+- Aliases: `nativecode-agent cancel-alert`, `nativecode-agent dismiss`

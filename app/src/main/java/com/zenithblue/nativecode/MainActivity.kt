@@ -7059,8 +7059,29 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
+    private val activeAgentDialogRef = java.util.concurrent.atomic.AtomicReference<android.app.Dialog?>(null)
+
+    override fun isAlertActive(): Boolean {
+        val dialog = activeAgentDialogRef.get()
+        return dialog != null && dialog.isShowing
+    }
+
+    override fun dismissActiveAlert(): Boolean {
+        val dialog = activeAgentDialogRef.getAndSet(null)
+        if (dialog != null && dialog.isShowing) {
+            runOnUiThread {
+                try {
+                    dialog.dismiss()
+                } catch (_: Exception) {}
+            }
+            return true
+        }
+        return false
+    }
+
     override fun showOpenLinkAlert(url: String, title: String?, message: String?): Boolean {
         if (isFinishing || isDestroyed) return false
+        if (isAlertActive()) return false
         runOnUiThread {
             showAgentOpenLinkDialog(url, title, message)
         }
@@ -7069,6 +7090,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     override fun showInstallApkAlert(apkFile: File, title: String?, message: String?): Boolean {
         if (isFinishing || isDestroyed) return false
+        if (isAlertActive()) return false
         runOnUiThread {
             showAgentInstallApkDialog(apkFile, title, message)
         }
@@ -7078,9 +7100,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun showAgentOpenLinkDialog(url: String, title: String?, message: String?) {
         val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
         dialog.setCancelable(true)
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            setDimAmount(0.55f)
+        }
 
         val scrim = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#CC0A0A0A"))
+            setBackgroundColor(Color.TRANSPARENT)
             layoutParams = ViewGroup.LayoutParams(MATCH, MATCH)
             setOnClickListener { dialog.dismiss() }
         }
@@ -7229,6 +7257,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         scrim.addView(card)
         dialog.setContentView(scrim)
+        dialog.setOnDismissListener {
+            activeAgentDialogRef.compareAndSet(dialog, null)
+        }
+        activeAgentDialogRef.set(dialog)
         dialog.show()
     }
 
@@ -7258,9 +7290,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
         dialog.setCancelable(true)
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            setDimAmount(0.55f)
+        }
 
         val scrim = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#CC0A0A0A"))
+            setBackgroundColor(Color.TRANSPARENT)
             layoutParams = ViewGroup.LayoutParams(MATCH, MATCH)
             setOnClickListener { dialog.dismiss() }
         }
@@ -7427,6 +7465,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         scrim.addView(card)
         dialog.setContentView(scrim)
+        dialog.setOnDismissListener {
+            activeAgentDialogRef.compareAndSet(dialog, null)
+        }
+        activeAgentDialogRef.set(dialog)
         dialog.show()
     }
 

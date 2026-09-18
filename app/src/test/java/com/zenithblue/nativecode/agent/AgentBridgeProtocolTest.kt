@@ -59,4 +59,16 @@ class AgentBridgeProtocolTest {
         val parsed = AgentBridgeProtocol.readControlString(ByteArrayInputStream(bytes))
         assertEquals(original, parsed)
     }
+
+    @Test
+    fun testDismissAlertPayloadRoundTrip() {
+        val out = ByteArrayOutputStream()
+        val original = """{"v":1,"cmd":"dismiss_alert"}"""
+
+        AgentBridgeProtocol.writeControlString(out, original)
+        val bytes = out.toByteArray()
+
+        val parsed = AgentBridgeProtocol.readControlString(ByteArrayInputStream(bytes))
+        assertEquals(original, parsed)
+    }
 }

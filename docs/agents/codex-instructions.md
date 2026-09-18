@@ -10,6 +10,9 @@ Use `/usr/local/bin/nativecode-agent` to bridge actions with Android:
   `nativecode-agent open-link --url "http://localhost:3000" --title "Web Preview"`
 - Prompt APK installation on Android without ADB:
   `nativecode-agent install-apk --path "path/to/app-debug.apk"`
+- Dismiss on-screen alert card:
+  `nativecode-agent dismiss-alert`
+- Single Active Alert Rule: Only one alert card can be visible on screen. If an alert is already displayed, new requests fail with `alert_already_active`.
 - Native push notification on task finish:
   `nativecode-agent notify --title "Task Complete" --message "Description"`
 - Instant host toast:

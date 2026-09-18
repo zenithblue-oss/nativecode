@@ -8,6 +8,9 @@ Always leverage `/usr/local/bin/nativecode-agent` to interact with the Android h
   `nativecode-agent open-link --url "http://localhost:3000" --title "Web Preview"`
 - **APK Testing:** When an Android APK is built, trigger on-device install dialog:
   `nativecode-agent install-apk --path "path/to/app-debug.apk" --title "Install APK"`
+- **Dismiss Alert:** Programmatically dismiss active on-screen alert card:
+  `nativecode-agent dismiss-alert`
+- **Single Active Alert Rule:** Exactly one alert can be active on screen at a time. If an alert is already visible, new alert requests fail with `alert_already_active`. Call `dismiss-alert` first or wait for the user to close it.
 - **Completion Notifications:** Send a push notification when long builds/tests finish:
   `nativecode-agent notify --title "Build Complete" --message "Completed in 12s" --priority high`
 - **Toasts:** Display instant status messages:

@@ -35,6 +35,8 @@ class AgentBridgeServer(
     interface UiDelegate {
         fun showOpenLinkAlert(url: String, title: String?, message: String?): Boolean
         fun showInstallApkAlert(apkFile: File, title: String?, message: String?): Boolean
+        fun isAlertActive(): Boolean = false
+        fun dismissActiveAlert(): Boolean = false
     }
 
     companion object {
@@ -211,7 +213,11 @@ class AgentBridgeServer(
                         response.put("telemetry", collectTelemetry())
                     }
                     "open_link", "open_url" -> {
-                        if (!dialogLimiter.tryAcquire()) {
+                        if (uiDelegate?.isAlertActive() == true) {
+                            response.put("ok", false)
+                            response.put("error", "alert_already_active")
+                            response.put("message", "An alert is already active on screen. Dismiss it first with 'nativecode-agent dismiss-alert' or wait for the user to close it.")
+                        } else if (!dialogLimiter.tryAcquire()) {
                             response.put("ok", false)
                             response.put("error", "Rate limit exceeded for link alerts (max 1/sec)")
                         } else {
@@ -235,7 +241,11 @@ class AgentBridgeServer(
                         }
                     }
                     "install_apk", "open_apk" -> {
-                        if (!dialogLimiter.tryAcquire()) {
+                        if (uiDelegate?.isAlertActive() == true) {
+                            response.put("ok", false)
+                            response.put("error", "alert_already_active")
+                            response.put("message", "An alert is already active on screen. Dismiss it first with 'nativecode-agent dismiss-alert' or wait for the user to close it.")
+                        } else if (!dialogLimiter.tryAcquire()) {
                             response.put("ok", false)
                             response.put("error", "Rate limit exceeded for APK alerts (max 1/sec)")
                         } else {
@@ -275,6 +285,14 @@ class AgentBridgeServer(
                                     response.put("version_name", verName)
                                 }
                             }
+                        }
+                    }
+                    "dismiss_alert", "cancel_alert", "dismiss" -> {
+                        val dismissed = uiDelegate?.dismissActiveAlert() == true
+                        response.put("ok", true)
+                        response.put("dismissed", dismissed)
+                        if (!dismissed) {
+                            response.put("message", "No active alert on screen to dismiss")
                         }
                     }
                     else -> {

@@ -91,6 +91,17 @@ export NATIVECODE_GPU_LAUNCH="/usr/local/bin/gpu-launch"
                 profileScript.setExecutable(true, false)
             }
 
+            // System CLI binary: update /usr/local/bin/nativecode-agent if asset present
+            val localBinDir = File(rootfs, "usr/local/bin")
+            if (localBinDir.isDirectory || localBinDir.mkdirs()) {
+                val agentScript = File(localBinDir, "nativecode-agent")
+                val scriptContent = readAssetOrFallback(context, "agents/nativecode-agent", "")
+                if (scriptContent.isNotBlank()) {
+                    writeIfChanged(agentScript, scriptContent)
+                    agentScript.setExecutable(true, false)
+                }
+            }
+
             // 2. User homes: flux and root
             val userHomes = listOf(
                 File(rootfs, "home/flux"),
@@ -205,6 +216,8 @@ You are executing inside a rootless Linux PRoot guest environment hosted within 
 CLI tool: `/usr/local/bin/nativecode-agent`
 - Web preview dialog: `nativecode-agent open-link --url "http://localhost:3000" --title "Web Preview"`
 - On-device APK testing: `nativecode-agent install-apk --path "path/to/app-debug.apk"`
+- Dismiss active on-screen alert: `nativecode-agent dismiss-alert` (or `dismiss`)
+- Single active alert rule: Only ONE alert card can be active on screen at a time. If an alert is already on screen, new requests return `{"ok": false, "error": "alert_already_active"}`. Call `dismiss-alert` or wait for the user to close it.
 - System notifications: `nativecode-agent notify --title "Build Done" --message "Success" --priority high`
 - System toasts: `nativecode-agent toast --text "Running tests..."`
 - Hardware telemetry: `nativecode-agent telemetry`
@@ -233,6 +246,7 @@ You are running inside NativeCode's rootless PRoot Linux environment (ARM64 Alpi
 ## Host Interaction via Agent Bridge (`nativecode-agent`)
 - Dev server previews: `nativecode-agent open-link --url "http://localhost:3000" --title "Web Preview"`
 - APK testing: `nativecode-agent install-apk --path "path/to/app-debug.apk"`
+- Dismiss on-screen alert: `nativecode-agent dismiss-alert` (only 1 active alert on screen allowed)
 - Notifications: `nativecode-agent notify --title "Build Complete" --message "Success" --priority high`
 - Toasts: `nativecode-agent toast --text "Running tests..."`
 - Telemetry: `nativecode-agent telemetry`
@@ -253,6 +267,7 @@ Default User: flux (/home/flux).
 ## Host Agent Bridge (`nativecode-agent`)
 - Open local web servers in host browser: `nativecode-agent open-link --url "http://localhost:3000"`
 - Install built APKs without ADB: `nativecode-agent install-apk --path "path/to/app-debug.apk"`
+- Dismiss active on-screen alert: `nativecode-agent dismiss-alert` (only 1 active alert allowed)
 - System notifications: `nativecode-agent notify --title "Title" --message "Message"`
 - System toasts: `nativecode-agent toast --text "Message"`
 - Telemetry: `nativecode-agent telemetry`

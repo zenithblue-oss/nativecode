@@ -45,8 +45,10 @@ Instead of baking static documentation files permanently into the heavy 130MB+ p
 - **Location:** `/usr/local/bin/nativecode-agent`.
 - **Core Commands:**
   - `nativecode-agent ping`: Test IPC bridge health.
-  - `nativecode-agent open-link --url "http://localhost:<port>" [--title "..."]`: Open local web servers in the Android browser via an interactive card with OPEN BROWSER / COPY / DISMISS actions.
+  - `nativecode-agent open-link --url "http://localhost:<port>" [--title "..."]`: Open local web servers in the Android browser via an interactive card with translucent dimming over the workspace (with OPEN BROWSER / COPY / DISMISS actions).
   - `nativecode-agent install-apk --path "<path/to/apk>" [--title "..."]`: Save built Android APK to Downloads and prompt user installation without requiring ADB.
+  - `nativecode-agent dismiss-alert`: Remotely dismiss active on-screen alert card (open-link or install-apk).
+  - **Single Active Alert Rule:** Exactly one alert can be active on screen at a time. If an alert is already visible, new requests return `{"ok": false, "error": "alert_already_active"}`.
   - `nativecode-agent notify --title "..." --message "..." [--priority high|default|low]`: Android system notification.
   - `nativecode-agent toast --text "..."`: Android system toast.
   - `nativecode-agent telemetry`: Return battery %, battery temperature °C, RAM available/total, power save status.

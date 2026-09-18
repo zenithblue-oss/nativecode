@@ -135,6 +135,11 @@ def main():
     open_apk_p.add_argument("--title", default="Install APK", help="Dialog / notification title")
     open_apk_p.add_argument("--message", default="", help="Message text")
 
+    # dismiss-alert / cancel-alert
+    subparsers.add_parser("dismiss-alert", help="Dismiss any active on-screen alert card (open-link or install-apk)")
+    subparsers.add_parser("cancel-alert", help="Alias for dismiss-alert")
+    subparsers.add_parser("dismiss", help="Alias for dismiss-alert")
+
     args = parser.parse_args()
     sock = connect_agent_socket(args.socket, args.host_uid)
 
@@ -184,6 +189,8 @@ def main():
                 "title": args.title,
                 "message": args.message
             }
+        elif args.cmd in ("dismiss-alert", "cancel-alert", "dismiss"):
+            req = {"v": 1, "cmd": "dismiss_alert"}
         else:
             sys.exit(1)
 

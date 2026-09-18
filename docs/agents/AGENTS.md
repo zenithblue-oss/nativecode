@@ -35,7 +35,16 @@ nativecode-agent open-link \
   --title "Web Preview" \
   --message "Vite dev server running on port 3000"
 ```
-- **In-App Behavior:** Displays an interactive Cyber-brutalist alert card with **OPEN BROWSER**, **COPY**, and **DISMISS** buttons.
+- **In-App Behavior:** Displays an interactive Cyber-brutalist alert card with a translucent dimmed backdrop over the workspace/terminal, with **OPEN BROWSER**, **COPY**, and **DISMISS** buttons.
+- **Single Active Alert Rule:** Only ONE on-screen alert (web preview or APK install) may be active at any given moment. If an alert is already displayed, new requests will fail with:
+  ```json
+  {
+    "v": 1,
+    "ok": false,
+    "error": "alert_already_active",
+    "message": "An alert is already active on screen. Dismiss it first with 'nativecode-agent dismiss-alert' or wait for the user to close it."
+  }
+  ```
 - **Background Behavior:** If NativeCode is minimized, posts a high-priority Android notification opening the URL directly in Chrome/system browser.
 - **Alias:** `nativecode-agent open-url`
 
@@ -47,10 +56,19 @@ nativecode-agent install-apk \
   --title "Build Complete" \
   --message "app-debug.apk built in 14.2s"
 ```
-- **Behavior:** Resolves relative and absolute paths, parses APK metadata, stages the APK to Android MediaStore `Downloads`, and presents an in-app card with **SAVE & OPEN** (launches Android Package Installer) and **SHARE** sheet actions.
+- **Behavior:** Resolves relative and absolute paths, parses APK metadata, stages the APK to Android MediaStore `Downloads`, and presents an in-app card with **SAVE & OPEN** (launches Android Package Installer) and **SHARE** sheet actions. Subject to the **Single Active Alert Rule**.
 - **Alias:** `nativecode-agent open-apk`
 
-### 2.3 Notifications (`notify`)
+### 2.3 Dismiss / Cancel On-Screen Alert (`dismiss-alert`)
+When an on-screen alert card is active, agents can dismiss/cancel it programmatically:
+```bash
+nativecode-agent dismiss-alert
+```
+- Output: `{"v": 1, "ok": true, "dismissed": true}`
+- If no alert is currently displayed: `{"v": 1, "ok": true, "dismissed": false, "message": "No active alert on screen to dismiss"}`
+- **Aliases:** `nativecode-agent cancel-alert`, `nativecode-agent dismiss`
+
+### 2.4 Notifications (`notify`)
 Dispatch native Android notifications when long-running operations (builds, test suites, large git clones) finish:
 ```bash
 nativecode-agent notify \
@@ -62,13 +80,13 @@ nativecode-agent notify \
 - `--id`: Optional integer notification ID (default: `1001`).
 - `--ongoing`: `true` or `false` (for ongoing background processes).
 
-### 2.4 System Toasts (`toast`)
+### 2.5 System Toasts (`toast`)
 Display lightweight, non-blocking on-screen status updates on Android:
 ```bash
 nativecode-agent toast --text "Running tests across 4 packages..."
 ```
 
-### 2.5 Device Hardware Telemetry (`telemetry`)
+### 2.6 Device Hardware Telemetry (`telemetry`)
 Query real-time thermal, battery, and memory state before initiating resource-heavy tasks:
 ```bash
 nativecode-agent telemetry
@@ -98,7 +116,7 @@ Output schema:
 ```
 *Tip: If `battery.temperature_c` > 42.0°C or `memory.low_memory` is true, reduce build concurrency (e.g. `make -j2` instead of `-j8`).*
 
-### 2.6 Background Task Progress (`status`)
+### 2.7 Background Task Progress (`status`)
 Update the persistent Android foreground service notification with progress during multi-step jobs:
 ```bash
 nativecode-agent status \
@@ -107,7 +125,7 @@ nativecode-agent status \
   --progress 45
 ```
 
-### 2.7 Healthcheck (`ping`)
+### 2.8 Healthcheck (`ping`)
 ```bash
 nativecode-agent ping
 ```
