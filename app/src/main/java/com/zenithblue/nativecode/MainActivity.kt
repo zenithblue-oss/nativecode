@@ -2274,9 +2274,56 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
+    private fun terminateSessionProcesses(session: TerminalSession) {
+        val pid = session.pid
+        if (pid > 0) {
+            try {
+                android.system.Os.kill(-pid, android.system.OsConstants.SIGTERM)
+                android.system.Os.kill(-pid, android.system.OsConstants.SIGHUP)
+                android.system.Os.kill(-pid, android.system.OsConstants.SIGKILL)
+            } catch (_: Exception) {}
+            try {
+                android.system.Os.kill(pid, android.system.OsConstants.SIGKILL)
+            } catch (_: Exception) {}
+        }
+        reapOrphanShells()
+    }
+
+    private fun reapOrphanShells() {
+        executor.execute {
+            try {
+                val procDir = File("/proc")
+                val files = procDir.listFiles() ?: return@execute
+                for (f in files) {
+                    val name = f.name
+                    if (name.all { it.isDigit() }) {
+                        val pid = name.toIntOrNull() ?: continue
+                        if (pid <= 1) continue
+                        val statFile = File(f, "stat")
+                        if (statFile.canRead()) {
+                            val statText = statFile.readText()
+                            val lastParen = statText.lastIndexOf(')')
+                            if (lastParen != -1 && lastParen + 2 < statText.length) {
+                                val rest = statText.substring(lastParen + 2).trim().split(" ")
+                                val comm = statText.substring(statText.indexOf('(') + 1, lastParen)
+                                val ppid = rest.getOrNull(1)?.toIntOrNull() ?: continue
+                                if (ppid == 1 && (comm == "bash" || comm == "zsh" || comm == "sh" || comm == "libproot.so")) {
+                                    try {
+                                        android.system.Os.kill(pid, android.system.OsConstants.SIGKILL)
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     private fun closeTerminalSession(index: Int) {
         if (index < 0 || index >= sessionsList.size) return
         val session = sessionsList[index]
+        terminateSessionProcesses(session)
         session.finishIfRunning()
         sessionsList.removeAt(index)
         if (index < terminalSessionTypes.size) {
@@ -20114,6 +20161,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun closeWorkspaceTab(index: Int) {
         if (index < 0 || index >= workspaceSessions.size) return
         val session = workspaceSessions[index]
+        terminateSessionProcesses(session)
         session.finishIfRunning()
         workspaceSessions.removeAt(index)
         workspaceTabNames.removeAt(index)
