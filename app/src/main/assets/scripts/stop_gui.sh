@@ -30,19 +30,11 @@ for proc in phosh phoc wvkbd wvkbd-mobintl glycin-svg glycin-image-rs glycin at-
     "$TB" pkill -9 -f "$proc" 2>/dev/null || true
 done
 
-# Step 2: Stop proot-distro sessions
-echo "[2/4] Killing proot sessions..."
-"$TB" pkill -9 -f "proot-distro" 2>/dev/null || true
-"$TB" pkill -9 -f "proot" 2>/dev/null || true
-"$TB" pkill -9 -f "libproot.so" 2>/dev/null || true
-
-# Clean up any orphaned child shells with PPID 1
-for _pid in $("$TB" pgrep -f "bash|zsh" 2>/dev/null); do
-    _ppid=$("$TB" awk '{print $4}' "/proc/$_pid/stat" 2>/dev/null)
-    if [ "$_ppid" = "1" ]; then
-        "$TB" kill -9 "$_pid" 2>/dev/null || true
-    fi
-done
+# Step 2: Stop the desktop supervisor (libbash running start_gui.sh) only.
+# Do not pkill "proot", "libproot.so", or "proot-distro" — every interactive
+# shell cmdline contains proot-distro in --rootfs=.../proot-distro/containers/...
+echo "[2/4] Killing desktop supervisor..."
+"$TB" pkill -9 -f "start_gui.sh" 2>/dev/null || true
 
 # Step 3: Stop Termux X11 server
 echo "[3/4] Stopping Termux X11..."

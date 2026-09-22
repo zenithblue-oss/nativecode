@@ -83,14 +83,8 @@ class OnboardingActivity : AppCompatActivity() {
     private lateinit var setupDetailText: TextView
     private lateinit var setupProgressTrack: FrameLayout
     private lateinit var setupProgressFill: View
-    private lateinit var baseLogText: TextView
-    private lateinit var baseLogScroll: ScrollView
-    private lateinit var setupLogPanel: View
-    private lateinit var setupLogToggleBtn: LinearLayout
-    private lateinit var setupLogToggleLabel: TextView
     private lateinit var baseNextBtn: View
 
-    private var setupLogVisible = false
     private val setupLogBuffer = StringBuilder()
     private var setupOverallPercent = 0
     private var setupPhaseIndex = 0
@@ -1895,7 +1889,7 @@ class OnboardingActivity : AppCompatActivity() {
             text = if (setupFinished) {
                 "Prebuilt Linux runtime ready"
             } else if (setupFailed) {
-                "Setup failed — open log for details"
+                "Setup failed"
             } else if (isDebianBaseSetupStarted) {
                 currentSetupPhase()?.label ?: "Installing environment…"
             } else {
@@ -1921,115 +1915,6 @@ class OnboardingActivity : AppCompatActivity() {
         progressCard.addView(setupDetailText)
         center.addView(progressCard)
 
-        // Log toggle (secondary, full width) — logs hidden by default
-        setupLogToggleLabel = TextView(this).apply {
-            text = if (setupLogVisible) "Hide setup log" else "View setup log"
-            textSize = 14f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-        }
-        setupLogToggleBtn = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_CONTAINER,
-                strokeColor = NC.PRIMARY_CON,
-                shadowColor = NC.SURFACE_BRIGHT,
-                offsetDp = 6,
-                cornerRadiusDp = 0,
-                rightFaceColor = NC.OUTLINE_VAR
-            )
-            setPadding(dp(20), dp(14), dp(20), dp(14))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
-            isClickable = true
-            isFocusable = true
-            contentDescription = "Toggle setup log visibility"
-            setOnClickListener { toggleSetupLogPanel() }
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.translationX = dp(4).toFloat()
-                        v.translationY = dp(4).toFloat()
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.translationX = 0f
-                        v.translationY = 0f
-                    }
-                }
-                false
-            }
-        }
-        val logIcon = ImageView(this).apply {
-            setImageResource(R.drawable.ic_terminal)
-            setColorFilter(NC.PRIMARY)
-            layoutParams = LinearLayout.LayoutParams(dp(16), dp(16)).apply { rightMargin = dp(8) }
-        }
-        setupLogToggleBtn.addView(logIcon)
-        setupLogToggleBtn.addView(setupLogToggleLabel)
-        center.addView(setupLogToggleBtn)
-
-        // Log panel (GONE by default) — max height so center cluster stays balanced
-        val consoleCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.LOGBG,
-                strokeColor = NC.BORDER,
-                shadowColor = NC.SURFACE_BRIGHT,
-                offsetDp = 6,
-                cornerRadiusDp = 0,
-                rightFaceColor = NC.OUTLINE_VAR
-            )
-            layoutParams = LinearLayout.LayoutParams(MATCH, dp(240))
-            visibility = if (setupLogVisible) View.VISIBLE else View.GONE
-        }
-        setupLogPanel = consoleCard
-        val consoleHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = roundedBg(NC.SURFACE_CONTAINER, NC.BORDER, 0)
-            setPadding(dp(14), dp(10), dp(14), dp(10))
-        }
-        val consoleIcon = ImageView(this).apply {
-            setImageResource(R.drawable.ic_terminal)
-            setColorFilter(NC.PRIMARY)
-            layoutParams = LinearLayout.LayoutParams(dp(16), dp(16)).apply { rightMargin = dp(8) }
-        }
-        val consoleTitle = TextView(this).apply {
-            text = "[ SETUP LOG ]"
-            textSize = 11f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.MONOSPACE
-            letterSpacing = 0.05f
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        }
-        val consoleClose = TextView(this).apply {
-            text = "HIDE"
-            textSize = 11f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-            setOnClickListener { setSetupLogVisible(false) }
-        }
-        consoleHeader.addView(consoleIcon)
-        consoleHeader.addView(consoleTitle)
-        consoleHeader.addView(consoleClose)
-        consoleCard.addView(consoleHeader)
-
-        baseLogScroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, MATCH)
-        }
-        baseLogText = TextView(this).apply {
-            text = setupLogBuffer.toString()
-            textSize = 11f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.MONOSPACE
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            setLineSpacing(dp(2).toFloat(), 1.2f)
-        }
-        baseLogScroll.addView(baseLogText)
-        consoleCard.addView(baseLogScroll)
-        center.addView(consoleCard)
-
         root.addView(center)
 
         // Next pinned to bottom
@@ -2049,23 +1934,6 @@ class OnboardingActivity : AppCompatActivity() {
         applySetupProgressUi()
 
         return root
-    }
-
-    private fun toggleSetupLogPanel() {
-        setSetupLogVisible(!setupLogVisible)
-    }
-
-    private fun setSetupLogVisible(visible: Boolean) {
-        setupLogVisible = visible
-        if (::setupLogPanel.isInitialized) {
-            setupLogPanel.visibility = if (visible) View.VISIBLE else View.GONE
-        }
-        if (::setupLogToggleLabel.isInitialized) {
-            setupLogToggleLabel.text = if (visible) "Hide setup log" else "View setup log"
-        }
-        if (visible && ::baseLogScroll.isInitialized) {
-            baseLogScroll.post { baseLogScroll.fullScroll(View.FOCUS_DOWN) }
-        }
     }
 
     private fun prootSetupPhases(): List<SetupPhase> {
@@ -2264,7 +2132,7 @@ class OnboardingActivity : AppCompatActivity() {
                 setupStepTitleText.setTextColor(NC.ERROR)
             }
             if (::setupDetailText.isInitialized) {
-                setupDetailText.text = "Open setup log for details"
+                setupDetailText.text = "Setup failed"
             }
             applySetupProgressUi(animate = true)
         }
@@ -2921,22 +2789,9 @@ class OnboardingActivity : AppCompatActivity() {
         if (chunk.isEmpty()) return
         synchronized(setupLogBuffer) {
             setupLogBuffer.append(chunk)
-            // Cap ~200k chars to avoid OOM on huge apt streams
             val max = 200_000
             if (setupLogBuffer.length > max) {
                 setupLogBuffer.delete(0, setupLogBuffer.length - max)
-            }
-        }
-        mainHandler.post {
-            if (!::baseLogText.isInitialized) return@post
-            baseLogText.append(chunk)
-            // Keep TextView from growing without bound if buffer was trimmed
-            val text = baseLogText.text
-            if (text != null && text.length > 220_000) {
-                baseLogText.text = text.subSequence(text.length - 200_000, text.length)
-            }
-            if (setupLogVisible && ::baseLogScroll.isInitialized) {
-                baseLogScroll.post { baseLogScroll.fullScroll(View.FOCUS_DOWN) }
             }
         }
     }

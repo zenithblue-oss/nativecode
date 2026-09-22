@@ -17,6 +17,7 @@ import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -52,7 +53,7 @@ private fun Context.brutalistBg(
 
 /**
  * Settings → SKILLS.
- * Categories: Inbuilt (docs/hardware), Project/Utility (empty), Install Programs (empty).
+ * Categories: Inbuilt, Project/Utility, Install Programs. Search filters the list.
  * Each skill can be viewed in full or copied as a markdown prompt for a CLI agent.
  */
 class SkillsPage(
@@ -78,6 +79,7 @@ class SkillsPage(
     }
 
     private var category: SkillCategory = SkillCategory.INBUILT
+    private var query: String = ""
     private var viewing: Skill? = null
     private val listHost = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
     private val detailHost = LinearLayout(ctx).apply {
@@ -93,6 +95,7 @@ class SkillsPage(
         view.addView(detailHost)
         body.addView(header())
         body.addView(categoryRow())
+        body.addView(searchBar())
         body.addView(listHost)
         renderList()
     }
@@ -207,12 +210,53 @@ class SkillsPage(
         listScroll.scrollTo(0, 0)
     }
 
+    private fun searchBar(): LinearLayout {
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(NC.SURFACE_LOWEST)
+                setStroke(ctx.dp(1), NC.OUTLINE_VAR)
+            }
+            setPadding(ctx.dp(10), ctx.dp(8), ctx.dp(10), ctx.dp(8))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = ctx.dp(14) }
+        }
+        row.addView(ImageView(ctx).apply {
+            setImageResource(R.drawable.ic_search)
+            setColorFilter(NC.PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(ctx.dp(18), ctx.dp(18)).apply { rightMargin = ctx.dp(8) }
+        })
+        row.addView(EditText(ctx).apply {
+            hint = "SEARCH SKILLS"
+            setHintTextColor(NC.OUTLINE)
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            typeface = Typeface.MONOSPACE
+            background = null
+            setPadding(0, 0, 0, 0)
+            isSingleLine = true
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    query = s?.toString().orEmpty()
+                    renderList()
+                }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+        })
+        return row
+    }
+
     private fun renderList() {
         paintCategories()
         listHost.removeAllViews()
-        val skills = SkillsCatalog.skills(category)
+        val q = query.trim()
+        val pool = if (q.isEmpty()) SkillsCatalog.skills(category) else SkillsCatalog.all()
+        val skills = SkillsCatalog.matching(q, pool)
         listHost.addView(TextView(ctx).apply {
-            text = category.subtitle
+            text = if (q.isEmpty()) category.subtitle else "${skills.size} MATCHES"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -233,11 +277,21 @@ class SkillsPage(
             orientation = LinearLayout.VERTICAL
             background = ctx.brutalistBg(NC.SURFACE_LOW)
             setPadding(ctx.dp(14), ctx.dp(14), ctx.dp(14), ctx.dp(14))
-            addView(TextView(ctx).apply {
-                text = skill.title
-                textSize = 14f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
+            addView(LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(ImageView(ctx).apply {
+                    layoutParams = LinearLayout.LayoutParams(ctx.dp(36), ctx.dp(36)).apply { rightMargin = ctx.dp(10) }
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    SkillIcons.bind(ctx, this, skill.id)
+                })
+                addView(TextView(ctx).apply {
+                    text = skill.title
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                    layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+                })
             })
             addView(TextView(ctx).apply {
                 text = skill.summary
@@ -271,7 +325,11 @@ class SkillsPage(
                 typeface = Typeface.DEFAULT_BOLD
             })
             addView(TextView(ctx).apply {
-                text = "No skills in this category yet. Inbuilt holds the NativeCode hardware skills."
+                text = if (query.isBlank()) {
+                    "No skills in this category yet. Inbuilt holds the NativeCode hardware skills."
+                } else {
+                    "No skills match that search."
+                }
                 textSize = 12f
                 setTextColor(NC.ON_SURF_VAR)
                 setPadding(0, ctx.dp(6), 0, 0)
@@ -299,6 +357,11 @@ class SkillsPage(
                     setColor(NC.SURFACE_CONTAINER)
                     setStroke(ctx.dp(1), NC.OUTLINE_VAR)
                 }
+            })
+            addView(ImageView(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(ctx.dp(28), ctx.dp(28)).apply { rightMargin = ctx.dp(8) }
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                SkillIcons.bind(ctx, this, skill.id)
             })
             addView(TextView(ctx).apply {
                 text = skill.title

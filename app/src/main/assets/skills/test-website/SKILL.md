@@ -1,0 +1,164 @@
+---
+name: test-website
+description: A local web project or a user-authorized test URL and a small acceptance checklist. Complete this task inside
+  NativeCode using the inline setup and workflow.
+compatibility: NativeCode ARM64 PRoot; use the installed Alpaquita/glibc runtime and existing host/GPU/media bridges
+metadata:
+  title: Test Website
+  category: PROJECT
+  group: Development
+  engine: Playwright with a proven compatible browser
+  setup: inline; no prerequisite skills
+  status: authored; not independently device-tested
+---
+
+# Test Website
+
+**Use for:** A local web project or a user-authorized test URL and a small acceptance checklist.
+
+**Deliver:** Reproducible browser tests, screenshots, console/network errors and a test report.
+
+## NativeCode fast path
+
+Work in the current project as `flux`; use `/home/flux/repos/<project>` only for a new project. Keep the existing stack, source files, lockfiles and user configuration. This skill is self-contained: **do not load another skill or wait for a dependency card**. Reuse working tools; the setup section below covers what to install when this task actually needs it.
+
+```sh
+export PATH="/home/flux/.local/bin:/home/flux/.local/share/nativecode/tools/node/current/bin:$PATH"
+uname -m
+cat /etc/os-release
+getconf GNU_LIBC_VERSION 2>/dev/null || ldd --version 2>&1 | head -1
+```
+
+Reuse this check when it was already done in the current task. The supplied installation records target ARM64 Alpaquita/glibc. Do not mix foreign Alpine/Debian repositories, use x86 binaries, assume CUDA, use systemd/Docker, or change NativeCode drivers. Use existing NativeCode bridges instead of opening/chmodding Android device nodes.
+
+For a required download/extraction, reuse existing utilities. If one is missing, install only the corresponding native `curl`, `ca-certificates`, `tar`, `xz`, `unzip`, `coreutils` or `binutils` package (`ar`) in the authorized root terminal. Do not install a full compiler suite for a binary-only task.
+
+**When executing this skill later:** install only missing task packages in the project's environment. Run `apk` changes only in NativeCode's authorized root terminal using the active distribution's repositories; return to `flux` for builds and content. Do not assume `sudo` is available. Keep existing versions that satisfy the project. Ask before large model downloads, paid/external services or destructive actions. Merely adding this Markdown to the Skills page must execute nothing.
+
+## Install what this task needs
+
+### Node.js / npm, only if missing or incompatible
+
+```sh
+command -v node; command -v npm
+node -p 'process.version + " " + process.arch + " " + process.platform'
+npm --version
+```
+
+Prefer the supplied working toolchain at `/home/flux/.local/share/nativecode/tools/node/current/bin`. Inspect the project's `engines` and package-manager lockfile once. Do not upgrade a working Node/npm installation simply to use this skill.
+
+If no compatible Node works, use the configured Alpaquita `nodejs`/`npm` packages when their candidate versions satisfy the project (`apk search -x nodejs`, `apk search -x npm`). Otherwise select a compatible `linux-arm64` release from [Node's official index](https://nodejs.org/dist/index.json), not an x64/musl archive. Set the exact approved version, then download and verify it:
+
+```sh
+: "${NODE_VERSION:?Set the selected official version, including v}"
+node_archive="node-${NODE_VERSION}-linux-arm64.tar.xz"
+node_stage=$(mktemp -d /tmp/nativecode-node.XXXXXX)
+node_base=/home/flux/.local/share/nativecode/tools/node
+curl -fL "https://nodejs.org/dist/${NODE_VERSION}/${node_archive}" -o "$node_stage/$node_archive"
+curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/SHASUMS256.txt" -o "$node_stage/SHASUMS256.txt"
+(cd "$node_stage"; grep "  ${node_archive}$" SHASUMS256.txt > selected.sha256; test -s selected.sha256; sha256sum -c selected.sha256) || exit 1
+mkdir -p "$node_base"
+tar -xJf "$node_stage/$node_archive" -C "$node_base"
+"$node_base/node-${NODE_VERSION}-linux-arm64/bin/node" --version
+```
+
+Activate the verified version with a recoverable `current` symlink; never replace an unknown real directory. Add the chosen `bin` once to both Bash/Zsh PATH only when toolchain setup changed it, preserving other entries. Use project-local packages. Respect an existing npm/pnpm/yarn lockfile; `npm ci` is the npm locked-install route, not a command to overwrite another manager's lockfile.
+
+### NativeCode Chromium, only for browser rendering/testing
+
+Reuse `/home/flux/.local/bin/chromium` or `/home/flux/.local/bin/google-chrome`. The supplied working browser tree is `/opt/google/chrome/`; its wrapper already selects NativeCode graphics. Do not replace that wrapper or append `--disable-gpu`. Check the real executable's architecture, shared libraries and `--version` once.
+
+If no usable browser exists, the supplied installation uses this ARM64 package source:
+
+```text
+https://dl.google.com/linux/direct/google-chrome-stable_current_arm64.deb
+```
+
+Download to a disposable directory; inspect the package with `ar`, extract its `control.tar.*` and `data.tar.*` without executing maintainer scripts, and require `Architecture: arm64` plus an aarch64 ELF. Record the actual downloaded version and checksum: this is a moving URL, not a pinned archive. Install only missing display/font/NSS libraries from the **native** package repositories based on control metadata and `ldd`. Preserve any existing browser, then place the verified `opt/google/chrome` tree at `/opt/google/chrome` using the authorized root terminal. No Debian repository or dpkg setup is needed.
+
+When creating a missing wrapper, use the supplied NativeCode route, not generic desktop flags:
+
+```sh
+#!/bin/sh
+exec gpu-launch --auto /opt/google/chrome/google-chrome \
+  --no-sandbox --enable-gpu --disable-software-rasterizer \
+  --ignore-gpu-blocklist --use-gl=angle --use-angle=vulkan "$@"
+```
+
+Save it as `/home/flux/.local/bin/chromium` only when that path is absent, make it executable and expose it in Bash/Zsh PATH. Reuse an existing known-good wrapper unchanged. Select Wayland/Ozone only with the live NativeCode Phosh socket; do not force a stale display. The supplied PRoot route needs `--no-sandbox`; confine automation to approved/local content with a fresh profile, not credentials or the user's normal browser profile. Do not weaken other security settings.
+
+Use `gpu-launch --diagnose`, then a real WebGL draw/readback or the application's own renderer report. Accept only the actual device-backed renderer; reject SwiftShader/llvmpipe as a GPU result. Headless HTML success alone is not GPU evidence. Do not create Phosh launchers as a side effect of a content task.
+
+### Browser-test package
+
+Use the existing project runner when present. For a new test setup use one project-local package without downloading desktop browsers:
+
+```sh
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --save-dev @playwright/test
+```
+
+Configure Chromium with `executablePath: '/home/flux/.local/bin/chromium'`, a 30-second launch timeout and one worker. The supplied wrapper carries NativeCode GPU/sandbox settings. Do not run Playwright's distribution-specific `install-deps` on Alpaquita or assume a custom browser is guaranteed compatible. Run one launch smoke before the suite; if it fails, diagnose that exact runner/browser combination once instead of installing several engines.
+
+## Do the task
+
+1. Read the app's existing test configuration and the requested flows. Use localhost or an explicitly authorized test target with non-production data.
+2. Start/reuse the task server and confirm HTTP readiness. Use a fresh browser context/profile and deterministic viewport; preserve the user's real browser profile.
+3. Add tests for essential interactions, forms, routing and responsive widths. Capture page errors, console errors, failed requests and screenshots on failure. Prefer accessible locators over fragile timing sleeps.
+4. Run `npx playwright test --workers=1`; collect the real report/trace. For GPU-required pages, draw/read back WebGL pixels and record the renderer rather than only taking a screenshot.
+5. For a local screenshot preview, expose only the report directory on localhost and use NativeCode's `open-link`. Close the test browser and only the server that this task owns.
+
+## Small WebGL probe for the test page
+
+Run inside a launched Playwright `page`; this executes a tiny draw/readback instead of trusting only a renderer string:
+
+```javascript
+const gpu = await page.evaluate(() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+  if (!gl) return {ok: false, reason: 'No WebGL context'};
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : null;
+  gl.clearColor(1, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  const pixel = new Uint8Array(4);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+  const ok = typeof renderer === 'string' &&
+    !/swiftshader|llvmpipe|software/i.test(renderer) &&
+    pixel[0] > 240 && pixel[1] < 16 && pixel[2] < 16;
+  return {ok, renderer, pixel: Array.from(pixel)};
+});
+console.log(JSON.stringify(gpu));
+if (!gpu.ok) throw new Error('Hardware WebGL was not verified');
+```
+
+Also match the renderer to the live device/backend and test the application's real workload. This probe does not measure browser video decoding or overall application performance.
+
+## NativeCode graphics and hardware use
+
+Run `gpu-launch --diagnose` once for this rendering job, reuse the existing wrappers and select `--auto`. Use explicit Turnip/PanVK/Venus only when the live diagnostic and installed launcher support that route. Do not hard-code an Adreno renderer on a Mali device, alter global ICDs, or disable GPU to hide a failure.
+
+Validate the actual application workload and record its renderer/device. SwiftShader, llvmpipe, a software-only route, a version string or a bare PASS in the launcher are not enough. If required hardware rendering fails, save the log, try one evidence-based correction in the task's configuration, then report the specific blocker; CPU substitution needs an explicit user choice. CPU-only parsing/build steps remain CPU steps.
+
+## Check the actual result
+
+Report actual passed/failed/skipped counts, reproducible failures and artifact paths. A WebGL context without a device-backed renderer is not GPU verification. If browser/runner compatibility is blocked, return source-level findings separately rather than inventing a browser-test pass.
+
+## NativeCode progress, preview and delivery
+
+Use available host features for their actual purpose: `nativecode-agent toast --text "Task started"` for a useful start message, `nativecode-agent telemetry` before large builds/renders, and `nativecode-agent status --key <task-id> --text <real-status> --progress <real-percent>` only when progress is measurable. Do not spam alerts.
+
+For a local preview, run only the task server on `127.0.0.1`, keep its PID/log, wait for HTTP readiness, then call `nativecode-agent open-link --url http://127.0.0.1:<actual-port> --title "Preview"`. This opens the host/system browser; it does **not** prove that the guest Chromium GPU wrapper was used. For a built APK, offer `nativecode-agent install-apk --path <actual-apk>`; it asks the user through Android's installer and is not silent installation.
+
+Only one NativeCode alert can be active. On `alert_already_active`, wait or ask; do not dismiss an unrelated user alert. Stop only task-owned processes. Send `nativecode-agent notify --title "Task complete" --message <actual-result>` after a long job.
+
+Deliver existing output paths and editable source through the current file UI. There is no documented generic `nativecode-agent open-file` or `share-file` command. Serve an isolated output folder only when a browser preview is useful, never the whole home directory. Report **created**, **built/rendered**, **checked**, and **device/hardware-verified** separately. Preserve originals and credentials; do not publish/upload automatically. This project workflow was authored from the supplied setup records and has not itself been device-tested by the pack author.
+
+## Sources and setup provenance
+
+The NativeCode paths and bridge/launcher patterns above are adapted from the user-supplied `create-skill.zip` installation records and the supplied NativeCode source. These project instructions are newly authored; the original installation files remain unmodified in the pack. Do not load those other files to perform this task: the necessary setup is included above.
+
+- https://github.com/microsoft/playwright
+- https://playwright.dev/docs/intro
+- https://github.com/puppeteer/puppeteer
+- https://playwright.dev/docs/api/class-browsertype

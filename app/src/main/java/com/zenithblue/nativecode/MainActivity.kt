@@ -112,6 +112,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val terminalSessionTypes = ArrayList<String>()
     private lateinit var terminalToolSelectorScrollView: ScrollView
     private lateinit var toggleExtraKeysBtn: ImageView
+    private lateinit var keepAwakeBtn: ImageView
+    private lateinit var terminalSkillsBtn: ImageView
+    private var keepAwake = false
+    private var skillsPicker: com.zenithblue.nativecode.skills.SkillsPickerSheet? = null
     private var activeSessionIndex = -1
 
     private var termFontSize = 40
@@ -322,7 +326,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var homeContainerLabel: TextView
     private lateinit var startGuiBtn: TextView
     private lateinit var stopGuiBtn: TextView
-    private lateinit var viewLogsBtn: TextView
 
     /** Streamed capture job for start/stop GUI scripts (never touches isScriptRunning). */
     private var guiShellJob: ShellJob? = null
@@ -330,7 +333,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** True while user-initiated STOP owns the card flip (ignore start cancel onDone). */
     @Volatile private var guiUserStopping: Boolean = false
 
-    /** True after first healthy start log line (STOP + VIEW LOGS shown). */
+    /** True after first healthy start log line (STOP shown). */
     @Volatile private var guiDesktopRunning: Boolean = false
 
     /** One X11 Activity launch per START attempt. */
@@ -624,6 +627,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         workspaceFontSize = termFontSize
         scriptFontSize = termFontSize
         showExtraKeys = prefs.getBoolean("pref_show_extra_keys", true)
+        keepAwake = prefs.getBoolean("pref_keep_awake", false)
         val storedMethod = prefs.getString("linux_method", "proot") ?: "proot"
         LinuxCommandBuilder.currentMethod = if (BuildConfig.PLAY_STORE_BUILD) "proot" else storedMethod
         if (BuildConfig.PLAY_STORE_BUILD && storedMethod != "proot") {
@@ -652,6 +656,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         buildRootLayout()
         setContentView(drawerLayout)
+        applyKeepAwake()
         ensurePostNotificationsPermission()
 
         // Apply Insets
@@ -761,6 +766,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     override fun onResume() {
         super.onResume()
         NativeCodeBridge.agentUiDelegate = this
+        applyKeepAwake()
     }
 
     override fun onPause() {
@@ -1323,6 +1329,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         selectBottomNavItem(id)
+        applyKeepAwake()
     }
 
     private fun selectBottomNavItem(id: Int) {
@@ -1369,7 +1376,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     @android.annotation.SuppressLint("MissingSuperCall", "GestureBackNavigation")
     override fun onBackPressed() {
         android.util.Log.e("NativeCodeNav", "onBackPressed called! currentPageId=$currentPageId, stack=$pageStack, privacyPolicyScrollVis=${if (::privacyPolicyScrollView.isInitialized) privacyPolicyScrollView.visibility else -1}")
-        
+        if (skillsPicker != null) {
+            skillsPicker?.dismiss()
+            return
+        }
+
         // Priority 1: Settings subpages (MUST check before any project/workspace checks)
         if (::privacyPolicyScrollView.isInitialized && privacyPolicyScrollView.visibility == View.VISIBLE) {
             navigateBackFromSubpage(ID_PRIVACY_POLICY, fallback = ID_SETTINGS)
@@ -2295,49 +2306,88 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
+    /**
+     * Kill this session only. session.pid is the setsid group leader (libproot.so for
+     * interactive shells). Guest bash is a proot tracee, reaped by --kill-on-exit when
+     * the tracer dies — not a PPid child. No comm-name or PPID-1 sweep.
+     */
     private fun terminateSessionProcesses(session: TerminalSession) {
         val pid = session.pid
-        if (pid > 0) {
-            try {
-                android.system.Os.kill(-pid, android.system.OsConstants.SIGTERM)
-                android.system.Os.kill(-pid, android.system.OsConstants.SIGHUP)
-                android.system.Os.kill(-pid, android.system.OsConstants.SIGKILL)
-            } catch (_: Exception) {}
-            try {
-                android.system.Os.kill(pid, android.system.OsConstants.SIGKILL)
-            } catch (_: Exception) {}
-        }
-        reapOrphanShells()
+        if (pid <= 1) return
+        val descendants = mutableListOf<Int>()
+        val tracees = mutableListOf<Int>()
+        collectDescendants(pid, descendants, 0)
+        collectTracees(pid, tracees)
+        signalPid(-pid, android.system.OsConstants.SIGTERM)
+        signalPid(-pid, android.system.OsConstants.SIGHUP)
+        signalPid(-pid, android.system.OsConstants.SIGKILL)
+        for (child in descendants) signalPid(child, android.system.OsConstants.SIGKILL)
+        signalPid(pid, android.system.OsConstants.SIGKILL)
+        for (tracee in tracees) signalPid(tracee, android.system.OsConstants.SIGKILL)
     }
 
-    private fun reapOrphanShells() {
-        executor.execute {
+    private fun signalPid(pid: Int, sig: Int) {
+        try {
+            android.system.Os.kill(pid, sig)
+        } catch (_: Exception) {}
+    }
+
+    /** PPid children of [root], host-side only. Guest tracees are not in this tree. */
+    private fun collectDescendants(root: Int, out: MutableList<Int>, depth: Int) {
+        if (depth > 32) return
+        val procDir = File("/proc")
+        val files = procDir.listFiles() ?: return
+        val children = ArrayList<Int>()
+        for (f in files) {
+            val name = f.name
+            if (!name.all { it.isDigit() }) continue
+            val pid = name.toIntOrNull() ?: continue
+            if (pid <= 1) continue
+            val ppid = readPpid(f) ?: continue
+            if (ppid == root) children.add(pid)
+        }
+        for (child in children) {
+            out.add(child)
+            collectDescendants(child, out, depth + 1)
+        }
+    }
+
+    /** Tasks whose TracerPid is [tracer]. Snapshot before the tracer is signalled. */
+    private fun collectTracees(tracer: Int, out: MutableList<Int>) {
+        val procDir = File("/proc")
+        val files = procDir.listFiles() ?: return
+        for (f in files) {
+            val name = f.name
+            if (!name.all { it.isDigit() }) continue
+            val pid = name.toIntOrNull() ?: continue
+            if (pid <= 1 || pid == tracer) continue
+            val status = File(f, "status")
+            if (!status.canRead()) continue
             try {
-                val procDir = File("/proc")
-                val files = procDir.listFiles() ?: return@execute
-                for (f in files) {
-                    val name = f.name
-                    if (name.all { it.isDigit() }) {
-                        val pid = name.toIntOrNull() ?: continue
-                        if (pid <= 1) continue
-                        val statFile = File(f, "stat")
-                        if (statFile.canRead()) {
-                            val statText = statFile.readText()
-                            val lastParen = statText.lastIndexOf(')')
-                            if (lastParen != -1 && lastParen + 2 < statText.length) {
-                                val rest = statText.substring(lastParen + 2).trim().split(" ")
-                                val comm = statText.substring(statText.indexOf('(') + 1, lastParen)
-                                val ppid = rest.getOrNull(1)?.toIntOrNull() ?: continue
-                                if (ppid == 1 && (comm == "bash" || comm == "zsh" || comm == "sh" || comm == "libproot.so")) {
-                                    try {
-                                        android.system.Os.kill(pid, android.system.OsConstants.SIGKILL)
-                                    } catch (_: Exception) {}
-                                }
-                            }
+                status.useLines { lines ->
+                    for (line in lines) {
+                        if (line.startsWith("TracerPid:")) {
+                            val tp = line.substringAfter(':').trim().toIntOrNull()
+                            if (tp == tracer) out.add(pid)
+                            break
                         }
                     }
                 }
             } catch (_: Exception) {}
+        }
+    }
+
+    private fun readPpid(procEntry: File): Int? {
+        val statFile = File(procEntry, "stat")
+        if (!statFile.canRead()) return null
+        return try {
+            val statText = statFile.readText()
+            val lastParen = statText.lastIndexOf(')')
+            if (lastParen == -1 || lastParen + 2 >= statText.length) return null
+            val rest = statText.substring(lastParen + 2).trim().split(" ")
+            rest.getOrNull(1)?.toIntOrNull()
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -3909,23 +3959,129 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun showAttachmentTutorial(onContinue: (() -> Unit)? = null) {
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Attach to Linux")
-            .setMessage(
-                "IMAGE selects a picture. FILE selects any document. NativeCode copies it into the active " +
-                    "project (or /home/flux), then copies the Linux path to Android's clipboard. Paste that " +
-                    "path into your terminal or agent. Hold either icon to reopen this help."
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
+        dialog.setCancelable(true)
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            setDimAmount(0.62f)
+        }
+        val scrim = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#CC0E0E0E"))
+            layoutParams = ViewGroup.LayoutParams(MATCH, MATCH)
+            setOnClickListener { dialog.dismiss() }
+        }
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOW,
+                strokeColor = NC.PRIMARY,
+                shadowColor = NC.SHADOW_GREEN,
+                offsetDp = 6,
+                cornerRadiusDp = 0,
+                rightFaceColor = NC.BORDER
             )
-            .setPositiveButton(if (onContinue == null) "GOT IT" else "CONTINUE") { _, _ ->
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            layoutParams = FrameLayout.LayoutParams(MATCH, WRAP).apply {
+                gravity = Gravity.CENTER
+                leftMargin = dp(24)
+                rightMargin = dp(24)
+            }
+            isClickable = true
+        }
+        card.addView(TextView(this).apply {
+            text = "ATTACH TO LINUX"
+            textSize = 15f
+            setTextColor(NC.PRIMARY)
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setPadding(0, 0, 0, dp(14))
+        })
+        fun step(icon: Int, title: String, body: String): LinearLayout {
+            return LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    setColor(NC.SURFACE_CONTAINER)
+                    setStroke(dp(1), NC.OUTLINE_VAR)
+                }
+                setPadding(dp(12), dp(10), dp(12), dp(10))
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(8) }
+                addView(ImageView(this@MainActivity).apply {
+                    setImageResource(icon)
+                    setColorFilter(NC.PRIMARY)
+                    layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { rightMargin = dp(12) }
+                })
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(TextView(this@MainActivity).apply {
+                        text = title
+                        textSize = 12f
+                        setTextColor(Color.WHITE)
+                        typeface = Typeface.MONOSPACE
+                        paint.isFakeBoldText = true
+                    })
+                    addView(TextView(this@MainActivity).apply {
+                        text = body
+                        textSize = 11f
+                        setTextColor(NC.ON_SURF_VAR)
+                        setPadding(0, dp(2), 0, 0)
+                    })
+                })
+            }
+        }
+        card.addView(step(R.drawable.ic_attach_image, "IMAGE", "Pick a picture. Copied into the project."))
+        card.addView(step(R.drawable.ic_attach_file, "FILE", "Pick any document. Same copy path."))
+        card.addView(TextView(this).apply {
+            text = "NativeCode writes the file into the active project (or /home/flux) and copies the Linux path to the clipboard. Paste it in the terminal or agent. Hold either icon to reopen this."
+            textSize = 12f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setLineSpacing(dp(2).toFloat(), 1.15f)
+            setPadding(0, dp(4), 0, dp(16))
+        })
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        if (onContinue != null) {
+            btnRow.addView(TextView(this).apply {
+                text = "CANCEL"
+                textSize = 12f
+                typeface = Typeface.MONOSPACE
+                paint.isFakeBoldText = true
+                setTextColor(NC.ON_SURF_VAR)
+                gravity = Gravity.CENTER
+                background = cyberBrutalistBg(NC.SURFACE_LOW, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
+                setPadding(dp(14), dp(10), dp(14), dp(10))
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
+                setOnClickListener { dialog.dismiss() }
+            })
+        }
+        btnRow.addView(TextView(this).apply {
+            text = if (onContinue == null) "GOT IT" else "CONTINUE"
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setTextColor(Color.parseColor("#0A0A0A"))
+            gravity = Gravity.CENTER
+            background = cyberBrutalistBg(NC.PRIMARY, NC.BORDER, NC.SHADOW_GREEN, 4, 0)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1.3f)
+            setOnClickListener {
                 getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
                     .putBoolean("attachment_tutorial_seen", true)
                     .apply()
+                dialog.dismiss()
                 onContinue?.invoke()
             }
-            .apply {
-                if (onContinue != null) setNegativeButton("CANCEL", null)
-            }
-            .show()
+        })
+        card.addView(btnRow)
+        scrim.addView(card)
+        dialog.setContentView(scrim)
+        dialog.show()
     }
 
     private fun pickAttachmentWithTutorial(picker: () -> Unit) {
@@ -4307,6 +4463,19 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
         }
+        keepAwakeBtn = ImageView(this).apply {
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(4) }
+            setOnClickListener { toggleKeepAwake() }
+        }
+        terminalSkillsBtn = ImageView(this).apply {
+            setImageResource(R.drawable.ic_smart_toy)
+            setColorFilter(NC.ON_SURFACE)
+            contentDescription = "Skills"
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(4) }
+            setOnClickListener { showSkillsPicker() }
+        }
         toggleExtraKeysBtn = ImageView(this).apply {
             setImageResource(R.drawable.ic_keyboard)
             setColorFilter(if (showExtraKeys) NC.PRIMARY else NC.ON_SURF_VAR)
@@ -4320,9 +4489,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         terminalTopBar.addView(menuTerminalBtn)
         terminalTopBar.addView(termSysPlate)
         terminalTopBar.addView(spacerTerminal)
+        terminalTopBar.addView(keepAwakeBtn)
+        terminalTopBar.addView(terminalSkillsBtn)
         terminalTopBar.addView(toggleExtraKeysBtn)
         terminalTopBar.addView(addTerminalWorkspaceBtn)
         terminalWorkspaceLayout.addView(terminalTopBar)
+        applyKeepAwake()
 
         terminalToolSelectorScrollView = buildTerminalToolSelectorView().apply {
             visibility = View.VISIBLE
@@ -4357,6 +4529,120 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             visibility = if (showExtraKeys) View.VISIBLE else View.GONE
         }
         terminalWorkspaceLayout.addView(terminalKeyboardToolbar)
+    }
+
+    private fun toggleKeepAwake() {
+        keepAwake = !keepAwake
+        getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
+            .putBoolean("pref_keep_awake", keepAwake)
+            .apply()
+        applyKeepAwake()
+    }
+
+    private fun showSkillsPicker() {
+        if (skillsPicker != null) {
+            skillsPicker?.dismiss()
+            return
+        }
+        skillsPicker = com.zenithblue.nativecode.skills.SkillsPickerSheet(this, contentFrame) {
+            skillsPicker = null
+        }
+    }
+
+    private fun showWorkspaceToolsMenu(anchor: View) {
+        val popupView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_CONTAINER,
+                strokeColor = NC.PRIMARY,
+                shadowColor = NC.SHADOW_DARK,
+                offsetDp = 4,
+                cornerRadiusDp = 0,
+                rightFaceColor = NC.OUTLINE_VAR
+            )
+        }
+        val popupWindow = PopupWindow(
+            popupView,
+            dp(220),
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            isOutsideTouchable = true
+            isFocusable = true
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            elevation = dp(10).toFloat()
+        }
+        fun row(icon: Int, label: String, on: Boolean, tinted: Boolean, click: () -> Unit): LinearLayout {
+            return LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(11), dp(12), dp(11))
+                background = roundedBg(NC.SURFACE_CONTAINER, Color.TRANSPARENT, 0)
+                addView(ImageView(this@MainActivity).apply {
+                    setImageResource(icon)
+                    if (tinted) setColorFilter(if (on) NC.PRIMARY else NC.ON_SURF_VAR)
+                    layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(12) }
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = label
+                    textSize = 12f
+                    typeface = Typeface.MONOSPACE
+                    paint.isFakeBoldText = true
+                    setTextColor(if (on) NC.PRIMARY else NC.ON_SURFACE)
+                    layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+                })
+                if (on) {
+                    addView(TextView(this@MainActivity).apply {
+                        text = "ON"
+                        textSize = 10f
+                        typeface = Typeface.MONOSPACE
+                        paint.isFakeBoldText = true
+                        setTextColor(Color.parseColor("#0A0A0A"))
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.RECTANGLE
+                            setColor(NC.PRIMARY)
+                        }
+                        setPadding(dp(6), dp(2), dp(6), dp(2))
+                    })
+                }
+                setOnClickListener {
+                    popupWindow.dismiss()
+                    click()
+                }
+            }
+        }
+        popupView.addView(row(R.drawable.ic_keyboard, "EXTRA KEYS", showExtraKeys, true) {
+            setExtraKeysEnabled(!showExtraKeys)
+        })
+        popupView.addView(row(
+            if (keepAwake) R.drawable.ic_visibility else R.drawable.ic_visibility_off,
+            "KEEP AWAKE",
+            keepAwake,
+            true
+        ) { toggleKeepAwake() })
+        popupView.addView(row(R.drawable.ic_smart_toy, "COPY SKILL", false, true) {
+            showSkillsPicker()
+        })
+        popupWindow.showAsDropDown(anchor, 0, dp(4))
+    }
+
+    /** Play-safe keep-awake: FLAG_KEEP_SCREEN_ON only. No WAKE_LOCK. Off when user toggles or app backgrounds. */
+    private fun applyKeepAwake() {
+        if (keepAwake) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        if (::keepAwakeBtn.isInitialized) {
+            keepAwakeBtn.setImageResource(
+                if (keepAwake) R.drawable.ic_visibility else R.drawable.ic_visibility_off
+            )
+            keepAwakeBtn.setColorFilter(if (keepAwake) NC.PRIMARY else NC.ON_SURF_VAR)
+            keepAwakeBtn.contentDescription =
+                if (keepAwake) "Keep screen on" else "Allow screen sleep"
+        }
     }
 
     private fun buildGitOperationsLayout() {
@@ -8807,19 +9093,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopGuiBtn.visibility = View.GONE
         stopGuiBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
 
-        viewLogsBtn = secondaryButton("  VIEW LOGS") {
-            openGuiLogPage()
-        }.apply {
-            // Beside STOP only after start is healthy (first log line) — not on idle START row
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(10) }
-            visibility = View.GONE
-            isEnabled = false
-            alpha = 0.5f
-        }
-
         row.addView(startGuiBtn)
         row.addView(stopGuiBtn)
-        row.addView(viewLogsBtn)
         card.addView(row)
         return card
     }
@@ -14056,18 +14331,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopGuiBtn.isEnabled = false
         stopGuiBtn.alpha = 0.5f
         stopGuiBtn.text = "STOP PHOSH DESKTOP"
-        if (::viewLogsBtn.isInitialized) {
-            viewLogsBtn.visibility = View.GONE
-            viewLogsBtn.isEnabled = false
-            viewLogsBtn.alpha = 0.5f
-        }
     }
 
-    /**
-     * Running: STOP + optional VIEW LOGS side-by-side.
-     * VIEW LOGS only when [showLogs]=true (healthy start has streamed output).
-     */
-    private fun setGuiCardRunning(showLogs: Boolean) {
+    /** Running: full-width STOP. Log capture stays; no VIEW LOGS button. */
+    private fun setGuiCardRunning() {
         if (!::startGuiBtn.isInitialized || !::stopGuiBtn.isInitialized) return
         guiDesktopRunning = true
         startGuiBtn.visibility = View.GONE
@@ -14075,35 +14342,21 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopGuiBtn.isEnabled = true
         stopGuiBtn.alpha = 1f
         stopGuiBtn.text = "STOP PHOSH DESKTOP"
-        stopGuiBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        if (::viewLogsBtn.isInitialized) {
-            if (showLogs) {
-                viewLogsBtn.visibility = View.VISIBLE
-                viewLogsBtn.isEnabled = true
-                viewLogsBtn.alpha = 1f
-                viewLogsBtn.layoutParams =
-                    LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = dp(10) }
-            } else {
-                viewLogsBtn.visibility = View.GONE
-                viewLogsBtn.isEnabled = false
-                viewLogsBtn.alpha = 0.5f
-            }
-        }
+        stopGuiBtn.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
     }
 
     /**
      * First healthy start/stop log line while STOP row is (or should be) active:
-     * show STOP + VIEW LOGS, open display shortcut + X11 once.
+     * show STOP, open display shortcut + X11 once.
      */
     private fun onGuiStreamHealthyLine() {
         if (guiUserStopping) {
-            // Stop path: keep VIEW LOGS if already running; ensure STOP row visible
             if (guiDesktopRunning || (::stopGuiBtn.isInitialized && stopGuiBtn.visibility == View.VISIBLE)) {
-                setGuiCardRunning(showLogs = true)
+                setGuiCardRunning()
             }
             return
         }
-        setGuiCardRunning(showLogs = true)
+        setGuiCardRunning()
         if (::displayBtn.isInitialized) {
             displayBtn.visibility = View.VISIBLE
         }
@@ -14159,7 +14412,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 guiLogHeader("START", scriptName, method)
                 guiLogAppend("ERROR: missing host script ${script.absolutePath} (deployScripts failed?)")
                 mainHandler.post {
-                    Toast.makeText(this, "GUI script missing — check VIEW LOGS after fix", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "GUI script missing", Toast.LENGTH_LONG).show()
                     setGuiCardIdle()
                     releaseDesktopFgs()
                 }
@@ -14180,7 +14433,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     args,
                     onLine = { line ->
                         guiLogAppend(line)
-                        // First real script output → STOP + VIEW LOGS (healthy enough)
                         onGuiStreamHealthyLine()
                     },
                     onDone = { code ->
@@ -14191,14 +14443,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                             code != 0 -> {
                                 Toast.makeText(
                                     this,
-                                    "Desktop start failed (exit $code) — opening log",
+                                    "Desktop start failed (exit $code)",
                                     Toast.LENGTH_LONG
                                 ).show()
                                 revertGuiCardToStart()
-                                // Fail path: still open log page if we captured anything
-                                if (guiLogFile().length() > 0L && !isScriptRunning) {
-                                    openGuiLogPage()
-                                }
                             }
                             else -> {
                                 // Clean desktop exit (session ended)
@@ -20513,22 +20761,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
 
-        val workspaceExtraKeysBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_keyboard)
-            setColorFilter(if (showExtraKeys) NC.PRIMARY else NC.ON_SURF_VAR)
+        val workspaceMoreBtn = ImageView(this).apply {
+            setImageResource(R.drawable.ic_more_vert)
+            setColorFilter(NC.ON_SURFACE)
+            contentDescription = "Workspace tools"
             setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(4) }
-            setOnClickListener {
-                setExtraKeysEnabled(!showExtraKeys)
-                setColorFilter(if (showExtraKeys) NC.PRIMARY else NC.ON_SURF_VAR)
-            }
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+            setOnClickListener { showWorkspaceToolsMenu(this) }
         }
 
         topBar.addView(backWorkspaceBtn)
         topBar.addView(workspaceProjectIconIv)
         topBar.addView(workspaceProjectNameTv)
         topBar.addView(projSysPlate)
-        topBar.addView(workspaceExtraKeysBtn)
+        topBar.addView(workspaceMoreBtn)
         projectWorkspaceLayout.addView(topBar)
 
         workspaceTabBarScroll = HorizontalScrollView(this).apply {

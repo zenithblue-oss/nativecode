@@ -24,8 +24,20 @@ internal object SkillsCatalog {
 
     fun skills(category: SkillCategory): List<Skill> = when (category) {
         SkillCategory.INBUILT -> inbuilt()
-        SkillCategory.PROJECT -> emptyList()
-        SkillCategory.INSTALL -> emptyList()
+        SkillCategory.PROJECT -> AdditionalSkillTexts.project
+        SkillCategory.INSTALL -> AdditionalSkillTexts.install
+    }
+
+    fun all(): List<Skill> = SkillCategory.entries.flatMap { skills(it) }
+
+    fun matching(query: String, pool: List<Skill>): List<Skill> {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return pool
+        return pool.filter { skill ->
+            skill.title.lowercase().contains(q) ||
+                skill.summary.lowercase().contains(q) ||
+                skill.id.lowercase().contains(q)
+        }
     }
 
     private val byPath = HardwareSkillTexts.files.toMap()

@@ -33,8 +33,8 @@ android {
         applicationId = "com.zenithblue.nativecode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "1.6.4"
+        versionCode = 13
+        versionName = "1.7.0"
         buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
         buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
         buildConfigField("String", "REPORT_ENDPOINT", "\"$nativeCodeReportUrl\"")
