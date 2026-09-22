@@ -187,6 +187,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var hardwareScrollView: ScrollView
     /** Settings → native X11 Settings page (modular x11 package). */
     private lateinit var x11SettingsScrollView: ScrollView
+    /** Settings → agent skills (inbuilt hardware docs + empty project/install). */
+    private lateinit var skillsScrollView: FrameLayout
+    private var skillsPage: com.zenithblue.nativecode.skills.SkillsPage? = null
     private var x11SettingsPage: com.zenithblue.nativecode.x11.X11SettingsPage? = null
     /** PRoot Home file navigation page. */
     private lateinit var prootFilesScrollView: ScrollView
@@ -430,6 +433,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val ID_HARDWARE = 24
     private val ID_X11_SETTINGS = 25
     private val ID_PROOT_FILES = 26
+    private val ID_SKILLS = 27
 
     private var fileViewerBackPage = ID_FILES
     private var diffViewerBackPage = ID_GIT
@@ -1046,6 +1050,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (::x11SettingsScrollView.isInitialized) {
             x11SettingsScrollView.visibility = View.GONE
         }
+        if (::skillsScrollView.isInitialized) {
+            skillsScrollView.visibility = View.GONE
+        }
         if (::prootSettingsScrollView.isInitialized) {
             prootSettingsScrollView.visibility = View.GONE
         }
@@ -1258,6 +1265,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
                 refreshX11SettingsPage()
             }
+            ID_SKILLS -> {
+                if (::skillsScrollView.isInitialized) {
+                    skillsScrollView.visibility = View.VISIBLE
+                    skillsScrollView.scrollTo(0, 0)
+                }
+                skillsPage?.refresh()
+            }
             ID_SCRIPT_INSTALL -> {
                 if (::scriptInstallLayout.isInitialized) {
                     scriptInstallLayout.visibility = View.VISIBLE
@@ -1367,6 +1381,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         if (::x11SettingsScrollView.isInitialized && x11SettingsScrollView.visibility == View.VISIBLE) {
             navigateBackFromSubpage(ID_X11_SETTINGS, fallback = ID_SETTINGS)
+            return
+        }
+        if (::skillsScrollView.isInitialized && skillsScrollView.visibility == View.VISIBLE) {
+            if (skillsPage?.handleBack() == true) return
+            navigateBackFromSubpage(ID_SKILLS, fallback = ID_SETTINGS)
             return
         }
         if (::componentsScrollView.isInitialized && componentsScrollView.visibility == View.VISIBLE) {
@@ -1512,7 +1531,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             id == ID_CHROOT_SETTINGS || id == ID_PROOT_SETTINGS ||
             id == ID_SOFTWARE_MANAGER || id == ID_MARKETPLACE || id == ID_APPS || id == ID_MP_INSTALLER ||
             id == ID_CLI_AUTH || id == ID_AI_SAFETY || id == ID_PRIVACY_POLICY || id == ID_COMPONENTS ||
-            id == ID_HARDWARE || id == ID_X11_SETTINGS
+            id == ID_HARDWARE || id == ID_X11_SETTINGS || id == ID_SKILLS
         ) {
             showGlobalNav = false
             showProjectNav = false
@@ -2006,6 +2025,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         buildProotSettingsPage()
         buildProotFilesPage()
         buildX11SettingsPage()
+        buildSkillsPage()
         if (!BuildConfig.PLAY_STORE_BUILD) buildChrootSettingsPage()
         buildSoftwareManagerPage()
         if (!BuildConfig.PLAY_STORE_BUILD) buildMarketplacePage()
@@ -2034,6 +2054,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         contentFrame.addView(privacyPolicyScrollView)
         contentFrame.addView(hardwareScrollView)
         contentFrame.addView(x11SettingsScrollView)
+        contentFrame.addView(skillsScrollView)
         contentFrame.addView(prootSettingsScrollView)
         contentFrame.addView(prootFilesScrollView)
         if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(chrootSettingsScrollView)
@@ -4478,6 +4499,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(buildHardwareSectionButton())
         settingsHubLayout.addView(spacer(16))
 
+        // Agent skills — markdown prompts for CLI tools
+        settingsHubLayout.addView(buildSkillsSectionButton())
+        settingsHubLayout.addView(spacer(16))
+
         // Privacy Policy — opens public GitHub markdown
         settingsHubLayout.addView(buildPrivacyPolicyCard())
         settingsHubLayout.addView(spacer(20))
@@ -4658,6 +4683,22 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         })
         page.addView(spacer(16))
         page.addView(buildAndroidSdkPackCard())
+    }
+
+    private fun buildSkillsSectionButton(): View {
+        return settingsHubNavRow(
+            iconRes = R.drawable.ic_smart_toy,
+            title = "SKILLS",
+            subtitle = "Agent prompts · hardware, project, install",
+            pageId = ID_SKILLS
+        )
+    }
+
+    private fun buildSkillsPage() {
+        skillsPage = com.zenithblue.nativecode.skills.SkillsPage(this) {
+            navigateBackFromSubpage(ID_SKILLS, fallback = ID_SETTINGS)
+        }
+        skillsScrollView = skillsPage!!.view
     }
 
     private fun buildX11SettingsSectionButton(): View {
