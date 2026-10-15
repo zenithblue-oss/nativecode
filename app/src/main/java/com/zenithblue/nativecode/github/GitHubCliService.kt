@@ -22,8 +22,11 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
 
 /**
@@ -37,8 +40,35 @@ object GitHubCliService {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newCachedThreadPool()
-    private val statusCache = mutableMapOf<String, GhAuthStatus>()
+    private data class StatusHit(val status: GhAuthStatus, val atNanos: Long, val generation: Int)
+
+    private val statusCache = ConcurrentHashMap<String, StatusHit>()
+    private val inFlight = ConcurrentHashMap<String, CompletableFuture<GhAuthStatus>>()
+    private val authGeneration = ConcurrentHashMap<String, AtomicInteger>()
     private val activeSession = AtomicBoolean(false)
+    private const val STATUS_TTL_NS = 5_000_000_000L
+
+    private fun authGen(method: String): Int =
+        authGeneration.getOrPut(method) { AtomicInteger(0) }.get()
+
+    /** method + rootfs path + auth generation. Not method alone. */
+    private fun statusKey(ctx: Context, method: String): String {
+        val root = if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+            ChrootCommandBuilder.CHROOT_PATH
+        } else {
+            ProjectPathResolver.prootRootfsDir(ctx).absolutePath
+        }
+        return "$method|$root|${authGen(method)}"
+    }
+
+    private fun invalidateAuth(method: String) {
+        authGeneration.getOrPut(method) { AtomicInteger(0) }.incrementAndGet()
+        val prefix = "$method|"
+        statusCache.keys.filter { it.startsWith(prefix) }.forEach { statusCache.remove(it) }
+        inFlight.keys.filter { it.startsWith(prefix) }.forEach { key ->
+            inFlight.remove(key)?.cancel(false)
+        }
+    }
 
     private val OTP_PATTERN = Pattern.compile("\\b([A-Z0-9]{4}-[A-Z0-9]{4})\\b")
 
@@ -48,7 +78,12 @@ object GitHubCliService {
     private const val DEVICE_CODE_URL = "https://github.com/login/device/code"
     private const val ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token"
 
-    fun cachedStatus(method: String): GhAuthStatus? = statusCache[method]
+    /** Last probe for this method, including stale. Not a fresh auth check. */
+    fun cachedStatus(method: String): GhAuthStatus? =
+        statusCache.entries
+            .filter { it.key.startsWith("$method|") }
+            .maxByOrNull { it.value.atNanos }
+            ?.value?.status
 
     fun isSessionActive(): Boolean = activeSession.get()
 
@@ -100,7 +135,7 @@ object GitHubCliService {
                 } else {
                     logoutProot(ctx, user)
                 }
-                statusCache.remove(method)
+                invalidateAuth(method)
                 val label = user?.takeIf { it.isNotBlank() }?.let { " @$it" } ?: ""
                 mainHandler.post {
                     onResult(
@@ -109,7 +144,7 @@ object GitHubCliService {
                     )
                 }
             } catch (e: Exception) {
-                statusCache.remove(method)
+                invalidateAuth(method)
                 mainHandler.post { onResult(false, e.message ?: "Logout failed") }
             }
         }
@@ -210,42 +245,61 @@ object GitHubCliService {
     // ── Sync helpers ────────────────────────────────────────────────────────
 
     private fun probeStatusSync(ctx: Context, method: String): GhAuthStatus {
+        val key = statusKey(ctx, method)
+        val gen = authGen(method)
+        val now = System.nanoTime()
+        statusCache[key]?.let { hit ->
+            if (hit.generation == gen && now - hit.atNanos < STATUS_TTL_NS) return hit.status
+        }
+        val created = CompletableFuture<GhAuthStatus>()
+        val existing = inFlight.putIfAbsent(key, created)
+        if (existing != null) {
+            return try {
+                existing.get()
+            } catch (_: Exception) {
+                probeStatusUncached(ctx, method)
+            }
+        }
+        try {
+            val status = probeStatusUncached(ctx, method)
+            if (authGen(method) == gen) {
+                statusCache[key] = StatusHit(status, System.nanoTime(), gen)
+            }
+            created.complete(status)
+            return status
+        } catch (e: Exception) {
+            created.completeExceptionally(e)
+            throw e
+        } finally {
+            inFlight.remove(key, created)
+        }
+    }
+
+    private fun probeStatusUncached(ctx: Context, method: String): GhAuthStatus {
         // Chroot home is not app-readable; use RootShell host paths + timed guest probe.
         if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
             return probeStatusChroot(ctx)
         }
-        // proot: host-visible rootfs + guest shell
-        val (dArgs, dEnv) = fluxCmd(ctx, GhGuestCommands.detectGh(), method)
+        // proot: one guest start for install check + whoami
+        val (dArgs, dEnv) = fluxCmd(ctx, GhGuestCommands.detectAndWhoami(), method)
         mergeGhEnv(dEnv)
-        val (_, dOut) = try {
+        val dPair = try {
             ShellCommandRunner.runCaptureExit(ctx, dArgs, dEnv)
         } catch (e: Exception) {
-            val s = GhAuthStatus(method, false, false, error = e.message)
-            statusCache[method] = s
-            return s
+            return GhAuthStatus(method, false, false, error = e.message)
         }
+        val dOut = dPair.second
         val installed = dOut.contains("GH_OK") && !dOut.contains("GH_MISSING")
         if (!installed) {
-            val s = GhAuthStatus(method, false, false, raw = dOut)
-            statusCache[method] = s
-            return s
+            return GhAuthStatus(method, false, false, raw = dOut)
         }
-
-        // Prefer whoami (works even if auth status --json missing / guest API flaky)
-        val (wArgs, wEnv) = fluxCmd(ctx, GhGuestCommands.whoami(), method)
-        mergeGhEnv(wEnv)
-        val wPair: Pair<Int, String> = try {
-            ShellCommandRunner.runCaptureExit(ctx, wArgs, wEnv)
-        } catch (e: Exception) {
-            Pair(-1, e.message ?: "")
-        }
-        val wExit = wPair.first
-        val wOut = wPair.second
-        val loginFromApi = parseWhoamiLogin(wOut)
+        val whoamiFrame = dOut.substringAfter("---NC-WHOAMI---", "")
+        val wExitMatch = Regex("""NC_WHOAMI_EXIT:(\d+)""").find(whoamiFrame)
+        val wExit = wExitMatch?.groupValues?.get(1)?.toIntOrNull()
+        val wOut = whoamiFrame.replace(Regex("""NC_WHOAMI_EXIT:\d+"""), "").trim()
+        val loginFromApi = if (wExit == 0) parseWhoamiLogin(wOut) else null
         if (wExit == 0 && !loginFromApi.isNullOrBlank()) {
-            val s = GhAuthStatus(method, true, true, loginFromApi, raw = wOut)
-            statusCache[method] = s
-            return s
+            return GhAuthStatus(method, true, true, loginFromApi, raw = wOut)
         }
 
         // JSON status (newer gh)
@@ -258,7 +312,6 @@ object GitHubCliService {
         }
         val fromJson = parseAuthStatusJson(method, sOut)
         if (fromJson.loggedIn) {
-            statusCache[method] = fromJson
             return fromJson
         }
 
@@ -275,12 +328,9 @@ object GitHubCliService {
         if (!fromHuman.loggedIn) {
             val fromFile = readHostsYmlUser(ctx, method)
             if (fromFile != null) {
-                val s = GhAuthStatus(method, true, true, fromFile, raw = hOut)
-                statusCache[method] = s
-                return s
+                return GhAuthStatus(method, true, true, fromFile, raw = hOut)
             }
         }
-        statusCache[method] = fromHuman
         return fromHuman
     }
 
@@ -295,9 +345,7 @@ object GitHubCliService {
         val method = "chroot"
         val root = ChrootCommandBuilder.CHROOT_PATH
         if (!RootShell.isRootAvailable()) {
-            val s = GhAuthStatus(method, false, false, error = "root required")
-            statusCache[method] = s
-            return s
+            return GhAuthStatus(method, false, false, error = "root required")
         }
         val binOut = RootShell.capture(
             "if [ -x '$root/usr/bin/gh' ] || [ -x '$root/usr/local/bin/gh' ] || " +
@@ -307,16 +355,12 @@ object GitHubCliService {
         )
         val installed = binOut.contains("GH_OK") && !binOut.contains("GH_MISSING")
         if (!installed) {
-            val s = GhAuthStatus(method, false, false, raw = binOut)
-            statusCache[method] = s
-            return s
+            return GhAuthStatus(method, false, false, raw = binOut)
         }
         // Offline SSOT: hosts.yml under chroot (root cat)
         val fromFile = readHostsYmlUser(ctx, method)
         if (fromFile != null) {
-            val s = GhAuthStatus(method, true, true, fromFile, raw = "hosts.yml")
-            statusCache[method] = s
-            return s
+            return GhAuthStatus(method, true, true, fromFile, raw = "hosts.yml")
         }
         // Optional live whoami (network; bounded)
         val who = RootShell.captureInChroot(
@@ -325,25 +369,21 @@ object GitHubCliService {
             timeoutMs = 45_000L,
             context = ctx
         )
-        val login = parseWhoamiLogin(who.stdout)
+        val login = if (who.exitCode == 0) parseWhoamiLogin(who.stdout) else null
         if (who.exitCode == 0 && !login.isNullOrBlank()) {
-            val s = GhAuthStatus(method, true, true, login, raw = who.stdout)
-            statusCache[method] = s
-            return s
+            return GhAuthStatus(method, true, true, login, raw = who.stdout)
         }
-        val s = GhAuthStatus(method, true, false, raw = who.stdout)
-        statusCache[method] = s
-        return s
+        return GhAuthStatus(method, true, false, raw = who.stdout)
     }
+
+    private val GITHUB_LOGIN = Regex("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 
     private fun parseWhoamiLogin(out: String): String? =
         out.lineSequence()
             .map { it.trim() }
             .firstOrNull {
-                it.isNotEmpty() &&
-                    !it.contains(' ') &&
-                    !it.contains("error", true) &&
-                    it.matches(Regex("[A-Za-z0-9-]+"))
+                it.matches(GITHUB_LOGIN) &&
+                    !it.equals("Unauthorized", ignoreCase = true)
             }
 
     private fun listReposSync(ctx: Context, method: String): List<GhRepo> {
@@ -538,9 +578,9 @@ object GitHubCliService {
             logLine("Wrote ~/.config/gh/hosts.yml for flux ($method)")
             // Seed cache now — VERIFY must not re-hang on guest shell
             if (!username.isNullOrBlank()) {
-                statusCache[method] = GhAuthStatus(
+                rememberAuth(ctx, method, GhAuthStatus(
                     method, true, true, username, raw = "hosts.yml-write"
-                )
+                ))
             }
         } else {
             logLine("Direct hosts.yml write failed — trying gh --with-token…")
@@ -549,9 +589,9 @@ object GitHubCliService {
                 return false
             }
             if (!username.isNullOrBlank()) {
-                statusCache[method] = GhAuthStatus(
+                rememberAuth(ctx, method, GhAuthStatus(
                     method, true, true, username, raw = "token-inject"
-                )
+                ))
             }
         }
         // setup-git deferred to VERIFY (timed) — do not block here
@@ -1026,6 +1066,11 @@ object GitHubCliService {
     }
 
     // ── Builders ────────────────────────────────────────────────────────────
+
+    private fun rememberAuth(ctx: Context, method: String, status: GhAuthStatus) {
+        val gen = authGen(method)
+        statusCache[statusKey(ctx, method)] = StatusHit(status, System.nanoTime(), gen)
+    }
 
     private fun fluxCmd(
         ctx: Context,

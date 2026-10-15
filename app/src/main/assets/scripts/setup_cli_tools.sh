@@ -197,27 +197,45 @@ mkdir -p "$ENV_DIR"
 
 cat > "$ENV_FILE" <<'ENVEOF'
 # Managed by NativeCode setup_cli_tools (prebuilt rootfs: Node 24 system)
+# Runtime only. NVM functions and completion load for interactive shells below.
 export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 
-if [ -d "$NVM_DIR/versions/node" ]; then
-    _flux_node=$(ls -1d "$NVM_DIR/versions/node"/v* 2>/dev/null | sort -V | tail -1)
-    if [ -n "$_flux_node" ] && [ -d "$_flux_node/bin" ]; then
-        export PATH="$_flux_node/bin:$PATH"
+if [ -n "${FLUX_NODE_BIN:-}" ] && [ -x "$FLUX_NODE_BIN" ] && "$FLUX_NODE_BIN" -v >/dev/null 2>&1; then
+    export PATH="${FLUX_NODE_BIN%/*}:$PATH"
+else
+    _flux_node=""
+    if [ -d "$NVM_DIR/versions/node" ]; then
+        _picked=$(ls -1d "$NVM_DIR/versions/node"/v* 2>/dev/null | sort -V | tail -1)
+        if [ -n "$_picked" ] && [ -x "$_picked/bin/node" ] && "$_picked/bin/node" -v >/dev/null 2>&1; then
+            _flux_node="$_picked/bin"
+        fi
+        unset _picked
+    fi
+    if [ -z "$_flux_node" ] && [ -x /opt/nodejs/bin/node ] && /opt/nodejs/bin/node -v >/dev/null 2>&1; then
+        _flux_node=/opt/nodejs/bin
+    fi
+    if [ -n "$_flux_node" ]; then
+        export PATH="$_flux_node:$PATH"
+        export FLUX_NODE_BIN="$_flux_node/node"
     fi
     unset _flux_node
-fi
-
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-    . "$NVM_DIR/nvm.sh"
-fi
-if [ -s "$NVM_DIR/bash_completion" ] && [ -n "${BASH_VERSION:-}" ]; then
-    . "$NVM_DIR/bash_completion"
 fi
 
 if [ -f "$HOME/.config/fluxlinux/cli-auth.env" ]; then
     . "$HOME/.config/fluxlinux/cli-auth.env"
 fi
+
+case "$-" in
+    *i*)
+        if [ -s "$NVM_DIR/nvm.sh" ]; then
+            . "$NVM_DIR/nvm.sh"
+        fi
+        if [ -s "$NVM_DIR/bash_completion" ] && [ -n "${BASH_VERSION:-}" ]; then
+            . "$NVM_DIR/bash_completion"
+        fi
+        ;;
+esac
 ENVEOF
 
 # PRoot vs chroot safe ownership handling

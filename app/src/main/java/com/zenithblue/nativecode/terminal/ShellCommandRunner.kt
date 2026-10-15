@@ -4,18 +4,25 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 
-/** Cancel handle for a streamed shell process. */
-class ShellJob(private val process: Process) {
+/** Cancel handle for a streamed shell process. Safe before the process exists. */
+class ShellJob {
     @Volatile
     var cancelled: Boolean = false
         private set
 
+    @Volatile
+    private var process: Process? = null
+
+    fun attach(proc: Process) {
+        process = proc
+        if (cancelled) {
+            try { proc.destroyForcibly() } catch (_: Exception) {}
+        }
+    }
+
     fun cancel() {
         cancelled = true
-        try {
-            process.destroyForcibly()
-        } catch (_: Exception) {
-        }
+        try { process?.destroyForcibly() } catch (_: Exception) {}
     }
 }
 
@@ -103,46 +110,64 @@ object ShellCommandRunner {
         applyEnvironment(ctx, pb, envMap)
         pb.redirectErrorStream(true)
 
-        // Placeholder process; real Process attached once started
-        val holder = arrayOfNulls<Process>(1)
-        val job = ShellJob(object : Process() {
-            override fun getOutputStream() = java.io.ByteArrayOutputStream()
-            override fun getInputStream() = java.io.ByteArrayInputStream(ByteArray(0))
-            override fun getErrorStream() = java.io.ByteArrayInputStream(ByteArray(0))
-            override fun waitFor(): Int = -1
-            override fun exitValue(): Int = -1
-            override fun destroy() {
-                holder[0]?.destroyForcibly()
+        val job = ShellJob()
+        val queue = java.util.concurrent.LinkedBlockingQueue<String>(256)
+        val drainPosted = java.util.concurrent.atomic.AtomicBoolean(false)
+        val done = java.util.concurrent.atomic.AtomicBoolean(false)
+        val completed = java.util.concurrent.atomic.AtomicBoolean(false)
+        val exitCode = java.util.concurrent.atomic.AtomicInteger(-1)
+
+        fun finish(code: Int) {
+            if (completed.compareAndSet(false, true)) onDone(code)
+        }
+
+        fun scheduleDrain() {
+            if (!drainPosted.compareAndSet(false, true)) return
+            mainHandler.post {
+                var n = 0
+                val start = System.nanoTime()
+                while (n < 64 && System.nanoTime() - start < 4_000_000L) {
+                    val line = queue.poll() ?: break
+                    onLine(line)
+                    n++
+                }
+                drainPosted.set(false)
+                if (queue.isNotEmpty()) {
+                    scheduleDrain()
+                } else if (done.get()) {
+                    if (queue.isNotEmpty()) scheduleDrain()
+                    else finish(exitCode.get())
+                }
             }
-            override fun destroyForcibly(): Process {
-                holder[0]?.destroyForcibly()
-                return this
-            }
-            override fun isAlive(): Boolean = holder[0]?.isAlive == true
-        })
+        }
 
         Thread {
             val proc = try {
                 if (job.cancelled) {
-                    mainHandler.post { onDone(-1) }
+                    done.set(true)
+                    scheduleDrain()
                     return@Thread
                 }
-                pb.start().also { holder[0] = it }
+                pb.start().also { job.attach(it) }
             } catch (_: Exception) {
-                mainHandler.post { onDone(-1) }
+                done.set(true)
+                scheduleDrain()
                 return@Thread
+            }
+            if (job.cancelled) {
+                try { proc.destroyForcibly() } catch (_: Exception) {}
             }
             try {
                 val reader = proc.inputStream.bufferedReader(Charsets.UTF_8)
                 var line: String?
                 while (reader.readLine().also { line = it } != null) {
                     if (job.cancelled) break
-                    val l = line ?: continue
-                    mainHandler.post { onLine(l) }
+                    queue.put(line ?: continue)
+                    scheduleDrain()
                 }
             } catch (_: Exception) {
             }
-            val exit = try {
+            exitCode.set(try {
                 if (job.cancelled) {
                     try { proc.destroyForcibly() } catch (_: Exception) {}
                     -1
@@ -151,8 +176,9 @@ object ShellCommandRunner {
                 }
             } catch (_: Exception) {
                 -1
-            }
-            mainHandler.post { onDone(exit) }
+            })
+            done.set(true)
+            scheduleDrain()
         }.start()
 
         return job

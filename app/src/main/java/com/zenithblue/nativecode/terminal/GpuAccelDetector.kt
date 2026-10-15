@@ -28,7 +28,21 @@ object GpuAccelDetector {
         val signals: String
     )
 
+    @Volatile
+    private var cachedDetection: Detection? = null
+
+    private val detectLock = Any()
+
+    /** Hardware signals are stable for the process. Backend choice stays uncached. */
     fun detect(): Detection {
+        cachedDetection?.let { return it }
+        synchronized(detectLock) {
+            cachedDetection?.let { return it }
+            return detectUncached().also { cachedDetection = it }
+        }
+    }
+
+    private fun detectUncached(): Detection {
         val parts = mutableListOf<String>()
         fun add(label: String, value: String?) {
             val v = value?.trim().orEmpty()
@@ -60,8 +74,9 @@ object GpuAccelDetector {
             "ro.gfx.driver.0",
             "ro.opengles.version"
         )
+        val properties = sysProps()
         for (key in props) {
-            add(key, sysProp(key))
+            add(key, properties[key])
         }
 
         val kgsl = File("/dev/kgsl-3d0").exists() || File("/dev/kgsl-3d0").canRead()
@@ -155,20 +170,31 @@ object GpuAccelDetector {
     private fun matchesXclipse(blob: String): Boolean =
         listOf("xclipse", "amdgpu", "samsung_xclipse").any { blob.contains(it) }
 
-    private fun sysProp(key: String): String {
-        return try {
+    /** One reflection pass, else one getprop process. Never one pass per key. */
+    private fun sysProps(): Map<String, String> {
+        val keys = listOf(
+            "ro.hardware", "ro.hardware.chipname", "ro.chipname", "ro.board.platform",
+            "ro.soc.model", "ro.soc.manufacturer", "ro.product.board", "ro.hardware.egl",
+            "ro.hardware.vulkan", "ro.gfx.driver.0", "ro.opengles.version"
+        )
+        try {
             val clazz = Class.forName("android.os.SystemProperties")
             val get = clazz.getMethod("get", String::class.java, String::class.java)
-            (get.invoke(null, key, "") as? String).orEmpty()
+            return keys.associateWith { (get.invoke(null, it, "") as? String).orEmpty() }
         } catch (_: Throwable) {
-            try {
-                val p = ProcessBuilder("getprop", key)
-                    .redirectErrorStream(true)
-                    .start()
-                p.inputStream.bufferedReader().use { it.readText() }.trim()
-            } catch (_: Throwable) {
-                ""
+        }
+        return try {
+            val p = ProcessBuilder("getprop").redirectErrorStream(true).start()
+            val text = p.inputStream.bufferedReader().use { it.readText() }
+            val wanted = keys.toSet()
+            val out = HashMap<String, String>()
+            for (line in text.lineSequence()) {
+                val m = Regex("""^\[([^]]+)]: \[(.*)]$""").find(line.trim()) ?: continue
+                if (m.groupValues[1] in wanted) out[m.groupValues[1]] = m.groupValues[2]
             }
+            out
+        } catch (_: Throwable) {
+            emptyMap()
         }
     }
 }

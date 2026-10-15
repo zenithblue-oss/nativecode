@@ -33,9 +33,11 @@ android {
         applicationId = "com.zenithblue.nativecode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 13
-        versionName = "1.7.0"
+        versionCode = 16
+        versionName = "1.7.1"
         buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
+        // Freemium gates (docs/monetisation/plan.md). On with Play Billing (PR5).
+        buildConfigField("boolean", "MONETISATION_ENFORCE", "true")
         buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
         buildConfigField("String", "REPORT_ENDPOINT", "\"$nativeCodeReportUrl\"")
         // 16 KB page-size devices (Android 15+): never ship 32-bit or extra-ABI JNI.
@@ -156,6 +158,9 @@ dependencies {
 
     // Play Asset Delivery
     implementation("com.google.android.play:asset-delivery-ktx:2.3.0")
+
+    // Play Billing (NativeCode Pro)
+    implementation("com.android.billingclient:billing-ktx:9.1.0")
 }
 
 tasks.register<Exec>("checkJni16kbAlignment") {

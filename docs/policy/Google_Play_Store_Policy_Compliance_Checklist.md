@@ -93,15 +93,15 @@ Items below are **followed** relative to the guide and current code.
 
 ---
 
-### A4. Payments / Play Billing N/A (free utility)
+### A4. Payments / Play Billing required (freemium Pro)
 
 | Field | Detail |
 |-------|--------|
 | **Guide §** | §1 Payments, §6.1–6.3 |
-| **Status** | **FOLLOWED** (for current free model) |
-| **Evidence** | No Play Billing library; no IAP UI; marketplace installs guest packages, not paid digital goods. |
-| **Reason** | No digital goods/subscriptions sold → Billing requirement not triggered. |
-| **How to fix if monetizing later** | Use Play Billing for any digital unlock/subscription; no external payment links for digital goods unless in an alternative-billing program. Update Data safety + listing. |
+| **Status** | **FOLLOWED (code)** — ops: create SKUs in Play Console |
+| **Evidence** | Play Billing Library 9.1.0 (`billing-ktx`); `billing/BillingRepository.kt`. Subscriptions `nativecode_pro_monthly` ($3.99/mo), `nativecode_pro_yearly` ($29.99/yr); one-time non-consumable `nativecode_pro_lifetime` ($19.99). Upgrade sheet shows Play-localized prices, Restore, Manage (Play subscription center deep link). PENDING purchases grant nothing; purchases acknowledged, lifetime never consumed. Gates: `entitlements/FeatureGate.kt` (`MONETISATION_ENFORCE=true`). |
+| **Reason** | NativeCode Pro is a digital unlock → Play Billing is the only payment path. No external payment links. |
+| **How to keep fixed** | No external payment links for digital goods unless in an alternative-billing program. Keep Data safety (purchase history via Google Play) + listing (“Contains in-app purchases”) + privacy policy in sync. Client-side verification only; add server verification + RTDN before scaling. |
 
 ---
 
@@ -709,7 +709,7 @@ Quick map of the guide’s structure to this audit.
 | §4.7 Device & network abuse | Mitigated / accepted | C6 AI opt-in; B11 guest residual accepted (user-tap only) |
 | §4.8 MUwS / hostile downloaders | Followed | No REQUEST_INSTALL (C9/A25) |
 | §5 Deception / malware | Followed / residual | Branding fixed; no intentional malware |
-| §6 Monetization/ads | Followed | Free, no ads |
+| §6 Monetization/ads | Followed | Freemium: free tier + NativeCode Pro via Play Billing (subs + lifetime IAP); no ads (A4) |
 | §7 Store listing | Followed (ops) | Console listing complete (C8) |
 | §8 Spam / functionality | Followed | Real product |
 | §9 Families | Followed | Audience declared in Console |

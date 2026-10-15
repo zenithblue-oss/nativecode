@@ -29,6 +29,8 @@ object ChrootCommandBuilder {
 
     const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v4"
     private const val TERM_WRAPPER_VERSION = "nativecode-chroot-term-wrapper v3"
+    private val launcherPrepLock = Any()
+    private var launcherPrepGeneration = 0L
 
     fun build(
         ctx: Context,
@@ -261,14 +263,27 @@ export GIT_CONFIG_VALUE_0="${'$'}PWD"
 export PATH="${'$'}HOME/.local/bin:${'$'}HOME/bin:${'$'}HOME/.cargo/bin:/opt/nodejs/bin:/usr/local/bin:/usr/bin:/bin:/sbin"
 
 # SSOT: same env as interactive setup_cli_tools
+_cli_env_loaded=0
 if [ -f "${'$'}HOME/.config/fluxlinux/cli-tools.env" ]; then
   . "${'$'}HOME/.config/fluxlinux/cli-tools.env"
+  _cli_env_loaded=1
 fi
 
-# Fallback if cli-tools.env missing: latest nvm node bin
-if [ -d "${'$'}NVM_DIR/versions/node" ]; then
-  _n=${'$'}(ls -1d "${'$'}NVM_DIR/versions/node"/v* 2>/dev/null | sort -V | tail -1)
-  [ -n "${'$'}_n" ] && [ -d "${'$'}_n/bin" ] && export PATH="${'$'}_n/bin:${'$'}PATH"
+# Keep configured node. Discover only when it is missing or will not run.
+if [ -n "${'$'}{FLUX_NODE_BIN:-}" ] && [ -x "${'$'}FLUX_NODE_BIN" ] && "${'$'}FLUX_NODE_BIN" -v >/dev/null 2>&1; then
+  export PATH="${'$'}{FLUX_NODE_BIN%/*}:${'$'}PATH"
+else
+  _n=""
+  if [ -d "${'$'}NVM_DIR/versions/node" ]; then
+    _n=$(ls -1d "${'$'}NVM_DIR/versions/node"/v* 2>/dev/null | sort -V | tail -1)
+  fi
+  if [ -n "${'$'}_n" ] && [ -x "${'$'}_n/bin/node" ] && "${'$'}_n/bin/node" -v >/dev/null 2>&1; then
+    export FLUX_NODE_BIN="${'$'}_n/bin/node"
+    export PATH="${'$'}_n/bin:${'$'}PATH"
+  elif [ -x /opt/nodejs/bin/node ] && /opt/nodejs/bin/node -v >/dev/null 2>&1; then
+    export FLUX_NODE_BIN=/opt/nodejs/bin/node
+    export PATH="/opt/nodejs/bin:${'$'}PATH"
+  fi
   unset _n
 fi
 
@@ -291,15 +306,32 @@ case "${'$'}cmd" in
     ;;
 esac
 """.trimIndent()
-        return try {
-            val f = File(scriptPath)
-            f.parentFile?.mkdirs()
-            if (f.exists() && f.readText() == script) return true
-            f.writeText(script)
-            f.setExecutable(true, false)
-            true
-        } catch (_: Exception) {
-            false
+        return synchronized(launcherPrepLock) {
+            val generation = ++launcherPrepGeneration
+            var tmp: File? = null
+            try {
+                val f = File(scriptPath)
+                val parent = f.parentFile ?: return@synchronized false
+                parent.mkdirs()
+                val stamp = File(parent, ".launch_tool.gen")
+                val gen = "$LAUNCH_TOOL_VERSION:${ctx.filesDir}"
+                if (f.isFile && f.canExecute() && stamp.isFile && stamp.readText() == gen) {
+                    return@synchronized true
+                }
+                val staged = File(parent, ".launch_tool.sh.$generation.tmp")
+                tmp = staged
+                staged.writeText(script)
+                if (!staged.setExecutable(true, false)) return@synchronized false
+                if (generation != launcherPrepGeneration) return@synchronized false
+                if (!staged.renameTo(f) || !f.isFile || !f.canExecute()) return@synchronized false
+                tmp = null
+                stamp.writeText(gen)
+                true
+            } catch (_: Exception) {
+                false
+            } finally {
+                tmp?.delete()
+            }
         }
     }
 
@@ -332,12 +364,14 @@ esac
         }
         val dir = workDir?.takeIf { it.isNotBlank() } ?: "/home/flux"
         val tool = toolBinaryName(type)
-        // Write host launch_tool; helper copies into guest /tmp on mount
-        ensureLauncherScript(ctx)
+        val dirQ = "'${dir.replace("'", "'\\''")}'"
+        if (!ensureLauncherScript(ctx)) {
+            return "echo 'launch_tool: failed to write launcher' >&2; exit 127"
+        }
         return if (workDir.isNullOrBlank()) {
             "/tmp/launch_tool.sh $tool"
         } else {
-            "mkdir -p $dir && cd $dir && /tmp/launch_tool.sh $tool"
+            "mkdir -p $dirQ && cd $dirQ && /tmp/launch_tool.sh $tool"
         }
     }
 }

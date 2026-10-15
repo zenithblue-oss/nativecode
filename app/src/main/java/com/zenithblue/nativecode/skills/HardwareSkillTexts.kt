@@ -1556,7 +1556,6 @@ To run desktop OpenGL applications up to OpenGL 3.3 Core Profile and OpenGL ES 3
 # Sourced automatically via /etc/profile.d/gpu-env.sh
 export VK_DRIVER_FILES="/opt/nativecode/panvk/icd.d/panvk_kbase.json"
 export VK_ICD_FILENAMES="${'$'}VK_DRIVER_FILES"
-export LD_PRELOAD="/opt/nativecode/panvk/lib/kbase_shim.so${'$'}{LD_PRELOAD:+:${'$'}LD_PRELOAD}"
 export WSI_X11_TERMUX=1
 export PANVK_KBASE_DRI3=raw
 export MESA_VK_WSI_DEBUG=sw

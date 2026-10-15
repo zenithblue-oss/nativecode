@@ -252,7 +252,6 @@ guest_gpu_env_args() {
         "GALLIUM_DRIVER=zink" \
         "VK_ICD_FILENAMES=/opt/nativecode/panvk/icd.d/panvk_kbase.json" \
         "VK_DRIVER_FILES=/opt/nativecode/panvk/icd.d/panvk_kbase.json" \
-        "LD_PRELOAD=/opt/nativecode/panvk/lib/kbase_shim.so" \
         "WSI_X11_TERMUX=1" \
         "PANVK_KBASE_DRI3=raw" \
         "MESA_VK_WSI_DEBUG=sw" \

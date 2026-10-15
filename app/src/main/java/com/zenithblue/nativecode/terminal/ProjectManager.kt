@@ -50,7 +50,8 @@ object ProjectManager {
         path: String,
         method: String = LinuxCommandBuilder.currentMethod
     ) {
-        val (args, envMap) = LinuxCommandBuilder.build(ctx, "mkdir -p $path", method = method)
+        val pathQ = shellQuote(path)
+        val (args, envMap) = LinuxCommandBuilder.build(ctx, "mkdir -p $pathQ", method = method)
         try {
             ShellCommandRunner.run(ctx, args, envMap)
         } catch (_: Exception) {

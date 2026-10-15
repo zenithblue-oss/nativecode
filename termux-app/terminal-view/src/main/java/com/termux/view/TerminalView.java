@@ -196,29 +196,33 @@ public final class TerminalView extends View {
                 if (!mScroller.isFinished()) return true;
 
                 final boolean mouseTrackingAtStartOfFling = mEmulator.isMouseTrackingActive();
+                final boolean alternateAtStartOfFling = mEmulator.isAlternateBufferActive();
                 float SCALE = 0.25f;
-                if (mouseTrackingAtStartOfFling) {
+                if (mouseTrackingAtStartOfFling || alternateAtStartOfFling) {
+                    // Alternate screen has no transcript. Do not clamp it to history bounds.
                     mScroller.fling(0, 0, 0, -(int) (velocityY * SCALE), 0, 0, -mEmulator.mRows / 2, mEmulator.mRows / 2);
                 } else {
                     mScroller.fling(0, mTopRow, 0, -(int) (velocityY * SCALE), 0, 0, -mEmulator.getScreen().getActiveTranscriptRows(), 0);
                 }
 
-                post(new Runnable() {
+                postOnAnimation(new Runnable() {
                     private int mLastY = 0;
 
                     @Override
                     public void run() {
-                        if (mouseTrackingAtStartOfFling != mEmulator.isMouseTrackingActive()) {
+                        if (!isAttachedToWindow() || mEmulator == null
+                                || mouseTrackingAtStartOfFling != mEmulator.isMouseTrackingActive()
+                                || alternateAtStartOfFling != mEmulator.isAlternateBufferActive()) {
                             mScroller.abortAnimation();
                             return;
                         }
                         if (mScroller.isFinished()) return;
                         boolean more = mScroller.computeScrollOffset();
                         int newY = mScroller.getCurrY();
-                        int diff = mouseTrackingAtStartOfFling ? (newY - mLastY) : (newY - mTopRow);
+                        int diff = (mouseTrackingAtStartOfFling || alternateAtStartOfFling) ? (newY - mLastY) : (newY - mTopRow);
                         doScroll(e2, diff);
                         mLastY = newY;
-                        if (more) post(this);
+                        if (more) postOnAnimation(this);
                     }
                 });
 
@@ -574,8 +578,13 @@ public final class TerminalView extends View {
                     decrementYTextSelectionCursors(up ? -1 : 1);
                 }
             } else {
-                mTopRow = Math.min(0, Math.max(-(mEmulator.getScreen().getActiveTranscriptRows()), mTopRow + (up ? -1 : 1)));
-                if (!awakenScrollBars()) invalidate();
+                int oldTop = mTopRow;
+                int historyRows = mEmulator.getScreen().getActiveTranscriptRows();
+                mTopRow = (int) Math.max(-(long) historyRows,
+                        Math.min(0L, (long) oldTop + rowsDown));
+                if (mTopRow != oldTop && !awakenScrollBars()) invalidate();
+                if (isSelectingText()) decrementYTextSelectionCursors(mTopRow - oldTop);
+                break;
             }
         }
         if (isSelectingText()) {
@@ -1070,7 +1079,9 @@ public final class TerminalView extends View {
     }
 
     public void setTopRow(int mTopRow) {
+        mScroller.abortAnimation();
         this.mTopRow = mTopRow;
+        invalidate();
     }
 
 

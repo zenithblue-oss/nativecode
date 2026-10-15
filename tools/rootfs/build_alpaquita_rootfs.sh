@@ -419,14 +419,7 @@ if [ -e /dev/kgsl-3d0 ] || [ -e /dev/kgsl ]; then
 elif [ -e /dev/mali0 ] || [ -e /dev/mali ]; then
     export VK_DRIVER_FILES="/opt/nativecode/panvk/icd.d/panvk_kbase.json"
     export VK_ICD_FILENAMES="$VK_DRIVER_FILES"
-    _shim="/opt/nativecode/panvk/lib/kbase_shim.so"
-    if [ -f "$_shim" ]; then
-        case ":${LD_PRELOAD:-}:" in
-            *:"$_shim":*) ;;
-            *) export LD_PRELOAD="${_shim}${LD_PRELOAD:+:$LD_PRELOAD}" ;;
-        esac
-    fi
-    unset _shim
+    # No kbase_shim.so preload: PanVK rc3 breaks with it (gpu_id decoded as v10 -> unknown).
     export WSI_X11_TERMUX=1
     export PANVK_KBASE_DRI3=raw
     export MESA_VK_WSI_DEBUG=sw

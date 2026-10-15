@@ -8,7 +8,18 @@ import com.zenithblue.nativecode.BuildConfig
 object LinuxCommandBuilder {
 
     /** Current isolation method: "proot" (default) or "chroot". */
-    var currentMethod = "proot"
+    @Volatile
+    var environmentGeneration: Int = 0
+        private set
+
+    private var methodName: String = "proot"
+
+    var currentMethod: String
+        get() = methodName
+        set(value) {
+            if (methodName != value) environmentGeneration++
+            methodName = value
+        }
 
     /** Guest user for session type. Rooted shell → root; everything else → flux. */
     fun sessionUserForType(type: String): String =
@@ -41,6 +52,23 @@ object LinuxCommandBuilder {
             "chroot" -> ChrootCommandBuilder.buildInteractive(ctx, user, workDir)
             else -> ProotCommandBuilder.buildInteractive(ctx, user, workDir, useSharedTmp)
         }
+    }
+
+    /**
+     * Proot terminal tools only: launcher runs directly under PRoot, no Python.
+     * Chroot and automated commands stay on [build].
+     */
+    fun buildToolDirect(
+        ctx: Context,
+        toolArgv: List<String>,
+        user: String = "flux",
+        workDir: String? = null,
+        useSharedTmp: Boolean = true
+    ): Pair<Array<String>, HashMap<String, String>> {
+        if (!ChrootCommandBuilder.ensureLauncherScript(ctx)) {
+            throw IllegalStateException("launch_tool: failed to install launcher")
+        }
+        return ProotCommandBuilder.buildTool(ctx, toolArgv, user, workDir, useSharedTmp)
     }
 
     /** System automation entry point. Every backend executes this through guest Bash. */

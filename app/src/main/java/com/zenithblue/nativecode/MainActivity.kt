@@ -51,6 +51,12 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import com.zenithblue.nativecode.ui.BrutalistToggle as CustomBrutalistToggle
 import com.zenithblue.nativecode.onboarding.LegacyProotDataMigrator
+import com.zenithblue.nativecode.billing.BillingRepository
+import com.zenithblue.nativecode.entitlements.EntitlementStore
+import com.zenithblue.nativecode.entitlements.FeatureGate
+import com.zenithblue.nativecode.entitlements.GateResult
+import com.zenithblue.nativecode.entitlements.ProFeature
+import com.zenithblue.nativecode.entitlements.XfceBudget
 import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
 import com.google.android.play.core.assetpacks.AssetPackStateUpdateListener
@@ -447,9 +453,33 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private var lastCpuIdle = 0L
 
     private var activeProjectName = "MyAndroidApp"
-    private var activeProjectPath = "/home/flux/repos/my-android-app"
+    private var activeProjectPathBacking = "/home/flux/repos/my-android-app"
+    private var projectGeneration = 0
+    private var activeProjectPath: String
+        get() = activeProjectPathBacking
+        set(value) {
+            if (activeProjectPathBacking != value) projectGeneration++
+            activeProjectPathBacking = value
+        }
+    private var diffRequestGen = 0
+    private var diffRequestName: String? = null
     /** Isolation method for [activeProjectPath] (proot|chroot). SSOT for path resolve. */
-    private var activeProjectMethod: String = "proot"
+    private var activeProjectMethodBacking: String = "proot"
+    private var activeProjectMethod: String
+        get() = activeProjectMethodBacking
+        set(value) {
+            if (activeProjectMethodBacking != value) projectGeneration++
+            activeProjectMethodBacking = value
+        }
+    private var terminalLifecycleGeneration = 0
+    private var terminalLaunchSeq = 0L
+    private var appLaunchWatermark = 0L
+    private var workspaceLaunchWatermark = 0L
+    private var pendingAppTerminalSlots = 0
+    private var pendingWorkspaceTerminalSlots = 0
+    private val bootstrapLock = Any()
+    @Volatile private var bootstrapReady = false
+    @Volatile private var bootstrapInFlight = false
     private lateinit var fileExplorerTitleTv: TextView
     private lateinit var projectIconInput: EditText
     private lateinit var projectNameInput: EditText
@@ -602,7 +632,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Safe if Splash already ran; covers deep-link / skip-splash entry
         AppUpgrade.runIfNeeded(this)
         com.zenithblue.nativecode.bridge.NativeCodeBridge.start(this)
-        
+        // Pro: connect Play Billing (queries products + purchases)
+        BillingRepository.init(this)
+
         // Enable fullscreen/immersive mode
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
@@ -767,6 +799,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         super.onResume()
         NativeCodeBridge.agentUiDelegate = this
         applyKeepAwake()
+        if (lastProState == null) lastProState = isPro() // state the onCreate-built views reflect
+        if (!panvkChecked && ::componentsScrollView.isInitialized) {
+            panvkChecked = true
+            refreshPanvkCard(promptIfNew = true)
+        }
+        BillingRepository.onChanged = { onEntitlementChanged() }
+        BillingRepository.refresh()
     }
 
     override fun onPause() {
@@ -830,18 +869,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     onChrootUninstalled(fromCallback = true)
                 }
             }
-            val projPath = it.getStringExtra("PROJECT_PATH")
+            // Project notification tap: gate first so a locked project gets no side effects.
+            val projBlocked = it.getStringExtra("PROJECT_PATH") != null && !projectGateAllows()
+            val projPath = if (projBlocked) null else it.getStringExtra("PROJECT_PATH")
             if (projPath != null) {
                 activeProjectPath = projPath
                 val preferred = getProjects().find { p -> p.path == projPath }?.linuxMethod
                     ?: LinuxCommandBuilder.currentMethod
                 applyProjectIsolation(projPath, preferred)
             }
-            val projName = it.getStringExtra("PROJECT_NAME")
+            val projName = if (projBlocked) null else it.getStringExtra("PROJECT_NAME")
             if (projName != null) {
                 activeProjectName = projName
             }
-            val targetPage = if (it.hasExtra("EXTRA_TARGET_PAGE")) {
+            val targetPage = if (projBlocked) -1 else if (it.hasExtra("EXTRA_TARGET_PAGE")) {
                 it.getIntExtra("EXTRA_TARGET_PAGE", -1)
             } else {
                 it.getIntExtra("target_page", -1)
@@ -996,7 +1037,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         navigateToPage(id, true)
     }
 
+    /** Project open gate (free = 0 projects). Deny → Upgrade sheet. */
+    private fun projectGateAllows(): Boolean {
+        if (FeatureGate.canUse(isPro(), ProFeature.WORKSPACE) is GateResult.Allow) return true
+        showUpgradeSheet("Unlock your projects with NativeCode Pro")
+        return false
+    }
+
     private fun navigateToPage(id: Int, pushToStack: Boolean) {
+        // Every project page (workspace, settings, dir tree, git diff) is Pro; all open paths route here.
+        val projectPage = id == ID_PROJECT_WORKSPACE || id == ID_PROJECT_SETTINGS || id == ID_PROJECT_DIR_TREE || id == ID_PROJECT_GIT_DIFF
+        if (projectPage && !projectGateAllows()) {
+            if (pageStack.isNotEmpty() && pageStack.peek() == id) pageStack.pop()
+            return
+        }
         if (pushToStack) {
             if (pageStack.isEmpty() || pageStack.peek() != id) {
                 pageStack.push(id)
@@ -1249,6 +1303,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 if (::componentsScrollView.isInitialized) {
                     componentsScrollView.visibility = View.VISIBLE
                     refreshAndroidSdkPackCard()
+                    refreshPanvkCard()
                 }
             }
             ID_PRIVACY_POLICY -> {
@@ -2181,38 +2236,66 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
+    /** Cold extract + path rewrite. One in-flight extraction; result visible only after it finishes. */
     private fun ensureBootstrapExtracted() {
+        if (bootstrapReady) return
+        synchronized(bootstrapLock) {
+            if (bootstrapReady) return
+            while (bootstrapInFlight) {
+                try {
+                    (bootstrapLock as Object).wait()
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return
+                }
+            }
+            if (bootstrapReady) return
+            bootstrapInFlight = true
+        }
+        var ok = false
+        try {
+            ok = extractBootstrapIfNeeded()
+        } finally {
+            synchronized(bootstrapLock) {
+                bootstrapInFlight = false
+                if (ok) bootstrapReady = true
+                (bootstrapLock as Object).notifyAll()
+            }
+        }
+    }
+
+    private fun extractBootstrapIfNeeded(): Boolean {
         val termuxExecFile = File(filesDir, "usr/lib/libtermux-exec.so")
         if (termuxExecFile.exists()) {
             val marker = File(filesDir, "usr/etc/.paths_rewritten")
             if (!marker.exists()) {
                 TermuxHostPaths.applyPackageToExtractedPrefix(filesDir)
             }
-            return
+            return true
         }
-
-        try {
+        return try {
             val usrDir = File(filesDir, "usr")
-            val tmpDir = File(usrDir, "tmp")
-            val etcDir = File(usrDir, "etc")
-            val homeDir = File(filesDir, "home")
-            tmpDir.mkdirs(); etcDir.mkdirs(); homeDir.mkdirs()
-
+            File(usrDir, "tmp").mkdirs()
+            File(usrDir, "etc").mkdirs()
+            File(filesDir, "home").mkdirs()
             assets.open("bootstrap.tar").use { input ->
                 extractTarStream(input, filesDir)
             }
             TermuxHostPaths.applyPackageToExtractedPrefix(filesDir, force = true)
+            true
         } catch (e: Exception) {
             e.printStackTrace()
+            false
         }
     }
 
 
     private fun createNewTerminalSession(type: String = "shell") {
-        if (sessionsList.size >= 10) {
+        if (sessionsList.size + pendingAppTerminalSlots >= 10) {
             Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
             return
         }
+        if (!aiLaunchAllowed(type)) return
         if (ToolLauncherCatalog.isAiToolType(type) &&
             !AiCliProvisionState.shouldShowAiToolLaunchers(this)
         ) {
@@ -2248,21 +2331,124 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun startNewTerminalSession(type: String) {
-        ensureBootstrapExtracted()
+        if (!reserveTerminalSlot(app = true)) {
+            Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
+            return
+        }
         maybeToastHeavyToolLaunch(type)
+        val ticket = captureTerminalLaunch(app = true)
+        val user = LinuxCommandBuilder.sessionUserForType(type)
         // Warm RootShell su cache so ChrootCommandBuilder.shellRootCommand uses discovered path
-        if (!BuildConfig.PLAY_STORE_BUILD && LinuxCommandBuilder.currentMethod == "chroot") {
+        if (!BuildConfig.PLAY_STORE_BUILD && ticket.method == "chroot") {
             executor.execute { try { RootShell.isRootAvailable() } catch (_: Exception) {} }
         }
-        val cwd     = File(filesDir, "home").absolutePath
-        val user = LinuxCommandBuilder.sessionUserForType(type)
-        val method = LinuxCommandBuilder.currentMethod
-        val (args, envMap) = if (type == "shell" || type == "shell-root") {
-            LinuxCommandBuilder.buildInteractive(this, user = user, workDir = null, method = method)
+        executor.execute {
+            val prepared = try {
+                ensureBootstrapExtracted()
+                if (!bootstrapReady) error("Failed to extract bootstrap")
+                terminalLaunchSpec(type, user, workDir = null, ticket.method)
+            } catch (e: Exception) {
+                mainHandler.post {
+                    if (!releaseTerminalLaunch(ticket)) return@post
+                    Toast.makeText(
+                        this,
+                        e.message?.takeIf { it.isNotBlank() } ?: "Failed to prepare terminal",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                return@execute
+            }
+            mainHandler.post {
+                if (!releaseTerminalLaunch(ticket)) return@post
+                if (!terminalLaunchStillCurrent(ticket)) return@post
+                val (args, envMap) = prepared
+                attachTerminalSession(type, args, envMap, ticket.method)
+            }
+        }
+    }
+
+    private data class TerminalLaunchTicket(
+        val app: Boolean,
+        val seq: Long,
+        val lifecycle: Int,
+        val project: String,
+        val projectGen: Int,
+        val method: String,
+        val methodGen: Int,
+        val rootfs: String
+    )
+
+    private fun captureTerminalLaunch(app: Boolean): TerminalLaunchTicket {
+        val seq = ++terminalLaunchSeq
+        if (app) appLaunchWatermark = seq else workspaceLaunchWatermark = seq
+        val method = if (app) LinuxCommandBuilder.currentMethod else projectGitMethod()
+        return TerminalLaunchTicket(
+            app = app,
+            seq = seq,
+            lifecycle = terminalLifecycleGeneration,
+            project = activeProjectPath,
+            projectGen = projectGeneration,
+            method = method,
+            methodGen = LinuxCommandBuilder.environmentGeneration,
+            rootfs = ProjectPathResolver.prootRootfsDir(this).absolutePath
+        )
+    }
+
+    /** Drop reservation. False when a newer request of the same kind already owns the slot. */
+    private fun releaseTerminalLaunch(ticket: TerminalLaunchTicket): Boolean {
+        if (ticket.app) pendingAppTerminalSlots-- else pendingWorkspaceTerminalSlots--
+        val watermark = if (ticket.app) appLaunchWatermark else workspaceLaunchWatermark
+        return ticket.seq == watermark
+    }
+
+    private fun terminalLaunchStillCurrent(ticket: TerminalLaunchTicket): Boolean {
+        if (isFinishing || isDestroyed || ticket.lifecycle != terminalLifecycleGeneration) return false
+        if (ticket.methodGen != LinuxCommandBuilder.environmentGeneration) return false
+        if (ProjectPathResolver.prootRootfsDir(this).absolutePath != ticket.rootfs) return false
+        if (!ticket.app &&
+            (ticket.project != activeProjectPath || ticket.projectGen != projectGeneration)
+        ) {
+            return false
+        }
+        val methodNow = if (ticket.app) LinuxCommandBuilder.currentMethod else projectGitMethod()
+        return ticket.method == methodNow
+    }
+
+    private fun reserveTerminalSlot(app: Boolean): Boolean {
+        val used = if (app) {
+            sessionsList.size + pendingAppTerminalSlots
         } else {
-            val shellCmd = ChrootCommandBuilder.buildToolShellCommand(this, type, workDir = null)
+            workspaceSessions.size + pendingWorkspaceTerminalSlots
+        }
+        if (used >= 10) return false
+        if (app) pendingAppTerminalSlots++ else pendingWorkspaceTerminalSlots++
+        return true
+    }
+
+    private fun terminalLaunchSpec(
+        type: String,
+        user: String,
+        workDir: String?,
+        method: String
+    ): Pair<Array<String>, HashMap<String, String>> =
+        if (type == "shell" || type == "shell-root") {
+            LinuxCommandBuilder.buildInteractive(this, user = user, workDir = workDir, method = method)
+        } else if (method != "chroot") {
+            LinuxCommandBuilder.buildToolDirect(
+                this, listOf(ChrootCommandBuilder.toolBinaryName(type)), user = user, workDir = workDir
+            )
+        } else {
+            val shellCmd = ChrootCommandBuilder.buildToolShellCommand(this, type, workDir)
             LinuxCommandBuilder.build(this, shellCmd, user = user, method = method)
         }
+
+    private fun attachTerminalSession(
+        type: String,
+        args: Array<String>,
+        envMap: HashMap<String, String>,
+        method: String
+    ) {
+        val cwd = File(filesDir, "home").absolutePath
         val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
         if (!::sessionClient.isInitialized) {
             initTerminalView()
@@ -2614,6 +2800,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setTextColor(NC.ON_SURFACE)
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
+                if (aiToolLocked(tool.type)) {
+                    text = "${tool.label} · PRO"
+                    markProLocked()
+                    card.contentDescription = "${tool.label}, Pro required"
+                }
             }
             card.addView(nameTv)
 
@@ -2852,6 +3043,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setTextColor(NC.ON_SURFACE)
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
+                if (aiToolLocked(tool.type)) {
+                    text = "${tool.label} · PRO"
+                    markProLocked()
+                    card.contentDescription = "${tool.label}, Pro required"
+                }
             }
             card.addView(nameTv)
 
@@ -3464,6 +3660,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setTextColor(NC.ON_PRIMARY)
                 typeface = Typeface.MONOSPACE
                 paint.isFakeBoldText = true
+                if (proLocked()) markProLocked()
             }
 
             addView(iconIv)
@@ -3618,6 +3815,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         contentCol.addView(titleTv)
         contentCol.addView(subtextTv)
+        createBtn.trackProLock()
         contentCol.addView(createBtn)
         heroCard.addView(contentCol)
 
@@ -4363,7 +4561,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         row2.addView(copyAllBtn)
 
-        val scrollBtn = makeToolbarKeyBtn("SCROLL", marginRight = 0, height = dp(44), exactWidth = (keyWidth * 1.4).toInt()).apply {
+        val scrollBtn = makeToolbarKeyBtn("Transcript", marginRight = 0, height = dp(44), exactWidth = (keyWidth * 2.2).toInt()).apply {
             setTextColor(NC.PRIMARY)
             setOnClickListener {
                 val customTf = try { Typeface.createFromAsset(assets, "fonts/font.ttf") } catch (_: Exception) { null }
@@ -4371,6 +4569,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         row2.addView(scrollBtn)
+
+        val liveBtn = makeToolbarKeyBtn("Jump to live", marginRight = 0, height = dp(44), exactWidth = (keyWidth * 2.4).toInt()).apply {
+            setTextColor(NC.PRIMARY)
+            setOnClickListener { tvRef()?.setTopRow(0) }
+        }
+        row2.addView(liveBtn)
 
         // F-keys row (hidden by default)
         val fRow = LinearLayout(this).apply {
@@ -4734,6 +4938,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         headerCol.addView(divider)
         settingsHubLayout.addView(headerCol)
 
+        // NativeCode Pro — status + Upgrade / Restore / Manage sheet
+        settingsHubLayout.addView(buildProCard())
+        settingsHubLayout.addView(spacer(16))
+
         // Graphical Desktop card
         settingsHubLayout.addView(buildGuiLaunchCard())
         settingsHubLayout.addView(spacer(16))
@@ -4969,6 +5177,81 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         })
         page.addView(spacer(16))
         page.addView(buildAndroidSdkPackCard())
+        panvkHolder = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        page.addView(panvkHolder)
+    }
+
+    private var panvkHolder: LinearLayout? = null
+    private var panvkBusy = false
+    private var panvkChecked = false
+
+    /** Show the PanVK update card only if guest .so exists and differs from the bundled one. */
+    private fun refreshPanvkCard(promptIfNew: Boolean = false) {
+        executor.execute {
+            val need = try { PanvkDriverUpdate.needsUpdate(this) } catch (_: Exception) { false }
+            runOnUiThread {
+                val holder = panvkHolder ?: return@runOnUiThread
+                holder.removeAllViews()
+                if (!need) return@runOnUiThread
+                holder.addView(spacer(16))
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    background = cyberBrutalistBg(NC.SURFACE_LOW, NC.OUTLINE_VAR, NC.SHADOW_DARK, 6, 0)
+                    setPadding(dp(16), dp(16), dp(16), dp(16))
+                }
+                card.addView(TextView(this).apply {
+                    text = "PanVK driver update (rc3-lowmem)"
+                    textSize = 15f
+                    setTextColor(Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                })
+                val status = TextView(this).apply {
+                    text = "New PanVK GPU driver for Mali GPUs. Stop the desktop first."
+                    textSize = 11f
+                    setTextColor(NC.ON_SURF_VAR)
+                    typeface = Typeface.MONOSPACE
+                    setPadding(0, dp(6), 0, dp(10))
+                }
+                card.addView(status)
+                val btn = primaryButton("UPDATE") {}
+                btn.setOnClickListener { runPanvkUpdate(status, btn) }
+                card.addView(btn)
+                holder.addView(card)
+                if (promptIfNew) maybePromptPanvk()
+            }
+        }
+    }
+
+    private fun runPanvkUpdate(status: TextView?, btn: View?, done: (() -> Unit)? = null) {
+        if (panvkBusy) return
+        panvkBusy = true
+        btn?.isEnabled = false
+        status?.text = "Updating PanVK driver…"
+        executor.execute {
+            val (ok, msg) = PanvkDriverUpdate.update(this)
+            runOnUiThread {
+                panvkBusy = false
+                btn?.isEnabled = true
+                status?.text = (if (ok) "SUCCESS · " else "FAILED · ") + msg
+                android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
+                done?.invoke()
+                if (ok) panvkHolder?.removeAllViews()
+            }
+        }
+    }
+
+    /** One-time (per bundled sha) prompt. Later => only the Components row. */
+    private fun maybePromptPanvk() {
+        val prefs = getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
+        val key = "panvk_prompted_" + try { PanvkDriverUpdate.bundledSha(this) } catch (_: Exception) { return }
+        if (prefs.getBoolean(key, false)) return
+        prefs.edit().putBoolean(key, true).apply()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("PanVK GPU driver")
+            .setMessage("New PanVK GPU driver available for Mali GPUs — update now?")
+            .setPositiveButton("Update") { _, _ -> runPanvkUpdate(null, null) }
+            .setNegativeButton("Later", null)
+            .show()
     }
 
     private fun buildSkillsSectionButton(): View {
@@ -5640,6 +5923,203 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     /** Settings Hub → Privacy Policy (public GitHub docs markdown). */
+    // ---- NativeCode Pro (docs/monetisation/plan.md) ----
+
+    private fun isPro() = EntitlementStore.isPro(this)
+
+    /** Free user under enforcement → Pro entry points show a lock. */
+    private fun proLocked() = BuildConfig.MONETISATION_ENFORCE && !isPro()
+    /** AI CLI tab (non-free) or interactive shell tab (user/root) locked for this user. */
+    private fun aiToolLocked(type: String) =
+        (if (ToolLauncherCatalog.isAiToolType(type)) FeatureGate.canLaunchAiTool(isPro(), type)
+        else FeatureGate.canOpenShell(isPro())) is GateResult.Deny
+
+    /** Built-once views (home banner/FAB, create page) re-marked when Pro flips. */
+    private val proLockTexts = mutableListOf<TextView>()
+
+    /** Trailing lock icon (tinted to the text, other slots kept) + "Pro required" for TalkBack. */
+    private fun TextView.markProLocked(locked: Boolean = true) {
+        val (start, top, _, bottom) = compoundDrawablesRelative
+        if (!locked) {
+            setCompoundDrawablesRelative(start, top, null, bottom)
+            contentDescription = null
+            return
+        }
+        val d = androidx.core.content.ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_lock)?.mutate() ?: return
+        d.setBounds(0, 0, dp(14), dp(14))
+        d.setTint(currentTextColor)
+        setCompoundDrawablesRelative(start, top, d, bottom)
+        compoundDrawablePadding = dp(6)
+        contentDescription = "${text.trim()}, Pro required"
+    }
+
+    /** Mark now and re-mark on entitlement change. */
+    private fun TextView.trackProLock() {
+        proLockTexts += this
+        markProLocked(proLocked())
+    }
+
+    private var lastProState: Boolean? = null
+
+    /** Billing hook: Pro card text always; rebuild the visible page only when Pro actually flips. */
+    private fun onEntitlementChanged() {
+        refreshProCard()
+        paintGuiBudget() // also re-reads minutes on every resume
+        val pro = isPro()
+        if (lastProState != null && lastProState != pro) {
+            proLockTexts.forEach { it.markProLocked(proLocked()) }
+            navigateToPage(currentPageId, false)
+        }
+        lastProState = pro
+    }
+
+    /** Deny → Upgrade sheet. Returns true when the action may proceed. */
+    private fun gateAllows(result: GateResult): Boolean {
+        if (result is GateResult.Deny) {
+            Log.i("NCBilling", "gate deny ${result.upsell}: ${result.reason}")
+            showUpgradeSheet(result.reason)
+        }
+        return result is GateResult.Allow
+    }
+
+    /** AI tool + concurrent AI session gates (app tabs + all project workspaces). */
+    private fun aiLaunchAllowed(type: String): Boolean {
+        if (!ToolLauncherCatalog.isAiToolType(type)) return gateAllows(FeatureGate.canOpenShell(isPro()))
+        if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), type))) return false
+        val others = projectTabNamesMap.filterKeys { it != activeProjectPath }.values.flatten()
+        val aiCount = (terminalSessionTypes + workspaceTabNames + others).count { ToolLauncherCatalog.isAiToolType(it) }
+        return gateAllows(FeatureGate.canOpenAiSession(isPro(), aiCount))
+    }
+
+    private val xfceBudgetStop = Runnable {
+        if (isPro() || !guiDesktopRunning && guiShellJob == null) return@Runnable
+        Toast.makeText(this, "Free desktop time used for today", Toast.LENGTH_LONG).show()
+        guiUserStopping = true
+        setGuiStopBusy()
+        stopGui()
+        showUpgradeSheet("Free desktop time used for today")
+    }
+
+    private fun startXfceBudget() {
+        XfceBudget.start(this)
+        mainHandler.removeCallbacks(xfceBudgetStop)
+        if (BuildConfig.MONETISATION_ENFORCE && !isPro()) {
+            mainHandler.postDelayed(xfceBudgetStop, XfceBudget.remainingMs(this))
+        }
+    }
+
+    private fun stopXfceBudget() {
+        mainHandler.removeCallbacks(xfceBudgetStop)
+        XfceBudget.stop(this)
+    }
+
+    private var proCardStatusTv: TextView? = null
+
+    private fun refreshProCard() {
+        proCardStatusTv?.text = if (isPro()) "Pro active" else
+            "Free plan · Upgrade · from ${BillingRepository.price(BillingRepository.SKU_MONTHLY) ?: "$3.99"}/mo"
+    }
+
+    private fun buildProCard(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = cyberBrutalistBg(
+            fillColor = NC.SURFACE_LOW,
+            strokeColor = NC.PRIMARY,
+            shadowColor = NC.SHADOW_DARK,
+            offsetDp = 6,
+            cornerRadiusDp = 0
+        )
+        setPadding(dp(16), dp(16), dp(16), dp(16))
+        contentDescription = "NativeCode Pro"
+        setOnClickListener { showUpgradeSheet(null) }
+        addView(ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_lock_open)
+            setColorFilter(NC.PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { rightMargin = dp(12) }
+        })
+        addView(LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            addView(TextView(this@MainActivity).apply {
+                text = "NATIVECODE PRO"
+                textSize = 15f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+            })
+            proCardStatusTv = TextView(this@MainActivity).apply {
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+            }
+            addView(proCardStatusTv)
+        })
+        addView(ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            setColorFilter(NC.PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20))
+        })
+        refreshProCard()
+    }
+
+    /** One shared Upgrade sheet: 3 plans (Play-localized prices), restore, manage. */
+    private fun showUpgradeSheet(reason: String?) {
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        fun line(t: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
+            text = t
+            textSize = size
+            setTextColor(color)
+            typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.MONOSPACE
+            setPadding(0, 0, 0, dp(8))
+        }
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(NC.BG)
+            setPadding(dp(20), dp(20), dp(20), dp(24))
+        }
+        col.addView(line("NATIVECODE PRO", 20f, NC.PRIMARY, bold = true))
+        reason?.let { col.addView(line("// $it", 12f, NC.ERROR)) }
+        if (isPro()) col.addView(line("Pro is active on this account.", 13f, NC.ON_SURFACE))
+        col.addView(
+            line(
+                "• All AI CLIs (opencode stays free)\n• Up to 5 parallel AI sessions\n" +
+                    "• Unlimited desktop (free: 30 min/day)\n• Projects, import & workspace\n• GitHub login (gh auth)",
+                12f, NC.ON_SURFACE
+            )
+        )
+        fun buy(label: String, sku: String, fallback: String) = primaryButton(
+            "$label · ${BillingRepository.price(sku) ?: fallback}"
+        ) {
+            BillingRepository.launch(this, sku)?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
+            sheet.dismiss()
+        }.apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) } }
+        if (!isPro()) {
+            col.addView(buy("MONTHLY", BillingRepository.SKU_MONTHLY, "$3.99/mo"))
+            col.addView(buy("YEARLY", BillingRepository.SKU_YEARLY, "$29.99/yr"))
+            col.addView(buy("LIFETIME", BillingRepository.SKU_LIFETIME, "$19.99"))
+        }
+        col.addView(secondaryButton("RESTORE PURCHASES") {
+            BillingRepository.refresh { ok ->
+                refreshProCard()
+                Toast.makeText(
+                    this,
+                    if (!ok) "Google Play unavailable" else if (isPro()) "Pro restored" else "No purchases found",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            sheet.dismiss()
+        }.apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(16) } })
+        col.addView(secondaryButton("MANAGE SUBSCRIPTION") {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BillingRepository.manageUrl(this))))
+            } catch (_: Exception) {
+                Toast.makeText(this, "Google Play not available", Toast.LENGTH_SHORT).show()
+            }
+        }.apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) } })
+        sheet.setContentView(ScrollView(this).apply { addView(col) })
+        sheet.show()
+    }
+
     private fun buildPrivacyPolicyCard(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -8576,8 +9056,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         diffViewerContainer.addView(loadingTv)
 
+        val project = activeProjectPath
+        val method = projectGitMethod()
+        val gen = ++diffRequestGen
+        diffRequestName = name
         executor.execute {
-            val method = projectGitMethod()
             fun filterDiff(lines: List<String>): List<String> = lines.filter { line ->
                 line.startsWith("diff ") || line.startsWith("index ") ||
                     line.startsWith("--- ") || line.startsWith("+++ ") ||
@@ -8586,29 +9069,34 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     line.startsWith("\\") || line.startsWith("new file") ||
                     line.startsWith("deleted file") || line.startsWith("Binary")
             }
+            fun stale(): Boolean =
+                gen != diffRequestGen || project != activeProjectPath || name != diffRequestName
             try {
-                val gitCmd = GitGuestCommands.diffFile(activeProjectPath, name)
+                val gitCmd = GitGuestCommands.diffFileAuto(project, name)
                 val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, gitCmd, method = method)
-                val env = HashMap(lcEnv).apply { putAll(GitGuestCommands.gitEnv(activeProjectPath)) }
-                val (_, out) = ShellCommandRunner.runCaptureExit(this, lcArgs, env)
-                var filteredLines = filterDiff(out.lines())
-
-                if (filteredLines.isEmpty()) {
-                    val untrackedCmd = GitGuestCommands.diffUntracked(activeProjectPath, name)
-                    val (utArgs, utEnv) = LinuxCommandBuilder.build(this, untrackedCmd, method = method)
-                    val utFull = HashMap(utEnv).apply { putAll(GitGuestCommands.gitEnv(activeProjectPath)) }
-                    val (_, utOut) = ShellCommandRunner.runCaptureExit(this, utArgs, utFull)
-                    val filteredUntracked = filterDiff(utOut.lines())
-                    if (filteredUntracked.isNotEmpty()) {
-                        filteredLines = filteredUntracked
+                val env = HashMap(lcEnv).apply { putAll(GitGuestCommands.gitEnv(project)) }
+                val (rc, out) = ShellCommandRunner.runCaptureExit(this, lcArgs, env)
+                if (rc >= 2) {
+                    mainHandler.post {
+                        if (stale()) return@post
+                        diffViewerContainer.removeAllViews()
+                        val errorTv = TextView(this@MainActivity).apply {
+                            text = "Error running git diff: ${out.trim().ifEmpty { "exit $rc" }}"
+                            setTextColor(NC.ERROR)
+                            setPadding(dp(16), dp(16), dp(16), dp(16))
+                        }
+                        diffViewerContainer.addView(errorTv)
                     }
+                    return@execute
                 }
-
+                val filteredLines = filterDiff(out.lines())
                 mainHandler.post {
+                    if (stale()) return@post
                     renderDiffLines(name, filteredLines)
                 }
             } catch (e: Exception) {
                 mainHandler.post {
+                    if (stale()) return@post
                     diffViewerContainer.removeAllViews()
                     val errorTv = TextView(this@MainActivity).apply {
                         text = "Error running git diff: ${e.message}"
@@ -8830,24 +9318,61 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             .setTitle("Discard Changes")
             .setMessage("Are you sure you want to discard changes in $fileName?")
             .setPositiveButton("Discard") { _, _ ->
+                val project = activeProjectPath
+                val method = projectGitMethod()
+                val name = fileName
                 executor.execute {
-                    val method = projectGitMethod()
-                    val discardCmd = "cd $activeProjectPath && (${GitGuestCommands.gitCommand(activeProjectPath, "checkout -- \"$fileName\"")} || rm -rf \"$fileName\")"
-                    val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, discardCmd, method = method)
-                    val pb = ProcessBuilder(*lcArgs)
-                    val env = pb.environment()
-                    env.putAll(lcEnv)
-                    env.putAll(GitGuestCommands.gitEnv(activeProjectPath))
-                    env["GIT_PAGER"] = "cat"
-                    env["GIT_TERMINAL_PROMPT"] = "0"
-                    env["TERM"] = "dumb"
-                    pb.redirectErrorStream(true)
+                    fun git(args: String): Pair<Int, String> {
+                        val cmd = "cd ${GitGuestCommands.shellQuote(project)} && ${GitGuestCommands.gitCommand(project, args)}"
+                        val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, cmd, method = method)
+                        val env = HashMap(lcEnv).apply { putAll(GitGuestCommands.gitEnv(project)) }
+                        return ShellCommandRunner.runCaptureExit(this, lcArgs, env)
+                    }
                     try {
-                        val proc = pb.start()
-                        proc.waitFor()
+                        val path = GitGuestCommands.shellQuote(name)
+                        val spec = GitGuestCommands.shellQuote(":(literal)$name")
+                        val (trackedExit, trackedOut) = git("cat-file -e HEAD:$path")
+                        val action = when (trackedExit) {
+                            0 -> "checkout HEAD -- $spec"
+                            else -> {
+                                val (untrackedExit, untrackedOut) = git("ls-files --others -- $spec")
+                                when {
+                                    untrackedExit != 0 -> {
+                                        mainHandler.post {
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "Failed to discard: ${untrackedOut.trim().take(120)}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        return@execute
+                                    }
+                                    untrackedOut.lineSequence().any { it == name } -> "clean -f -- $spec"
+                                    else -> {
+                                        mainHandler.post {
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "Failed to discard: ${trackedOut.trim().take(120).ifEmpty { "not a tracked or untracked file" }}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        return@execute
+                                    }
+                                }
+                            }
+                        }
+                        val (exit, out) = git(action)
                         mainHandler.post {
-                            onBackPressed()
-                            refreshGitDiffTree()
+                            if (exit == 0) {
+                                onBackPressed()
+                                refreshGitDiffTree()
+                            } else {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Failed to discard: ${out.trim().take(120)}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     } catch (e: Exception) {
                         mainHandler.post {
@@ -8882,27 +9407,43 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     Toast.makeText(this, "Commit message cannot be empty", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
+                val project = activeProjectPath
+                val method = projectGitMethod()
+                val name = fileName
                 executor.execute {
-                    val method = projectGitMethod()
-                    val safeMsg = msg.replace("'", "'\\''")
-                    val commitCmd =
-                        "cd $activeProjectPath && ${GitGuestCommands.gitCommand(activeProjectPath, "add \"$fileName\" && commit -m '$safeMsg'")}"
-                    val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, commitCmd, method = method)
-                    val pb = ProcessBuilder(*lcArgs)
-                    val env = pb.environment()
-                    env.putAll(lcEnv)
-                    env.putAll(GitGuestCommands.gitEnv(activeProjectPath))
-                    env["GIT_PAGER"] = "cat"
-                    env["GIT_TERMINAL_PROMPT"] = "0"
-                    env["TERM"] = "dumb"
-                    pb.redirectErrorStream(true)
+                    fun git(args: String): Pair<Int, String> {
+                        val cmd = "cd ${GitGuestCommands.shellQuote(project)} && ${GitGuestCommands.gitCommand(project, args)}"
+                        val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, cmd, method = method)
+                        val env = HashMap(lcEnv).apply { putAll(GitGuestCommands.gitEnv(project)) }
+                        return ShellCommandRunner.runCaptureExit(this, lcArgs, env)
+                    }
                     try {
-                        val proc = pb.start()
-                        proc.waitFor()
+                        val spec = GitGuestCommands.shellQuote(":(literal)$name")
+                        val quotedMsg = GitGuestCommands.shellQuote(msg)
+                        val (addExit, addOut) = git("add -- $spec")
+                        if (addExit != 0) {
+                            mainHandler.post {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Commit failed: ${addOut.trim().take(120)}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            return@execute
+                        }
+                        val (exit, out) = git("commit -m $quotedMsg")
                         mainHandler.post {
-                            Toast.makeText(this@MainActivity, "Committed successfully", Toast.LENGTH_SHORT).show()
-                            onBackPressed()
-                            refreshGitDiffTree()
+                            if (exit == 0) {
+                                Toast.makeText(this@MainActivity, "Committed successfully", Toast.LENGTH_SHORT).show()
+                                onBackPressed()
+                                refreshGitDiffTree()
+                            } else {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Commit failed: ${out.trim().take(120)}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     } catch (e: Exception) {
                         mainHandler.post {
@@ -9064,6 +9605,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
             setOnClickListener {
                 // Do not flip to STOP yet — wait for first start log line (healthy start)
+                if (!gateAllows(FeatureGate.canStartXfce(isPro(), XfceBudget.usedTodayMs(this@MainActivity)))) return@setOnClickListener
                 guiUserStopping = false
                 setGuiStartBusy()
                 startGui()
@@ -9620,6 +10162,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val dateStr = if (p.lastOpened > 0) dateFormat.format(java.util.Date(p.lastOpened)) else "recent"
             val card = projectCard(p.name, p.path, dateStr, p.icon)
             card.setOnClickListener {
+                if (!projectGateAllows()) return@setOnClickListener
                 markProjectOpened(p.path)
                 activeProjectName = p.name
                 activeProjectPath = p.path
@@ -14311,6 +14854,19 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
+    /** Free tier: idle START shows today's remaining desktop minutes; lock at 0. No-op unless idle START. */
+    private fun paintGuiBudget() {
+        if (!::startGuiBtn.isInitialized || !startGuiBtn.text.startsWith("START PHOSH DESKTOP")) return
+        if (!proLocked()) {
+            startGuiBtn.text = "START PHOSH DESKTOP"
+            startGuiBtn.markProLocked(false)
+            return
+        }
+        val min = (XfceBudget.remainingMs(this) + 59_999) / 60_000
+        startGuiBtn.text = "START PHOSH DESKTOP\n$min min left today"
+        startGuiBtn.markProLocked(min == 0L)
+    }
+
     /** Idle: full-width START only (no VIEW LOGS). */
     private fun setGuiCardIdle() {
         if (!::startGuiBtn.isInitialized || !::stopGuiBtn.isInitialized) return
@@ -14321,6 +14877,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             startGuiBtn.text = "START PHOSH DESKTOP"
             startGuiBtn.isEnabled = true
             startGuiBtn.alpha = 1f
+            paintGuiBudget()
         } else {
             startGuiBtn.text = "PHOSH NOT INSTALLED"
             startGuiBtn.isEnabled = false
@@ -14390,6 +14947,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         guiUserStopping = false
         guiDesktopRunning = false
         guiX11Launched = false
+        startXfceBudget()
 
         executor.execute {
             ensureBootstrapExtracted()
@@ -14466,6 +15024,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopBroadcast.setPackage(packageName)
         sendBroadcast(stopBroadcast)
         releaseDesktopFgs()
+        stopXfceBudget()
 
         guiShellJob?.cancel()
 
@@ -14501,6 +15060,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Start stream failed → card back to START (not stuck on STOP). */
     private fun revertGuiCardToStart() {
         guiDesktopRunning = false
+        stopXfceBudget()
         setGuiCardIdle()
         if (::displayBtn.isInitialized) {
             displayBtn.visibility = View.GONE
@@ -14676,6 +15236,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     override fun onDestroy() {
+        terminalLifecycleGeneration++
         if (NativeCodeBridge.agentUiDelegate === this) {
             NativeCodeBridge.agentUiDelegate = null
         }
@@ -15036,6 +15597,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setTextColor(Color.parseColor("#66FFFFFF"))
                 typeface = Typeface.MONOSPACE
             }
+            if (proLocked()) {
+                timeTv.text = "${timeTv.text} · PRO"
+                timeTv.markProLocked()
+                contentDescription = "$name, Pro required"
+            }
             infoCol.addView(titleTv)
             infoCol.addView(timeTv)
 
@@ -15168,6 +15734,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
                 tagsRow.addView(methodTag)
             }
+            if (FeatureGate.canUse(isPro(), ProFeature.WORKSPACE) is GateResult.Deny) tagsRow.addView(TextView(this@MainActivity).apply { text = "LOCKED · PRO"; textSize = 10f; setTextColor(NC.ERROR); typeface = Typeface.MONOSPACE; setPadding(dp(6), dp(2), dp(6), dp(2)); markProLocked() })
 
             val openCount = projectSessionsMap[path]?.count { it.isRunning } ?: 0
             if (openCount > 0) {
@@ -16124,6 +16691,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             textSize = 12f
+            if (proLocked()) markProLocked()
         }
         settingsGhActionBtn = connectBtn
         val logoutBtn = secondaryButton("LOGOUT") {
@@ -16268,6 +16836,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 sub?.text = "Not connected"
                 btn?.apply {
                     text = "CONNECT"
+                    markProLocked(proLocked())
                     isEnabled = !GitHubCliService.isSessionActive()
                     alpha = if (isEnabled) 1f else 0.5f
                     setOnClickListener {
@@ -16280,6 +16849,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 sub?.text = "@${status.username}"
                 btn?.apply {
                     text = "REFRESH"
+                    markProLocked(false)
                     isEnabled = true
                     alpha = 1f
                     setOnClickListener {
@@ -16574,9 +17144,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 settingsGhLogoutBtn?.visibility = View.GONE
             }
         }
+        settingsGhActionBtn?.markProLocked(proLocked())
     }
 
     private fun startGithubConnect(method: String, fromSettings: Boolean) {
+        if (!gateAllows(FeatureGate.canUse(isPro(), ProFeature.GITHUB_LOGIN))) return
         if (GitHubCliService.isSessionActive()) {
             Toast.makeText(this, "Auth already in progress", Toast.LENGTH_SHORT).show()
             return
@@ -16841,6 +17413,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }.apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(14) }
             textSize = 13f
+            trackProLock()
         }
         pageLayout.addView(openTermBtn)
 
@@ -16895,6 +17468,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }.apply {
                 layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
                 textSize = 11f
+                // Built once; tracked so purchase/restore drops the lock.
+                if (tool.sessionType != com.zenithblue.nativecode.entitlements.FeatureLimits.FREE_AI_TOOL_ID) trackProLock()
             }
             cmdRow.addView(openBtn)
             card.addView(cmdRow)
@@ -19045,6 +19620,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         projectCreateBtn = primaryButton("CREATE / IMPORT PROJECT") {
             val name = projectNameInput.text.toString().trim()
             val gitUrl = projectGithubInput.text.toString().trim()
+            val createFeature = if (gitUrl.isEmpty()) ProFeature.PROJECTS else ProFeature.PROJECT_IMPORT
+            if (!gateAllows(FeatureGate.canUse(isPro(), createFeature))) return@primaryButton
             val icon = projectIconInput.text.toString().trim()
             var method = projectCreateSelectedMethod
             // Hard gate: never create with chroot unless root + install (same as chip)
@@ -19288,6 +19865,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 addAndOpenProject(name, icon, path, method)
             }
         }
+        projectCreateBtn.trackProLock()
         projectCreateLayout.addView(projectCreateBtn)
     }
 
@@ -19463,6 +20041,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
             emptyCard.addView(emptyTitle)
             emptyCard.addView(emptyDesc)
+            if (proLocked()) createBtn.markProLocked()
             emptyCard.addView(createBtn)
 
             projectsListLayout.addView(emptyCard)
@@ -19481,6 +20060,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         rightMargin = dp(8)
                     }
                     setOnClickListener {
+                        if (!projectGateAllows()) return@setOnClickListener
                         markProjectOpened(p1.path)
                         activeProjectName = p1.name
                         activeProjectPath = p1.path
@@ -19501,6 +20081,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                             leftMargin = dp(8)
                         }
                         setOnClickListener {
+                            if (!projectGateAllows()) return@setOnClickListener
                             markProjectOpened(p2.path)
                             activeProjectName = p2.name
                             activeProjectPath = p2.path
@@ -20331,10 +20912,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun createWorkspaceTerminalTab(type: String) {
-        if (workspaceSessions.size >= 10) {
+        if (!gateAllows(FeatureGate.canUse(isPro(), ProFeature.WORKSPACE))) return
+        if (workspaceSessions.size + pendingWorkspaceTerminalSlots >= 10) {
             Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
             return
         }
+        if (!aiLaunchAllowed(type)) return
         val method = projectGitMethod()
         if (ToolLauncherCatalog.isAiToolType(type) &&
             !AiCliProvisionState.shouldShowAiToolLaunchers(this, method)
@@ -20372,23 +20955,49 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun startWorkspaceTerminalTab(type: String) {
+        if (!reserveTerminalSlot(app = false)) {
+            Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
+            return
+        }
         maybeToastHeavyToolLaunch(type)
-        if (projectGitMethod() == "chroot") {
+        val ticket = captureTerminalLaunch(app = false)
+        // shell-root: login at /root (no project cwd — avoid root-owned files under flux home)
+        val workDir = if (type == "shell-root") null else ticket.project
+        val user = LinuxCommandBuilder.sessionUserForType(type)
+        if (ticket.method == "chroot") {
             executor.execute { try { RootShell.isRootAvailable() } catch (_: Exception) {} }
         }
-        val method = projectGitMethod()
-        val cwd = File(filesDir, "home").absolutePath
-        // shell-root: login at /root (no project cwd — avoid root-owned files under flux home)
-        val workDir = if (type == "shell-root") null else activeProjectPath
-        val user = LinuxCommandBuilder.sessionUserForType(type)
-        val (args, envMap) = if (type == "shell" || type == "shell-root") {
-            LinuxCommandBuilder.buildInteractive(this, user = user, workDir = workDir, method = method)
-        } else {
-            val shellCmd = ChrootCommandBuilder.buildToolShellCommand(this, type, workDir)
-            LinuxCommandBuilder.build(this, shellCmd, user = user, method = method)
+        executor.execute {
+            val prepared = try {
+                terminalLaunchSpec(type, user, workDir, ticket.method)
+            } catch (e: Exception) {
+                mainHandler.post {
+                    if (!releaseTerminalLaunch(ticket)) return@post
+                    Toast.makeText(
+                        this,
+                        e.message?.takeIf { it.isNotBlank() } ?: "Failed to prepare terminal",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                return@execute
+            }
+            mainHandler.post {
+                if (!releaseTerminalLaunch(ticket)) return@post
+                if (!terminalLaunchStillCurrent(ticket)) return@post
+                val (args, envMap) = prepared
+                attachWorkspaceSession(type, args, envMap, ticket.method)
+            }
         }
-        val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
+    }
 
+    private fun attachWorkspaceSession(
+        type: String,
+        args: Array<String>,
+        envMap: HashMap<String, String>,
+        method: String
+    ) {
+        val cwd = File(filesDir, "home").absolutePath
+        val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
         val sessionClient = NativeCodeTerminalSessionClient(
             context = this,
             terminalViewRef = { if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null },
@@ -20548,6 +21157,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     textSize = 13f
                     setTextColor(NC.ON_SURFACE)
                     typeface = Typeface.MONOSPACE
+                    // 200dp popup: lock only, no "· PRO" text (would wrap)
+                    if (aiToolLocked(type)) markProLocked()
                 }
 
                 addView(iconView)
@@ -21934,23 +22545,19 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         forceTerminalResize(if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null)
     }
 
-    /** Push view size to PTY and SIGWINCH session pid (chroot WINCH trap forwards to guest). */
+    /** One resize per frame. updateSize writes TIOCSWINSZ; no extra SIGWINCH to the tracer pid. */
+    private val resizePosted = java.util.Collections.newSetFromMap(
+        java.util.WeakHashMap<TerminalView, Boolean>()
+    )
+
     private fun forceTerminalResize(tv: TerminalView?) {
         tv ?: return
-        tv.post {
+        synchronized(resizePosted) { if (!resizePosted.add(tv)) return }
+        tv.postOnAnimation {
+            synchronized(resizePosted) { resizePosted.remove(tv) }
             try {
-                if (tv.width <= 0 || tv.height <= 0) return@post
+                if (tv.width <= 0 || tv.height <= 0) return@postOnAnimation
                 tv.updateSize()
-                tv.onScreenUpdated()
-                val session = tv.currentSession ?: return@post
-                if (!session.isRunning) return@post
-                val pid = session.pid
-                if (pid > 0) {
-                    try {
-                        Os.kill(pid, OsConstants.SIGWINCH)
-                    } catch (_: Exception) {
-                    }
-                }
             } catch (_: Exception) {
             }
         }

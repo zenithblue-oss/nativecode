@@ -72,6 +72,41 @@ object GitGuestCommands {
     fun diffFile(projectPath: String, filePath: String): String =
         "cd ${shellQuote(projectPath)} && ${gitCommand(projectPath, "diff HEAD -- ${shellQuote(filePath)}")}"
 
+    /** Pathspec with glob magic off. shellQuote does not stop `*`, `[`, `?`. */
+    private fun literalPathspec(filePath: String): String =
+        shellQuote(":(literal)$filePath")
+
+    /**
+     * One guest start. HEAD membership and index membership are separate
+     * (`cat-file -e`, not `ls-files`, so a staged deletion still diffs against HEAD).
+     * Unborn + staged: `git diff <empty-tree> -- path` (hash-object -t tree /dev/null).
+     * Untracked: `--no-index` exit 1 means differences and is mapped to 0; exit >=2 stays.
+     * Newlines in filenames are not safe in this one-line script.
+     */
+    fun diffFileAuto(projectPath: String, filePath: String): String {
+        val p = shellQuote(projectPath)
+        val spec = literalPathspec(filePath)
+        val obj = shellQuote(filePath)
+        val hasHead = gitCommand(projectPath, "rev-parse --verify HEAD")
+        val inHead = gitCommand(projectPath, "cat-file -e HEAD:$obj")
+        val inIndex = gitCommand(projectPath, "cat-file -e :$obj")
+        val diffHead = gitCommand(projectPath, "diff HEAD -- $spec")
+        val emptyTree = gitCommand(projectPath, "hash-object -t tree /dev/null")
+        val diffEmpty = gitCommand(projectPath, "diff --no-ext-diff \$empty -- $spec")
+        val untracked = gitCommand(projectPath, "diff --no-index -- /dev/null $obj")
+        return "cd $p || exit 2; " +
+            "if $hasHead >/dev/null 2>&1; then has_head=1; else has_head=0; fi; " +
+            "if $inHead >/dev/null 2>&1; then in_head=1; else in_head=0; fi; " +
+            "if $inIndex >/dev/null 2>&1; then in_index=1; else in_index=0; fi; " +
+            "if [ \"\$has_head\" = 1 ] && { [ \"\$in_head\" = 1 ] || [ \"\$in_index\" = 1 ]; }; then " +
+            "$diffHead; exit \$?; fi; " +
+            "if [ \"\$has_head\" = 0 ] && [ \"\$in_index\" = 1 ]; then " +
+            "empty=\$($emptyTree) && $diffEmpty; exit \$?; fi; " +
+            "if [ -e $obj ] || [ -L $obj ]; then " +
+            "$untracked; rc=\$?; if [ \$rc -eq 1 ]; then exit 0; fi; exit \$rc; fi; " +
+            "echo 'not found' >&2; exit 2"
+    }
+
     fun diffUntracked(projectPath: String, filePath: String): String =
         "cd ${shellQuote(projectPath)} && [ -f ${shellQuote(filePath)} ] && " +
             gitCommand(projectPath, "diff --no-index /dev/null ${shellQuote(filePath)}")

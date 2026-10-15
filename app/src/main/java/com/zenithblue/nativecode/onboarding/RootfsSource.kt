@@ -46,7 +46,7 @@ sealed interface RootfsSource {
 
 object RootfsSourceResolver {
     private const val TAG = "RootfsSourceResolver"
-    const val PINNED_ALPAQUITA_SHA256 = "209b7d4b92367cf46e5a7b6c03ca3fbf49e2a2428963429d71566dcb6ac9bb11"
+    const val PINNED_ALPAQUITA_SHA256 = "edeec26af1c7d7dedd490c99473733ad90b8fff16aab27c63c6f43d467ff0698"
     const val ALPAQUITA_NAME = "alpaquita_rootfs.tar.zst"
     const val ALPAQUITA_SHA_NAME = "alpaquita_rootfs.tar.zst.sha256"
 

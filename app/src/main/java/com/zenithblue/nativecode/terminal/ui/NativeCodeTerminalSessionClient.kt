@@ -30,8 +30,7 @@ class NativeCodeTerminalSessionClient(
     override fun onTitleChanged(session: TerminalSession) {}
 
     override fun onSessionFinished(session: TerminalSession) {
-        val transcript = try { session.emulator?.screen?.transcriptText } catch (e: Exception) { e.message }
-        Log.d("Terminal", "Session finished: ${session.exitStatus} transcript: $transcript")
+        Log.d("Terminal", "Session finished: ${session.exitStatus}")
         onSessionFinishedCallback?.invoke(session)
     }
 
@@ -43,9 +42,13 @@ class NativeCodeTerminalSessionClient(
     override fun onPasteTextFromClipboard(session: TerminalSession) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString() ?: return
-        executor.execute {
+        val view = terminalViewRef()
+        val apply = Runnable {
+            view?.setTopRow(0)
             session.emulator?.paste(text) ?: session.write(text)
         }
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) apply.run()
+        else view?.post(apply) ?: android.os.Handler(android.os.Looper.getMainLooper()).post(apply)
     }
 
     override fun onBell(session: TerminalSession) {}

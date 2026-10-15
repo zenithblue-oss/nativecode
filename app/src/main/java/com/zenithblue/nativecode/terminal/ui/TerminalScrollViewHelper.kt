@@ -58,7 +58,7 @@ object TerminalScrollViewHelper {
         context: Context,
         session: TerminalSession?,
         customTypeface: Typeface? = null,
-        title: String = "TERMINAL SCROLLVIEW"
+        title: String = "Transcript (read-only)"
     ) {
         val transcript = transcriptOf(session)
         val density = context.resources.displayMetrics.density

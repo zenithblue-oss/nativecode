@@ -23,6 +23,12 @@ object GhGuestCommands {
     fun detectGh(): String =
         "if command -v gh >/dev/null 2>&1; then echo GH_OK; gh --version 2>&1 | head -1; else echo GH_MISSING; fi"
 
+    /** One guest start: install/version frame, then whoami frame. Exit 0 only when both succeed. */
+    fun detectAndWhoami(): String =
+        "if ! command -v gh >/dev/null 2>&1; then echo GH_MISSING; echo '---NC-WHOAMI---'; exit 2; fi; " +
+            "echo GH_OK; gh --version 2>&1 | head -1; echo '---NC-WHOAMI---'; " +
+            "gh api user -q .login 2>&1; rc=\$?; echo; echo \"NC_WHOAMI_EXIT:\$rc\"; exit \$rc"
+
     fun installPrimary(): String =
         "if command -v apk >/dev/null 2>&1; then " +
             "apk update && apk add --no-cache github-cli; " +

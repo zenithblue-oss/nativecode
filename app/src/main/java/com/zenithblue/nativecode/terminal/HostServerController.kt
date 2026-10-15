@@ -32,9 +32,20 @@ object HostServerController {
     @Volatile
     private var pulseProcess: Process? = null
 
+    @Volatile
+    private var bgThread: Thread? = null
+
     private val bgExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-        Thread(r, "host-server-controller-bg").apply { isDaemon = true }
+        Thread(r, "host-server-controller-bg").apply {
+            isDaemon = true
+            bgThread = this
+        }
     }
+
+    private val ensureLock = Any()
+
+    /** In-flight prepare, keyed by rootfs + GPU config generation. Same key joins; a new key is queued, not dropped. */
+    private val inFlightByGen = HashMap<String, java.util.concurrent.Future<*>>()
 
     @Volatile
     private var cachedVenusStatus: Pair<Long, Status>? = null
@@ -60,14 +71,33 @@ object HostServerController {
     }
 
     fun status(kind: Kind, forceRefresh: Boolean = false): Status {
-        val now = System.currentTimeMillis()
+        val now = System.nanoTime() / 1_000_000L
         if (!forceRefresh) {
+            val live = if (kind == Kind.VENUS) venusProcess else pulseProcess
+            val handleDead = live != null && !live.isAlive
             val cached = when (kind) {
                 Kind.VENUS -> cachedVenusStatus
                 Kind.PULSE -> cachedPulseStatus
             }
-            if (cached != null && (now - cached.first) < STATUS_CACHE_TTL_MS) {
+            // Venus "running" with a missing socket is not healthy — fall through so recovery can see it.
+            val socketDown = kind == Kind.VENUS &&
+                cached?.second?.running == true &&
+                !socketFile().exists()
+            if (cached != null &&
+                (now - cached.first) < STATUS_CACHE_TTL_MS &&
+                !handleDead &&
+                !socketDown
+            ) {
                 return cached.second
+            }
+            // Live handle is enough inside the health window. /proc only when dead, socket-down, stale, or forced.
+            if (live?.isAlive == true && (kind != Kind.VENUS || socketFile().exists())) {
+                val st = Status(kind, binary(kind).isFile, true, "running (live handle)")
+                when (kind) {
+                    Kind.VENUS -> cachedVenusStatus = now to st
+                    Kind.PULSE -> cachedPulseStatus = now to st
+                }
+                return st
             }
         }
         val bin = binary(kind)
@@ -90,8 +120,8 @@ object HostServerController {
         return st
     }
 
-    fun start(ctx: Context, kind: Kind): String {
-        val st = status(kind, forceRefresh = true)
+    fun start(ctx: Context, kind: Kind, forceRefresh: Boolean = false): String {
+        val st = status(kind, forceRefresh)
         if (!st.binaryExists) return "${label(kind)}: binary missing (rebuild bootstrap)"
         if (st.running) return "${label(kind)}: already ${st.detail}"
         File(TermuxHostPaths.TMPDIR).mkdirs()
@@ -109,13 +139,44 @@ object HostServerController {
      * Runs asynchronously on a background executor by default to keep the UI thread responsive.
      */
     fun ensureServers(ctx: Context, async: Boolean = true) {
-        if (async) {
-            bgExecutor.execute {
-                runEnsureServers(ctx)
+        val app = ctx.applicationContext
+        val key = configGeneration(app)
+        val future = synchronized(ensureLock) {
+            inFlightByGen.entries.removeAll { it.value.isDone }
+            val flying = inFlightByGen[key]
+            if (flying != null && !flying.isDone) {
+                flying
+            } else {
+                val submitted = bgExecutor.submit { runEnsureServers(app) }
+                inFlightByGen[key] = submitted
+                submitted
             }
-        } else {
-            runEnsureServers(ctx)
         }
+        if (!async && Thread.currentThread() != bgThread) {
+            try {
+                future.get()
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /** Rootfs path + the GPU files GuestGpuConfig would write. Different config is a different key. */
+    private fun configGeneration(ctx: Context): String {
+        val detect = GpuAccelDetector.detect()
+        val alpaquita = File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpaquita/rootfs")
+        val alpine = File(ctx.filesDir, "usr/var/lib/proot-distro/containers/alpine/rootfs")
+        val root = when {
+            alpaquita.isDirectory -> alpaquita.absolutePath
+            alpine.isDirectory -> alpine.absolutePath
+            else -> ""
+        }
+        val backend = when (detect.mode) {
+            GpuAccelDetector.MODE_TURNIP -> GpuAccelDetector.MODE_TURNIP
+            GpuAccelDetector.MODE_PANVK -> "panvk-zink"
+            else -> "zink-venus"
+        }
+        return listOf(root, detect.mode, backend, detect.vendorHint, GpuAccelDetector.methodLabel(backend))
+            .joinToString("\u0000")
     }
 
     private fun runEnsureServers(ctx: Context) {

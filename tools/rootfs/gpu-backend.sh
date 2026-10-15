@@ -104,12 +104,22 @@ gpu_mali_present() {
     [ -e /dev/mali0 ] || [ -e /dev/mali ]
 }
 
+# PanVK rc3 must NOT run with kbase_shim.so preloaded (gpu_id decoded as v10 -> "Unknown gpu_id").
+# Strip it if an old profile exported it.
 gpu_kbase_shim() {
-    _shim=/opt/nativecode/panvk/lib/kbase_shim.so
-    [ -f "$_shim" ] || return 0
-    case ":${LD_PRELOAD:-}:" in
-        *:"$_shim":*) ;;
-        *) export LD_PRELOAD="${_shim}${LD_PRELOAD:+:$LD_PRELOAD}" ;;
+    case "${LD_PRELOAD:-}" in
+        *kbase_shim.so*)
+            _np=""
+            _oldifs=$IFS
+            IFS=:
+            for _p in $LD_PRELOAD; do
+                case "$_p" in ""|*/kbase_shim.so) continue ;; esac
+                _np="${_np:+$_np:}$_p"
+            done
+            IFS=$_oldifs
+            if [ -n "$_np" ]; then export LD_PRELOAD="$_np"; else unset LD_PRELOAD; fi
+            unset _np _oldifs _p
+            ;;
     esac
 }
 
@@ -146,12 +156,10 @@ gpu_apply() {
                 ;;
         esac
     fi
-    _fd=$(gpu_find_icd freedreno 2>/dev/null || true)
-    _pv=$(gpu_find_icd panvk 2>/dev/null || true)
-    _vn=$(gpu_find_icd virtio 2>/dev/null || true)
     export VTEST_SOCKET_NAME="$VTEST_SOCK"
     case "$_be" in
         turnip)
+            _fd=$(gpu_find_icd freedreno 2>/dev/null || true)
             export MESA_LOADER_DRIVER_OVERRIDE=zink
             export GALLIUM_DRIVER=zink
             [ -n "$_fd" ] && export VK_DRIVER_FILES="$_fd" && export VK_ICD_FILENAMES="$_fd"
@@ -162,6 +170,7 @@ gpu_apply() {
             export MESA_NO_ERROR=1
             ;;
         panfrost)
+            _pv=$(gpu_find_icd panvk 2>/dev/null || true)
             export LD_LIBRARY_PATH="$GPU_MESA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             export LIBGL_DRIVERS_PATH="$GPU_MESA_PREFIX/lib/dri"
             export GALLIUM_DRIVER=panfrost
@@ -170,12 +179,14 @@ gpu_apply() {
             gpu_kbase_shim
             ;;
         panvk)
+            _pv=$(gpu_find_icd panvk 2>/dev/null || true)
             [ -n "$_pv" ] && export VK_DRIVER_FILES="$_pv" && export VK_ICD_FILENAMES="$_pv"
             gpu_kbase_shim
             export WSI_X11_TERMUX=1
             export PANVK_KBASE_DRI3=raw
             ;;
         panvk-zink|zink-panvk)
+            _pv=$(gpu_find_icd panvk 2>/dev/null || true)
             export MESA_LOADER_DRIVER_OVERRIDE=zink
             export GALLIUM_DRIVER=zink
             [ -n "$_pv" ] && export VK_DRIVER_FILES="$_pv" && export VK_ICD_FILENAMES="$_pv"
@@ -186,6 +197,7 @@ gpu_apply() {
             export MESA_NO_ERROR=1
             ;;
         venus|zink-venus)
+            _vn=$(gpu_find_icd virtio 2>/dev/null || true)
             # Same as zink-venus: GL via Zink, Vulkan via virtio ICD + vtest.
             export VN_DEBUG=vtest
             export GALLIUM_DRIVER=zink

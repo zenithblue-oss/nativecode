@@ -59,37 +59,27 @@ object ProotCommandBuilder {
             remove("LD_PRELOAD")
         }
 
-    private fun pythonCmd(ctx: Context): String {
-        val pythonBin = "${TermuxHostPaths.BIN}/python"
-        return if (File("/system/bin/linker64").exists()) {
-            "/system/bin/linker64 $pythonBin"
-        } else {
-            pythonBin
-        }
-    }
-
     fun build(
         ctx: Context,
         shellCmd: String,
         user: String = "flux",
         useSharedTmp: Boolean = true
     ): Pair<Array<String>, HashMap<String, String>> {
-        val shell = TermuxHostPaths.libBash(ctx).absolutePath
-        val sharedTmpFlag = if (useSharedTmp) "--shared-tmp" else ""
-        val prootDistro = TermuxHostPaths.PROOT_DISTRO
-
-        // Single-quote guest payload so host bash never expands $HOME/$PATH/etc.
-        // Escape embedded single quotes: ' → '\''.
-        val distro = resolveDistro(ctx)
-        val escaped = (ANDROID_DEV_ENV + GPU_ENV + shellCmd).replace("'", "'\\''")
-        val py = pythonCmd(ctx)
-        val command =
-            "exec $py $prootDistro login $distro $sharedTmpFlag --user $user -- " +
-                "/bin/bash --noprofile --norc -c '$escaped'"
-        val args = arrayOf(shell, "-c", command)
-
-        val envMap = prootHostEnv(ctx)
-        return args to envMap
+        // Payload is one argv element. Guest bash interprets it; do not re-escape.
+        // Linker prefix is added once by ShellCommandRunner.adjustHostCmd / sessionExec.
+        val args = buildList {
+            add("${TermuxHostPaths.BIN}/python")
+            add(TermuxHostPaths.PROOT_DISTRO)
+            add("login")
+            add(resolveDistro(ctx))
+            if (useSharedTmp) add("--shared-tmp")
+            add("--user"); add(user)
+            add("--")
+            add("/bin/bash"); add("--noprofile"); add("--norc")
+            add("-c")
+            add(ANDROID_DEV_ENV + GPU_ENV + shellCmd)
+        }.toTypedArray()
+        return args to prootHostEnv(ctx)
     }
 
     private fun ensureSysdata(sysdataDir: File) {
@@ -149,6 +139,36 @@ object ProotCommandBuilder {
         user: String = "flux",
         workDir: String? = null,
         useSharedTmp: Boolean = true
+    ): Pair<Array<String>, HashMap<String, String>> =
+        buildDirect(ctx, user, workDir, useSharedTmp, listOf("/bin/bash", "-l"))
+
+    /**
+     * Terminal tools only. Guest runs the launcher directly under PRoot — no Python.
+     * [toolArgv] is already split; this does not parse command strings.
+     */
+    fun buildTool(
+        ctx: Context,
+        toolArgv: List<String>,
+        user: String = "flux",
+        workDir: String? = null,
+        useSharedTmp: Boolean = true
+    ): Pair<Array<String>, HashMap<String, String>> =
+        buildDirect(
+            ctx, user, workDir, useSharedTmp,
+            listOf("/bin/bash", "--noprofile", "--norc", "-c", toolLaunch(toolArgv))
+        )
+
+    private fun toolLaunch(toolArgv: List<String>): String {
+        val q = toolArgv.joinToString(" ") { "'" + it.replace("'", "'\\''") + "'" }
+        return ". /etc/profile.d/flux-gpu.sh 2>/dev/null || true; exec /tmp/launch_tool.sh $q"
+    }
+
+    private fun buildDirect(
+        ctx: Context,
+        user: String,
+        workDir: String?,
+        useSharedTmp: Boolean,
+        guestArgv: List<String>
     ): Pair<Array<String>, HashMap<String, String>> {
         HostServerController.ensureGuestGpu(ctx)
 
@@ -289,9 +309,7 @@ object ProotCommandBuilder {
             argsList.add("--bind=${TermuxHostPaths.TMPDIR}:/tmp")
         }
 
-        // Direct login bash
-        argsList.add("/bin/bash")
-        argsList.add("-l")
+        argsList.addAll(guestArgv)
 
         // Environment map
         val envMap = prootHostEnv(ctx).apply {

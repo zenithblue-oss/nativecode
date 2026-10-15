@@ -1,9 +1,9 @@
 # Monetisation — Freemium (Free + Pro)
 
 **Date:** 2026-08-01  
-**Status:** plan (not implemented)  
+**Status:** PR1 in progress  
 **Model:** freemium, one premium tier  
-**Principle:** **local-first free** — Debian, shell, git, GitHub, basic catalog stay free forever. Gate multi-agent concurrency, extra AI CLIs, unlimited desktop, full marketplace.
+**Principle:** **local-first free** — Debian, shell, git, GitHub, basic catalog stay free (interactive shells are Pro; free = opencode tab + 30 min/day desktop). Gate multi-agent concurrency, extra AI CLIs, unlimited desktop, full marketplace.
 
 **Related:** `docs/policy/Google_Play_Store_Policy_Compliance_Checklist.md` §A4 (Billing N/A today); `docs/plan/software-manager-marketplace.md`; `ToolLauncherCatalog` free/paid split.
 
@@ -15,9 +15,9 @@
 
 | Goal | Meaning |
 |------|---------|
-| **Free forever useful** | User can install Debian (PRoot), use terminal/shell, git workspace + GitHub, 1 AI CLI, limited XFCE, basic marketplace, 1 project agent workspace |
+| **Free tier useful** | User can install Debian (PRoot), use the opencode tab (1 AI CLI), 30 min/day desktop, basic marketplace (projects, workspace, GitHub login = Pro). Interactive shells = Pro |
 | **Pro unlocks scale** | All AI CLIs, unlimited XFCE, full marketplace, unlimited multi-project agents, 5+ parallel agent sessions |
-| **Local-first** | Never paywall rootfs, shell, apt Software Manager inventory, git porcelain, GH CLI, host scripts, repairs |
+| **Local-first** | Never paywall rootfs, apt Software Manager inventory, git porcelain, GH CLI, host scripts, repairs. Interactive shells are Pro |
 | **Play-compliant** | Digital unlocks via **Google Play Billing** only; no external pay links for Pro |
 | **Hard to bypass casually** | Entitlements cached + Play verify; gates at UI **and** create/launch paths (not label-only) |
 
@@ -41,15 +41,16 @@ Prices (USD, Play-managed; final SKUs may differ by region tax):
 | Feature | Free | Pro |
 |---------|------|-----|
 | Debian PRoot install | ✓ | ✓ |
-| Terminal + shell (flux/root) | ✓ | ✓ |
-| Git workspace + GitHub | ✓ | ✓ |
+| Interactive terminal shell (flux/root, `ProFeature.SHELL`) | — (free = opencode tab only) | ✓ |
+| Plain git in terminal | ✓ | ✓ |
+| **Projects** — create (`addAndOpenProject`), import/clone, workspace (`openProjectWorkspace`) | — (0 projects) | ✓ |
+| **GitHub login** (`gh auth login`; `GitHubCliService` / Settings GitHub card) | — | ✓ |
 | Software Manager (apt inventory) | ✓ | ✓ |
 | Host scripts / repairs / onboarding | ✓ | ✓ |
 | **1 AI CLI launcher** (pick or fixed; default **codex** on proot; **opencode** if chroot hides codex) | ✓ | ✓ |
 | **All AI CLIs** (opencode, codex, claude-code, agy, qwen-code, grok, kiro; chroot still hides codex) | — | ✓ |
 | XFCE4 desktop (X11 + VirGL) | **limited** session cap | **unlimited** |
 | Marketplace | **basic catalog** | **full catalog** |
-| Multi-project agents | **1 project** in agent workspace | **unlimited** |
 | Agent sessions / parallel | **1** concurrent AI/agent session | **5+** (default 5, configurable constant) |
 
 ### “Stricter free, local mostly free” policy
@@ -57,10 +58,9 @@ Prices (USD, Play-managed; final SKUs may differ by region tax):
 **Always free (local / core):**
 
 - PRoot/chroot install & switch  
-- App terminal + Debian shell (non-AI types `shell`, `shell-root`)  
-- Unlimited **non-AI** terminal tabs (optional soft cap later for battery only — not monetisation)  
-- Projects as **folders/repos** for browse/git (see §3.4 nuance)  
-- Git + GitHub connect  
+- Non-interactive internal runs (installers, apt, setup, git/gh services)  
+- **Superseded:** interactive `shell` / `shell-root` tabs are Pro (any shell could run any AI CLI); free = opencode tab only  
+- Plain git in the terminal (no `gh auth login`)  
 - Software Manager  
 - Marketplace **basic** tier packages  
 - One AI CLI install + login + launch  
@@ -71,8 +71,9 @@ Prices (USD, Play-managed; final SKUs may differ by region tax):
 |-------|------------|-----------|--------|
 | AI CLI tools unlocked | 1 | all | Install of locked tools blocked or UI-locked with upgrade sheet |
 | Concurrent **AI** sessions (app + workspace combined types in `ToolLauncherCatalog.isAiToolType`) | 1 | 5 | Shell sessions do **not** count |
-| Projects with **agent workspace open** (multi-project agents) | 1 “active agent project” | unlimited | Free may still create/browse many git projects; only **one** may run agent sessions / multi-tool workspace at a time |
-| XFCE continuous runtime | e.g. **30 min / day** wall clock, or **single session ≤ 30 min** then soft-stop + upgrade | unlimited | Prefer **session length + daily budget** so free can “try desktop” |
+| Projects (create / import / workspace) | 0 | unlimited | Pro-only. Replaces former “1 agent project, unlimited plain git projects” rule |
+| GitHub login (`gh auth login`) | — | ✓ | Pro-only; plain git stays free |
+| XFCE runtime | **30 min / day** wall clock, then hard stop + upgrade | unlimited | Decided §9 |
 | Marketplace packages | `tier=basic` only | `basic` + `pro` | Catalog field; unknown tier → basic |
 
 **Stricter than original sketch where it helps conversion without gutting free:**
@@ -84,7 +85,7 @@ Prices (USD, Play-managed; final SKUs may differ by region tax):
 
 **Looser on local** vs aggressive freemium apps:
 
-- Do **not** limit shell tabs, rootfs size, apt, clone count, or git ops.  
+- Interactive shell tabs are **Pro** (owner decision); free = opencode tab + 30 min/day desktop. Do **not** limit rootfs size, apt, clone count, or git ops.  
 - Do **not** require Pro for chroot/root.  
 - Do **not** watermark terminal.
 
@@ -235,6 +236,8 @@ Vendor “paid product” wording moves to tool subtitle only.
 
 ### 3.4 Multi-project agents (nuance)
 
+> **Superseded:** projects, import, workspace and GitHub login are Pro-only (free = 0 projects). Kept below for history.
+
 “1 project free / unlimited Pro” maps poorly if every git folder is a “project”.
 
 **Definition for gating:**
@@ -363,6 +366,8 @@ Upgrade sheet copy: matrix bullets + 3 price buttons (mo / yr / lifetime) + Rest
 
 **Files:** new `entitlements/*`; touch session create, startGui, add project agent path, marketplace install, tool cards.
 
+**As built:** `entitlements/` scaffold + `MONETISATION_ENFORCE=false` + `FeatureGateTest`. Call-site wiring deferred to PR2–PR4 (no behaviour change while enforce is off).
+
 ### PR2 — Align AI free/pro catalog
 
 - Resolve free tool SSOT (`opencode` default + optional picker)  
@@ -371,13 +376,13 @@ Upgrade sheet copy: matrix bullets + 3 price buttons (mo / yr / lifetime) + Rest
 
 **Files:** `ToolLauncherCatalog.kt`, `MainActivity` tool sections, `CliToolsInstaller` / Settings AI list, `AiCliProvisionState` optional.
 
-### PR3 — Session + agent project + XFCE budgets
+### PR3 — Session + projects + GitHub login + XFCE budgets
 
 - AI session counter gate  
-- Agent project single-slot free  
+- Pro-only entry points (`FeatureGate.canUse`): project create (`addAndOpenProject`), project import/clone, workspace (`openProjectWorkspace`), GitHub login (`GitHubCliService` / `buildSettingsGithubCard`)  
 - `XfceSessionBudget` + `BackgroundService` timer + auto stop  
 
-**Files:** `MainActivity` session create, `BackgroundService`, new budget class.
+**Files:** `MainActivity` session create + project/workspace paths, `GitHubCliService`, `BackgroundService`, new budget class.
 
 ### PR4 — Marketplace tiers
 
@@ -416,7 +421,7 @@ Upgrade sheet copy: matrix bullets + 3 price buttons (mo / yr / lifetime) + Rest
 | 3 | Launch free AI only | works | works |
 | 4 | Launch second AI tool | upgrade | works |
 | 5 | Two AI sessions | blocked | up to 5 |
-| 6 | Shell tabs ×10 | works | works |
+| 6 | Shell / root-shell tab | upgrade sheet | works (10 tabs) |
 | 7 | AI in project A then B | block B agent | works |
 | 8 | XFCE 0 budget | block | unlimited |
 | 9 | XFCE mid-session expire | auto stop | n/a |
@@ -450,13 +455,13 @@ Upgrade sheet copy: matrix bullets + 3 price buttons (mo / yr / lifetime) + Rest
 
 ## 9. Open questions (need product call)
 
-1. **Free AI tool:** fixed opencode vs user-pick once vs fixed codex (proot-only)?  
-2. **XFCE budget:** 30 min/day vs 30 min/session vs 60 min/week?  
+1. ~~**Free AI tool:**~~ **Resolved:** fixed **opencode**.  
+2. ~~**XFCE budget:**~~ **Resolved:** **30 min/day** free.  
 3. **Marketplace pro packages:** show locked vs hide entirely?  
 4. **Lifetime install of locked AI:** allow silent install of all bins vs free installs only free tool?  
 5. **Pro session cap 5:** hard limit or soft?  
-6. **Grandfather:** existing users all Free with promo lifetime?  
-7. **Price final:** confirm $3.99 / $29.99 / $19.99 vs regional experiments?
+6. ~~**Grandfather:**~~ **Resolved:** no special handling — existing users get no grace period or grandfathering.  
+7. ~~**Price final:**~~ **Resolved:** approved **$3.99/mo · $29.99/yr · $19.99 lifetime**.
 
 ---
 
@@ -464,12 +469,15 @@ Upgrade sheet copy: matrix bullets + 3 price buttons (mo / yr / lifetime) + Rest
 
 | Risk | Mitigation |
 |------|------------|
+| opencode itself can run shell commands via its bash tool | Accepted; can't be gated without crippling opencode |
+| Free desktop (30 min/day) includes a terminal app = shell access | Accepted by owner |
 | Root/shell bypass of marketplace scripts | Accept guest freedom; gate **app UI install path**; don’t claim secure DRM |
 | Users install AI CLIs via apt/npm in shell | Expected; Pro sells **integrated launchers, multi-session UX, desktop time, catalog** — not crypto lock on bins |
 | Play policy rejection | Billing only, clear subscription disclosure, no external pay |
 | MainActivity merge conflicts | Thin gate calls; avoid large refactors in same PR as billing |
 | Offline false Free | 7-day Pro cache grace |
 | Lifetime vs sub double-own | Prefer highest entitlement; don’t double charge UX |
+| Existing users with projects lose access when `MONETISATION_ENFORCE` flips on | Accepted: user chose no grace period / grandfathering (§9.6) |
 
 ---
 

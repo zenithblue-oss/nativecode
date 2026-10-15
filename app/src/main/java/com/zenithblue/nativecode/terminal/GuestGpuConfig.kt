@@ -27,9 +27,18 @@ object GuestGpuConfig {
         write(dir, "gpu_method", GpuAccelDetector.methodLabel(backend))
     }
 
+    /** Atomic replace, and only when the value actually changed. */
     private fun write(dir: File, name: String, value: String) {
         try {
-            File(dir, name).writeText("$value\n")
+            val dest = File(dir, name)
+            val text = "$value\n"
+            if (dest.isFile && dest.readText() == text) return
+            val tmp = File(dir, ".$name.tmp")
+            tmp.writeText(text)
+            if (!tmp.renameTo(dest)) {
+                dest.writeText(text)
+                tmp.delete()
+            }
         } catch (_: Throwable) {
         }
     }
