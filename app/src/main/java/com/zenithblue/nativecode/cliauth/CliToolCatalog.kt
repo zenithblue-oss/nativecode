@@ -30,8 +30,14 @@ data class CliToolDef(
     val envKey: String? = null,
     val subtitle: String = "",
     /** Works without login (free built-in models): cards show no LOGIN prompt unless already signed in. */
-    val loginOptional: Boolean = false
+    val loginOptional: Boolean = false,
+    /** Agent chat wire protocol (item 12); null = terminal only until that runtime ships. */
+    val chat: ChatProtocol? = null,
+    /** [ChatProtocol.ACP] profile id (argv, env, mode map) when [chat] is ACP. */
+    val acpProfile: String? = null
 )
+
+enum class ChatProtocol { OPENCODE_HTTP, CLAUDE_STREAM, CODEX_APP_SERVER, ACP }
 
 object CliToolCatalog {
 

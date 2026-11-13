@@ -88,6 +88,7 @@ import com.zenithblue.nativecode.media.MediaCodecDecodeBenchmark
 import com.zenithblue.nativecode.media.MediaCodecEncodeBenchmark
 import com.zenithblue.nativecode.agent.AgentBridgeServer
 import com.zenithblue.nativecode.agent.AgentBridgeProtocol
+import com.zenithblue.nativecode.agent.chat.AgentChats
 import org.json.JSONObject
 import com.zenithblue.nativecode.media.MediaBridgeServer
 import com.zenithblue.nativecode.cliauth.*
@@ -479,6 +480,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private var workspaceLaunchWatermark = 0L
     private var pendingAppTerminalSlots = 0
     private var pendingWorkspaceTerminalSlots = 0
+    private var pendingAiTerminalLaunches = 0
+    /** Project whose tabs are in [workspaceSessions] right now ("" = none loaded yet). */
+    private var workspaceLoadedPath = ""
+    private val chatsChanged: () -> Unit = { mainHandler.post { if (!isDestroyed) syncTerminalServices() } }
     private val bootstrapLock = Any()
     @Volatile private var bootstrapReady = false
     @Volatile private var bootstrapInFlight = false
@@ -641,6 +646,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         com.zenithblue.nativecode.bridge.NativeCodeBridge.start(this)
         // Pro: connect Play Billing (queries products + purchases)
         BillingRepository.init(this)
+        AgentChats.onChanged = chatsChanged
+        if (AgentChats.liveCount() + AgentChats.startingCount() > 0) chatsChanged() // chats outlived a recreate
 
         // Enable fullscreen/immersive mode
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -951,22 +958,23 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun syncTerminalServices() {
         ensurePostNotificationsPermission()
-        val appCount = sessionsList.count { it.isRunning }
+        // Agent chats count like tabs: chat-only use must keep the FGS too (R4 B4).
+        val appCount = sessionsList.count { it.isRunning } + AgentChats.countFor(null)
         saveActiveProjectSessions()
 
         val projectList = ArrayList<TerminalService.ProjectState>()
         val allProjects = getProjects()
-        for ((path, sessions) in projectSessionsMap) {
-            val runningSessions = sessions.filter { it.isRunning }
-            if (runningSessions.isNotEmpty()) {
+        for (path in projectSessionsMap.keys + AgentChats.projectPaths()) {
+            val running = (projectSessionsMap[path]?.count { it.isRunning } ?: 0) + AgentChats.countFor(path)
+            if (running > 0) {
                 val name = allProjects.find { it.path == path }?.name
                     ?: if (path == activeProjectPath && activeProjectName.isNotEmpty()) activeProjectName else File(path).name
-                val tabs = projectTabNamesMap[path] ?: emptyList()
+                val tabs = (projectTabNamesMap[path] ?: emptyList()) + AgentChats.toolsFor(path)
                 projectList.add(
                     TerminalService.ProjectState(
                         name = name,
                         path = path,
-                        sessionCount = runningSessions.size,
+                        sessionCount = running,
                         tabNames = tabs
                     )
                 )
@@ -2277,7 +2285,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             return
         }
         maybeToastHeavyToolLaunch(type)
-        val ticket = captureTerminalLaunch(app = true)
+        val ticket = captureTerminalLaunch(app = true, type)
         val user = LinuxCommandBuilder.sessionUserForType(type)
         // Warm RootShell su cache so ChrootCommandBuilder.shellRootCommand uses discovered path
         if (!BuildConfig.PLAY_STORE_BUILD && ticket.method == "chroot") {
@@ -2316,14 +2324,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val projectGen: Int,
         val method: String,
         val methodGen: Int,
-        val rootfs: String
+        val rootfs: String,
+        val ai: Boolean
     )
 
-    private fun captureTerminalLaunch(app: Boolean): TerminalLaunchTicket {
+    private fun captureTerminalLaunch(app: Boolean, type: String): TerminalLaunchTicket {
         val seq = ++terminalLaunchSeq
         if (app) appLaunchWatermark = seq else workspaceLaunchWatermark = seq
         val method = if (app) LinuxCommandBuilder.currentMethod else projectGitMethod()
+        val ai = ToolLauncherCatalog.isAiToolType(type)
+        if (ai) pendingAiTerminalLaunches++ // counted by aiLaunchAllowed until the tab exists or the launch fails
         return TerminalLaunchTicket(
+            ai = ai,
             app = app,
             seq = seq,
             lifecycle = terminalLifecycleGeneration,
@@ -2338,6 +2350,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Drop reservation. False when a newer request of the same kind already owns the slot. */
     private fun releaseTerminalLaunch(ticket: TerminalLaunchTicket): Boolean {
         if (ticket.app) pendingAppTerminalSlots-- else pendingWorkspaceTerminalSlots--
+        if (ticket.ai) pendingAiTerminalLaunches--
         val watermark = if (ticket.app) appLaunchWatermark else workspaceLaunchWatermark
         return ticket.seq == watermark
     }
@@ -5450,7 +5463,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     /** Billing hook: Pro card text always; rebuild the visible page only when Pro actually flips. */
     private fun onEntitlementChanged() {
-        GuestGate.sync(this) // guest shims read this state; keep it current before any CLI runs
+        GuestGate.syncAsync(this) // guest shims read this state; keep it current before any CLI runs
         refreshProCard()
         paintGuiBudget() // also re-reads minutes on every resume
         val pro = isPro()
@@ -5473,11 +5486,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     /** AI tool + concurrent AI session gates (app tabs + all project workspaces). */
     private fun aiLaunchAllowed(type: String): Boolean {
-        GuestGate.sync(this)
+        GuestGate.syncAsync(this)
         if (!ToolLauncherCatalog.isAiToolType(type)) return gateAllows(FeatureGate.canOpenShell(isPro()))
         if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), type))) return false
-        val others = projectTabNamesMap.filterKeys { it != activeProjectPath }.values.flatten()
-        val aiCount = (terminalSessionTypes + workspaceTabNames + others).count { ToolLauncherCatalog.isAiToolType(it) }
+        val others = projectTabNamesMap.filterKeys { it != workspaceLoadedPath }.values.flatten()
+        val tabs = (terminalSessionTypes + workspaceTabNames + others).count { ToolLauncherCatalog.isAiToolType(it) }
+        // Launches still starting count too, or fast taps (or a chat handshake) pass the cap together.
+        val aiCount = tabs + pendingAiTerminalLaunches + AgentChats.liveCount() + AgentChats.startingCount()
         val ok = gateAllows(FeatureGate.canOpenAiSession(isPro(), aiCount))
         if (ok) {
             Telemetry.logOnce(this, Telemetry.Event.FIRST_AI_SESSION, Telemetry.Param.TOOL to type)
@@ -14533,9 +14548,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         super.onDestroy()
         resourceMonitorRunnable?.let { mainHandler.removeCallbacks(it) }
         desktop.onHostDestroyed(isChangingConfigurations)
-        stopService(Intent(this, TerminalService::class.java))
-        for (session in sessionsList) {
+        if (AgentChats.onChanged === chatsChanged) AgentChats.onChanged = null
+        // Terminal tabs are Activity-owned (views, session clients), so they end with it; the manifest's
+        // configChanges keeps theme, font scale, density and locale changes from recreating it at all.
+        // Workspace and background-project tabs too, or they run on uncounted (R4 B5). Chats are
+        // process-scoped: a recreate keeps them, a real finish (back, swipe-away) stops them.
+        for (session in (sessionsList + workspaceSessions + projectSessionsMap.values.flatten()).distinct()) {
             session.finishIfRunning()
+        }
+        if (!isChangingConfigurations) AgentChats.stopAll()
+        if (AgentChats.liveCount() + AgentChats.startingCount() == 0) {
+            stopService(Intent(this, TerminalService::class.java))
         }
         scriptInstallSession?.finishIfRunning()
         mpInstallerSession?.finishIfRunning()
@@ -19857,7 +19880,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         bindWorkspaceProjectIcon(workspaceProjectIconIv, iconStr)
 
         refreshWorkspaceDirTree()
-        
+
+        saveActiveProjectSessions() // the tabs on screen still belong to the previously loaded project
+        workspaceLoadedPath = activeProjectPath
         val sessions = projectSessionsMap.getOrPut(activeProjectPath) { ArrayList() }
         val tabNames = projectTabNamesMap.getOrPut(activeProjectPath) { ArrayList() }
         val activeIdx = projectActiveTabIndexMap.get(activeProjectPath) ?: -1
@@ -19924,7 +19949,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             return
         }
         maybeToastHeavyToolLaunch(type)
-        val ticket = captureTerminalLaunch(app = false)
+        val ticket = captureTerminalLaunch(app = false, type)
         // shell-root: login at /root (no project cwd — avoid root-owned files under flux home)
         val workDir = if (type == "shell-root") null else ticket.project
         val user = LinuxCommandBuilder.sessionUserForType(type)
@@ -19999,12 +20024,34 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         updateProjectTerminalService()
     }
 
+    /**
+     * Files the workspace tabs under the project they belong to ([workspaceLoadedPath]), never under
+     * [activeProjectPath]: that one changes before [openProjectWorkspace] swaps the tabs (R4 B13).
+     */
     private fun saveActiveProjectSessions() {
-        if (activeProjectPath.isNotEmpty()) {
-            projectSessionsMap[activeProjectPath] = ArrayList(workspaceSessions)
-            projectTabNamesMap[activeProjectPath] = ArrayList(workspaceTabNames)
-            projectActiveTabIndexMap[activeProjectPath] = activeWorkspaceTabIndex
+        val path = workspaceLoadedPath
+        if (path.isNotEmpty()) {
+            projectSessionsMap[path] = ArrayList(workspaceSessions)
+            projectTabNamesMap[path] = ArrayList(workspaceTabNames)
+            projectActiveTabIndexMap[path] = activeWorkspaceTabIndex
         }
+    }
+
+    /** Ends every terminal tab and agent chat of [path] and forgets its tab state. */
+    private fun stopProjectSessions(path: String) {
+        if (path.isEmpty()) return
+        saveActiveProjectSessions()
+        projectSessionsMap.remove(path)?.forEach { terminateSessionProcesses(it); it.finishIfRunning() }
+        projectTabNamesMap.remove(path)
+        projectActiveTabIndexMap.remove(path)
+        if (workspaceLoadedPath == path) {
+            workspaceSessions.clear()
+            workspaceTabNames.clear()
+            activeWorkspaceTabIndex = -1
+            workspaceLoadedPath = ""
+        }
+        AgentChats.stopProject(path)
+        syncTerminalServices()
     }
 
     private fun switchWorkspaceTab(index: Int) {
@@ -21178,6 +21225,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 list.removeAt(idx)
                 saveProjects(list)
                 Toast.makeText(this@MainActivity, "Project removed.", Toast.LENGTH_SHORT).show()
+                stopProjectSessions(activeProjectPath) // else they run on, counted, with no tab to close (R4 B20)
                 activeProjectName = ""
                 activeProjectPath = ""
                 while (pageStack.isNotEmpty() && (

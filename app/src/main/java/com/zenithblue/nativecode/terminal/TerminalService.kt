@@ -179,10 +179,11 @@ class TerminalService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        // count = terminal tabs + agent chats (MainActivity.syncTerminalServices)
         val text = if (count == 1) {
-            "1 terminal session running"
+            "1 session running (terminal + chat)"
         } else {
-            "$count terminal sessions running"
+            "$count sessions running (terminal + chat)"
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID_APP)
