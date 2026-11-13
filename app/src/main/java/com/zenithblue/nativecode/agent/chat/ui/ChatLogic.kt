@@ -147,7 +147,7 @@ object ChatLogic {
     fun contextFraction(used: Long?, size: Long?): Float? =
         if (used == null || size == null || size <= 0) null else (used.toFloat() / size).coerceIn(0f, 1f)
 
-    private val hunk = Regex("""^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
+    private val hunk = Regex("""^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@""")
 
     /** Unified diff (git or bare) to files. [fallbackPath] names a header-less single-file diff. */
     fun parseUnifiedDiff(patch: String, fallbackPath: String = "file"): List<DiffFile> {
@@ -157,9 +157,13 @@ object ChatLogic {
         var lines = ArrayList<DiffLine>()
         var add = 0; var del = 0; var o = 0; var n = 0
         var inHunk = false
+        var hunks = 0; var oldEmpty = true; var newEmpty = true // header-less patches (opencode, jsdiff): `@@ -0,0` = added
         fun flush() {
+            // ponytail: one `-0,0` hunk is also a -U0 insert at line 1 of a non-empty file; jsdiff/git default context never emit that
+            if (kind == 'M' && hunks == 1) kind = if (oldEmpty) 'A' else if (newEmpty) 'D' else kind
             if (path != null || lines.isNotEmpty()) files += DiffFile(path ?: fallbackPath, kind, add, del, lines)
             path = null; kind = 'M'; lines = ArrayList(); add = 0; del = 0; inHunk = false
+            hunks = 0; oldEmpty = true; newEmpty = true
         }
         for (l in patch.lines()) {
             when {
@@ -177,7 +181,12 @@ object ChatLogic {
                 }
                 l.startsWith("@@") -> {
                     inHunk = true
-                    hunk.find(l)?.let { o = it.groupValues[1].toInt(); n = it.groupValues[2].toInt() }
+                    hunks++
+                    hunk.find(l)?.let {
+                        o = it.groupValues[1].toInt(); n = it.groupValues[3].toInt()
+                        oldEmpty = oldEmpty && o == 0 && it.groupValues[2] == "0"
+                        newEmpty = newEmpty && n == 0 && it.groupValues[4] == "0"
+                    }
                     lines += DiffLine('@', l, null, null)
                 }
                 inHunk && l.startsWith("+") -> { lines += DiffLine('+', l.substring(1), null, n++); add++ }

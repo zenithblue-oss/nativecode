@@ -86,6 +86,15 @@ class OpenCodeWireTest {
         assertEquals("file:///a%20b/c.png", OpenCodeWire.fileUri("/a b/c.png"))
     }
 
+    /** write's metadata has no diff: a one-line file with a trailing newline is +1, not +2. */
+    @Test fun writeWithoutDiffCountsLines() {
+        fun add(content: String) = (OpenCodeWire.toolPayload("write", JSONObject().put("filePath", "/p/n.txt").put("content", content), "", JSONObject().put("exists", false))
+            as com.zenithblue.nativecode.agent.chat.core.ItemPayload.FileChange).add
+        assertEquals(1, add("hello chat\n"))
+        assertEquals(1, add("hello chat"))
+        assertEquals(3, add("a\nb\n\n"))
+    }
+
     @Test fun argvSlashAndForms() {
         val argv = OpenCodeWire.serveArgv(40123)
         assertEquals("opencode", argv[0])

@@ -160,7 +160,8 @@ internal object OpenCodeWire {
             "bash" in n || "shell" in n -> ItemPayload.CommandExecution(s("command", "cmd") ?: input.toString(), output.orEmpty().takeLast(OUTPUT_TAIL), exitCode(meta))
             "edit" in n || "write" in n || "patch" in n -> {
                 val diff = meta?.let { m -> m.optString("diff").ifBlank { m.optString("patch") }.ifBlank { filesPatch(m) } }?.ifBlank { null }
-                val (add, del) = if (diff != null) diffStat(diff) else (s("content", "newString")?.lines()?.size ?: 0) to 0
+                // write's metadata has no diff: count content lines, a trailing newline is not a line ("a\n" = +1)
+                val (add, del) = if (diff != null) diffStat(diff) else (s("content", "newString")?.removeSuffix("\n")?.lines()?.size ?: 0) to 0 // s() skips blank content
                 ItemPayload.FileChange(s("filePath", "path", "file") ?: name, add, del, diff)
             }
             "web" in n || n == "codesearch" || n == "code_search" -> ItemPayload.WebSearch(s("query", "url", "pattern").orEmpty(), results)

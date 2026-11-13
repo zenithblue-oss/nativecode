@@ -109,6 +109,14 @@ class ChatLogicTest {
         assertEquals("p.kt", ChatLogic.parseUnifiedDiff("@@ -1 +1 @@\n-a\n+b", "p.kt").single().path)
     }
 
+    /** opencode/jsdiff patches carry no `new file mode` or /dev/null: an empty old side means Added, an empty new side Deleted. */
+    @Test fun headerlessNewAndDeletedFiles() {
+        val added = ChatLogic.parseUnifiedDiff("Index: notes.txt\n===\n--- notes.txt\n+++ notes.txt\n@@ -0,0 +1,1 @@\n+hello chat\n").single()
+        assertEquals('A', added.kind); assertEquals("notes.txt", added.path); assertEquals(1, added.add)
+        assertEquals('D', ChatLogic.parseUnifiedDiff("--- a.txt\n+++ a.txt\n@@ -1,2 +0,0 @@\n-x\n-y").single().kind)
+        assertEquals('M', ChatLogic.parseUnifiedDiff("--- a.txt\n+++ a.txt\n@@ -1,1 +1,1 @@\n-x\n+y").single().kind)
+    }
+
     @Test fun rowsGroupWorkAndMeta() {
         fun item(id: String, run: String, p: ItemPayload) = TurnItem(id, "t", run, id.hashCode(), null, null, ItemStatus.COMPLETED, p, 0)
         val items = listOf(
