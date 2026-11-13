@@ -90,7 +90,9 @@ object CliToolCatalog {
             strategy = CliLoginStrategy.STREAM_URL,
             terminalType = "agy",
             consoleUrl = "https://accounts.google.com",
-            subtitle = "agy acp --login · Google OAuth, paste code"
+            subtitle = "agy acp --login · Google OAuth, paste code",
+            chat = ChatProtocol.ACP,
+            acpProfile = "agy"
         ),
         CliToolDef(
             id = "grok",
@@ -100,7 +102,9 @@ object CliToolCatalog {
             terminalType = "grok",
             consoleUrl = "https://console.x.ai",
             envKey = "XAI_API_KEY",
-            subtitle = "grok login · or XAI_API_KEY"
+            subtitle = "grok login · or XAI_API_KEY",
+            chat = ChatProtocol.ACP,
+            acpProfile = "grok"
         ),
         CliToolDef(
             id = "kiro",
