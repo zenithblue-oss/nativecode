@@ -55,6 +55,34 @@ class ChatReducerTest {
         return fx
     }
 
+    @Test fun firstTokenPerRunAndReconnecting() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        val run1 = r.beginRun("c1", "hi", emptyList())
+        r.step(rows, AgentEvent.TurnStarted("n1"))
+        r.step(rows, AgentEvent.ItemUpsert("tool", ItemStatus.RUNNING, ItemPayload.CommandExecution("ls")))
+        assertNull(r.state.firstTokenMs) // tools do not count
+        clock += 1500
+        r.step(rows, AgentEvent.ItemUpsert("a1", ItemStatus.RUNNING, ItemPayload.AssistantMessage("He")))
+        val ttft = r.state.firstTokenMs!!
+        assertTrue(ttft >= 1500)
+        assertEquals(run1.id, r.state.firstTokenRunId)
+        r.step(rows, AgentEvent.ItemUpsert("a1", ItemStatus.RUNNING, ItemPayload.AssistantMessage("Hello")))
+        assertEquals(ttft, r.state.firstTokenMs) // first token only
+        r.step(rows, AgentEvent.TurnTerminal(RunStatus.COMPLETED))
+        val run2 = r.beginRun("c2", "again", emptyList())
+        r.step(rows, AgentEvent.TurnStarted("n2"))
+        r.step(rows, AgentEvent.ItemUpsert("a2", ItemStatus.RUNNING, ItemPayload.Reasoning("think")))
+        assertEquals(run2.id, r.state.firstTokenRunId)
+
+        r.step(rows, AgentEvent.Connection(true))
+        assertTrue(r.state.reconnecting)
+        r.step(rows, AgentEvent.Connection(false))
+        assertFalse(r.state.reconnecting)
+        r.step(rows, AgentEvent.Connection(true))
+        r.exited(1, "", expected = false)
+        assertFalse(r.state.reconnecting)
+    }
+
     @Test fun fullTurnWithApproval() {
         val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
         val run = r.beginRun("c1", "Fix the login crash\nplease", emptyList())

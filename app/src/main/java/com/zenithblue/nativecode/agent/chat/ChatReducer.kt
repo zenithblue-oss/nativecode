@@ -56,6 +56,10 @@ data class ChatLiveState(
     val queued: List<QueuedMessage> = emptyList(),
     val queueHeld: Boolean = false,
     val lastError: String? = null,
+    /** Time to first token of run [firstTokenRunId]: turn start to its first assistant text or reasoning item. */
+    val firstTokenMs: Long? = null,
+    val firstTokenRunId: String? = null,
+    val reconnecting: Boolean = false,
 ) {
     val live: Boolean get() = phase != LivePhase.IDLE && phase != LivePhase.ENDED
     val turnActive: Boolean get() = runningRunId != null
@@ -261,7 +265,7 @@ class ChatReducer(
             }
         }
         readySeen = false
-        state = state.copy(forceStopAvailable = false)
+        state = state.copy(forceStopAvailable = false, reconnecting = false)
     }
 
     /** Force stop / stopAll: the turn ends interrupted now; the later expected exit is a no-op. */
@@ -302,6 +306,7 @@ class ChatReducer(
                 state = state.copy(usage = e.usage)
             }
             is AgentEvent.RateLimit -> state = state.copy(rateLimit = e)
+            is AgentEvent.Connection -> state = state.copy(reconnecting = e.reconnecting)
             is AgentEvent.TurnTerminal -> {
                 if (run == null) return
                 endTurn(e.status, e.failure, expireUserInput = false)
@@ -359,6 +364,11 @@ class ChatReducer(
             parentId = e.parentRef?.let { items[it]?.id } ?: old.parentId)
             ?: TurnItem(newId(), thread.id, run?.id, itemOrd++, e.nativeRef, e.parentRef?.let { items[it]?.id }, e.status, payload, now())
         dirty += e.nativeRef
+        val r = run
+        val started = r?.startedAt
+        if (r != null && started != null && state.firstTokenRunId != r.id &&
+            (payload is ItemPayload.AssistantMessage || payload is ItemPayload.Reasoning)
+        ) state = state.copy(firstTokenMs = (now() - started).coerceAtLeast(0), firstTokenRunId = r.id)
         publishItems()
     }
 

@@ -30,6 +30,15 @@ data class LiveState(
     val banner: Banner? = null,
     val usage: Usage? = null,
     val forceStopAvailable: Boolean = false,
+    /** Time to first token of run [ttftRunId] (live only, not persisted). */
+    val ttftMs: Long? = null,
+    val ttftRunId: String? = null,
+    val reconnecting: Boolean = false,
+    /** Provider quota state (claude rate_limit_event, codex rateLimits; M2+); null = not reported. */
+    val rateLimit: AgentEvent.RateLimit? = null,
+    val account: String? = null,
+    /** Run id of the turn streaming now. */
+    val runId: String? = null,
 )
 
 enum class DiffScope(val label: String) { TURN("This turn"), THREAD("Whole thread"), UNCOMMITTED("Uncommitted") }

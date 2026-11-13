@@ -125,6 +125,12 @@ class StoreBackend(ctx: Context) : ChatBackend {
         banner = banner(s),
         usage = s.usage,
         forceStopAvailable = s.forceStopAvailable,
+        ttftMs = s.firstTokenMs,
+        ttftRunId = s.firstTokenRunId,
+        reconnecting = s.reconnecting,
+        rateLimit = s.rateLimit,
+        account = s.account,
+        runId = s.runningRunId,
     )
 
     private fun banner(s: ChatLiveState): Banner? {

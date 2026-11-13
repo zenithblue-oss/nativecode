@@ -45,6 +45,9 @@ sealed interface AgentEvent {
 
     data class RateLimit(val status: String, val resetAt: Long? = null) : AgentEvent
 
+    /** Transport to the agent dropped and is being re-established (opencode SSE reconnect); false = back. */
+    data class Connection(val reconnecting: Boolean) : AgentEvent
+
     /** Ephemeral live command output; the item itself keeps a 64 KiB tail. */
     data class CommandOutputDelta(val nativeRef: String, val chunk: String) : AgentEvent
 

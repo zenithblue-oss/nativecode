@@ -302,7 +302,7 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
                 val c = api.events(SILENCE_MS)
                 stream = c
                 connected.countDown()
-                if (everConnected) onIo { recover() }
+                if (everConnected) { sink(AgentEvent.Connection(false)); onIo { recover() } }
                 everConnected = true
                 failures = 0
                 InputStreamReader(c.inputStream, Charsets.UTF_8).use { r -> SseParser(::onFrame).pump(r) }
@@ -311,7 +311,9 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
                 host.log("NATIVE", "event stream: ${e.javaClass.simpleName} ${e.message.orEmpty()}")
             }
             if (closed) return
+            if (everConnected && failures == 0) sink(AgentEvent.Connection(true))
             if (++failures > RECONNECT_ATTEMPTS) {
+                sink(AgentEvent.Connection(false))
                 if (mapper.active) sink(AgentEvent.TurnTerminal(RunStatus.FAILED, Failure(FailureClass.TRANSPORT_ERROR, "Lost the connection to opencode"), reusable = false))
                 sink(AgentEvent.SessionState(AgentEvent.Phase.ERROR, message = "Lost the connection to opencode"))
                 return
