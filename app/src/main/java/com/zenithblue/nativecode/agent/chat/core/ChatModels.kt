@@ -209,4 +209,18 @@ data class ModelInfo(
     val contextLimit: Long? = null,
 )
 
-data class SlashCommand(val name: String, val description: String? = null)
+/**
+ * One slash-popup entry (plan 9.2.15 "Slash commands"). Runtimes report [Kind.PROVIDER] and [Kind.SKILL] entries in
+ * `SessionState.commands`; [Kind.BUILTIN] ones are the client-side t3code built-ins (ui/SlashMenu). [argumentHint] is
+ * shown after the name and as ghost text once `/name ` is inserted (claude `argumentHint`, ACP `input.hint`).
+ * A provider command is run by sending its raw text (`/name args`) through [AgentRuntime.send]; a skill is inserted
+ * as a `$name` mention the runtime resolves (opencode prompt `skills`, codex native `$name`).
+ */
+data class SlashCommand(
+    val name: String,
+    val description: String? = null,
+    val argumentHint: String? = null,
+    val kind: Kind = Kind.PROVIDER,
+) {
+    enum class Kind { BUILTIN, PROVIDER, SKILL }
+}

@@ -43,7 +43,8 @@ sealed interface AgentEvent {
 
     data class UsageUpdate(val usage: Usage) : AgentEvent
 
-    data class RateLimit(val status: String, val resetAt: Long? = null) : AgentEvent
+    /** [detail] = human quota summary for Thread settings (codex: "5h 42% · weekly 13%"). */
+    data class RateLimit(val status: String, val resetAt: Long? = null, val detail: String? = null) : AgentEvent
 
     /** Transport to the agent dropped and is being re-established (opencode SSE reconnect); false = back. */
     data class Connection(val reconnecting: Boolean) : AgentEvent

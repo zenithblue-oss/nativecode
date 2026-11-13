@@ -4,6 +4,7 @@ import android.content.Context
 import com.zenithblue.nativecode.agent.chat.core.ModelInfo
 import com.zenithblue.nativecode.agent.chat.core.RuntimeCaps
 import com.zenithblue.nativecode.agent.chat.core.RuntimeMode
+import com.zenithblue.nativecode.agent.chat.core.SlashCommand
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -14,7 +15,8 @@ import java.io.File
  * session reports a non-empty `SessionState.models`; a live list always replaces the cached one.
  */
 object ModelCache {
-    data class Entry(val models: List<ModelInfo>, val defaultModel: String?, val caps: RuntimeCaps?)
+    /** [commands] = last-known provider commands + skills, so the slash popup works before the session starts. */
+    data class Entry(val models: List<ModelInfo>, val defaultModel: String?, val caps: RuntimeCaps?, val commands: List<SlashCommand> = emptyList())
 
     private fun file(ctx: Context, tool: String) = File(ctx.filesDir, "agent/models-${tool.replace(Regex("[^A-Za-z0-9._-]"), "_")}.json")
 
@@ -40,8 +42,11 @@ object ModelCache {
         .put("caps", e.caps?.let { c ->
             JSONObject().put("steer", c.steer).put("images", c.images).put("pdf", c.pdf).put("userInput", c.userInput)
                 .put("planMode", c.planMode).put("effort", c.effort).put("slash", c.slashCommands).put("resume", c.resume)
-                .put("modes", JSONArray(c.modes.map { it.wire }))
+                .put("fork", c.fork).put("modes", JSONArray(c.modes.map { it.wire }))
         })
+        .put("commands", JSONArray(e.commands.map { c ->
+            JSONObject().put("name", c.name).put("description", c.description).put("hint", c.argumentHint).put("kind", c.kind.name)
+        }))
         .toString()
 
     fun decode(s: String): Entry? {
@@ -63,10 +68,16 @@ object ModelCache {
             RuntimeCaps(
                 steer = c.optBoolean("steer"), images = c.optBoolean("images"), pdf = c.optBoolean("pdf"),
                 userInput = c.optBoolean("userInput"), planMode = c.optBoolean("planMode"), effort = c.optBoolean("effort"),
-                slashCommands = c.optBoolean("slash"), resume = c.optBoolean("resume"),
+                slashCommands = c.optBoolean("slash"), resume = c.optBoolean("resume"), fork = c.optBoolean("fork"),
                 modes = (0 until (modes?.length() ?: 0)).map { RuntimeMode.of(modes!!.getString(it)) }.ifEmpty { listOf(RuntimeMode.APPROVAL_REQUIRED) },
             )
         }
-        return Entry(models, o.optString("default").ifEmpty { null }, caps)
+        val cmds = o.optJSONArray("commands")
+        val commands = (0 until (cmds?.length() ?: 0)).mapNotNull { i ->
+            val c = cmds!!.optJSONObject(i) ?: return@mapNotNull null
+            SlashCommand(c.optString("name").ifEmpty { return@mapNotNull null }, c.optString("description").ifEmpty { null },
+                c.optString("hint").ifEmpty { null }, runCatching { SlashCommand.Kind.valueOf(c.optString("kind")) }.getOrDefault(SlashCommand.Kind.PROVIDER))
+        }
+        return Entry(models, o.optString("default").ifEmpty { null }, caps, commands)
     }
 }

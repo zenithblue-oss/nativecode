@@ -232,7 +232,17 @@ class ChatReducer(
     /** Last-known list for the tool ([ModelCache]): the picker works before a session; a live SessionState replaces it. */
     fun seedModels(c: ModelCache.Entry) {
         if (state.models.isNotEmpty()) return
-        state = state.copy(models = c.models, defaultModel = state.defaultModel ?: c.defaultModel, caps = state.caps ?: c.caps)
+        state = state.copy(models = c.models, defaultModel = state.defaultModel ?: c.defaultModel, caps = state.caps ?: c.caps,
+            commands = state.commands.ifEmpty { c.commands })
+    }
+
+    /** t3code `/clear`: forget the native session (the next turn starts a new one); earlier rows stay visible. */
+    fun freshSession() {
+        thread = thread.copy(nativeId = null)
+        writes += ChatWrite.UpdateThread(thread.id) { it.copy(nativeId = null) }
+        readySeen = false
+        state = state.copy(phase = LivePhase.IDLE, usage = null, reconnecting = false)
+        reduce(AgentEvent.Notice("fresh_session", "New session · earlier messages are not in the agent's context"))
     }
 
     /** What the runtime starts with: the thread's persisted picks (model/effort chosen before the first send included). */

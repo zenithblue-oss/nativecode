@@ -41,6 +41,8 @@ data class RuntimeCaps(
     val effort: Boolean = false,
     val slashCommands: Boolean = false,
     val resume: Boolean = false,
+    /** Can start a session as a copy of another one ([SessionConfig.forkFrom]); enables `/side` and `/btw`. */
+    val fork: Boolean = false,
 )
 
 data class SessionConfig(
@@ -52,6 +54,8 @@ data class SessionConfig(
     val runtimeMode: RuntimeMode,
     val interactionMode: InteractionMode,
     val title: String?,
+    /** Side chat: native id of the parent session to fork (full history) instead of a new session; only with `caps.fork`. */
+    val forkFrom: String? = null,
 )
 
 /** [clientId] is the user_message item's native ref (opencode prompt `id`). */

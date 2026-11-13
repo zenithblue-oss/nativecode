@@ -4,6 +4,7 @@ import android.content.Context
 import com.zenithblue.nativecode.agent.chat.core.AgentEvent
 import com.zenithblue.nativecode.agent.chat.core.AgentRuntime
 import com.zenithblue.nativecode.agent.chat.core.ChatAttachment
+import com.zenithblue.nativecode.agent.chat.core.ChatMcp
 import com.zenithblue.nativecode.agent.chat.core.ChatRequest
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.ConfigChange
@@ -56,6 +57,7 @@ class ChatThreadController internal constructor(
     private var flushTask: Future<*>? = null
     private var idleTask: Future<*>? = null
     private var forceTask: Future<*>? = null
+    private var forkFrom: String? = null // side chat: parent native session, until this thread has its own
     private val coalescer = DeltaCoalescer<AgentEvent.ItemUpsert>(
         schedule = { ms, block -> AgentChats.schedule(ms) { block(); commit() } },
         emit = { reducer.reduce(it) },
@@ -76,14 +78,23 @@ class ChatThreadController internal constructor(
 
     // ---------------- commands (main thread) ----------------
 
-    /** Send a message: steer if the runtime can and a turn runs, queue if a turn runs, else start a turn. False = refused. */
-    fun send(text: String, attachments: List<ChatAttachment> = emptyList()): Boolean {
+    /**
+     * Send a message: steer if the runtime can and a turn runs, queue if a turn runs, else start a turn. False = refused.
+     * [fresh] (t3code `/clear` armed): when idle, the turn starts a new native session instead of resuming.
+     */
+    fun send(text: String, attachments: List<ChatAttachment> = emptyList(), fresh: Boolean = false): Boolean {
         if (text.isBlank() && attachments.isEmpty()) return false
         if (ChatAttachments.checkMessage(text, attachments.size) != null) return false
         if (!preflight()) return false
-        AgentChats.post { doSend(text, attachments) }
+        AgentChats.post {
+            if (fresh && reducer.activeRun == null) freshSession()
+            doSend(text, attachments)
+        }
         return true
     }
+
+    /** Side chat (t3code `/side`): this thread's first session forks [parentNativeId] (runtime `caps.fork`). */
+    fun forkFrom(parentNativeId: String) = AgentChats.post { if (thread.nativeId == null) forkFrom = parentNativeId }
 
     fun interrupt() = AgentChats.post {
         if (reducer.activeRun == null) return@post
@@ -225,7 +236,10 @@ class ChatThreadController internal constructor(
         closing = false
         reducer.starting()
         try {
-            rt.start(reducer.sessionConfig(), t.nativeId) { e -> AgentChats.post { onEvent(e) } }
+            // Events of a runtime detached by /clear are dropped (its process still winds down).
+            rt.start(reducer.sessionConfig().copy(forkFrom = forkFrom.takeIf { t.nativeId == null }), t.nativeId) { e ->
+                AgentChats.post { if (runtime === rt) onEvent(e) }
+            }
         } catch (e: Exception) {
             runtime = null
             onExit(-1, "Chat failed to start: ${e.message}")
@@ -264,9 +278,10 @@ class ChatThreadController internal constructor(
             if (pendingTurn == null && reducer.activeRun == null) scheduleIdleRelease() // warm-up / resume without a send
         }
         if (e is AgentEvent.TurnTerminal) forceTask?.cancel(false)
+        if (e is AgentEvent.NativeId) forkFrom = null
         reducer.reduce(e)
-        if (e is AgentEvent.SessionState && !e.models.isNullOrEmpty()) reducer.state.let { s ->
-            ModelCache.save(ctx, thread.tool, ModelCache.Entry(s.models, s.defaultModel, s.caps))
+        if (e is AgentEvent.SessionState && (!e.models.isNullOrEmpty() || e.commands != null)) reducer.state.let { s ->
+            ModelCache.save(ctx, thread.tool, ModelCache.Entry(s.models, s.defaultModel, s.caps, s.commands))
         }
         commit()
     }
@@ -284,7 +299,20 @@ class ChatThreadController internal constructor(
         idleTask?.cancel(false)
         reducer.exited(code, stderrTail, expected)
         AgentChats.turnRunning(ctx, threadId, false)
+        ChatMcp.release(threadId)
         commit()
+    }
+
+    /** Detach the live runtime (it closes in the background; its exit and events are ignored) and drop the native id. */
+    private fun freshSession() {
+        val rt = runtime
+        if (rt != null) {
+            runtime = null; proc = null; entry = null; ready = false; pendingTurn = null
+            idleTask?.cancel(false)
+            rt.close()
+            ChatMcp.release(threadId)
+        }
+        reducer.freshSession()
     }
 
     private fun close(hold: Boolean) {
