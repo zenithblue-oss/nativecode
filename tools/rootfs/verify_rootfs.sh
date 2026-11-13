@@ -168,7 +168,7 @@ if [ "$(uname -m)" = "aarch64" ] && [ -x "$ROOTFS/bin/sh" ] && [ -x "$ROOTFS/hom
     OPENCODE_PIN="$(grep '^OPENCODE_VERSION=' "$DIR/versions.env" | cut -d= -f2)"
     chroot "$ROOTFS" su -s /bin/sh flux -c '
       export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
-      v="$(opencode --version)"; echo "opencode $v"
+      v="$(opencode --version)"; echo "$v"; v="${v##*v}" # prints "opencode v2.3.0"
       [ "$v" = "'"$OPENCODE_PIN"'" ] || { echo "FAIL opencode $v != pinned '"$OPENCODE_PIN"'"; exit 1; }
       codex --version
       qwen --version
