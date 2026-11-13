@@ -134,6 +134,8 @@ android {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    // Real org.json for JVM tests (android.jar's is a stub): chat store/runtime tests (item 12).
+    testImplementation("org.json:json:20240303")
 
     implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.appcompat:appcompat:1.8.0")

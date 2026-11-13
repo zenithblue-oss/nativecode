@@ -80,7 +80,8 @@ object CliToolCatalog {
             terminalType = "opencode",
             consoleUrl = "https://opencode.ai/auth",
             subtitle = "opencode auth login · providers",
-            loginOptional = true
+            loginOptional = true,
+            chat = ChatProtocol.OPENCODE_HTTP
         ),
         CliToolDef(
             id = "agy",
