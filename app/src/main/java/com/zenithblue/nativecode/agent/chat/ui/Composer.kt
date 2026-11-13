@@ -43,6 +43,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,13 +112,14 @@ internal fun Composer(
     s: ComposerState,
     placeholder: String,
     commands: List<SlashCommand>,
+    slashCtx: SlashMenu.Ctx,
     running: Boolean,
     canSteer: Boolean,
     context: ContextInfo,
     freeModel: Boolean,
     onSend: (steer: Boolean) -> Unit,
     onStop: () -> Unit,
-    onSlash: (String) -> Unit,
+    onSlash: (SlashCommand) -> Unit,
 ) {
     var plus by remember { mutableStateOf(false) }
     var sendMenu by remember { mutableStateOf(false) }
@@ -123,18 +128,16 @@ internal fun Composer(
     val focused by focus.collectIsFocusedAsState()
     Column(Modifier.fillMaxWidth().background(C.lowest)) {
         Hairline()
-        val slash = s.text.takeIf { it.startsWith("/") && it.none(Char::isWhitespace) }
-        if (slash != null) {
-            val all = listOf(SlashCommand("model", "Model, effort, mode"), SlashCommand("clear", "New thread, same tool")) + commands
-            val hits = all.filter { it.name.startsWith(slash.drop(1), ignoreCase = true) }.distinctBy { it.name }
-            if (hits.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().padding(start = S.m, end = S.m, top = S.s).heightIn(max = 220.dp).brutal(3.dp).card(C.low)) {
-                items(hits, key = { it.name }) { c ->
-                    Row(Modifier.fillMaxWidth().clickable { onSlash(c.name) }.heightIn(min = 44.dp).padding(horizontal = S.m, vertical = S.gap),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Text("/" + c.name, color = C.primary, style = T.codeSm)
-                        Text(c.description.orEmpty(), Modifier.padding(start = S.m), color = C.onVar, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+        val trigger = SlashMenu.trigger(s.text)
+        if (trigger != null) {
+            val hits = SlashMenu.items(commands, slashCtx, trigger, bare = s.chips.isEmpty())
+            val (cmds, skills) = hits.partition { it.kind != SlashCommand.Kind.SKILL }
+            if (hits.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().padding(start = S.m, end = S.m, top = S.s).heightIn(max = 260.dp).brutal(3.dp).card(C.low)) {
+                items(cmds, key = { "c:" + it.name }) { c -> SlashRow(c, "/" + c.name) { onSlash(c) } }
+                if (skills.isNotEmpty()) item("skills") {
+                    Overline("Skills", Modifier.padding(start = S.m, end = S.m, top = S.s, bottom = S.xs), color = C.outline)
                 }
+                items(skills, key = { "s:" + it.name }) { c -> SlashRow(c, "/skill:" + c.name) { onSlash(c) } }
             }
         }
         Column(
@@ -154,6 +157,11 @@ internal fun Composer(
                 decorationBox = { inner ->
                     Box {
                         if (s.text.isEmpty()) Text(placeholder, color = C.outline, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // Argument hint as ghost text after `/name ` until arguments are typed.
+                        SlashMenu.ghostHint(s.text, SlashMenu.builtins(slashCtx) + commands)?.let { h ->
+                            Text(buildAnnotatedString { withStyle(SpanStyle(color = Color.Transparent)) { append(s.text) }; append(h) },
+                                color = C.outline, style = T.body, maxLines = 4)
+                        }
                         inner()
                     }
                 },
@@ -264,6 +272,18 @@ private fun ContextRing(c: ContextInfo) {
                 )
             }
         }
+    }
+}
+
+/** Popup row: label, greyed argument hint, description; skills carry a "skill" tag. */
+@Composable
+private fun SlashRow(c: SlashCommand, label: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Insert $label", onClick = onClick).heightIn(min = 44.dp).padding(horizontal = S.m, vertical = S.gap),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = C.primary, style = T.codeSm, maxLines = 1)
+        c.argumentHint?.let { Text(it, Modifier.padding(start = S.xs), color = C.outline, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        Text(c.description.orEmpty(), Modifier.weight(1f).padding(start = S.m), color = C.onVar, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (c.kind == SlashCommand.Kind.SKILL) Text("skill", Modifier.padding(start = S.s).card(C.container).padding(horizontal = S.xs), color = C.tertiary, style = T.meta)
     }
 }
 

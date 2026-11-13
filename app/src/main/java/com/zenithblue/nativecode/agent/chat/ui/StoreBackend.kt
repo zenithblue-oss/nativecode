@@ -76,10 +76,19 @@ class StoreBackend(ctx: Context) : ChatBackend {
         main.post { block(c) }
     }
 
-    override fun send(threadId: String, text: String, attachments: List<ChatAttachment>, steer: Boolean) = cmd(threadId) { c ->
+    override fun send(threadId: String, text: String, attachments: List<ChatAttachment>, steer: Boolean, fresh: Boolean) = cmd(threadId) { c ->
         // ponytail: the controller picks steer vs queue itself (steer when the runtime can); the long-press choice is advisory.
         ChatAttachments.checkMessage(text, attachments.size)?.let { Toast.makeText(app, it, Toast.LENGTH_LONG).show(); return@cmd }
-        c.send(text, attachments)
+        c.send(text, attachments, fresh)
+    }
+
+    override fun sideChat(parentId: String, prompt: String): ChatThread? {
+        val p = store.thread(parentId) ?: return null
+        val native = p.nativeId ?: return null
+        val t = store.createThread(p.projectPath, p.cwd, p.tool, "Side chat", p.model, p.effort, p.runtimeMode)
+        val c = AgentChats.controller(app, t.id) ?: return null
+        main.post { c.forkFrom(native); if (prompt.isNotBlank()) c.send(prompt) }
+        return t
     }
 
     override fun interrupt(threadId: String) = cmd(threadId) { it.interrupt() }

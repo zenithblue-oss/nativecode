@@ -50,6 +50,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zenithblue.nativecode.agent.chat.core.AgentEvent
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
+import com.zenithblue.nativecode.agent.chat.core.ConfigChange
+import com.zenithblue.nativecode.agent.chat.core.SlashCommand
 import com.zenithblue.nativecode.agent.chat.core.ItemPayload
 import com.zenithblue.nativecode.agent.chat.core.ItemStatus
 import com.zenithblue.nativecode.agent.chat.core.RequestAnswer
@@ -101,6 +105,20 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
     val liveRunId = live?.runId ?: activeRun?.id
     LaunchedEffect(running) { if (!running) stopAt = 0L }
 
+    // Slash built-ins (t3code): `/clear` arms a fresh session for the next message; `/usage-limits` opens a sheet.
+    val ctx = LocalContext.current
+    var freshArmed by remember(threadId) { mutableStateOf(false) }
+    var usageSheet by remember { mutableStateOf(false) }
+    val slashCtx = SlashMenu.Ctx(
+        side = live?.caps?.fork == true,
+        sideBlocked = when {
+            t.nativeId == null -> "Side chats start after the first message."
+            running -> "Side chats start when the thread is idle."
+            else -> null
+        },
+        fresh = pending == null && !running && items.any { it.payload is ItemPayload.UserMessage },
+    )
+
     // Draft persists per thread (debounced, and on leave).
     LaunchedEffect(threadId, composer.text, composer.chips.size) { delay(800); v.bg { v.backend.setDraft(threadId, composer.draftJson()) } }
     DisposableEffect(threadId) { onDispose { val j = composer.draftJson(); v.bg { v.backend.setDraft(threadId, j) } } }
@@ -126,7 +144,29 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                     else if (qs.all { inputDraft.answers[it.id] != null }) v.bg { v.backend.respond(threadId, pending.id, RequestAnswer(answers = inputDraft.answers.toMap())) }
                 }
             }
-            else -> v.bg { v.backend.send(threadId, text, atts, steer) }
+            else -> {
+                // t3code built-ins typed as the whole message run here and are never sent.
+                when (val a = if (atts.isEmpty()) SlashMenu.parse(text) else null) {
+                    SlashMenu.Action.Clear -> if (slashCtx.fresh) { freshArmed = true; composer.clear(); return }
+                    SlashMenu.Action.UsageLimits -> { usageSheet = true; composer.clear(); return }
+                    is SlashMenu.Action.Model -> {
+                        val m = a.arg?.let { SlashMenu.matchModel(live?.models.orEmpty(), it) }
+                        if (m != null) {
+                            v.bg { v.backend.configure(threadId, ConfigChange(model = m.id)) }
+                            Toast.makeText(ctx, "Model: ${m.name.ifBlank { m.id }}", Toast.LENGTH_SHORT).show()
+                        } else v.push(Route.Settings(threadId))
+                        composer.clear(); return
+                    }
+                    is SlashMenu.Action.Side -> if (slashCtx.side) {
+                        slashCtx.sideBlocked?.let { Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show(); return }
+                        v.sideChat(threadId, a.prompt)
+                        composer.clear(); return
+                    }
+                    null -> Unit
+                }
+                v.bg { v.backend.send(threadId, text, atts, steer, fresh = freshArmed) }
+                freshArmed = false
+            }
         }
         composer.clear()
     }
@@ -210,7 +250,8 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
 
         // Banner slot (one): reconnecting > live banner > held queue > session ended.
         val alive = live?.alive == true
-        val banner = (if (live?.reconnecting == true) Banner("reconnecting", "Reconnecting to ${t.tool}") else null)
+        val banner = (if (freshArmed) Banner("fresh", "Fresh session armed · the next message starts a new session", "Cancel") else null)
+            ?: (if (live?.reconnecting == true) Banner("reconnecting", "Reconnecting to ${t.tool}") else null)
             ?: live?.banner
             ?: (if (queued.isNotEmpty() && !running && !alive) Banner("queue", "${queued.size} queued", "Resume queue") else null)
             ?: (if (!alive && lastRun?.status == RunStatus.INTERRUPTED && live == null) Banner("ended", "Session ended", "Resume") else null)
@@ -221,6 +262,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                     "queue" -> v.bg { v.backend.queueResume(threadId) }
                     "upsell" -> v.host.showUpgradeSheet(b.text)
                     "error" -> openInTerminal(v, t)
+                    "fresh" -> freshArmed = false
                     else -> v.bg { v.backend.resume(threadId) }
                 }
             }
@@ -250,20 +292,29 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                 else -> "Ask ${t.tool}  ·  / for commands"
             },
             commands = live?.commands.orEmpty(),
+            slashCtx = slashCtx,
             running = running && pending == null,
             canSteer = live?.caps?.steer == true,
             context = ContextInfo(usage?.contextUsed, ctxSize, compacting),
             freeModel = live?.models?.firstOrNull { it.id == (t.model ?: live.defaultModel) }?.free == true,
             onSend = ::send,
             onStop = { stopAt = System.currentTimeMillis(); v.bg { v.backend.interrupt(threadId) } },
-            onSlash = { name ->
-                when (name) {
-                    "model" -> { composer.text = ""; v.push(Route.Settings(threadId)) }
-                    "clear" -> { composer.text = ""; v.newThread(t.tool, t.projectPath) }
-                    else -> composer.text = "/$name "
+            onSlash = { c ->
+                val rest = composer.text.substringBeforeLast('\n', "") // the trigger line goes
+                when {
+                    c.kind != SlashCommand.Kind.BUILTIN -> composer.text = SlashMenu.insert(composer.text, c)
+                    c.name == "model" -> { composer.text = rest; v.push(Route.Settings(threadId)) }
+                    c.name == "side" || c.name == "btw" ->
+                        slashCtx.sideBlocked?.let { Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show() } ?: run { composer.text = "/${c.name} " }
+                    c.name == "clear" -> { composer.text = rest; freshArmed = true }
+                    c.name == SlashMenu.USAGE_LIMITS.name -> { composer.text = rest; usageSheet = true }
                 }
             },
         )
+    }
+
+    if (usageSheet) ModalBottomSheet({ usageSheet = false }, containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
+        UsageLimitsSheet(t.tool, live?.rateLimit, usage, ctxSize, d.runs)
     }
 
     if (queueSheet) ModalBottomSheet({ queueSheet = false }, containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
@@ -440,6 +491,7 @@ private fun BannerRow(b: Banner, onAction: () -> Unit) {
         "error" -> Ic.CircleX to C.error
         "signin", "upsell" -> Ic.Lock to C.tertiary
         "queue" -> Ic.Clock to C.tertiary
+        "fresh" -> Ic.Retry to C.primary
         else -> Ic.Alert to C.onVar
     }
     Column {
@@ -448,6 +500,31 @@ private fun BannerRow(b: Banner, onAction: () -> Unit) {
             if (b.kind == "reconnecting") Spinner(14.dp, C.tertiary) else NcIcon(icon, null, tint = color, size = 16.dp)
             Text(b.text, Modifier.weight(1f).padding(horizontal = S.s), color = C.on, style = T.bodySm, maxLines = 2, overflow = TextOverflow.Ellipsis)
             b.action?.let { NcButton(it, kind = BtnKind.GHOST, onClick = onAction) }
+        }
+    }
+}
+
+/** `/usage-limits` (t3code usage panel): the provider's quota from the live state, else "not reported"; plus this thread's usage. */
+@Composable
+private fun UsageLimitsSheet(tool: String, r: AgentEvent.RateLimit?, usage: com.zenithblue.nativecode.agent.chat.core.Usage?, ctxSize: Long?, runs: List<com.zenithblue.nativecode.agent.chat.core.Run>) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = S.l).padding(bottom = S.l).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(S.s)) {
+        Text("Usage limits", color = C.on, style = T.title)
+        Overline(tool, color = C.outline)
+        if (r == null) {
+            Text("Not reported: $tool has not sent quota or rate-limit information in this session.", color = C.onVar, style = T.body)
+        } else {
+            val limited = r.status !in setOf("ok", "allowed", "allowed_warning")
+            Text(if (limited) "Limit reached" else "Within limits", color = if (limited) C.error else C.primary, style = T.label)
+            r.detail?.let { Text(it, color = C.on, style = T.codeSm) }
+            r.resetAt?.let { Text("Resets " + java.text.SimpleDateFormat("MMM d, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(it)), color = C.onVar, style = T.meta) }
+        }
+        val used = usage?.contextUsed
+        if (used != null && ctxSize != null) Text("Context ${ChatLogic.tokens(used)} / ${ChatLogic.tokens(ctxSize)} tokens", color = C.onVar, style = T.meta)
+        val done = runs.filter { it.usage != null }
+        if (done.isNotEmpty()) {
+            val tok = done.sumOf { (it.usage?.inputTokens ?: 0) + (it.usage?.outputTokens ?: 0) }
+            Text(listOfNotNull("This thread: ${done.size} turn${if (done.size == 1) "" else "s"}", "${ChatLogic.tokens(tok)} tokens",
+                ChatLogic.cost(done.mapNotNull { it.usage?.costUsd }.takeIf { it.isNotEmpty() }?.sum())).joinToString(" · "), color = C.onVar, style = T.meta)
         }
     }
 }

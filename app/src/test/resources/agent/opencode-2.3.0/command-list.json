@@ -1,0 +1,1 @@
+{"location":{"directory":"/home/flux/proj"},"data":[{"name":"init","description":"create/update AGENTS.md"},{"name":"review","description":"review changes [commit|branch|pr], defaults to uncommitted"},{"name":"compact"},{"name":"release-notes","description":"Draft release notes"},{"name":"init","description":"duplicate"},{"name":" "}]}

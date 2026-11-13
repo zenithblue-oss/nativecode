@@ -273,6 +273,20 @@ class AgentChatView(
         }
     }
 
+    /** `/side` / `/btw`: fork into a side-chat thread and open it on top (t3code opens it as a panel tab). */
+    internal fun sideChat(parentId: String, prompt: String) {
+        io.execute {
+            val t = runCatching { backend.sideChat(parentId, prompt) }.getOrNull()
+            main.post {
+                if (t == null) {
+                    android.widget.Toast.makeText(context, "Could not start a side chat", android.widget.Toast.LENGTH_SHORT).show()
+                    return@post
+                }
+                reloadList(); push(Route.Chat(t.id))
+            }
+        }
+    }
+
     companion object {
         const val HOME = "/home/flux"
     }

@@ -2,6 +2,7 @@ package com.zenithblue.nativecode.agent.chat.runtime
 
 import com.zenithblue.nativecode.agent.chat.core.AgentEvent
 import com.zenithblue.nativecode.agent.chat.core.AgentRuntime
+import com.zenithblue.nativecode.agent.chat.core.ChatMcp
 import com.zenithblue.nativecode.agent.chat.core.ConfigChange
 import com.zenithblue.nativecode.agent.chat.core.Failure
 import com.zenithblue.nativecode.agent.chat.core.FailureClass
@@ -197,11 +198,18 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
         val serverDefault = runCatching { OpenCodeWire.slugOf(client.call("GET", "/api/model/default?$loc")?.optJSONObject("data")) }.getOrNull()
         val default = serverDefault?.takeIf { s -> models.any { it.id == s } } ?: models.firstOrNull { it.free }?.id ?: models.firstOrNull()?.id
         commands = loadCommands()
+        ChatMcp.endpoint(cfg.threadId, "opencode")?.let { e -> // M7 NC tools (t3 `client.mcp.add`); body carries the token
+            runCatching { client.call("PUT", "/api/experimental/mcp/${enc(e.name)}?$loc", OpenCodeSlash.mcpBody(e), secret = true) }
+                .onFailure { host.log("NATIVE", "mcp ${e.name}: ${(it as? OpenCodeHttp.HttpError)?.status ?: it.javaClass.simpleName}") }
+        }
+        // OpenCode Go / Console quota (t3 `readServerUsageLimits`); null data = no Console workspace signed in.
+        runCatching { OpenCodeSlash.usageLimits(client.call("GET", "/api/experimental/usage/limits?$loc", timeoutMs = 5_000)?.optJSONObject("data")) }
+            .getOrNull()?.let(sink)
         model = cfg.model?.takeIf { s -> models.any { it.id == s } } ?: default
         effort = cfg.effort ?: OpenCodeWire.defaultEffort(models.firstOrNull { it.id == model })
         mapper.contextSize = models.firstOrNull { it.id == model }?.contextLimit
 
-        val sid = nativeId?.let { resume(it) } ?: create()
+        val sid = nativeId?.let { resume(it) } ?: cfg.forkFrom?.let { fork(it) } ?: create()
         sessionId = sid
         mapper.root = sid
         sink(AgentEvent.NativeId(sid))
@@ -241,10 +249,28 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
         return null
     }
 
+    /** `compact` + `GET /api/command` + `GET /api/skill` (skills as their own kind); a failed read keeps the last list. */
     private fun loadCommands(): List<SlashCommand> = runCatching {
-        OpenCodeWire.objects(api.call("GET", "/api/command?${location(cfg.cwd)}", timeoutMs = 5_000)?.optJSONArray("data"))
-            .map { SlashCommand(it.optString("name"), it.optString("description").ifBlank { null }) }
+        val loc = location(cfg.cwd)
+        val skills = runCatching { api.call("GET", "/api/skill?$loc", timeoutMs = 5_000)?.optJSONArray("data") }.getOrNull()
+        OpenCodeSlash.commands(api.call("GET", "/api/command?$loc", timeoutMs = 5_000)?.optJSONArray("data"), skills)
     }.getOrDefault(commands)
+
+    /** Re-list; tell the UI when it changed. */
+    private fun refreshCommands() {
+        val fresh = loadCommands()
+        if (fresh != commands) { commands = fresh; sink(AgentEvent.SessionState(AgentEvent.Phase.READY, commands = fresh)) }
+    }
+
+    /** Side chat: copy the parent's whole history (t3 `forkThread`, `POST /api/session/:id/fork`), then set it up like a resume. */
+    private fun fork(parent: String): String? = try {
+        val id = api.call("POST", "/api/session/${enc(parent)}/fork", JSONObject())!!.getJSONObject("data").getString("id")
+        resume(id)
+    } catch (e: Exception) {
+        host.log("NATIVE", "fork failed: ${e.message}")
+        sink(AgentEvent.Notice("fork_failed", "The side chat could not copy the parent conversation; it starts empty"))
+        null
+    }
 
     private fun create(): String {
         val body = JSONObject()
@@ -284,13 +310,18 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
         }
         val command = if (bare && !steer) OpenCodeWire.commandOf(text) else null
         if (command != null) {
-            commands = loadCommands()
-            if (commands.any { it.name == command.first }) {
+            refreshCommands() // re-list to confirm the name (t3 v2)
+            if (commands.any { it.name == command.first && it.kind == SlashCommand.Kind.PROVIDER }) {
                 api.call("POST", "$s/command", JSONObject().put("name", command.first).put("text", command.second))
                 return
             }
         }
-        api.call("POST", "$s/prompt", OpenCodeWire.promptBody(id, turn, steer))
+        // `$skill` mentions → prompt `skills` (t3 `skillsMentioned`: re-list once when one is unknown).
+        val mentions = OpenCodeSlash.skillMentions(text)
+        if (mentions.any { m -> commands.none { it.kind == SlashCommand.Kind.SKILL && it.name == m } }) refreshCommands()
+        val body = OpenCodeWire.promptBody(id, turn, steer)
+        OpenCodeSlash.skillAttachments(text, commands)?.let { body.put("skills", it) }
+        api.call("POST", "$s/prompt", body)
     }
 
     /** SSE with a 45 s silence watchdog (read timeout); reconnect, then refetch history so a turn can always end. */
@@ -345,7 +376,7 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
     companion object {
         val CAPS = RuntimeCaps(
             steer = true, images = true, pdf = false, userInput = true, planMode = true,
-            modes = RuntimeMode.entries.toList(), effort = true, slashCommands = true, resume = true,
+            modes = RuntimeMode.entries.toList(), effort = true, slashCommands = true, resume = true, fork = true,
         )
         private const val READY_TIMEOUT_S = 30L
         private const val BOOT_CALL_MS = 120_000

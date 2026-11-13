@@ -68,7 +68,10 @@ interface ChatBackend {
     fun live(threadId: String): LiveState?
     /** Live snapshot changes of one thread; returns the unsubscribe. */
     fun observeLive(threadId: String, l: () -> Unit): () -> Unit
-    fun send(threadId: String, text: String, attachments: List<ChatAttachment>, steer: Boolean)
+    /** [fresh] = `/clear` armed: an idle thread starts a new native session for this message. */
+    fun send(threadId: String, text: String, attachments: List<ChatAttachment>, steer: Boolean, fresh: Boolean = false)
+    /** `/side`: new "Side chat" thread forking [parentId]'s session (same tool, cwd, picks), [prompt] sent when not blank. IO thread. */
+    fun sideChat(parentId: String, prompt: String): ChatThread?
     fun interrupt(threadId: String)
     fun forceStop(threadId: String)
     /** Close the process (frees the slot); history stays. */

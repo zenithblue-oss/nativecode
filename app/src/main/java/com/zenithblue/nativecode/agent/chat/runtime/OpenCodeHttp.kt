@@ -16,9 +16,9 @@ internal class OpenCodeHttp(private val base: String, password: String, private 
 
     private val auth = "Basic " + Base64.getEncoder().encodeToString("opencode:$password".toByteArray(Charsets.UTF_8))
 
-    /** JSON body or null (204 / empty). Non-2xx throws [HttpError]. */
-    fun call(method: String, path: String, body: JSONObject? = null, timeoutMs: Int = 15_000): JSONObject? {
-        log("> $method $path${body?.let { " $it" } ?: ""}")
+    /** JSON body or null (204 / empty). Non-2xx throws [HttpError]. [secret] = the body carries a token: not logged. */
+    fun call(method: String, path: String, body: JSONObject? = null, timeoutMs: Int = 15_000, secret: Boolean = false): JSONObject? {
+        log("> $method $path${body?.let { if (secret) " <redacted>" else " $it" } ?: ""}")
         val c = open(path, timeoutMs)
         try {
             setMethod(c, method)
