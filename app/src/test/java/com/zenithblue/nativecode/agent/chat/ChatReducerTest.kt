@@ -1,6 +1,7 @@
 package com.zenithblue.nativecode.agent.chat
 
 import com.zenithblue.nativecode.agent.chat.core.AgentEvent
+import com.zenithblue.nativecode.agent.chat.core.ChatRequest
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.FailureClass
 import com.zenithblue.nativecode.agent.chat.core.ItemPayload
@@ -8,6 +9,7 @@ import com.zenithblue.nativecode.agent.chat.core.ItemStatus
 import com.zenithblue.nativecode.agent.chat.core.RequestAnswer
 import com.zenithblue.nativecode.agent.chat.core.RequestDetail
 import com.zenithblue.nativecode.agent.chat.core.RequestKind
+import com.zenithblue.nativecode.agent.chat.core.RequestOption
 import com.zenithblue.nativecode.agent.chat.core.RequestStatus
 import com.zenithblue.nativecode.agent.chat.core.RunStatus
 import com.zenithblue.nativecode.agent.chat.core.RuntimeCaps
@@ -136,6 +138,25 @@ class ChatReducerTest {
         assertEquals(ItemStatus.COMPLETED, rows.items.values.single { it.nativeRef == "cmd1" }.status)
         assertNull(r.state.runningRunId)
         assertEquals(LivePhase.READY, r.state.phase)
+    }
+
+    /** The approval row says what the user chose: Decline = declined, Cancel = cancelled, Approve = completed. */
+    @Test fun approvalRowShowsDecision() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        r.beginRun("c1", "go", emptyList())
+        r.step(rows, AgentEvent.SessionState(AgentEvent.Phase.READY))
+        r.step(rows, AgentEvent.TurnStarted("t1"))
+        val opts = listOf(RequestOption("cancel", "cancel", "Cancel"), RequestOption("reject", "reject", "Decline"), RequestOption("once", "allow_once", "Approve"))
+        fun ask(id: String): ChatRequest {
+            val fx = r.step(rows, AgentEvent.RequestUpsert(id, RequestKind.COMMAND, RequestStatus.PENDING, opts, RequestDetail("Run ls", "ls")))
+            return (fx.single() as ChatReducer.Effect.NeedsAttention).request
+        }
+        for ((option, want) in listOf("reject" to ItemStatus.DECLINED, "cancel" to ItemStatus.CANCELLED, "once" to ItemStatus.COMPLETED)) {
+            val req = ask("p-$option")
+            r.answer(req.id, RequestAnswer(option, feedback = "no".takeIf { option == "reject" }))
+            rows.apply(r.drain().first)
+            assertEquals(option, want, rows.items[req.itemId]!!.status)
+        }
     }
 
     @Test fun gateDeniedExit() {

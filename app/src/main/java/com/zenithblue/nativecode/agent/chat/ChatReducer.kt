@@ -245,10 +245,11 @@ class ChatReducer(
     fun answer(requestId: String, a: RequestAnswer): Pair<ChatRequest, Boolean>? {
         val liveReq = live.values.firstOrNull { it.id == requestId }
         val req = liveReq ?: stale[requestId] ?: return null
-        val done = req.copy(status = if (a.cancel) RequestStatus.CANCELLED else RequestStatus.RESOLVED,
+        val kind = req.options.firstOrNull { it.id == a.optionId }?.kind.orEmpty()
+        val done = req.copy(status = if (a.cancel || kind == "cancel") RequestStatus.CANCELLED else RequestStatus.RESOLVED,
             answerJson = ChatCodec.answer(a), resolvedAt = now())
         if (liveReq != null) live.remove(req.nativeId) else stale.remove(requestId)
-        settleRequest(done)
+        settleRequest(done, declined = kind.startsWith("reject"))
         return done to (liveReq != null)
     }
 
@@ -412,9 +413,9 @@ class ChatReducer(
 
     // ---------------- internals ----------------
 
-    private fun settleRequest(req: ChatRequest) {
+    private fun settleRequest(req: ChatRequest, declined: Boolean = false) {
         writes += ChatWrite.PutRequest(req)
-        val st = if (req.status == RequestStatus.RESOLVED) ItemStatus.COMPLETED else ItemStatus.CANCELLED
+        val st = if (req.status != RequestStatus.RESOLVED) ItemStatus.CANCELLED else if (declined) ItemStatus.DECLINED else ItemStatus.COMPLETED
         val key = "req:${req.nativeId}"
         val it = items[key]
         if (it != null && it.id == req.itemId) {

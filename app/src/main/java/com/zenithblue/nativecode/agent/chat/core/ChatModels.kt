@@ -18,7 +18,9 @@ enum class RunStatus(val wire: String) {
 
 enum class ItemStatus(val wire: String) {
     PENDING("pending"), RUNNING("running"), WAITING("waiting"), COMPLETED("completed"),
-    FAILED("failed"), CANCELLED("cancelled"), INTERRUPTED("interrupted");
+    FAILED("failed"), CANCELLED("cancelled"), INTERRUPTED("interrupted"),
+    /** Approval answered with a reject option (the request itself is RESOLVED). */
+    DECLINED("declined");
 
     companion object { fun of(w: String?) = entries.firstOrNull { it.wire == w } ?: COMPLETED }
 }
