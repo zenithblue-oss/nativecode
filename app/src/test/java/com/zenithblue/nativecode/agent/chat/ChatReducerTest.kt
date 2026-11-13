@@ -205,4 +205,17 @@ class ChatReducerTest {
         assertFalse(fx.any { it is ChatReducer.Effect.SessionLost || it is ChatReducer.Effect.GateDenied })
         assertNull(r.state.banner)
     }
+
+    @Test fun agentReportedModeAndModelPersist() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        r.step(rows, AgentEvent.SessionState(AgentEvent.Phase.READY,
+            model = "sonnet", runtimeMode = com.zenithblue.nativecode.agent.chat.core.RuntimeMode.AUTO_ACCEPT_EDITS))
+        assertEquals("sonnet", r.thread.model)
+        assertEquals("sonnet", rows.thread!!.model)
+        assertEquals(com.zenithblue.nativecode.agent.chat.core.RuntimeMode.AUTO_ACCEPT_EDITS, rows.thread!!.runtimeMode)
+        val before = n
+        r.step(rows, AgentEvent.SessionState(AgentEvent.Phase.READY)) // nulls = unchanged, no write
+        assertEquals("sonnet", rows.thread!!.model)
+        assertEquals(before, n)
+    }
 }

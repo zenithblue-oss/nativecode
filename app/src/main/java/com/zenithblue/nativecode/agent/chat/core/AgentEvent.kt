@@ -17,6 +17,11 @@ sealed interface AgentEvent {
         val commands: List<SlashCommand>? = null,
         val account: String? = null,
         val message: String? = null,
+        /** Agent-reported current values (claude `system/status.permissionMode`, plan mode switching the model,
+         *  ACP `current_mode_update`); non-null = persisted to the thread row, the chips follow. */
+        val model: String? = null,
+        val runtimeMode: RuntimeMode? = null,
+        val interactionMode: InteractionMode? = null,
     ) : AgentEvent
 
     /** Resume key (opencode session id, claude session_id, codex thread id, ACP sessionId). */

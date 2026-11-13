@@ -340,6 +340,15 @@ class ChatReducer(
             lastError = if (e.phase == AgentEvent.Phase.ERROR) e.message else s.lastError,
         )
         if (e.phase == AgentEvent.Phase.READY && !readySeen) { readySeen = true; effects += Effect.Ready }
+        val t = thread.copy(
+            model = e.model ?: thread.model,
+            runtimeMode = e.runtimeMode ?: thread.runtimeMode,
+            interactionMode = e.interactionMode ?: thread.interactionMode,
+        )
+        if (t != thread) {
+            thread = t
+            writes += ChatWrite.UpdateThread(t.id) { it.copy(model = t.model, runtimeMode = t.runtimeMode, interactionMode = t.interactionMode) }
+        }
     }
 
     private fun upsertItem(e: AgentEvent.ItemUpsert) {
