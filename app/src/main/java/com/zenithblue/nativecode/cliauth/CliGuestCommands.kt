@@ -3,6 +3,7 @@ package com.zenithblue.nativecode.cliauth
 /**
  * Pure guest shell snippets for AI CLI auth. No Android UI.
  * Always run as flux with NVM/PATH bootstrap matching setup_cli_tools.sh.
+ * Login state is NOT read here: [CliCredentialProbe] reads the auth files from the host.
  */
 object CliGuestCommands {
 
@@ -66,126 +67,20 @@ object CliGuestCommands {
         )
     }
 
-    // ── per-tool status ─────────────────────────────────────────────────────
-
-    fun statusClaude(): String = wrap(
-        """
-        if [ -f "${'$'}HOME/.claude/.credentials.json" ] && [ -s "${'$'}HOME/.claude/.credentials.json" ]; then
-          echo AUTH_OK credentials
-          head -c 200 "${'$'}HOME/.claude/.credentials.json" 2>/dev/null | tr '\n' ' '
-          echo
-        elif [ -n "${'$'}{CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-          echo AUTH_OK env_token
-        else
-          echo AUTH_NO
-        fi
-        """.trimIndent().replace('\n', ' ')
-    )
-
-    fun statusCodex(): String = wrap(
-        "codex login status 2>&1 || true"
-    )
-
-    fun statusQwen(): String = wrap(
-        """
-        if [ -n "${'$'}{BAILIAN_CODING_PLAN_API_KEY:-}" ] || [ -n "${'$'}{DASHSCOPE_API_KEY:-}" ] || [ -n "${'$'}{OPENAI_API_KEY:-}" ]; then
-          echo AUTH_OK env_key
-        elif [ -f "${'$'}HOME/.qwen/settings.json" ] && grep -qE 'api[_-]?key|API_KEY|sk-' "${'$'}HOME/.qwen/settings.json" 2>/dev/null; then
-          echo AUTH_OK settings
-        else
-          echo AUTH_NO
-        fi
-        """.trimIndent().replace('\n', ' ')
-    )
-
-    fun statusOpencode(): String = wrap(
-        """
-        if command -v opencode >/dev/null 2>&1; then
-          out=${'$'}(opencode auth list 2>&1 || opencode auth ls 2>&1 || true)
-          echo "${'$'}out"
-          if [ -f "${'$'}HOME/.local/share/opencode/auth.json" ] && [ -s "${'$'}HOME/.local/share/opencode/auth.json" ]; then
-            echo AUTH_OK auth_json
-          elif echo "${'$'}out" | grep -qiE 'anthropic|openai|google|copilot|provider|logged|authenticated'; then
-            echo AUTH_OK list
-          else
-            echo AUTH_NO
-          fi
-        else
-          echo AUTH_NO
-        fi
-        """.trimIndent().replace('\n', ' ')
-    )
-
-    fun statusAgy(): String = wrap(
-        """
-        if [ -d "${'$'}HOME/.gemini/antigravity-cli" ] || [ -d "${'$'}HOME/.config/antigravity" ]; then
-          # any non-empty token-ish file under known dirs
-          if find "${'$'}HOME/.gemini" "${'$'}HOME/.config/antigravity" -type f \( -name '*token*' -o -name '*cred*' -o -name '*.json' \) 2>/dev/null | head -1 | grep -q .; then
-            echo AUTH_OK files
-          else
-            echo AUTH_NO
-          fi
-        else
-          echo AUTH_NO
-        fi
-        """.trimIndent().replace('\n', ' ')
-    )
-
-    fun statusGrok(): String = wrap(
-        """
-        if [ -n "${'$'}{XAI_API_KEY:-}" ] || [ -n "${'$'}{GROK_API_KEY:-}" ]; then
-          echo AUTH_OK env_key
-        elif [ -f "${'$'}HOME/.grok/user-settings.json" ] || [ -f "${'$'}HOME/.grok/config.toml" ]; then
-          if grep -qiE 'api[_-]?key|xai-|token' "${'$'}HOME/.grok/user-settings.json" "${'$'}HOME/.grok/config.toml" 2>/dev/null; then
-            echo AUTH_OK config
-          else
-            echo AUTH_MAYBE config_present
-          fi
-        else
-          echo AUTH_NO
-        fi
-        """.trimIndent().replace('\n', ' ')
-    )
-
-    fun statusKiro(): String = wrap(
-        """
-        if [ -n "${'$'}{KIRO_API_KEY:-}" ]; then
-          echo AUTH_OK env_key
-        elif command -v kiro-cli >/dev/null 2>&1; then
-          kiro-cli login status 2>&1 || kiro-cli whoami 2>&1 || true
-          if [ -d "${'$'}HOME/.kiro" ] || [ -d "${'$'}HOME/.config/kiro" ]; then
-            echo AUTH_MAYBE home
-          else
-            echo AUTH_NO
-          fi
-        elif command -v kiro >/dev/null 2>&1; then
-          kiro login status 2>&1 || true
-          echo AUTH_MAYBE kiro
-        else
-          echo AUTH_NO
-        fi
-        """.trimIndent().replace('\n', ' ')
-    )
-
-    // ── login commands ──────────────────────────────────────────────────────
+    // ── login commands (the CLI's own flow; BROWSER=echo prints the URL for the app to open) ──
 
     fun loginCodexDevice(): String = wrap(
         "export BROWSER=echo; codex login --device-auth 2>&1"
     )
 
-    fun loginClaudeSetupToken(): String = wrap(
-        "export BROWSER=echo; claude setup-token 2>&1"
+    /** URL is printed; localhost callback works on-device, a pasted code goes to stdin. */
+    fun loginClaude(): String = wrap(
+        "export BROWSER=echo; claude auth login 2>&1"
     )
 
     fun loginKiro(): String = wrap(
-        """
-        export BROWSER=echo
-        if command -v kiro-cli >/dev/null 2>&1; then
-          kiro-cli login 2>&1
-        else
-          kiro login 2>&1
-        fi
-        """.trimIndent().replace('\n', ' ')
+        "export BROWSER=echo; if command -v kiro-cli >/dev/null 2>&1; then " +
+            "kiro-cli login --use-device-flow 2>&1; else kiro login --use-device-flow 2>&1; fi"
     )
 
     fun loginOpencode(): String = wrap(
@@ -197,20 +92,14 @@ object CliGuestCommands {
     )
 
     fun loginGrok(): String = wrap(
-        "export BROWSER=echo; grok 2>&1 || true"
+        "export BROWSER=echo; grok login 2>&1"
     )
 
-    // ── logout ──────────────────────────────────────────────────────────────
+    // ── logout (only CLIs whose own logout is non-interactive; others: file removal) ──
 
     fun logoutCodex(): String = wrap("codex logout 2>&1 || true")
 
-    fun logoutOpencode(): String = wrap("opencode auth logout 2>&1 || true")
-
     fun logoutKiro(): String = wrap(
         "kiro-cli logout 2>&1 || kiro logout 2>&1 || true"
-    )
-
-    fun logoutClaudeFiles(): String = wrap(
-        "rm -f \"${'$'}HOME/.claude/.credentials.json\" 2>/dev/null; echo CLEARED"
     )
 }

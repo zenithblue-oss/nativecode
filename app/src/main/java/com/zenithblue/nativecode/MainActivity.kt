@@ -190,6 +190,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private var cliAuthInstallHost: LinearLayout? = null
     private var cliAuthCredentialsHost: LinearLayout? = null
     private var cliAuthMethodBadge: TextView? = null
+    private var cliAuthBody: LinearLayout? = null
+    private var cliAuthTitle: TextView? = null
+    /** Tool id whose login page is open; null shows the list. */
+    private var cliAuthSelected: String? = null
     private var cliAuthSession: com.zenithblue.nativecode.cliauth.CliAuthSession? = null
     private var cliAuthOverlay: FrameLayout? = null
     /** Settings → AI Safety & Report (C5 / B16). */
@@ -801,6 +805,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         super.onResume()
         NativeCodeBridge.agentUiDelegate = this
         applyKeepAwake()
+        // Login may have finished in the browser or terminal: re-read the auth files.
+        if (::cliAuthScrollView.isInitialized && cliAuthScrollView.visibility == View.VISIBLE) paintCliAuth()
         if (desktop.isRunning) desktop.syncUi() // desktop started by a previous (recreated) Activity
         if (lastProState == null) lastProState = isPro() // state the onCreate-built views reflect
         if (!panvkChecked && ::componentsScrollView.isInitialized) {
@@ -1475,8 +1481,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             return
         }
         if (::cliAuthScrollView.isInitialized && cliAuthScrollView.visibility == View.VISIBLE) {
-            dismissCliAuthOverlay()
-            navigateBackFromSubpage(ID_CLI_AUTH, fallback = ID_SETTINGS)
+            cliAuthBack()
             return
         }
         if (::scriptsScrollView.isInitialized && scriptsScrollView.visibility == View.VISIBLE) {
@@ -16568,10 +16573,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(dp(4), dp(4), dp(4), dp(4))
             layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(8) }
             contentDescription = "Back"
-            setOnClickListener {
-                dismissCliAuthOverlay()
-                navigateBackFromSubpage(ID_CLI_AUTH)
-            }
+            setOnClickListener { cliAuthBack() }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 setColor(NC.SURFACE_CONTAINER)
@@ -16585,6 +16587,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
+        cliAuthTitle = titleTv
         val methodBadge = textBadge(
             LinuxCommandBuilder.currentMethod.uppercase(),
             NC.SURFACE_HIGHEST,
@@ -16595,108 +16598,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         headerTitleRow.addView(titleTv)
         headerTitleRow.addView(methodBadge)
         pageLayout.addView(headerTitleRow)
-        pageLayout.addView(TextView(this).apply {
-            text = "// INCLUDED IN THE PRE-BUILT LINUX RUNTIME"
-            textSize = 11f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-            setPadding(0, dp(6), 0, dp(6))
-        })
-        pageLayout.addView(TextView(this).apply {
-            text = "NativeCode does not install, repair, authenticate, or remove\n" +
-                "AI CLI tools from this page.\n\n" +
-                "Use each CLI directly in its terminal. Authentication and account\n" +
-                "management are handled by the CLI vendor."
-            textSize = 12f
-            setTextColor(NC.OUTLINE)
-            typeface = Typeface.MONOSPACE
-            setLineSpacing(dp(2).toFloat(), 1.25f)
-            setPadding(0, 0, 0, dp(12))
-        })
-
-        val openTermBtn = primaryButton("OPEN TERMINAL") {
-            createNewTerminalSession("shell")
-            if (pageStack.isEmpty() || pageStack.peek() != ID_TERMINAL) {
-                pageStack.push(ID_TERMINAL)
-            }
-            navigateToPage(ID_TERMINAL)
-        }.apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(14) }
-            textSize = 13f
-            trackProLock()
-        }
-        pageLayout.addView(openTermBtn)
-
-        data class BundledTool(val name: String, val cmd: String, val sessionType: String)
-        val bundledTools = listOf(
-            BundledTool("OpenCode", "opencode --auto", "opencode"),
-            BundledTool("Codex", "codex", "codex"),
-            BundledTool("Qwen Code", "qwen", "qwen-code"),
-            BundledTool("Claude Code", "claude", "claude-code"),
-            BundledTool("Antigravity", "agy", "agy"),
-            BundledTool("Grok", "grok", "grok"),
-            BundledTool("Kiro", "kiro-cli", "kiro")
-        )
-
-        bundledTools.forEach { tool ->
-            val card = glassCard().apply {
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(10) }
-            }
-            val titleRow = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, 0, 0, dp(4))
-            }
-            titleRow.addView(TextView(this).apply {
-                text = tool.name
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            })
-            titleRow.addView(textBadge("BUNDLED", NC.PRIMARY, Color.parseColor("#0A0A0A")))
-            card.addView(titleRow)
-
-            val cmdRow = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, dp(2), 0, dp(2))
-            }
-            cmdRow.addView(TextView(this).apply {
-                text = tool.cmd
-                textSize = 12f
-                setTextColor(NC.ON_SURF_VAR)
-                typeface = Typeface.MONOSPACE
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            })
-            val openBtn = secondaryButton("OPEN") {
-                createNewTerminalSession(tool.sessionType)
-                if (pageStack.isEmpty() || pageStack.peek() != ID_TERMINAL) {
-                    pageStack.push(ID_TERMINAL)
-                }
-                navigateToPage(ID_TERMINAL)
-            }.apply {
-                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
-                textSize = 11f
-                // Built once; tracked so purchase/restore drops the lock.
-                if (tool.sessionType != com.zenithblue.nativecode.entitlements.FeatureLimits.FREE_AI_TOOL_ID) trackProLock()
-            }
-            cmdRow.addView(openBtn)
-            card.addView(cmdRow)
-
-            pageLayout.addView(card)
-        }
-
-        val safetyBtn = secondaryButton("AI SAFETY & REPORT") {
-            if (pageStack.isEmpty() || pageStack.peek() != ID_AI_SAFETY) {
-                pageStack.push(ID_AI_SAFETY)
-            }
-            navigateToPage(ID_AI_SAFETY)
-        }.apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6); bottomMargin = dp(16) }
-            textSize = 12f
-        }
-        pageLayout.addView(safetyBtn)
+        pageLayout.addView(spacer(12))
+        cliAuthBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        pageLayout.addView(cliAuthBody)
     }
 
     private fun rebuildCliAuthCredentialsCard() {}
@@ -18082,155 +17986,199 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         dialog.show()
     }
 
-    /**
-     * Non-mutating AI CLI page: update isolation method badge.
-     */
-    private fun refreshCliAuthPage(force: Boolean = false) {
-        val method = LinuxCommandBuilder.currentMethod
-        cliAuthMethodBadge?.text = method.uppercase()
-    }
+    // ── AI CLI login pages: list (one row per CLI) -> one native page per CLI ──────────
 
-    private fun paintCliAuthList(
-        list: LinearLayout,
-        statuses: List<CliToolStatus>,
-        footer: String? = null
-    ) {
-        list.removeAllViews()
-        if (statuses.isEmpty()) {
-            list.addView(TextView(this).apply {
-                text = "No tools for this method"
-                textSize = 12f
-                setTextColor(NC.ON_SURF_VAR)
-                typeface = Typeface.MONOSPACE
-            })
-            return
-        }
-        statuses.forEach { st ->
-            val def = CliToolCatalog.byId(st.toolId) ?: return@forEach
-            list.addView(buildCliToolCard(def, st))
-            list.addView(spacer(12))
-        }
-        if (!footer.isNullOrBlank()) {
-            list.addView(TextView(this).apply {
-                text = footer
-                textSize = 11f
-                setTextColor(NC.OUTLINE)
-                typeface = Typeface.MONOSPACE
-                setPadding(0, dp(4), 0, dp(4))
-            })
-        }
-    }
-
-    private fun buildCliToolCard(def: CliToolDef, status: CliToolStatus): LinearLayout {
-        val card = glassCard()
-        val titleRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(6))
-        }
-        titleRow.addView(TextView(this).apply {
-            text = def.displayName
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        })
-        val installBadge = if (status.installed) {
-            textBadge("INSTALLED", NC.PRIMARY, Color.parseColor("#0A0A0A"))
+    /** Back: tool page -> list -> previous page. */
+    private fun cliAuthBack() {
+        dismissCliAuthOverlay()
+        if (cliAuthSelected != null) {
+            cliAuthSelected = null
+            paintCliAuth()
         } else {
-            textBadge("MISSING", NC.SURFACE_HIGHEST, NC.ERROR)
+            navigateBackFromSubpage(ID_CLI_AUTH)
         }
-        titleRow.addView(installBadge)
-        card.addView(titleRow)
+    }
 
+    private fun refreshCliAuthPage(@Suppress("UNUSED_PARAMETER") force: Boolean = false) = paintCliAuth()
+
+    private fun cliAuthName(id: String) = if (id == "gh") "GitHub CLI" else CliToolCatalog.byId(id)?.displayName ?: id
+
+    private fun cliAuthDetail(i: CliAuthInfo): String? =
+        listOfNotNull(i.account, i.detail).takeIf { it.isNotEmpty() }?.joinToString(" · ")
+
+    /** Re-reads login state from the auth files (plain file I/O off the main thread) and repaints. */
+    private fun paintCliAuth() {
+        val body = cliAuthBody ?: return
+        val method = LinuxCommandBuilder.currentMethod
+        val sel = cliAuthSelected
+        cliAuthMethodBadge?.text = method.uppercase()
+        cliAuthTitle?.text = if (sel == null) "AI CLI TOOLS" else cliAuthName(sel).uppercase()
+        val ids = if (sel != null) listOf(sel) else CliToolCatalog.forMethod(method).map { it.id } + "gh"
+        Thread {
+            val home = ProjectPathResolver.guestHomeDir(this, method)
+            val infos = ids.associateWith { CliCredentialProbe.probe(it, home) }
+            runOnUiThread {
+                if (cliAuthBody !== body || cliAuthSelected != sel) return@runOnUiThread
+                body.removeAllViews()
+                if (sel == null) paintCliAuthList(body, infos)
+                else paintCliToolPage(body, sel, infos.getValue(sel), method)
+            }
+        }.start()
+    }
+
+    private fun paintCliAuthList(body: LinearLayout, infos: Map<String, CliAuthInfo>) {
+        infos.forEach { (id, info) ->
+            val signedIn = info.state == AuthState.SIGNED_IN
+            val card = glassCard().apply {
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(10) }
+                setOnClickListener { cliAuthSelected = id; paintCliAuth() }
+            }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            row.addView(TextView(this).apply {
+                text = cliAuthName(id)
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            })
+            row.addView(
+                textBadge(
+                    info.state.name.replace('_', ' '),
+                    if (signedIn) NC.PRIMARY else NC.SURFACE_HIGHEST,
+                    if (signedIn) Color.parseColor("#0A0A0A") else NC.ON_SURF_VAR
+                )
+            )
+            card.addView(row)
+            cliAuthDetail(info)?.let {
+                card.addView(TextView(this).apply {
+                    text = it
+                    textSize = 11f
+                    setTextColor(NC.OUTLINE)
+                    typeface = Typeface.MONOSPACE
+                    setPadding(0, dp(4), 0, 0)
+                })
+            }
+            body.addView(card)
+        }
+        body.addView(secondaryButton("AI SAFETY & REPORT") {
+            if (pageStack.isEmpty() || pageStack.peek() != ID_AI_SAFETY) pageStack.push(ID_AI_SAFETY)
+            navigateToPage(ID_AI_SAFETY)
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6); bottomMargin = dp(16) }
+            textSize = 12f
+        })
+    }
+
+    private fun paintCliToolPage(body: LinearLayout, id: String, info: CliAuthInfo, method: String) {
+        val def = CliToolCatalog.byId(id) // null for "gh"
+        val signedIn = info.state == AuthState.SIGNED_IN
+        val card = glassCard().apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(10) }
+        }
         card.addView(TextView(this).apply {
-            text = "${def.bin} · ${def.subtitle}"
+            text = if (def != null) "${def.bin} · ${def.subtitle}" else "gh · device flow"
             textSize = 11f
             setTextColor(NC.OUTLINE)
             typeface = Typeface.MONOSPACE
-            setPadding(0, 0, 0, dp(6))
+            setPadding(0, 0, 0, dp(8))
         })
-
-        // Never block login on probe flake; suite may be uninstalled (C6)
-        val suiteOk = AiCliProvisionState.shouldShowAiToolLaunchers(this)
-        val stateLine = when {
-            status.loggedIn -> "SIGNED IN" + (status.accountLabel?.let { " · $it" } ?: "")
-            !status.installed && !suiteOk -> "MISSING · install suite above"
-            !status.installed -> "NOT LOGGED IN · bin probe weak"
-            else -> "NOT LOGGED IN" + (status.detail?.let { " · $it" } ?: "")
-        }
         card.addView(TextView(this).apply {
-            text = stateLine
-            textSize = 12f
-            setTextColor(if (status.loggedIn) NC.PRIMARY else NC.ON_SURF_VAR)
+            text = when (info.state) {
+                AuthState.SIGNED_IN -> "SIGNED IN"
+                AuthState.SIGNED_OUT -> "NOT SIGNED IN"
+                AuthState.UNKNOWN -> "STATE UNKNOWN · open the terminal to check"
+            }
+            textSize = 14f
+            setTextColor(if (signedIn) NC.PRIMARY else NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
-            setPadding(0, 0, 0, dp(10))
+            paint.isFakeBoldText = true
         })
+        cliAuthDetail(info)?.let {
+            card.addView(TextView(this).apply {
+                text = it
+                textSize = 12f
+                setTextColor(NC.ON_SURFACE)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(4), 0, 0)
+            })
+        }
+        body.addView(card)
 
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+        fun add(b: TextView) {
+            b.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) }
+            body.addView(b)
         }
-        val loginLabel = when {
-            status.loggedIn -> "RE-AUTH"
-            def.strategy == CliLoginStrategy.API_KEY_FORM -> "SET API KEY"
-            def.strategy == CliLoginStrategy.TERMINAL_GUIDED -> "LOGIN (TERM)"
-            else -> "LOGIN"
-        }
-        val loginBtn = primaryButton(loginLabel) {
-            startCliToolLogin(def)
-        }.apply {
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            textSize = 11f
-            isEnabled = !CliAuthService.isSessionActive()
-        }
-        row.addView(loginBtn)
-        if (status.installed && status.loggedIn) {
-            val logoutBtn = secondaryButton("LOGOUT") {
-                performCliToolLogout(def)
-            }.apply {
-                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(8) }
-                textSize = 11f
-                isEnabled = !CliAuthService.isSessionActive()
+        if (signedIn) {
+            add(primaryButton("SIGN OUT") { confirmCliLogout(id, method) })
+        } else {
+            val label = when {
+                def == null -> "SIGN IN WITH GITHUB"
+                def.strategy == CliLoginStrategy.API_KEY_FORM -> "SET API KEY"
+                def.strategy == CliLoginStrategy.TERMINAL_GUIDED -> "SIGN IN (TERMINAL)"
+                else -> "SIGN IN"
             }
-            row.addView(logoutBtn)
-        }
-        if (!def.consoleUrl.isNullOrBlank()) {
-            val docsBtn = secondaryButton("WEB") {
-                CliAuthService.openBrowser(this@MainActivity, def.consoleUrl!!)
-            }.apply {
-                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(8) }
-                textSize = 11f
+            add(primaryButton(label) { startCliLogin(id, method) })
+            if (def?.envKey != null && def.strategy != CliLoginStrategy.API_KEY_FORM) {
+                add(secondaryButton(if (id == "claude") "USE A TOKEN" else "USE AN API KEY") {
+                    if (gateAllows(FeatureGate.canLaunchAiTool(isPro(), def.terminalType))) showCliApiKeyDialog(def)
+                })
             }
-            row.addView(docsBtn)
         }
-        card.addView(row)
-        return card
+        if (def != null) {
+            add(secondaryButton("OPEN TERMINAL") { openCliTerminal(def) })
+            if (!def.consoleUrl.isNullOrBlank()) {
+                add(secondaryButton("OPEN WEBSITE") { CliAuthService.openBrowser(this, def.consoleUrl) })
+            }
+        }
+        add(secondaryButton("REFRESH") { paintCliAuth() })
     }
 
-    private fun startCliToolLogin(def: CliToolDef) {
+    private fun startCliLogin(id: String, method: String) {
+        if (id == "gh") {
+            startGithubConnect(method, fromSettings = true)
+            return
+        }
+        val def = CliToolCatalog.byId(id) ?: return
+        if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), def.terminalType))) return
         if (CliAuthService.isSessionActive()) {
             Toast.makeText(this, "Auth already in progress", Toast.LENGTH_SHORT).show()
             return
         }
-        val method = LinuxCommandBuilder.currentMethod
         when (def.strategy) {
             CliLoginStrategy.API_KEY_FORM -> showCliApiKeyDialog(def)
+            // Interactive TUI wizards (no URL to stream): hand over to the tool's own terminal.
             CliLoginStrategy.TERMINAL_GUIDED -> {
-                // Try service stream + guided terminal fallback via overlay
-                showCliAuthOverlay(def, method)
+                val hint = if (id == "opencode") "Type /connect to sign in" else "Follow the sign-in prompt"
+                Toast.makeText(this, hint, Toast.LENGTH_LONG).show()
+                openCliTerminal(def)
             }
             else -> showCliAuthOverlay(def, method)
         }
     }
 
-    private fun performCliToolLogout(def: CliToolDef) {
-        val method = LinuxCommandBuilder.currentMethod
-        Toast.makeText(this, "Logging out ${def.displayName}…", Toast.LENGTH_SHORT).show()
-        CliAuthService.logout(this, method, def.id) { ok, msg ->
-            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-            refreshCliAuthPage(force = true)
-        }
+    private fun openCliTerminal(def: CliToolDef) {
+        createNewTerminalSession(def.terminalType)
+        if (pageStack.isEmpty() || pageStack.peek() != ID_TERMINAL) pageStack.push(ID_TERMINAL)
+        navigateToPage(ID_TERMINAL)
+    }
+
+    private fun confirmCliLogout(id: String, method: String) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Sign out of ${cliAuthName(id)}?")
+            .setMessage("This removes the saved login for this tool only. Other tools are not affected.")
+            .setPositiveButton("SIGN OUT") { _, _ ->
+                val done = { _: Boolean, msg: String ->
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                    paintCliAuth()
+                }
+                if (id == "gh") GitHubCliService.logout(this, method, done)
+                else CliAuthService.logout(this, method, id, done)
+            }
+            .setNegativeButton("CANCEL", null)
+            .show()
     }
 
     private fun showCliApiKeyDialog(def: CliToolDef) {
@@ -18348,6 +18296,26 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         otpRow.addView(openBrowserBtn)
         panel.addView(otpRow)
 
+        // Browser flows that end with "paste the code here" (claude auth login).
+        val pasteRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            setPadding(0, 0, 0, dp(8))
+        }
+        val pasteInput = EditText(this).apply {
+            hint = "Paste the code from the browser"
+            setTextColor(Color.WHITE)
+            setHintTextColor(NC.OUTLINE)
+            typeface = Typeface.MONOSPACE
+            textSize = 12f
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        }
+        pasteRow.addView(pasteInput)
+        panel.addView(pasteRow)
+
         val logScroll = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
             setBackgroundColor(Color.parseColor("#0A0A0A"))
@@ -18374,6 +18342,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             })
             logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
         }
+
+        pasteRow.addView(secondaryButton("SEND") {
+            val code = pasteInput.text?.toString().orEmpty().trim()
+            if (code.isNotEmpty() && cliAuthSession?.writeLine(code) == true) {
+                pasteInput.setText("")
+                phaseTv.text = "Code sent, waiting…"
+            }
+        }.apply {
+            textSize = 11f
+            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
+        })
 
         val cancelBtn = primaryButton("CANCEL") {
             cliAuthSession?.cancel()
@@ -18412,6 +18391,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             override fun onUrl(url: String) {
                 lastUrl = url
                 otpRow.visibility = View.VISIBLE
+                if (def.strategy == CliLoginStrategy.STREAM_URL) pasteRow.visibility = View.VISIBLE
                 if (lastOtp == null) otpTv.text = "URL ready"
                 appendLog("URL: $url")
             }

@@ -24,6 +24,13 @@ class ShellJob {
         cancelled = true
         try { process?.destroyForcibly() } catch (_: Exception) {}
     }
+
+    /** Writes [text] + newline to the process stdin (e.g. a pasted login code). */
+    fun writeLine(text: String): Boolean = try {
+        process?.outputStream?.let { it.write((text + "\n").toByteArray()); it.flush(); true } ?: false
+    } catch (_: Exception) {
+        false
+    }
 }
 
 /** Runs shell commands with proper environment, supporting both proot and chroot. */

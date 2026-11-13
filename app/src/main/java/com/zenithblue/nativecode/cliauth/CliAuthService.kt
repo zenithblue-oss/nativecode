@@ -37,12 +37,10 @@ object CliAuthService {
     /** Skip guest re-probe if cache younger than this (unless force). */
     private const val CACHE_TTL_MS = 10 * 60 * 1000L
 
-    private val URL_PATTERN = Pattern.compile("(https?://[^\\s\"'<>\\]\\)]+)")
+    private val ANSI = Regex("\u001B\\[[0-9;?]*[A-Za-z]")
+    private val URL_PATTERN =Pattern.compile("(https?://[^\\s\"'<>\\]\\)]+)")
     private val OTP_PATTERN = Pattern.compile(
         "\\b([A-Z0-9]{4,5}-[A-Z0-9]{4,6})\\b"
-    )
-    private val CLAUDE_TOKEN = Pattern.compile(
-        "\\b(sk-ant-oat[A-Za-z0-9_-]+|claude_oauth_[A-Za-z0-9_-]+)\\b"
     )
 
     fun isSessionActive(): Boolean = activeSession.get()
@@ -232,37 +230,35 @@ object CliAuthService {
                 mainHandler.post { onResult(false, "Unknown tool") }
                 return@execute
             }
+            // The CLI's own non-interactive logout where it has one; the rest remove only
+            // their own auth file below (opencode's `auth logout` is an interactive picker).
             val cmd = when (toolId) {
                 "codex" -> CliGuestCommands.logoutCodex()
-                "opencode" -> CliGuestCommands.logoutOpencode()
                 "kiro" -> CliGuestCommands.logoutKiro()
-                "claude" -> CliGuestCommands.logoutClaudeFiles()
                 else -> null
             }
             if (cmd != null) {
-                val (args, env) = fluxCmd(ctx, cmd, method)
-                mergeCliEnv(env)
-                ShellCommandRunner.runCaptureExit(ctx, args, env)
-            }
-            // Clear env keys for this tool
-            def.envKey?.let { clearAuthEnvKey(ctx, method, it) }
-            when (toolId) {
-                "qwen" -> {
-                    clearAuthEnvKey(ctx, method, "BAILIAN_CODING_PLAN_API_KEY")
-                    clearAuthEnvKey(ctx, method, "DASHSCOPE_API_KEY")
-                    try {
-                        File(ProjectPathResolver.guestHomeDir(ctx, method), ".qwen/settings.json")
-                            .delete()
-                    } catch (_: Exception) {
-                    }
-                }
-                "grok" -> {
-                    clearAuthEnvKey(ctx, method, "XAI_API_KEY")
-                    clearAuthEnvKey(ctx, method, "GROK_API_KEY")
+                try {
+                    val (args, env) = fluxCmd(ctx, cmd, method)
+                    mergeCliEnv(env)
+                    ShellCommandRunner.runCaptureExit(ctx, args, env)
+                } catch (_: Exception) {
                 }
             }
+            val home = ProjectPathResolver.guestHomeDir(ctx, method)
+            try {
+                CliCredentialProbe.clearFiles(toolId, home)
+            } catch (_: Exception) {
+            }
+            // Keys saved by the API-key form
+            listOfNotNull(def.envKey, "DASHSCOPE_API_KEY".takeIf { toolId == "qwen" },
+                "GROK_API_KEY".takeIf { toolId == "grok" }, "ANTHROPIC_API_KEY".takeIf { toolId == "claude" })
+                .forEach { clearAuthEnvKey(ctx, method, it) }
             statusCache.remove("$toolId|$method")
-            mainHandler.post { onResult(true, "Logged out ${def.displayName}") }
+            val still = CliCredentialProbe.probe(toolId, home).state == AuthState.SIGNED_IN
+            mainHandler.post {
+                onResult(!still, if (still) "Still signed in; open the terminal to sign out" else "Logged out ${def.displayName}")
+            }
         }
     }
 
@@ -321,6 +317,7 @@ object CliAuthService {
                 val loginCmd = when (def.id) {
                     "codex" -> CliGuestCommands.loginCodexDevice()
                     "kiro" -> CliGuestCommands.loginKiro()
+                    "grok" -> CliGuestCommands.loginGrok()
                     else -> null
                 }
                 if (loginCmd == null) {
@@ -350,29 +347,23 @@ object CliAuthService {
             CliLoginStrategy.STREAM_URL -> {
                 phase(CliAuthPhase.LOGIN, "Starting browser login…")
                 val loginCmd = when (def.id) {
-                    "claude" -> CliGuestCommands.loginClaudeSetupToken()
+                    "claude" -> CliGuestCommands.loginClaude()
                     else -> null
                 }
                 if (loginCmd == null) {
                     fail("No stream login for ${def.id}")
                     return
                 }
-                val token = streamAndCaptureToken(ctx, method, def, loginCmd, session, listener)
+                val ok = streamLoginAndCapture(ctx, method, def, loginCmd, session, listener)
                 if (session.cancelled) {
                     mainHandler.post { listener.onCancelled() }
                     return
                 }
-                if (token.isNullOrBlank()) {
-                    // fallback guided
-                    mainHandler.post {
-                        listener.onTerminalGuided(def.id, "claude setup-token")
-                    }
-                    fail("No token captured — finish in terminal if needed")
+                if (!ok) {
+                    mainHandler.post { listener.onTerminalGuided(def.id, "claude auth login") }
+                    fail("Not signed in yet; finish in the terminal if needed")
                     return
                 }
-                phase(CliAuthPhase.CAPTURE_TOKEN, "Saving token…")
-                log("Token captured (${token.take(12)}…)")
-                writeAuthEnvKey(ctx, method, "CLAUDE_CODE_OAUTH_TOKEN", token)
             }
             CliLoginStrategy.TERMINAL_GUIDED -> {
                 phase(CliAuthPhase.LOGIN, "Guided terminal login…")
@@ -467,8 +458,9 @@ object CliAuthService {
 
         val job = ShellCommandRunner.runStreamedCancelable(
             ctx, args, env,
-            onLine = { line ->
+            onLine = { raw ->
                 if (session.cancelled) return@runStreamedCancelable
+                val line = ANSI.replace(raw, "")
                 mainHandler.post { listener.onLog(line) }
                 extractUrl(line)?.let { url ->
                     if (lastUrl.get() != url) {
@@ -535,48 +527,6 @@ object CliAuthService {
         return st.loggedIn
     }
 
-    private fun streamAndCaptureToken(
-        ctx: Context,
-        method: String,
-        @Suppress("UNUSED_PARAMETER") def: CliToolDef,
-        loginCmd: String,
-        session: CliAuthSession,
-        listener: CliAuthListener
-    ): String? {
-        val (args, env) = fluxCmd(ctx, loginCmd, method)
-        mergeCliEnv(env)
-        val latch = CountDownLatch(1)
-        val tokenRef = AtomicReference<String?>(null)
-        val all = StringBuilder()
-
-        val job = ShellCommandRunner.runStreamedCancelable(
-            ctx, args, env,
-            onLine = { line ->
-                if (session.cancelled) return@runStreamedCancelable
-                all.append(line).append('\n')
-                mainHandler.post { listener.onLog(line) }
-                extractUrl(line)?.let { url ->
-                    mainHandler.post {
-                        listener.onPhase(CliAuthPhase.WAIT_BROWSER, "Open browser…")
-                        listener.onUrl(url)
-                    }
-                    openBrowser(ctx, url)
-                }
-                extractClaudeToken(line)?.let { t ->
-                    tokenRef.set(t)
-                }
-            },
-            onDone = { latch.countDown() }
-        )
-        session.attach(job)
-        latch.await(CliGuestCommands.AUTH_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        session.clearJob()
-        if (tokenRef.get() == null) {
-            extractClaudeToken(all.toString())?.let { tokenRef.set(it) }
-        }
-        return tokenRef.get()
-    }
-
     // ── probe ───────────────────────────────────────────────────────────────
 
     private fun probeOneSync(ctx: Context, method: String, def: CliToolDef): CliToolStatus {
@@ -586,31 +536,20 @@ object CliAuthService {
             statusCache["${def.id}|$method"] = st
             return st
         }
-        val statusCmd = when (def.id) {
-            "claude" -> CliGuestCommands.statusClaude()
-            "codex" -> CliGuestCommands.statusCodex()
-            "qwen" -> CliGuestCommands.statusQwen()
-            "opencode" -> CliGuestCommands.statusOpencode()
-            "agy" -> CliGuestCommands.statusAgy()
-            "grok" -> CliGuestCommands.statusGrok()
-            "kiro" -> CliGuestCommands.statusKiro()
-            else -> "echo AUTH_NO"
-        }
-        val raw = try {
-            val (args, env) = fluxCmd(ctx, statusCmd, method)
-            mergeCliEnv(env)
-            ShellCommandRunner.runCaptureExit(ctx, args, env).second
-        } catch (e: Exception) {
-            val st = CliToolStatus(
-                def.id, method, true, false,
-                error = e.message, raw = ""
-            )
-            statusCache["${def.id}|$method"] = st
-            return st
-        }
-        val st = parseStatus(def, method, raw)
+        val st = hostStatus(ctx, method, def.id).copy(installed = true)
         statusCache["${def.id}|$method"] = st
         return st
+    }
+
+    /** Login state from the tool's auth file on the host (no guest process). */
+    fun hostStatus(ctx: Context, method: String, toolId: String): CliToolStatus {
+        val info = CliCredentialProbe.probe(toolId, ProjectPathResolver.guestHomeDir(ctx, method))
+        return CliToolStatus(
+            toolId, method, installed = false,
+            loggedIn = info.state == AuthState.SIGNED_IN,
+            accountLabel = info.account ?: info.detail,
+            detail = info.state.name
+        )
     }
 
     /**
@@ -675,52 +614,6 @@ object CliAuthService {
             }
         }
         return false
-    }
-
-    private fun parseStatus(def: CliToolDef, method: String, raw: String): CliToolStatus {
-        val lower = raw.lowercase()
-        when (def.id) {
-            "codex" -> {
-                val loggedIn = lower.contains("logged in") ||
-                    lower.contains("signed in") ||
-                    (lower.contains("chatgpt") && !lower.contains("not logged")) ||
-                    (lower.contains("email") && lower.contains("@")) ||
-                    (!lower.contains("not logged") && lower.contains("account"))
-                val notIn = lower.contains("not logged") ||
-                    lower.contains("not signed") ||
-                    lower.contains("log in") && lower.contains("required")
-                val inOk = loggedIn && !notIn
-                val label = Regex("""[\w.+-]+@[\w.-]+\.\w+""").find(raw)?.value
-                return CliToolStatus(
-                    def.id, method, true, inOk,
-                    accountLabel = label,
-                    detail = if (inOk) "codex" else "not logged in",
-                    raw = raw
-                )
-            }
-            else -> {
-                val authOk = raw.contains("AUTH_OK")
-                val authMaybe = raw.contains("AUTH_MAYBE")
-                val label = when {
-                    raw.contains("credentials") -> "credentials"
-                    raw.contains("env_token") || raw.contains("env_key") -> "env"
-                    raw.contains("settings") -> "settings"
-                    raw.contains("auth_json") -> "auth.json"
-                    else -> null
-                }
-                return CliToolStatus(
-                    def.id, method, true,
-                    loggedIn = authOk || (authMaybe && def.id == "kiro"),
-                    accountLabel = label,
-                    detail = when {
-                        authOk -> "signed in"
-                        authMaybe -> "maybe"
-                        else -> "not logged in"
-                    },
-                    raw = raw
-                )
-            }
-        }
     }
 
     // ── file writes ─────────────────────────────────────────────────────────
@@ -841,17 +734,14 @@ object CliAuthService {
     }
 
     private fun extractOtp(line: String): String? {
-        // Avoid matching years/dates: prefer patterns near "code"
+        // The code is alone on its line, or the line says "code" (not e.g. BUILD-TOOLS in an env dump).
+        val alone = OTP_PATTERN.matcher(line.trim().uppercase()).let { it.matches() }
+        if (!alone && !line.contains("code", ignoreCase = true)) return null
         val m = OTP_PATTERN.matcher(line.uppercase())
         if (!m.find()) return null
         val code = m.group(1) ?: return null
         // skip pure hex that looks like hashes if too long segments
         return code
-    }
-
-    private fun extractClaudeToken(text: String): String? {
-        val m = CLAUDE_TOKEN.matcher(text)
-        return if (m.find()) m.group(1) else null
     }
 
     private fun fluxCmd(

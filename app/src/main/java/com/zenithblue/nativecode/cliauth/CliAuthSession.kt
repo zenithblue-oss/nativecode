@@ -22,6 +22,9 @@ class CliAuthSession {
         job = null
     }
 
+    /** Sends a pasted code to the login process; never logged. */
+    fun writeLine(text: String): Boolean = job?.writeLine(text) ?: false
+
     fun clearJob() {
         job = null
     }

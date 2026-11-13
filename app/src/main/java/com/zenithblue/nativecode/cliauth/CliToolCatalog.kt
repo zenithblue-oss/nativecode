@@ -6,7 +6,7 @@ package com.zenithblue.nativecode.cliauth
 enum class CliLoginStrategy {
     /** Stream login cmd; parse OTP + URL (codex device-auth, kiro). */
     DEVICE_CODE,
-    /** Stream login; parse https URL + optional token capture (claude setup-token). */
+    /** Stream login; parse https URL, accept a pasted code on stdin (claude auth login). */
     STREAM_URL,
     /** Paste API key (+ optional open console URL). */
     API_KEY_FORM,
@@ -42,7 +42,7 @@ object CliToolCatalog {
             terminalType = "claude-code",
             consoleUrl = "https://claude.ai/login",
             envKey = "CLAUDE_CODE_OAUTH_TOKEN",
-            subtitle = "claude setup-token · browser OAuth"
+            subtitle = "claude auth login · browser OAuth"
         ),
         CliToolDef(
             id = "codex",
@@ -86,11 +86,11 @@ object CliToolCatalog {
             id = "grok",
             displayName = "Grok Build",
             bin = "grok",
-            strategy = CliLoginStrategy.API_KEY_FORM,
+            strategy = CliLoginStrategy.DEVICE_CODE,
             terminalType = "grok",
             consoleUrl = "https://console.x.ai",
             envKey = "XAI_API_KEY",
-            subtitle = "XAI_API_KEY or first-run browser"
+            subtitle = "grok login · or XAI_API_KEY"
         ),
         CliToolDef(
             id = "kiro",
