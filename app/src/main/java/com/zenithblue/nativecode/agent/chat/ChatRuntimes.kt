@@ -17,6 +17,7 @@ object ChatRuntimes {
 
     fun create(tool: String, host: RuntimeHost): AgentRuntime? = when (protocolOf(tool)) {
         ChatProtocol.OPENCODE_HTTP -> OpenCodeHttpRuntime(host)
+        ChatProtocol.CLAUDE_STREAM -> com.zenithblue.nativecode.agent.chat.claude.ClaudeStreamRuntime(host)
         ChatProtocol.CODEX_APP_SERVER -> com.zenithblue.nativecode.agent.chat.codex.CodexAppServerRuntime(host)
         ChatProtocol.ACP -> com.zenithblue.nativecode.agent.chat.acp.AcpProfile.of(CliToolCatalog.ALL.firstOrNull { it.terminalType == tool }?.acpProfile)
             ?.let { com.zenithblue.nativecode.agent.chat.acp.AcpRuntime(host, it) }

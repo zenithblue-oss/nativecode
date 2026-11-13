@@ -50,7 +50,8 @@ object CliToolCatalog {
             terminalType = "claude-code",
             consoleUrl = "https://claude.ai/login",
             envKey = "CLAUDE_CODE_OAUTH_TOKEN",
-            subtitle = "claude auth login · browser OAuth"
+            subtitle = "claude auth login · browser OAuth",
+            chat = ChatProtocol.CLAUDE_STREAM
         ),
         CliToolDef(
             id = "codex",
