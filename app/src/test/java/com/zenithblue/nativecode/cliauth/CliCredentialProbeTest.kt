@@ -89,6 +89,8 @@ class CliCredentialProbeTest {
         assertEquals("anthropic, openai", i.detail)
         h.put(".local/share/opencode/auth.json", "{}")
         assertEquals(AuthState.SIGNED_OUT, probe("opencode", h).state)
+        h.put(".local/share/opencode/opencode.db", "x")
+        assertEquals(AuthState.UNKNOWN, probe("opencode", h).state)
     }
 
     @Test fun qwenKeyBlankedOnClear() {

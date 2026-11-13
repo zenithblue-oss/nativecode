@@ -99,6 +99,8 @@ object CliCredentialProbe {
     private fun opencode(home: File): CliAuthInfo {
         val a = File(home, ".local/share/opencode/auth.json").textOrNull()
         val providers = a?.let { PROVIDER.findAll(it).map { m -> m.groupValues[1] }.distinct().toList() }.orEmpty()
+        // opencode 2.x moves credentials into opencode.db (auth.json only legacy): cannot tell.
+        if (providers.isEmpty() && File(home, ".local/share/opencode/opencode.db").isFile) return CliAuthInfo(AuthState.UNKNOWN)
         return if (providers.isEmpty()) CliAuthInfo(AuthState.SIGNED_OUT)
         else CliAuthInfo(AuthState.SIGNED_IN, detail = providers.joinToString(", "))
     }
