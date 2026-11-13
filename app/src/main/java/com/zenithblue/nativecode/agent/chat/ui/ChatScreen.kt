@@ -152,6 +152,11 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                     if (!fwd) unseen = false
                 }
             }
+            // Stay pinned while following when content grows without a new item (throttled markdown, the
+            // working pill's pad, an approval card shrinking the viewport).
+            LaunchedEffect(list) {
+                snapshotFlow { list.canScrollForward }.collect { fwd -> if (fwd && follow && !list.isScrollInProgress) list.scrollBy(100_000f) }
+            }
             val sig = rows.size to (items.lastOrNull()?.let { it.updatedAt + it.payload.hashCode() } ?: 0)
             LaunchedEffect(sig) {
                 if (follow && rows.isNotEmpty()) { list.scrollToItem(list.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1); list.scrollBy(100_000f) }

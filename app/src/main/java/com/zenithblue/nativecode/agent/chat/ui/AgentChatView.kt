@@ -78,6 +78,17 @@ class AgentChatView(
     private var unObserve: (() -> Unit)? = null
     private var approvals = emptySet<String>()
 
+    /**
+     * A landscape host LinearLayout (baseline-aligned, weighted child) measures us with an UNSPECIFIED width;
+     * Compose turns that into an infinite max width and every horizontalScroll throws. Cap it at the given size.
+     */
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        fun cap(spec: Int, fallback: Int) = if (MeasureSpec.getMode(spec) != MeasureSpec.UNSPECIFIED) spec
+            else MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(spec).takeIf { it > 0 } ?: fallback, MeasureSpec.AT_MOST)
+        val dm = resources.displayMetrics
+        super.onMeasure(cap(widthMeasureSpec, dm.widthPixels), cap(heightMeasureSpec, dm.heightPixels))
+    }
+
     private val storeListener: (Set<String>) -> Unit = { ids ->
         main.post {
             reloadList()
@@ -194,7 +205,7 @@ class AgentChatView(
                     val preview = backend.items(t.id, 8).lastOrNull { it.payload is ItemPayload.AssistantMessage || it.payload is ItemPayload.UserMessage }?.payload?.let { p ->
                         ((p as? ItemPayload.AssistantMessage)?.text ?: (p as ItemPayload.UserMessage).text).lineSequence().firstOrNull { it.isNotBlank() }
                             ?.trim()?.trimStart('#', '>', '-', '*', ' ')?.take(200)?.let { Md.inline(it).text }
-                    }
+                    }?.takeUnless { it.startsWith(t.title.take(40)) } // the first prompt is already the title
                     ThreadRow(t, ChatLogic.status(t, last, backend.openRequests(t.id)), last, stat.sumOf { it.add }, stat.sumOf { it.del }, preview)
                 }
             }.getOrDefault(emptyList())

@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.Placeholder
@@ -379,17 +380,20 @@ private fun MdBlock(n: Md.Node, open: Boolean, caret: Boolean) {
 @Composable
 private fun MdTable(n: Md.Node.Table) {
     val cols = maxOf(n.header.size, n.rows.maxOfOrNull { it.size } ?: 0)
+    // Fixed row height (single-line cells): a cell of inline code has other font metrics and would drift its column.
+    val rowH = with(LocalDensity.current) { T.bodySm.lineHeight.toDp() } + S.s * 2
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).border(1.dp, C.border)) {
         for (c in 0 until cols) {
             Column(Modifier.width(IntrinsicSize.Max)) {
                 val ann = remember(n.header, c) { Md.inline(n.header.getOrElse(c) { "" }) }
-                Text(ann, Modifier.fillMaxWidth().background(C.container).padding(horizontal = S.m, vertical = S.s),
-                    color = C.on, style = T.bodySm.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, softWrap = false)
+                Box(Modifier.fillMaxWidth().height(rowH).background(C.container), contentAlignment = Alignment.CenterStart) {
+                    Text(ann, Modifier.padding(horizontal = S.m), color = C.on, style = T.bodySm.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, softWrap = false)
+                }
                 n.rows.forEachIndexed { r, row ->
                     val cell = remember(row, c) { Md.inline(row.getOrElse(c) { "" }) }
-                    Box(Modifier.fillMaxWidth().background(if (r % 2 == 1) C.low else Color.Transparent)) {
-                        Hairline()
-                        Text(cell, Modifier.padding(horizontal = S.m, vertical = S.s), color = C.on, style = T.bodySm, maxLines = 1, softWrap = false)
+                    Box(Modifier.fillMaxWidth().height(rowH + 1.dp).background(if (r % 2 == 1) C.low else Color.Transparent), contentAlignment = Alignment.CenterStart) {
+                        Hairline(Modifier.align(Alignment.TopStart))
+                        Text(cell, Modifier.padding(horizontal = S.m), color = C.on, style = T.bodySm, maxLines = 1, softWrap = false)
                     }
                 }
             }
