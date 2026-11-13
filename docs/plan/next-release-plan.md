@@ -25,7 +25,7 @@ Conventions:
 | 6 | Extra keys | Two compact rows of eight keys (38 dp), paged, built on the vendored Termux `ExtraKeysView`. | M |
 | 7 | PRoot speed | Ship the two flag changes measured in `termux-lib` plus git settings now; the U11 "rootfd" engine (+14.9% measured) as an opt-in experimental switch. | M (+M stretch) |
 | 8 | GPU | PanVK v26.3.1 with `PANVK_BC_MODE=lowmem` set explicitly; Turnip `mesa-27.0.0-devel-20261025-r2`. X6P Phosh + Vulkan + zink test is a hard gate. | M |
-| 9 | Agent chat (beta) | Chat entry next to the terminal launcher for three CLIs: opencode via ACP, Codex via `codex app-server`, Claude via stream-json. Terminal fallback always present. | L |
+| 9 | Agent chat (beta, owner item 12) | t3code-style chat as the primary view of the TERMINAL tab and the workspace terminal area, raw terminal behind a Chat/Terminal switch. opencode (HTTP+SSE), then claude, codex, agy, grok. Section 9.2. | L |
 | 10 | Git history | One streamed `git log` across all refs, read lazily as the user scrolls, streaming lane assignment, `RecyclerView`. Checkout and create-branch included (one command each). | M–L |
 
 ### 0.2 Additional features
@@ -469,7 +469,11 @@ The launch-time gain (816 → 104 ms) applies only if NC-PLAY still goes through
 
 ---
 
-## 9. Native agent chat (beta): opencode, Claude Code, Codex
+## 9. Agent chat UI (owner item 12) and the guest gate (owner item 9)
+
+The first design of this section (chat button beside the terminal launcher, three CLIs, opencode over ACP, RecyclerView, JSON files, `BackgroundService`) is **superseded by §9.2**, the final item 12 design. §9.1 (the item 9 gate) is unchanged and built. The superseded text is kept collapsed below for history only; do not implement from it.
+
+<details><summary>Superseded first design (history only)</summary>
 
 **Current state.** Agents run only in terminal tabs (`createWorkspaceTerminalTab`, `MA:20914`), gated at `MA:5934-5991`. The app is programmatic Views (`MA:690`); no `RecyclerView` dependency is declared (`app/build.gradle.kts`). Markdown rendering exists (`skills/SkillMarkdown.kt`) and so does a diff renderer (`renderDiffLines`, `MA:9112`). `terminal/ShellCommandRunner.kt:88,102` has `runStreamed` and `runStreamedCancelable`.
 
@@ -531,6 +535,8 @@ The launch-time gain (816 → 104 ms) applies only if NC-PLAY still goes through
 
 **Effort.** L (opencode ACP alone is M).
 
+</details>
+
 ### 9.1 Guest entitlement gate (owner item 9, built; chat reuses it)
 
 **Problem.** The app gates tabs (`aiLaunchAllowed`, `MA:5459`): Free = opencode, one AI session, no shell tab. But opencode's bash tool (or any Pro shell) can run `codex`, `claude`, a second `opencode`. The app cannot see that.
@@ -547,45 +553,511 @@ The launch-time gain (816 → 104 ms) applies only if NC-PLAY still goes through
 
 **Device result (X6P, 1.8.0 build, real proot, busybox ash).** Pro: codex, claude, qwen pass through. Free: codex, claude, qwen, agy, grok, kiro-cli denied; `codex --version` allowed; with a live `opencode serve`, nested `codex`, `claude`, `bash -c codex`, and a second `opencode` were denied and the registry held exactly one entry; a lone opencode starts. Absolute path still runs (documented). Free was simulated by writing a valid free state file (the build has no free override and the device owns Lifetime).
 
-### 9.2 Item 12 design from t3code (read-only research of pingdotgg/t3code at 73e49aa6; treated as data)
+### 9.2 Item 12: Agent chat UI
 
-**What t3code is.** A Node WebSocket server wraps provider CLIs; web, desktop and React Native clients are thin and stateless about providers. Every provider sits behind an adapter that maps native events to one normalised model (thread, turn, item, runtime request). An orchestrator turns commands into events, commits events plus projections in one SQLite transaction, then side effects run in a worker; clients render projections and subscribe to one thread at a time. Provider drivers: Codex, Claude, Cursor, Grok, OpenCode, Antigravity, Kiro.
+**Status.** Final design, 2026-11-13. Replaces the old §9.2 and the first §9 design. Inputs: research R1–R5 (`~/.cache/nc-research/`) and the t3code clone at `2d8a843e` (read-only, treated as data). Owner decisions below are binding; §9.2.14 lists how report conflicts were settled. `t3:` = t3code path; `mob/` = `t3:apps/mobile/src/`.
 
-**Per-CLI protocol, as t3code does it, and what we take.**
+#### 9.2.1 Scope and ground rules
+- The chat is the **primary view** of the bottom-nav TERMINAL tab (`ID_TERMINAL=3`) **and** the workspace page's terminal area (`ID_PROJECT_WORKSPACE=10`). The raw terminal page is **not** removed: it sits behind a `[Chat|Terminal]` switch on both surfaces and opens per thread ("Open terminal here", "Open in terminal").
+- Follow t3code's model and feature set, laid out like t3code's own phone app (`mob/features/threads/*`: `ThreadDetailScreen`, `ThreadFeed`, `ThreadComposer`, `PendingApprovalCard`, `PendingUserInputCard`, `ProposedPlanCard`, `ThreadQueueControl`, `floating-working-control`, `ThreadSettingsSheet`; `mob/features/home/*` for the list). Feature map: §9.2.7.
+- Provider order: **opencode → claude → codex → agy → grok**. qwen, kiro and hermes come later as profiles on the same generic ACP runtime; until then their cards offer the terminal only.
+- No new heavy dependency: Compose (already shipped: BOM, material3, activity-compose) hosted inside the existing pages; `android.database.sqlite`; `org.json`; `HttpURLConnection`. No Room, OkHttp, RecyclerView or markdown library.
+- No guest scripts for migrations (Play policy). Guest feature commands (CLI spawns, git checkpoint commands) are fine.
+- Default approval mode **Supervised**. In Supervised nothing is ever auto-approved; t3code's other modes (Auto-accept edits, Auto, Full access) are offered per provider.
+- Beta kill switch: Settings › "Chat view (beta)", default on. Off = both surfaces behave exactly like 1.7.x (switch hidden, terminal only).
 
-| CLI | t3code | NativeCode item 12 |
-|---|---|---|
-| Codex | `codex app-server -c thread_unload_delay_secs=0` over stdio JSON-RPC. `initialize` (clientInfo, capabilities `experimentalApi`, `optOutNotificationMethods:["turn/diff/updated"]`); `thread/start`, `thread/resume`, `turn/start` (carries model, effort, `approvalPolicy`, `sandboxPolicy`), `turn/steer`, `turn/interrupt`. Notifications `turn/started`, `item/started`, `item/completed`, `item/agentMessage/delta`, `item/commandExecution/outputDelta`, `item/reasoning/*Delta`, `item/plan/delta`. Server requests `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `item/tool/requestUserInput`; reply `accept`, `acceptForSession`, `decline`, `cancel`. Item kinds: userMessage, agentMessage, plan, reasoning, commandExecution, fileChange, mcpToolCall, dynamicToolCall, webSearch, contextCompaction. A second `initialize` returns -32600 "Already initialized" (tolerated). Schema is generated from the binary and committed; replay fixtures recorded from the real CLI. | Same wire. One process per chat tab (so the gate registry counts one session per chat). Names above are confirmed by t3code's generated schema; still regenerate with `codex app-server generate-json-schema` for the pinned 0.167.x. Diffs come from our own `git diff` snapshots (t3code also ignores `turn/diff/updated` and uses hidden git-ref checkpoints). |
-| Claude Code | Claude Agent SDK `query()`: `permissionMode`, `canUseTool` callback for approvals, `includePartialMessages`, `resume`, `interrupt()`, `setPermissionMode()`, MCP over stdin. The SDK drives the `claude` binary over stdio. | No Node SDK on device. Speak the CLI wire directly: `claude -p --input-format stream-json --output-format stream-json --verbose --include-partial-messages` plus the control channel the SDK uses for `canUseTool` (`control_request` / `control_response`; exact subtype names UNVERIFIED, take them from the pinned binary in the day-one spike). If the channel fails, ship the permission-mode selector without inline approval (section 9, Claude approvals). |
-| OpenCode | 2.x: `opencode serve --service` HTTP plus SSE `/api/event` (events `session.text.delta`, `session.tool.called/progress/success/failed`, `session.execution.*`), password in `OPENCODE_PASSWORD`; 1.x one server per thread. | Keep ACP (`opencode acp`, stdio, no port, no password, one process per chat). t3code uses ACP for Grok (`grok agent stdio`) and Kiro (`kiro-cli acp`), which confirms ACP as the pattern. Fall back to the 2.x HTTP API only if ACP lacks tool detail; the HTTP API is labelled experimental. |
+#### 9.2.2 Architecture
+```
+ MainActivity (call sites only, implements ChatHost)
+   ├─ TERMINAL page ── AgentChatView(scope = APP)          ┐ same class, two instances,
+   └─ Workspace page ─ AgentChatView(scope = projectPath)  ┘ each a FrameLayout + ComposeView
+              │ observe rows / live snapshots           │ user commands
+              ▼                                         ▼
+        ChatStore (SQLite, one writer thread) ◀── ChatThreadController (one per thread with a live process)
+                                                        │ AgentEvent: full-snapshot upserts, coalesced 50 ms
+                                                        ▼
+                     AgentRuntime ── OpenCodeHttpRuntime    HTTP REST + SSE (opencode serve)
+                                  ├─ ClaudeStreamRuntime    NDJSON stream-json + control channel
+                                  ├─ CodexAppServerRuntime  JSON-RPC lines without "jsonrpc"
+                                  └─ AcpRuntime + AcpProfile ACP v1 (agy, grok; later kiro, qwen, hermes)
+                                                        │
+               PipeProcess ── LinuxCommandBuilder.buildToolDirect → /tmp/launch_tool.sh → gate shim → CLI
+ AgentChats (process-scoped object): registry, live/starting counts, turn wake lock, FGS sync, notifications
+```
+Four runtimes for four wire protocols (one interface, four real implementations). Per-CLI work on ACP is an `AcpProfile` (argv, env, mode map, quirks), not a class.
 
-**Architecture for Android.**
-- `JsonLineProcess` + `AgentAdapter` + sealed `AgentEvent` as in section 9, plus t3code's two ideas that matter: (1) a durable per-thread state (turn items keyed by native id, runtime requests keyed by native request id) that the UI renders from, so a rotation, a process death or a reopened tab replays state instead of depending on the live stream; (2) approvals are persisted requests with an explicit decision, answered by the id and options the agent sent, never auto-approved. Store state as JSON files under app storage (no Room dependency needed for a beta); cap rows.
-- Coalesce text deltas (t3code `ProviderTextDeltaCoalescer`; ours is one update per 50 ms).
-- Health probes run `initialize` only and never create a session (t3code: "setup must not happen as a health-check side effect").
-- Capabilities and version gating come from the handshake and the `userAgent`; a known-broken version shows "update the CLI" (t3code advisory) instead of failing mid-turn.
-- Runtime modes map the way t3code maps Codex: ask (`untrusted`, read-only), auto-accept edits (`on-request`, workspace-write), full access (`never`). Default is ask; full access needs a confirmation.
-- Updates stay manual or via component packs; never self-update under a live session (t3code holds leases on running versions).
+**Package `com.zenithblue.nativecode.agent.chat`** (sizes ESTIMATE):
 
-**Android UI mapping (t3code web to our Views).**
-
-| t3code | NativeCode |
+| File | Role |
 |---|---|
-| ChatView timeline | `RecyclerView`, one row type per item kind, stable ids |
-| ChatComposer + controls bar (model, runtime mode) | bottom composer: input, send/stop, mode chip, model chip, attach, skills |
-| ComposerBanner stack (approvals, errors) | cards pinned above the composer; approval card lists the agent's options |
-| Changed files tree / diff panel | bottom sheet with file list; `renderDiffLines` |
-| Command output panel, terminal drawers | tool card expands to output; "Open in terminal" |
-| Background work / subagent rows | collapsed rows, count badge |
+| `core/PipeProcess.kt` (~150) | Spawn via `buildToolDirect` + `sessionArgs`, `environment().clear(); putAll(envMap)` plus `NO_COLOR=1`, `TERM=dumb` (the `TerminalSession` env contract; never `ShellCommandRunner`, R4 B1–B3, B9). Stdout: byte split on `\n`, UTF-8 per whole line (the `GitLogStream` pattern), one reader thread that never blocks on UI. Stderr: separate drain into a 64 KiB in-memory ring. `@Synchronized writeLine`. `close()`: stdin EOF → 2 s → `destroy()` → 2 s → `destroyForcibly()`. Exit callback with code and stderr tail. |
+| `core/ChatModels.kt` (~150) | `ChatThread`, `Run`, `TurnItem` (sealed payloads), `RuntimeRequest`, `RunStatus`, `ItemStatus`, `RuntimeMode`, `InteractionMode`, `Failure` (copied from t3code `C/orchestrationV2.ts`). |
+| `core/AgentEvent.kt` (~50) | Normalised event union (§9.2.3). |
+| `core/AgentRuntime.kt` (~40) | Interface + `RuntimeCaps`. |
+| `core/DeltaCoalescer.kt` (~50) | Per item, 50 ms flush of full-text snapshots (t3code `ProviderTextDeltaCoalescer`). |
+| `runtime/OpenCodeHttpRuntime.kt` (~450) | opencode 2.x (§9.2.4). Includes the tiny SSE reader. |
+| `runtime/ClaudeStreamRuntime.kt` (~400) | claude. |
+| `runtime/CodexAppServerRuntime.kt` (~400) | codex. |
+| `runtime/AcpRuntime.kt` (~450) + `runtime/AcpProfiles.kt` (~150) | ACP client + agy, grok profiles. |
+| `store/ChatDb.kt` (~150) | `SQLiteOpenHelper`, schema §9.2.5, `user_version` migrations in Kotlin. |
+| `store/ChatStore.kt` (~250) | Single writer executor, queries, change listeners keyed by thread id, recovery on open. |
+| `ChatThreadController.kt` (~350) | Owns one runtime: send/queue/steer, interrupt + Force stop timer, idle release, checkpoint calls, approval routing, notification triggers. |
+| `AgentChats.kt` (~150) | `object` registry like `NativeCodeBridge`: `controller(threadId)`, `liveCount()`, `startingCount()`, `liveCountFor(projectPath)`, `stopProject(path)`, `stopAll()`, turn wake lock, change callback that MA uses for `syncTerminalServices`. |
+| `TurnCheckpoints.kt` (~120) | Hidden-ref capture and per-turn diff via guest git (§9.2.6 G). |
+| `ChatAttachments.kt` (~100) | Copy picked files into the guest (moved out of `MA.handleAttachment`, §9.2.4 attachments). |
+| `ChatNotifications.kt` (~80) | Channel `agent_notifications`, deep-link PendingIntents. |
+| `ui/AgentChatView.kt` (~150) | View host (GitHistoryView pattern: `(context, io, scope, host)`), holds the ComposeView, survives page switches. |
+| `ui/ChatHost.kt` (~30) | What MA provides: `aiLaunchAllowed(tool)`, `showUpgradeSheet`, `openCliLoginPage(id)`, `openTerminal(tool, args, cwd)`, `openShellHere(cwd)`, `pickImage/pickFile(cb)`, `openFile(path)`, `isPro()`. |
+| `ui/ThreadListScreen.kt`, `ui/NewThreadSheet.kt`, `ui/ChatScreen.kt`, `ui/TimelineRows.kt`, `ui/Composer.kt`, `ui/PendingCards.kt`, `ui/DiffScreen.kt`, `ui/ThreadSettingsScreen.kt`, `ui/ChatMarkdown.kt` | Compose screens (§9.2.6). `ChatMarkdown` reuses `skills/SkillMarkdown.html()` → `HtmlCompat` spans in a `TextView` (AndroidView) for finished blocks, plain text while streaming; fenced code blocks are their own composable (monospace, horizontal scroll, Copy). |
 
-**Pro gating hooks (reuse item 9, add nothing parallel).**
-1. Launch: a chat tab goes through `aiLaunchAllowed(type)` like a terminal tab, so `FeatureGate.canLaunchAiTool` and `canOpenAiSession` apply and the chat tab counts in `terminalSessionTypes`/`workspaceTabNames` with terminals.
-2. Spawn through `LinuxCommandBuilder.buildToolDirect` (launch_tool.sh, gate dir on PATH). The shim then enforces the same entitlement file and registers the chat process as a session in `/tmp/.nc-ai-sessions`, so terminal sessions, chat sessions and nested shell-tool calls share one count.
-3. A denied start prints `NativeCode: ...` on stderr and exits 1 before any JSON. The adapter treats exit before `initialize` with that prefix as `GateDenied` and shows the Upgrade sheet (`gateAllows`), not "chat unavailable".
-4. Two launcher details to fix in item 12: `launch_tool.sh` appends `--auto` to opencode (not valid before `acp`), and it may print banners; skip-until-JSON stays mandatory.
-5. Chat sync: `GuestGate.sync` already runs on every AI tab open; no new entitlement code.
+**Changed files** (call sites): `MainActivity.kt` (`aiLaunchAllowed` ~5475, `syncTerminalServices` ~952, `onDestroy` ~14526, `buildTerminalLayout` ~4167 / `fillToolRail` ~4277, `buildProjectWorkspaceLayout` ~20285, `openProjectWorkspace` ~19853, `handleIntent` ~878, `handleAttachment` ~3896 move, project removal ~21228), `terminal/ChrootCommandBuilder.kt` (launcher v7), `assets/gate/nc-gate.sh` (lock), `terminal/TerminalService.kt`, `cliauth/CliToolCatalog.kt` (`chat` field), `AndroidManifest.xml`, new `res/xml/network_security_config.xml`, `docs/policy/fgs-special-use-declaration.md`. Locate MA anchors by function name (the file is shared with other agents).
 
-**Risks.** t3code is a Node server with a database; we copy its model, not its stack. Claude control-channel names unverified. Codex and ACP wire names must be taken from the pinned binaries, not from t3code (it targets its own versions). The shim costs one `sh` start plus a few small tools per CLI start (not measured, ESTIMATE tens of ms under proot). Long conversations on a phone: cap rows and page older ones. A model that is told to avoid the gate message can still use an absolute path; do not promise more than 9.1.
+**Catalog.** One new field on `CliToolDef`: `chat: ChatProtocol?` (`OPENCODE_HTTP | CLAUDE_STREAM | CODEX_APP_SERVER | ACP`) plus `acpProfile` id; keyed by the existing `terminalType` (`opencode`, `claude-code`, `codex`, `agy`, `grok`). `null` = terminal only. No fourth catalog (R4 B18).
+
+#### 9.2.3 Event model
+Each runtime maps its wire to `AgentEvent`. Like t3code `ProviderAdapterV2Event`, every `*Upsert` is a **full snapshot** of one record, never a delta; the UI never sees deltas.
+
+| Event | Payload | Stored |
+|---|---|---|
+| `SessionState` | `starting / ready / running / waiting / stopped / error`, caps, models, modes, slash commands, account | thread row (caps cached in memory) |
+| `NativeId` | resume key (opencode session id, claude `session_id`, codex thread id, ACP `sessionId`) | `threads.native_id` |
+| `TurnStarted` | native turn id | `runs` |
+| `ItemUpsert` | full `TurnItem` keyed by `native_ref` | `turn_items` |
+| `RequestUpsert` | approval / user input / plan exit, with the agent's exact options | `requests` + an `approval_request` / `user_input_request` item |
+| `Usage` | tokens in/out/cache/reasoning, cost, context used/size | `runs.usage_json` |
+| `RateLimit` | status, reset time | banner (memory) |
+| `CommandOutputDelta` | item id, chunk | **ephemeral**; the item keeps a 64 KiB tail |
+| `TurnTerminal` | `completed / interrupted / cancelled / failed(failure class, retryAt)` + `reusable / broken` | `runs.status` |
+| `Notice` | compaction, retry scheduled, steer delivered, resume fell back | `system_notice` / `compaction` item |
+| `Unknown(raw)` | unparsed frame | protocol log only; never fatal, never shown as a row |
+
+Statuses are t3code's: run `queued | starting | running | waiting | completed | interrupted | failed | cancelled`; item `pending | running | waiting | completed | failed | cancelled | interrupted`; request `pending | resolved | expired | cancelled`. Thread status is **derived** (t3code has no thread status field): pending approval > pending input > running (Working + timer) > last run failed > completed and unread (Done •) > idle.
+
+```kotlin
+interface AgentRuntime {
+    val caps: RuntimeCaps   // steer, images, pdf, userInput, planMode, modes, effort, slashCommands, resume
+    fun start(cfg: SessionConfig, nativeId: String?, sink: (AgentEvent) -> Unit) // spawn, handshake, new or resume
+    fun send(turn: TurnInput, steer: Boolean)
+    fun interrupt()
+    fun respond(requestNativeId: String, answer: RequestAnswer) // option id, or answers, or cancel, + feedback
+    fun configure(change: ConfigChange)                          // model, effort, runtime mode, plan; live or respawn+resume
+    fun close()
+}
+```
+**Protocol log.** Per thread, `filesDir/agent/logs/<thread>.log`, lines `NATIVE|CANON <json>`, delta frames dropped, 2 × 1 MiB rotation, opened from an error row's Details. Never logged to logcat (code and tokens; R4 §9).
+
+#### 9.2.4 Providers: protocol summary and quirks
+All structured spawns: **pipes, not a PTY**, through `buildToolDirect([bin, args…])` so `launch_tool.sh` and the gate shim apply. Skip stdout lines that are not protocol (proot or `flux-gpu.sh` noise). Unknown request from the agent → answer with an error (`-32601` on JSON-RPC wires), never silence. Pin a minimum CLI version per runtime; on handshake failure show "Chat not available for this version of <tool>" with [Open in terminal] [Details].
+
+**Attachments (all providers).** The composer `+` opens Photo / File (the existing pickers, MA `ActivityResultContracts.GetContent` launchers). `ChatAttachments` is today's `handleAttachment` copy moved out of MA (pure move first): it copies the pick into the thread's cwd as `attach_<ts>_<safe-name>` (the folder the CLI is opened in; `/home/flux` for project-less threads) and returns the guest path. Limits from t3code `C/chatAttachment.ts`: images gif/jpeg/png/webp ≤ 10 MB, files ≤ 50 MB, ≤ 100 per message, prompt ≤ 120,000 chars. Per provider:
+
+| Provider | Images | Documents |
+|---|---|---|
+| opencode | Guest copy, sent as `files:[{uri:"file://<guestPath>", name}]` (t3code sends file URLs, never inline) | Guest copy + text line `[Attached file "<name>" is saved at: <guestPath>]` (t3code `providerMessageTextWithAttachmentPaths`) |
+| claude | **Inline** `{"type":"image","source":{"type":"base64","media_type",data}}` | PDF **inline** `{"type":"document","source":{"type":"base64","media_type":"application/pdf",data}}`; other files: guest copy + path line |
+| codex | **Inline** `{"type":"image","url":"data:<mime>;base64,…"}` (t3code) | Guest copy + path line |
+| ACP (agy, grok) | **Inline** `{"type":"image","mimeType",data}` only if `initialize.agentCapabilities.promptCapabilities.image`; else guest copy + path line | Guest copy + path line |
+
+Inline images still get a host-side thumbnail in `cacheDir/chat-thumbs/` for the bubble; nothing is copied into the guest for them.
+
+##### opencode 2.x: HTTP + SSE, exactly as t3code (`t3:packages/provider-opencode/src/server/`)
+- **Spawn:** `opencode serve --hostname=127.0.0.1 --port=<N>` with env `OPENCODE_PASSWORD=<32 random bytes, base64url>` (fresh per spawn; drop any inherited `OPENCODE_SERVER_PASSWORD`). `N` from a host `ServerSocket(0)` probe; retry once with a new port on bind failure. Ready = stdout line `server listening on http://…` within 30 s (`OpenCodeRuntime.ts:360`), then `GET /api/info` with major ≥ 2. Auth: HTTP Basic `opencode:<password>`. **One server per thread**, so each chat is one gate-registry pid (t3code shares one server; we do not, to keep the count honest). Needs M0 fixes B6 (`--auto`) and cleartext loopback.
+- **Session:** `POST /api/session {location:{directory:cwd}, model, permissions, title}` → native id. Resume: `GET /api/session/:id`, then `POST /api/session/:id/move` if the cwd changed.
+- **Events:** open `GET /api/event` (SSE) **before** the first prompt (the stream is not replayed). Heartbeats every 10–15 s; 45 s of silence = stuck → reconnect and refetch `GET /api/session/:id/message`. Skip frames that fail to decode, except recover `session.execution.{started,succeeded,failed,interrupted}` from the envelope so a turn always ends. Filter by session id plus child ids.
+- **Mapping:** `session.text.*` → assistant_message; `session.reasoning.*` → reasoning; `session.tool.{input.started,called,progress,success,failed}` → tool items (shell → command_execution, edit/write/patch → file_change, read/glob/grep/list → file_search, webfetch → web_search, task → subagent, else dynamic_tool); `permission.asked/replied` → approval; `form.created/replied/cancelled` → user input; `session.created{parentID}` → subagent child; `session.step.ended` → usage + cost; `session.compaction.*` → compaction row; `session.retry.scheduled` → notice; `session.inbox.*` → steer/queue state; `session.execution.*` → turn start/terminal.
+- **Prompt:** `POST /api/session/:id/prompt {id, text, files?}`. **Steer** = same call with `delivery:"steer"`. A bare `/name` that matches the server's command list → `POST …/command`; `/compact` → `POST …/compact`.
+- **Interrupt:** `POST …/interrupt` (and each live child).
+- **Approvals:** `POST …/permission/:reqId/reply {decision:"once"|"reject", message?}`. "Allow for session" = append an allow rule to the session rules (`PATCH /api/session/:id`) and reply `once`. Decline with typed feedback also posts `POST …/synthetic {text, delivery:"steer", resume:false}`. Forms: `POST …/form/:fid/reply {answer}` or `DELETE …/form/:fid`.
+- **Modes → session permission rules** (last match wins; `t3:…/v2/adapter.ts:425-441`): Supervised and Auto: `shell ask, edit ask, external_directory ask`; Auto-accept edits: `edit allow`; Full access: `* allow`; Plan: append `edit deny`. **`read` is never denied** in any mode, including plan: the Zen free models refuse sessions with no tools (`textGeneration.ts:216`). Mode change = `PATCH` rules, live. Model `POST …/model`; plan/build agent `POST …/agent`.
+- **Models and Free:** `GET /api/model?location[directory]=cwd`, slug `providerID/id`; `variants` → Effort select (default `medium` for opencode providers). Badge **Free** when `providerID ∈ {opencode, opencode-go}` and the id ends in `-free` (t3code `usage.ts:34`) or every `cost[]` input and output is 0 (our rule, UNVERIFIED). **No login:** ready iff `/api/model` returns ≥ 1 model; with no login the Zen free models are expected to be the whole list (UNVERIFIED, device check D1). Zero models → "Sign in" banner → item 10 opencode page. New threads default to the server default model (`GET /api/model/default`), falling back to the first Free model.
+- **Quirks:** routes are marked experimental and minor versions change schema (t3code patches 2.1 pages missing `recent`). Record fixtures from the version that ships: 2.2.7 today; the 2.3.0 bump is a separate task and adds `durable{…}`, `location`, `session.step.first-token`, `experimental.mcp.event` (all handled by skip-unknown); no route changes. `--stdio` mode (R2) is not used (not in t3code, UNVERIFIED).
+
+##### claude: stream-json + control channel (`t3:apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts`; wire = `@anthropic-ai/claude-agent-sdk` ProcessTransport)
+- **Spawn:** `claude --output-format stream-json --verbose --input-format stream-json --include-partial-messages --permission-prompt-tool stdio --permission-mode <m> [--model <id>] [--effort <e>] (--session-id <uuid> | --resume <id>) --setting-sources user,project,local`. `--permission-prompt-tool stdio` is mandatory (without it `-p` auto-denies); `--verbose` is mandatory with stream-json. Env as the SDK: `CLAUDE_CODE_ENTRYPOINT=sdk-ts`, no `NODE_OPTIONS`/`DEBUG`.
+- **Handshake:** `control_request {subtype:"initialize"}` → `models[]` (with `supportedEffortLevels`), `commands[]`, account, version. `system/init` after the first message carries `session_id` (resume key; new threads know it up front via `--session-id`).
+- **Prompt:** `{"type":"user","parent_tool_use_id":null,"message":{"role":"user","content":[text, image, document]}}`. **Steer** = another `user` line with `priority:"now"` (t3code `:12937`).
+- **Stream:** `stream_event` (`text_delta`, `thinking_delta`, `input_json_delta`, `message_start/delta` usage); `assistant` full messages; `user` `tool_result`; `result` (usage, `modelUsage`, `total_cost_usd`, `subtype`, `is_error`, `api_error_status` 429/529) = TurnTerminal; `rate_limit_event`; `system` `api_retry`, `compact_boundary`, `status`, `task_*`. `parent_tool_use_id != null` = subagent traffic.
+- **Approvals:** inbound `control_request can_use_tool` → card. Replies: allow once `{behavior:"allow", updatedInput, toolUseID, decisionClassification:"user_temporary"}`; allow for session = `user_permanent` + `updatedPermissions` from `permission_suggestions` with `destination:"session"` (or an `addRules` rule for the tool); deny `{behavior:"deny", message}`; cancel `{…deny, interrupt:true}`. `control_cancel_request` dismisses the card. `AskUserQuestion` → user-input card, answered as `allow` with `updatedInput.answers`. `ExitPlanMode` → proposed-plan card; reply `deny` with t3code's text ("The client captured your proposed plan…"); the card's **Implement** sends `PLEASE IMPLEMENT THIS PLAN:` + plan with mode back to default. Unsupported `elicitation` → `{action:"decline"}`.
+- **Interrupt:** `control_request {subtype:"interrupt"}`; no `result` within 10 s → Force stop (stdin close, kill group).
+- **Modes:** Supervised `default`, Auto-accept edits `acceptEdits`, Auto `auto`, Full `bypassPermissions` (guest user is `flux`; a root session gets `acceptEdits` and the client auto-allows, because claude refuses bypass as root), Plan `plan`. Live switches: `set_permission_mode`, `set_model`, `apply_flag_settings {effortLevel}`; thinking on/off needs respawn + `--resume`.
+- **Resume:** `--resume <id>`; unanswered prompts come back in `initialize` as `pending_permission_requests`.
+- **Quirks:** internal protocol, chatty (one frame per token); ignore unknown `type`/`subtype`; root refusal appears on stderr only. Day-one task of M2: confirm the wire on the pinned binary with a recorded fixture; fallback if `can_use_tool` fails = mode selector without inline approvals (stated on screen).
+
+##### codex: app-server (`t3:…/Adapters/CodexAdapterV2.ts`, `t3:packages/effect-codex-app-server/src/_generated/`)
+- **Spawn:** `codex app-server -c thread_unload_delay_secs=0` (in-process stdio; never reaches the PRoot pid-daemon bug). `CODEX_HOME` absolute if set. One process per thread.
+- **Wire:** JSON-RPC-style NDJSON **without** a `"jsonrpc"` field; lines can be very large (stream-parse; cap 64 MiB per line, beyond = error item).
+- **Handshake:** `initialize {clientInfo:{name:"nativecode",title:"NativeCode",version}, capabilities:{experimentalApi:true}}` → notification `initialized`. Models from `model/list`.
+- **Threads/turns:** `thread/start {cwd, model, approvalPolicy, sandbox}`; resume `thread/resume {threadId}` (fallback `thread/unarchive`). `turn/start {threadId, input[], cwd, model, effort, summary:"auto", approvalPolicy, approvalsReviewer, sandboxPolicy, collaborationMode:{mode, settings:{model, reasoning_effort}}}`. **Steer** `turn/steer`; interrupt `turn/interrupt {threadId, turnId}`.
+- **Notifications:** `turn/started|completed`, `item/started|completed`, `item/agentMessage/delta`, `item/reasoning/summaryTextDelta|textDelta`, `item/commandExecution/outputDelta` (ephemeral), `item/fileChange/patchUpdated`, `item/plan/delta`, `turn/plan/updated` (todo strip), `thread/tokenUsage/updated`, `account/rateLimits/updated`, `error {willRetry}`. Ignore `turn/diff/updated` (own checkpoints, like t3code).
+- **Server requests:** `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `item/tool/requestUserInput`, `mcpServer/elicitation/request`; reply `accept | acceptForSession | decline | cancel`. The reply is held until the user decides (no timeout).
+- **Modes** (`CodexAdapterV2.ts:728-760`): Supervised `untrusted` + `{type:"readOnly"}`; Auto-accept edits `on-request` + `{type:"workspaceWrite"}`; Auto `on-request` + `workspaceWrite` + `approvalsReviewer:"auto_review"`; Full `never` + `{type:"dangerFullAccess"}`. Plan = `collaborationMode.mode:"plan"`.
+- **Quirks:** codex's Linux sandbox may not work under PRoot (device check D6); if `readOnly`/`workspaceWrite` break commands, show a banner suggesting Full access instead of silently changing mode. One writer per thread per `CODEX_HOME` (a second writer gets `-32600`): close the chat process before "Open in terminal". Generate the schema from the pinned binary (`codex app-server generate-json-schema`) and commit it beside the fixtures.
+
+##### ACP v1: generic runtime (`t3:packages/provider-acp/src/server/`)
+- JSON-RPC 2.0 NDJSON. `initialize {protocolVersion:1, clientCapabilities:{fs:{readTextFile:false,writeTextFile:false}, terminal:false}}` (t3code default: the agent does its own I/O inside PRoot) → `authenticate {methodId}` when `authMethods` is non-empty. `session/new {cwd, mcpServers:[]}` → modes, models, configOptions. Resume: `session/resume` if advertised, else `session/load` (replays history as updates; dedupe by native refs).
+- Prompt `session/prompt {prompt:[text, image?]}` → `stopReason` (`end_turn | max_tokens | max_turn_requests | refusal | cancelled`) = TurnTerminal. Updates: `agent_message_chunk`, `agent_thought_chunk`, `tool_call`, `tool_call_update` (content, `diff` blocks for file changes), `plan` (todo strip), `usage_update`, `available_commands_update` (slash popup), `current_mode_update`, `config_option_update`, `session_info_update`.
+- Permissions: `session/request_permission` → card from option `kind` (`allow_once | allow_always | reject_once | reject_always`); reply `{outcome:{outcome:"selected", optionId}}` or `{outcome:"cancelled"}`. Cancel = `session/cancel` notification, then answer every pending request `cancelled`. No steer: sends while running queue.
+- **agy profile:** `agy acp` (CLI ≥ 1.5.0). Uses the user's existing agy login from item 10 (no private profile dir, unlike t3code). Modes: Supervised, Auto-accept edits, Full; the CLI only accepts `default`, so the **client** answers permission requests from the thread's mode (Auto-accept edits: allow `edit` kinds; Full: allow all; Supervised: always ask), as t3code does (`AntigravityAcpSupport.ts:174-192`). `toolCallId` starting `interaction_` = a question → user-input card. Show `_meta` warnings on `allow_always`. `stopReason:"refusal"` = quota banner. Each launch unpacks about 1 GB: keep the process warm while the thread is open (idle release still applies); clean its per-run `TMPDIR`.
+- **grok profile:** argv by mode (`t3:packages/provider-grok/src/server/acpSupport.ts:46-56`): Supervised `--permission-mode default agent stdio`; Auto `--permission-mode auto agent stdio`; Full `agent --always-approve stdio` (no Auto-accept edits). Mode change = respawn + `session/load`. `initialize` with `_meta:{clientType:"extension"}`; `authenticate` `cached_token` (or `xai.api_key` when `XAI_API_KEY` is set). Env `GROK_DISABLE_AUTOUPDATER=1`. Turn may end via `x.ai/session/prompt_complete` (first of that or the prompt result; also the `_`-prefixed aliases). `x.ai/ask_user_question` → user-input card; `x.ai/exit_plan_mode` → plan card, reply `abandoned` + t3code text. Hide `allow_always` options except `allow-edits-session` (others persist project grants). Cancel with `_meta:{cancelTrigger:"ctrl_c"}`. Error `-32003` = rate limit banner. Effort = config option `thought_level`, set after a model switch. Usage from `turn_completed` (`costUsdTicks` / 1e10 = USD).
+- **Later profiles (not in 1.8.0 milestones):** kiro `kiro-cli acp --agent-engine=v3 --auth-method=cli` (set `autopilot` off after `session/new`, drop `fetch_cloud_config` tool calls, hold cancel ≥ 2 s after prompt start, steer via `_session/steer`); qwen `qwen --acp` (modes via `session/set_mode`); hermes (protocol UNVERIFIED).
+
+#### 9.2.5 Data model and SQLite schema
+`agent_chat.db` in the app's databases dir (private; `allowBackup=false`). `SQLiteOpenHelper`, WAL, `foreign_keys=ON`, migrations by `user_version` in Kotlin. **Projection only** (t3code's event log, outbox and receipts exist for remote clients; we have none). One writer executor (the analog of t3code's per-thread lock + FIFO outbox); reads on the IO executor; after each commit the store notifies listeners with the changed thread ids. While a turn streams, the controller holds the live snapshot in memory (the UI reads it) and writes the row at most once per second and on completion.
+
+```sql
+CREATE TABLE threads(
+  id TEXT PRIMARY KEY,                 -- uuid
+  project_path TEXT,                   -- NULL = TERMINAL-tab thread without a project
+  cwd TEXT NOT NULL,                   -- guest path the CLI runs in
+  tool TEXT NOT NULL,                  -- terminal type: opencode | claude-code | codex | agy | grok
+  title TEXT NOT NULL,                 -- first 60 chars of the first prompt; renamable
+  native_id TEXT,                      -- resume key
+  model TEXT, effort TEXT,
+  runtime_mode TEXT NOT NULL DEFAULT 'approval-required', -- | auto-accept-edits | auto | full-access
+  interaction_mode TEXT NOT NULL DEFAULT 'default',       -- | plan
+  draft_json TEXT,                     -- {text, attachments[]}
+  pinned_at INTEGER, archived_at INTEGER, last_visited_at INTEGER,
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE INDEX threads_scope ON threads(project_path, archived_at, updated_at);
+
+CREATE TABLE runs(
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  ordinal INTEGER NOT NULL,
+  status TEXT NOT NULL,                -- queued|starting|running|waiting|completed|interrupted|failed|cancelled
+  queue_position INTEGER,              -- set while queued
+  native_turn_id TEXT,
+  failure_json TEXT,                   -- {class: usage_limit|provider_error|transport_error|permission_error|validation_error|unknown, message, retryAt}
+  usage_json TEXT,                     -- tokens, cost, context used/size
+  chk_base TEXT, chk_end TEXT,         -- hidden-ref commits (git projects only)
+  diff_stat_json TEXT,                 -- [{path, kind, add, del}]
+  started_at INTEGER, completed_at INTEGER,
+  UNIQUE(thread_id, ordinal));
+
+CREATE TABLE turn_items(
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  run_id TEXT, ordinal INTEGER NOT NULL,
+  native_ref TEXT,                     -- provider item / tool / message id: the upsert key
+  parent_id TEXT,                      -- subagent children
+  type TEXT NOT NULL,                  -- see below
+  status TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  updated_at INTEGER NOT NULL);
+CREATE INDEX items_thread ON turn_items(thread_id, ordinal);
+CREATE UNIQUE INDEX items_native ON turn_items(thread_id, native_ref) WHERE native_ref IS NOT NULL;
+
+CREATE TABLE requests(
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  run_id TEXT, item_id TEXT,
+  native_id TEXT NOT NULL,             -- JSON-RPC id / request_id / opencode permission or form id
+  kind TEXT NOT NULL,                  -- command|file-read|file-change|mcp-elicitation|permission|user_input|plan_exit
+  status TEXT NOT NULL,                -- pending|resolved|expired|cancelled
+  options_json TEXT NOT NULL,          -- exactly the agent's options [{id, kind, label, warning}]
+  payload_json TEXT NOT NULL,          -- command, path, proposed diff, reason, questions
+  answer_json TEXT,
+  created_at INTEGER NOT NULL, resolved_at INTEGER);
+CREATE INDEX requests_open ON requests(thread_id, status);
+```
+Item `type` (t3code `TurnItem` subset): `user_message {text, attachments[], intent: start|queued|steer}`, `assistant_message {text, phase}`, `reasoning {text}`, `command_execution {command, outputTail, exitCode, durationMs}`, `file_change {path, add, del, diff?}`, `file_search {pattern, results[]}`, `web_search {query, results[]}`, `dynamic_tool {name, input, output}`, `subagent {title, childCount, result}`, `todo_list {steps[{text,status}]}`, `proposed_plan {markdown}`, `approval_request {requestId}`, `user_input_request {requestId}`, `error {class, message, retryAt}`, `compaction {tokens}`, `system_notice {text}`. Queued messages are `runs` rows with `status=queued` plus their `user_message` item. Memory cap: the timeline loads the newest 200 items and pages older ones by `ordinal` ("Load earlier").
+
+#### 9.2.6 Screens (360 dp portrait; t3code phone layout)
+Sheets are only for pick-lists; anything with a text field is a full page (`mob/features/layout/route-options.ts`: Android form sheets cannot host the keyboard). At ≥ 720 dp (landscape, tablet, DeX) list and chat sit side by side (S).
+
+**A. Thread list, TERMINAL tab (root of the Chat position)**
+```
+┌────────────────────────────────────────────┐
+│ Terminal   [Chat|Terminal]   ⌕   ● 1/1 Free│ row 1: title, switch, search, sessions chip
+│ 82% C34 R61 38°      │ 📎 ✦ ☀ ●24:10        │ row 2: stats | rail (extra-keys toggle hidden)
+├────────────────────────────────────────────┤
+│ TERMINALS                                ▾ │ live terminal tabs of this surface
+│  >_ opencode · ~/proj-a           2m     › │ tap → Terminal position on that tab
+├────────────────────────────────────────────┤
+│ ▾ proj-a                    main  (3)      │ group per project (TERMINAL tab only)
+│ ◆ Fix login crash                 1:04 ●   │ codex · Working + live timer
+│   ⛨ Approval · main          +12 −3   >_   │ status chip; >_ = thread has a terminal
+│ ◇ Add dark mode                   14m  •   │ opencode · Done, unread
+│ ▸ No project                     (1)       │
+│ ▸ Archived                       (7)       │
+│                              ┌──────────┐  │
+│                              │ ✎  New   │  │ extended FAB → sheet C
+│                              └──────────┘  │
+├────────────────────────────────────────────┤
+│  HOME     PROJECT    [TERMINAL]  SETTINGS  │
+└────────────────────────────────────────────┘
+ swipe ← : Archive + "Archived · UNDO" · long-press: Rename · Pin · Open in terminal · Open terminal here · Copy path · Delete
+ empty state: tool cards (login chip, Free/PRO lock, [Chat] [Terminal]) + "Install AI tools" when none
+```
+**B. Workspace page, Chat position:** same list scoped to the project, no group headers, `☰ proj-a` title, project bottom nav; new threads use the project dir.
+
+**C. New-thread sheet (pick-list)**
+```
+┌────────────────────────────────────────────┐
+│ New thread in  [ proj-a ▾ ]                │ fixed to the project on the workspace page
+├────────────────────────────────────────────┤
+│ opencode   ● Signed in · Free models  [Chat][Term]│
+│ Claude     ○ Sign in ›    PRO         [Chat][Term]│ chip → item 10 login page
+│ Codex      ● Signed in    PRO         [Chat][Term]│
+│ agy · Grok                PRO         [Chat][Term]│ [Chat] appears per milestone
+│ Qwen · Kiro               PRO               [Term]│ terminal only (later ACP profiles)
+├────────────────────────────────────────────┤
+│ Raw shell: [ >_ Shell ]  PRO               │ → Terminal position, new tab
+└────────────────────────────────────────────┘
+ Free + PRO card → upsell; at the session limit → "Stop <thread>?" / Upgrade
+```
+Built in Compose from `CliToolCatalog` + `CliCredentialProbe` (off main) + `FeatureGate`; the item 10 views are not reused as Views.
+
+**D. Chat**
+```
+┌────────────────────────────────────────────┐
+│ ← Fix login crash  [Chat|Terminal]      ⋮  │ ⋮ Diff · Thread settings · Open terminal here
+│ codex · gpt-5 · main │ 📎 ✦ ☀ ●24:10       │   · Open in terminal · Git · Files · Rename · Delete
+├────────────────────────────────────────────┤ row 2 hides while the IME is open
+│ ▣ Tasks 2/4 · Writing tests            ▾   │ sticky todo strip
+│                 ┌────────────────────────┐ │
+│                 │ login crashes on empty │ │ user bubble (fold > 12 lines, thumbnails)
+│                 │ password, fix it  [img]│ │
+│                 └────────────────────────┘ │
+│ ▸ Thought for 6s                           │ reasoning row
+│ ▾ Read 3 files · ran 1 command      4.2s   │ work group (live turn expanded)
+│   >_ ./gradlew test        ✗ exit 1  3.1s  │ output ≤ 256 dp, inner scroll, Copy
+│   ✎ LoginViewModel.kt   +12 −3     Diff ›  │ inline mini-diff ≤ 40 lines
+│ The crash came from `password!!` …         │ assistant markdown
+│ ┌ kotlin ─────────────────────── ⧉ Copy ┐  │
+│ 14:02 · 18k tok · ⧉                        │ meta: time, tokens, copy
+│        ┌─────────────────────────┐    ↓    │
+│        │ ● Working 1:04  ■ Stop  │         │ floating pill; → "Force stop" after 10 s
+│        └─────────────────────────┘         │
+├────────────────────────────────────────────┤
+│ [banner: Not signed in · Sign in]          │ one banner slot
+│ Queued (1) ›                               │ sheet: Send now · Edit · Remove
+│ [📷 a.png ✕] [📄 spec.pdf ✕]               │ attachment strip
+│ ┌────────────────────────────────────────┐ │
+│ │ Ask codex…  / commands  @ files  $ skills│ │ multiline; IME Enter = newline
+│ └────────────────────────────────────────┘ │
+│ [+] [gpt-5 · high ▾] [⛨ Supervised]   [➤] │ + attach · model chip → page H · mode chip
+└────────────────────────────────────────────┘
+ Send while running: steer where native (opencode, claude, codex), else queue; long-press ➤ = "Queue" / "Steer now"
+ empty thread: "What should codex do in proj-a?"; starting: "Starting codex…" row (handshake ≤ 20 s)
+ error row: [Retry] [Open in terminal] [Details] · process gone: "Session ended · [Resume]"
+```
+**E. Chat/Terminal switch.** A segmented control in row 1 of both top bars (one `rail`/`WorkspaceTopBar` child; no layout rebuild, R4 10.4). Terminal = today's page untouched (drawer, `+`, tool cards, `TerminalView`, extra keys). Position remembered per page (owner decision Q3: `pref_terminal_mode_app`, `pref_terminal_mode_ws`), default Chat. Entry points that must show a terminal (`openCliTerminal`, `onTerminalGuided`, `CREATE_TERM` intent, logins) force Terminal. In Chat: `ExtraKeysBar.Host.send` is a no-op and IME resize targets the composer, not the hidden `TerminalView`. An approval arriving while in Terminal shows a snackbar "Approval needed · Open". Terminal → Chat "Add to chat" on a selection (S).
+
+**F. Approval card (docked over the composer; `mob/…/PendingApprovalCard.tsx`)**
+```
+├────────────────────────────────────────────┤
+│ ⛨ Command approval               codex     │
+│ ┌────────────────────────────────────────┐ │
+│ │ $ rm -rf build && ./gradlew assemble   │ │ monospace, scroll, ≤ 40% height
+│ └────────────────────────────────────────┘ │
+│ Reason: clean build to verify fix      ▾   │
+│ [ Allow once ] [ Allow for session ] [Deny]│ exactly the agent's options, answered by id
+├────────────────────────────────────────────┤
+│ │ Reply to deny with feedback…           │ │ composer repurposed
+└────────────────────────────────────────────┘
+ file-change variant: file list with collapsible unified diff per file
+ user-input variant (codex requestUserInput, claude AskUserQuestion, opencode form, grok ask_user_question,
+   agy interaction_): header, question, radio/checkbox options with descriptions, custom answer in composer,
+   Prev/Next for several questions, Dismiss
+ plan variant: proposed-plan markdown (fold > 20 lines) · [Implement] [Keep planning] · Copy · Save to project
+ agent gone: "Agent stopped · [Restart]"
+```
+**G. Diff page (full page)**
+```
+┌────────────────────────────────────────────┐
+│ ←  Changes            [ This turn ▾ ]   ⋮  │ This turn · Whole thread · Uncommitted
+├────────────────────────────────────────────┤ ⋮ Open in editor · Git ›
+│ ▾ 3 files                      +44 −9      │ flat list, tap scrolls to file
+│   M app/…/LoginViewModel.kt    +12 −3      │
+│   A app/…/LoginTest.kt         +30         │
+├────────────────────────────────────────────┤
+│ ▾ LoginViewModel.kt                M  +12−3│ sticky header, collapsible
+│  42 - val pw = password!!                  │ unified only, horizontal scroll
+│  42 + val pw = password ?: return Invalid  │
+└────────────────────────────────────────────┘
+```
+Source: `TurnCheckpoints` (t3code hidden refs, `GitVcsDriver.ts:969-1370`): at turn start, `GIT_INDEX_FILE=<git-dir>/nc-chk-<uuid> git read-tree HEAD && git add -A -- . && git write-tree && git commit-tree <tree> -p HEAD && git update-ref refs/nativecode/chk/<thread>/<ordinal>/base <commit>`; the same at turn end (`…/end`). The user's index, stash and branches are never touched. 5 s budget per capture; over budget = no diff for that turn. Summary `git diff --numstat -z base end` into `runs.diff_stat_json`; the patch on tap, byte-capped with a `[truncated]` marker. Whole thread = first base → last end; Uncommitted = `git diff HEAD`. Non-git cwd: only the per-item diffs the protocol sent. Thread delete prunes its refs (`git update-ref -d` for every `refs/nativecode/chk/<thread>/*`; owner decision Q4). **No revert and no worktrees in 1.8.0** (owner decision). The diff renderer is a small Compose unified-diff list in the chat package (not a move of MA `renderDiffLines`, which item 11b is touching).
+
+**H. Thread settings (full page from the model chip; `mob/…/ThreadSettingsSheet.tsx`)**
+```
+┌────────────────────────────────────────────┐
+│ ←  Thread settings                         │
+│ Tool        codex (locked after first msg) │
+│ Model       ⌕ search · Free badge (opencode)│
+│   ● gpt-5-codex  ○ gpt-5                   │
+│ Effort      low · medium · [high] · xhigh  │ only if the runtime reports it
+│ Mode        [Supervised] Auto-edit Auto Full⚠│ provider's supported modes; Full = confirm
+│ Plan mode   [ off ]                        │ only where the CLI has one
+│ Workspace   proj-a (main)                  │ read-only
+│ Context     ████████░░░░  42k / 200k       │ S
+│ Session     ● live · 12 min   [Stop]       │ Stop frees the Free/Pro slot
+└────────────────────────────────────────────┘
+```
+**I. Attachments.** `+` → pick-list sheet `[📷 Photo] [📄 File]` → copy/encode per §9.2.4 → chip in the strip (thumbnail or file icon, size, ✕; "Copying…" spinner; failure chip with Retry). Over-limit files are refused with the limit in the message. The draft (text + chips) persists per thread.
+
+#### 9.2.7 Feature checklist (t3code → phone)
+M = beta, ships in M1 (opencode) and with each provider M2–M5; S = M6 polish; C = after 1.8.0; D = drop on a phone.
+
+| Area | t3code feature | Pri |
+|---|---|---|
+| Surfaces | Chat primary on TERMINAL tab + workspace; Chat/Terminal switch; beta kill switch | M |
+| Thread list | Project grouping (TERMINAL tab) / project scope (workspace); status chips and order; relative time / live timer; `+N −N`; branch | M |
+| | Swipe Archive + undo; long-press Rename · Pin · Delete · Copy path · Open in terminal; Archived shelf; sessions chip; Terminals shelf; CLI-card empty state | M |
+| | Search (titles + last assistant text, SQL `LIKE`) | S |
+| | Settle / snooze shelves, drafts block, filter by project, launcher shortcut | C |
+| | Multi-select, drag reorder, command palette | D |
+| Composer | Multiline, send/stop, Force stop after 10 s, per-thread draft, banner slot, compact phone layout | M |
+| | Image + file attachments (§9.2.4) | M |
+| | Slash popup: provider commands + `/model`, `/clear` | M |
+| | Model, effort, mode chips → Thread settings page; tool locked after first send | M |
+| | Steer where native, queue elsewhere; Queued sheet (Send now · Edit · Remove) | M |
+| | Plan mode where the CLI has one | M |
+| | `@` file mentions (walk via `DirectoryScanner`), `$` skills (existing skills) | S |
+| | Prompt history, favourites | C |
+| | Stash, voice, multi-model send, prompt suggestion | D |
+| Timeline | Stick-to-bottom LazyColumn, ↓ New pill, Load earlier | M |
+| | User bubble (fold, thumbnails, Copy); assistant markdown, code blocks with Copy; timestamps | M |
+| | Thinking row; tool rows; command card; file-change card with mini diff; read/search rows; work-group collapse after turn end | M |
+| | Working pill with timer; error row with Retry / Open in terminal / Details; process-exit banner | M |
+| | Todo strip; proposed-plan card with Implement | M |
+| | User-input card; approval card (§9.2.6 F) | M |
+| | MCP/dynamic tool JSON, subagent rows (collapsed, count), compaction divider, token/context bar | S |
+| | "Run in terminal" on shell blocks, file links → editor, haptics, "hide successful tool calls" | S |
+| | Fork, reply-quote, find in thread, syntax highlight, cost display | C |
+| | Edit-from-here / checkpoint revert | C (owner: not in beta) |
+| | Minimap, math/mermaid, HTML/MCP-app frames | D |
+| Diff / git | Diff page: this turn / thread / uncommitted, file list, unified view | M |
+| | Git quick actions via item 11 pages; Open in editor (§16); Files page at cwd | S |
+| | Worktree per thread, PR rows, project scripts, diff line comments | C |
+| | Split diff | D |
+| Terminal | Open terminal here (shell tab at cwd, tagged with the thread; Pro, Free sees the upsell); Open in terminal (same CLI TUI, resume) | M |
+| | Add to chat from a terminal selection | S |
+| | Terminal splits | D |
+| Lifecycle | Durable state, recovery, resume by native id, idle release, Force stop | M |
+| | Notifications (approval, input, done, failed) with deep link and on-screen suppression | M |
+| | FGS summary "2 agents working · 1 needs approval" | S |
+| | Approve from the notification | C |
+| Settings | Chat view (beta) switch | M |
+| | Agent chat settings: default mode, follow-up (steer/queue), tool-call visibility, hardware Enter, default position | S |
+| | Remember last model/effort/mode per CLI; first-run coach mark on the switch | S |
+| | Keybindings, custom themes | D |
+
+#### 9.2.8 Lifecycle
+- **Start.** [Chat] or send in an idle thread → `ChatHost.aiLaunchAllowed(tool)` (counts terminals, live and starting chats, pending terminal slots) → login preflight `CliCredentialProbe.probe` (SIGNED_OUT → Sign-in banner, no spawn; UNKNOWN → try; opencode never needs login) → `AgentChats` marks *starting* and syncs `TerminalService` (FGS up before the spawn) → `PipeProcess` spawn → handshake (≤ 20 s; opencode readiness ≤ 30 s) → new session or resume.
+- **Gate denied.** Exit before the handshake with `NativeCode:` in the stderr ring → `GateDenied` → upgrade or session-limit sheet. Never shown as "chat unavailable".
+- **Foreground service.** `TerminalService` (not `BackgroundService`, which is desktop/setup only). `syncTerminalServices` adds app-scope live chats to `appCount` and each project's live chats to its `ProjectState`; notification text "N AI sessions (terminal + chat)"; manifest FGS text and `docs/policy/fgs-special-use-declaration.md` mention agent chat (R4 B4, B19).
+- **Wake lock (owner decision 6).** One `PARTIAL_WAKE_LOCK` (tag `nativecode:agent-turn`, not reference-counted) owned by `AgentChats`: acquired when running turns go 0 → 1, released when they go back to 0, on `stopAll`, on process exit and on Force stop. Acquired with a 2 h timeout as a leak guard (re-acquired on the next turn start). Needs `WAKE_LOCK` (normal permission). Keep-awake (`FLAG_KEEP_SCREEN_ON`) is unchanged.
+- **Interrupt.** Stop → protocol cancel. No `TurnTerminal` within 10 s → pill shows "Agent not responding · Force stop" → kill the process tree; run `interrupted`, slot freed.
+- **Idle release.** 30 min after the last turn end with no pending request: close the process (frees the slot and RAM; agy's unpack makes this matter). The next send respawns and resumes. A Free user at the limit gets "Stop <thread>?" listing live chats and terminals.
+- **Unexpected exit.** Run `failed` (`transport_error`) with the stderr tail in Details; pending requests `expired`; banner "Session ended · [Resume]".
+- **Config change / page switch / project switch.** Nothing is killed. `AgentChatView` detaches and re-attaches to `AgentChats`; state comes from the store plus live snapshots. Requires M0 fix B5. Switching workspace projects only changes the view's scope; other projects' chats keep running and stay counted.
+- **Activity really finishing (incl. swipe-away).** `AgentChats.stopAll()`, the same as terminals (owner decision Q5): runs in flight become `interrupted`, thread history stays in the store, and the next send resumes by `native_id`.
+- **Process death and restore** (`ChatStore` open = t3code `reconcile("startup")`, without auto-continue): runs `starting/running/waiting` → `interrupted` with a "Session ended" notice; pending approvals → `expired`; pending user-input questions stay answerable as a new message; queued runs stay queued but **held** (banner "2 queued · Resume queue"). Opening the thread shows history at once; the next send resumes by `native_id` (opencode `GET /api/session/:id`, claude `--resume`, codex `thread/resume`, ACP `session/resume|load`). If resume fails: clear `native_id`, start a fresh native session, add a `system_notice` ("Earlier context could not be restored").
+- **Notifications.** From Kotlin, channel `agent_notifications`, for approval needed, input needed, turn done, turn failed; suppressed while that thread is on screen in the Chat position. `contentIntent` (IMMUTABLE, explicit) → MA with `EXTRA_TARGET_PAGE` 3, or 10 + `PROJECT_PATH`, plus `EXTRA_THREAD_ID`; `handleIntent` switches to Chat and opens the thread.
+- **Open in terminal.** Close the chat process first (Free has one slot; codex allows one writer), then `ChatHost.openTerminal(tool, resumeArgs, cwd)`: claude `--resume <id>`, codex `resume <id>` (needs B7), opencode/agy/grok resume flags UNVERIFIED (fresh start until verified). The switch alone never kills anything.
+- **Thread delete / project removal.** Stop the process, delete rows (cascade) and hidden refs, free the slot; project removal calls `AgentChats.stopProject(path)` (R4 B20).
+- **Runtime pack updates (item 3).** Never update a CLI under a live chat: the updater refuses while `AgentChats.liveCount() > 0` for that tool.
+
+#### 9.2.9 Pro gating
+- **Free:** chat = opencode only; 1 AI session in total across chat, terminal tabs and nested shell-tool calls; TERMINAL tab only (the workspace is Pro via `ProFeature.WORKSPACE`). Other tool cards show the PRO lock → upsell. All opencode models the user can reach (Zen free models without login) are allowed.
+- **Pro:** every chat provider; 5 AI sessions in total.
+- **Counted unit:** a live agent process (or one starting). An idle-released thread costs nothing. Count = live + starting chats + AI terminal tabs + pending terminal slots, in the single `aiLaunchAllowed` (no parallel gate). The sessions chip shows the global count (`● 1/1`, `● 3/5`); tapping it lists live sessions with Stop.
+- **Guest backstop:** every chat spawns through `buildToolDirect` → `launch_tool.sh`, so the item 9 shim registers the pid in `/tmp/.nc-ai-sessions` and the agent's own shell tool inherits the gate PATH. Unit test asserts the chat argv contains `/tmp/launch_tool.sh`. No separate health probes: the first real handshake is the probe (R4 G4).
+- **Downgrade (Pro → Free) with a paid chat live (owner decision Q2):** the current turn finishes; after that every send re-checks `FeatureGate.canLaunchAiTool(isPro, tool)` and is refused with the upsell. Queued messages on a paid tool stay queued and held.
+- **Open terminal here** needs a shell tab, which is Pro: Free users get the Pro upsell (owner decision Q1).
+- Workspace chat is Pro by construction.
+
+#### 9.2.10 Prerequisite fixes (M0)
+State checked against the working tree on 2026-11-13 (other agents have uncommitted edits in `nc-gate.sh`, `GuestGate.kt` and the setup scripts; rebase on them, do not overwrite).
+
+| # | Fix | Where | State |
+|---|---|---|---|
+| P1 | opencode `--auto` only on a bare launch (R4 B6): `[ $# -eq 0 ] && exec opencode --auto; exec opencode "$@"` | `ChrootCommandBuilder` launcher `opencode)` case | open |
+| P2 | codex `--no-daemon` also for `resume` and `fork` (R4 B7); keep `app-server`/`login` plain. Flag position for subcommands UNVERIFIED: check `codex resume --help` on the pinned binary | `codex)` case | open |
+| P3 | Launcher `v6` → `v7` so devices rewrite it; JVM test running the generated script with stub binaries (`opencode`→`--auto`, `opencode serve …`→plain, `codex`→`--no-daemon`, `codex resume x`→`--no-daemon`, `codex app-server`→plain) | `ChrootCommandBuilder`, new test | open |
+| P4 | Session-cap race (R4 G2 + B8): `mkdir "$REG/.lock"` spin ≤ 2 s around count + write, `rmdir` before `exec`; app side counts `pendingAppTerminalSlots + pendingWorkspaceTerminalSlots + AgentChats.startingCount()` | `nc-gate.sh`; MA `aiLaunchAllowed` | open |
+| P5 | Atomic entitlement write (R4 G3/B10, R5 L8): `writeTextAtomic` tmp + rename | `GuestGate.kt` | done in the working tree (uncommitted, other agent): verify and commit before M1 |
+| P6 | `onDestroy` (R4 B5): when `isChangingConfigurations`, do not stop `TerminalService` or finish sessions; on a real finish also finish workspace/project sessions and call `AgentChats.stopAll()` | MA `onDestroy` | open |
+| P7 | `TerminalService` counts chat sessions (R4 B4, B19) | MA `syncTerminalServices`, `TerminalService`, manifest text, FGS declaration doc | open |
+| P8 | Gate PATH bypass in normal shells (R5 H1): gate dir re-asserted last | setup scripts, `LinuxGuestDefaults` | in the working tree (other agent): verify |
+| P9 | Project switch saves before `activeProjectPath` changes (R4 B13); removal stops its sessions (B20) | MA | open |
+| P10 | `GuestGate.sync` off the main thread (R4 G8, R5 L14); chat calls it per spawn | MA, `GuestGate` | open |
+| P11 | Cleartext HTTP to loopback for opencode: `res/xml/network_security_config.xml` permitting cleartext for `127.0.0.1` and `localhost` only; `android:networkSecurityConfig` | new file, manifest | open |
+| P12 | `android.permission.WAKE_LOCK` | manifest | open |
+| P13 | `CliToolDef.chat` + `acpProfile` | `CliToolCatalog` | open |
+
+#### 9.2.11 Milestones
+Each milestone ships on its own: tools without a finished runtime keep `chat = null` (terminal only), and the beta switch turns chat off.
+
+| M | Content | Effort |
+|---|---|---|
+| **M0 Prerequisites** | P1–P13. No visible UI change except FGS text. | S |
+| **M1 Runtime + opencode end to end** | `PipeProcess`, `AgentEvent`, `AgentRuntime`, `DeltaCoalescer`, `ChatDb`/`ChatStore` + recovery, `ChatThreadController`, `AgentChats` (counts, FGS sync, wake lock), `ChatNotifications`, `ChatAttachments`, `TurnCheckpoints`, `OpenCodeHttpRuntime`. UI: `AgentChatView` on both surfaces with the switch, screens A–I, every M row of §9.2.7 that opencode supports (approvals, forms, steer, todo, subagents, Free badge, no-login state). Fixtures `app/src/test/resources/agent/opencode-<ver>/`. | L |
+| **M2 claude** | `ClaudeStreamRuntime`: control channel, `AskUserQuestion`, `ExitPlanMode` plan card, inline image/PDF, `priority:"now"` steer, live mode/model/effort, rate-limit banner. Day 1: record the pinned-binary fixture and confirm `can_use_tool`. | M |
+| **M3 codex** | `CodexAppServerRuntime`: committed generated schema, four modes, `turn/steer`, `requestUserInput`, `turn/plan/updated`, token usage, sandbox banner. | M |
+| **M4 agy** | `AcpRuntime` (generic) + agy profile: client-side mode policy, `interaction_` questions, refusal = quota, warm process. | M |
+| **M5 grok** | grok profile: argv modes + respawn/load, `x.ai/*` requests and completion, effort `thought_level`, rate limit `-32003`. | S |
+| **M6 Polish** | All S rows of §9.2.7 (search, `@` files, `$` skills, MCP/subagent detail, context bar, Run in terminal, Add to chat, Git/editor/files links, chat settings page, per-CLI defaults, coach mark, FGS summary text, side-by-side ≥ 720 dp, haptics). kiro/qwen profiles only if time remains. | M |
+
+#### 9.2.12 Test plan
+**Every milestone (JVM):** fixture replay per runtime (`<tool>-<version>/*.jsonl` or `*.sse`) through the runtime into a fake store, asserting items, requests, terminal state; `PipeProcess` (torn lines, non-JSON noise, UTF-8 split across reads, 1 MiB line, stderr flood does not block stdout); `ChatStore` recovery (running → interrupted, pending → expired, user input kept, queue held); mode-mapping tables per provider; attachment routing per provider; the combined gate count (Free: 1 chat → terminal opencode denied and the reverse; Pro: 5 sessions across app and workspace → 6th denied); chat argv contains `/tmp/launch_tool.sh`.
+
+**Device (OP13R and X6P), per milestone:**
+
+| M | Script | Free | Pro |
+|---|---|---|---|
+| M0 | Launcher test passes; `opencode` TUI still `--auto`; `codex` and `codex resume <id>` tabs work; two fast taps on an AI card never exceed the cap; rotate / font-scale / dark-mode change keeps terminals alive; chat-free regression of items 3, 5, 9, 10 | 1 opencode tab; 2nd denied | 5 tabs; 6th denied |
+| M1 | Fresh install, no login: opencode chat with a Free Zen model reads a file, edits (diff card + Diff page), runs a command (Allow once, Allow for session, Deny with feedback), plan mode still reads; steer mid-turn; Stop; Force stop on a hung turn; image + PDF attach; background 2 min mid-turn with screen off (turn finishes, wake lock released after: `dumpsys power`); rotate; kill the app and reopen (history, expired approval, resume); notification deep link on both surfaces; switch to Terminal and back mid-turn; Open in terminal; idle release after 30 min; 5,000-token answer smooth on X6P; 200 turns memory | Chat in TERMINAL tab only; opencode chat holds the slot → terminal opencode and a 2nd chat show the session sheet; other cards upsell; Open terminal here → upsell; swipe-away stops the chat, history resumes on reopen | Workspace chat in a project; chats in two projects at once, counted globally; Pro → Free downgrade mid-turn: the turn finishes, the next send on a paid tool shows the upsell |
+| M2 | Same script for claude + `AskUserQuestion`, `ExitPlanMode` → Implement, inline image and PDF, Auto mode, resume after kill, `--resume` in Open in terminal | Card upsell, no spawn | Full flow |
+| M3 | Same for codex + requestUserInput, `turn/steer`, each mode under PRoot (sandbox), one-writer rule with Open in terminal | Upsell | Full flow |
+| M4 | Same for agy + client-side Auto-accept edits / Full policy, `interaction_` question, quota refusal, warm-process memory | Upsell | Full flow |
+| M5 | Same for grok + mode respawn, `ask_user_question`, `exit_plan_mode`, rate limit | Upsell | Full flow |
+| M6 | Polish items; tablet/landscape side-by-side; regression of M1–M5 scripts | — | — |
+
+Gating regression at every milestone: a Free user reaches no Pro tool, no second session, no workspace chat through any new entry point (card, FAB, notification, deep link, Open in terminal, nested shell tool).
+
+#### 9.2.13 Risks and open device checks
+| # | Check / risk | Mitigation |
+|---|---|---|
+| D1 | opencode `serve` under PRoot: loopback bind, readiness line, SSE heartbeats; **with no login, `GET /api/model` lists the free Zen models** (fresh `XDG_DATA_HOME`) | M1 day-1 spike; Free tier depends on it |
+| D2 | Cleartext HTTP to `127.0.0.1` from the app with the new network config | P11 |
+| D3 | The loopback port is reachable by other apps on the device | Fresh 32-byte password per spawn, Basic auth on every call, password never logged |
+| D4 | `--kill-on-exit` cleans tracees after `destroyForcibly` (no orphan pids in `/proc`, registry entry pruned) | Extract MA `terminateSessionProcesses` if orphans appear |
+| D5 | Play Android-vitals "excessive partial wake locks" | Lock only while a turn runs; 2 h guard; watch vitals in the staged rollout |
+| D6 | codex `readOnly` / `workspaceWrite` sandbox under PRoot | Banner suggesting Full; never auto-switch |
+| D7 | claude `can_use_tool` over stdio on the pinned binary | M2 day-1 fixture; fallback = mode selector |
+| D8 | agy: ~1 GB unpack per launch, IPv6, CA bundle, page size | Warm process; measure start time and RAM on X6P |
+| D9 | grok `x.ai/*` extensions churn | Fixtures per pinned version; unknown requests get `-32601` |
+| D10 | Doze with FGS: network stays available mid-turn with the screen off | M1 background test |
+| D11 | Main-thread jank on a 5k-token stream (X6P) and memory after 200 turns | 50 ms coalescer, plain text while streaming, 200-item window |
+| D12 | Hidden refs `refs/nativecode/chk/*` live in the user's repo (keep objects alive until removed) | Accepted by the owner (Q4); pruned when the thread is deleted |
+| D13 | Two writers on one native session (TUI + chat) | Close chat before Open in terminal; one live process per native id |
+| D14 | Protocol drift on CLI bumps (opencode 2.2.7 → 2.3.0 next) | Fixtures + skip-unknown; re-record on every pin bump |
+| D15 | MA regressions: IME/insets on ID_TERMINAL, extra keys injecting into a hidden session, duplicate `toolRails` registration | R4 10.4 guards; beta switch as escape hatch |
+
+#### 9.2.14 Conflicts settled and owner decisions
+**Settled.**
+1. opencode transport: R1 and the old plan said ACP; R2 and t3code use HTTP + SSE; **owner chose HTTP** (`serve --hostname --port`, `OPENCODE_PASSWORD`). R2's `serve --stdio` is not in t3code and is not used.
+2. Runtimes: four (opencode HTTP, claude, codex, ACP), not three; ACP serves agy, grok and the later CLIs.
+3. Provider order: owner's opencode-first, over R2's claude-first.
+4. Storage: SQLite projection tables (owner), not JSON files; no event log or outbox.
+5. UI: Compose in the existing pages (owner, R4), not RecyclerView.
+6. Service: `TerminalService`, not `BackgroundService` (R4).
+7. Modes: t3code's four (Supervised, Auto-accept edits, Auto, Full) per provider support, default Supervised; t3code's own default is Full access (deliberate deviation). Codex sandbox values are camelCase objects.
+8. Images: inline where the protocol takes them (claude, codex, ACP with the image capability); opencode uses guest `file://` URLs like t3code; documents use the guest copy + path line everywhere (claude PDFs inline).
+9. Revert: R3 suggested "revert files" in the beta; owner: per-turn diffs only.
+10. "Never auto-approve": holds in Supervised; in user-chosen Auto-edit/Full on agy the client answers from the mode, as t3code does.
+11. Atomic entitlement write and the gate PATH fix are already in the working tree (other agents); M0 verifies instead of redoing them.
+
+**Owner decisions (2026-11-13, answers to the former open questions).**
+- Q1. "Open terminal here" for Free users shows the Pro upsell (the terminal is Pro-only).
+- Q2. Pro → Free downgrade: the current turn finishes, then new sends are refused with the upsell.
+- Q3. The Chat/Terminal switch is remembered per page.
+- Q4. Hidden checkpoint refs `refs/nativecode/chk/*` in the user's repo are accepted; pruned when the thread is deleted.
+- Q5. Swiping the app away stops chats the same way terminals stop; thread history is kept and resumable.
+
+No open questions remain for item 12.
 
 ---
 
@@ -901,7 +1373,8 @@ One observation for the owner: the bridge carries messages from agent to user. T
 |---|---|---|
 | opencode 2.2.7 terminal and chat (beta) | Yes, 1 AI session | Multiple sessions |
 | Codex, Claude Code, Qwen, agy, Grok, Kiro, Hermes (terminal) | Upsell | Yes |
-| Chat (beta) for Claude and Codex | Upsell | Yes |
+| Chat (beta) for Claude, Codex, agy, Grok | Upsell | Yes |
+| Chat in the workspace page | Upsell (workspace is Pro) | Yes |
 | CLI login pages | opencode page | All tools, GitHub |
 | Desktop: pill, notification, tile, widget | 30 min/day, minutes shown | Unlimited |
 | Top bar stats, tool rail, extra keys | Yes | Yes |
@@ -930,7 +1403,7 @@ All chunks land on `feature/monetisation-pr1` in this order, each reviewable on 
 | # | Chunk | Items | MA regions touched | Depends on |
 |---|-------|-------|--------------------|------------|
 | 0 | Console and spikes, no app code: Play pack policy and size cap, trial offers, Firebase project, opencode 2.x scratch-rootfs spike, Claude control-channel spike, Hermes build-and-measure, `sshd` under PRoot | 3, 9, 11, 14, 17 | — | — |
-| 1 | Foundations: `strings.xml` and the resources rule, `RecyclerView` dependency, raw-stdout and non-PTY launch in `ShellCommandRunner`/`LinuxCommandBuilder`, bench harness ported, baseline results committed | 7E, 20.1 | none | — |
+| 1 | Foundations: `strings.xml` and the resources rule, `RecyclerView` dependency (git history only; chat uses Compose and its own `PipeProcess`, section 9.2.2), bench harness ported, baseline results committed | 7E, 20.1 | none | — |
 | 2 | Telemetry: Firebase, consent, event wrapper, privacy policy text | 14 | call sites only | 0 |
 | 3 | Free trial | 11 | 6020, 6066–6095 | 0, 2 |
 | 4 | Workspace top bar and tool rail | 5 | 21322–21420, 3516–3600, 4756–4850 | 1 |
@@ -942,8 +1415,8 @@ All chunks land on `feature/monetisation-pr1` in this order, each reviewable on 
 | — | **Cut line.** Everything above is a coherent release on its own if needed. | | | |
 | 10 | CLI login pages; Hermes in launchers | 2, 3 | 17339–17429, 18878–19100 | 9 |
 | 11 | Git history | 10 | 22424–22460, 21667–21916, 4869–4877 | 1, 7 |
-| 12 | Chat beta: opencode (ACP) | 9 | 20914, 5934–5991 | 8, 10 |
-| 13 | Chat beta: Codex and Claude | 9 | none new | 12 |
+| 12 | Chat: M0 prerequisites + M1 runtime and opencode (section 9.2.11) | 9 | `aiLaunchAllowed`, `syncTerminalServices`, `onDestroy`, `buildTerminalLayout`, `buildProjectWorkspaceLayout`, `handleAttachment`, `handleIntent` | 8, 10 |
+| 13 | Chat: M2 claude, M3 codex, M4 agy, M5 grok, M6 polish | 9 | none new | 12 |
 | 14 | Dev-server preview | 12 | tab registration | 1 |
 | 15 | Code editor | 16 | 7210, 7705 | 6 |
 | 16 | Backup and restore | 15 | Settings entry | 1 |
@@ -994,7 +1467,7 @@ Rules:
 
 ## 25. Testing strategy
 
-- **JVM unit tests** for every pure function: lane assignment (linear, branch, merge, octopus, criss-cross), log record parsing (short and malformed records), the three chat adapters by fixture replay, auth status parsers (one sample per CLI per pinned version), component manifest verification and the apply state machine (with a fake filesystem, including a crash at every step), offer-token choice, extra-keys JSON validation, port regex, backup path validation, the feature-gate matrix.
+- **JVM unit tests** for every pure function: lane assignment (linear, branch, merge, octopus, criss-cross), log record parsing (short and malformed records), the four chat runtimes by fixture replay (section 9.2.12), auth status parsers (one sample per CLI per pinned version), component manifest verification and the apply state machine (with a fake filesystem, including a crash at every step), offer-token choice, extra-keys JSON validation, port regex, backup path validation, the feature-gate matrix.
 - **Rootfs checks** in `verify_rootfs.sh`: every pinned version equals `versions.env`; glibc ≥ 2.39; no musl binaries; each component's smoke command passes inside a proot run on the build host; pack sizes under ceiling; sha256 values in `versions.env`, `components.json` and `RootfsSource.kt` agree.
 - **Benchmarks**: the ported `termux-lib` harness on both devices at chunk 1 (baseline), chunk 7 (profiles and git settings) and chunk 21 (engine), results committed under `docs/results/`.
 - **Device matrix** at chunks 9, 13 and 23: OP13R and X6P × fresh install and upgrade from 1.7.1 with data × Free and Pro. The per-item test lists are the script. The GPU gate in item 8 is run on X6P before chunk 8 is accepted.
@@ -1013,7 +1486,7 @@ Rules:
 4. **Pack layout departs from "inside the rootfs"** for Hermes and the Pro CLIs because of the 1.5 GB cap. If the owner rejects it, Hermes still needs its own pack and the runtime pack may not fit.
 5. **Updating a live rootfs.** A failed or interrupted update must leave a working install; the staged, rename-only commit and the fake-filesystem tests are the mitigation.
 6. **`--link2symlink` removal on the CLI profile** has only a microbenchmark behind it (+8.5%) and no package-manager regression run. It ships with a COMPAT profile and can be turned off by one constant.
-7. **Claude inline approvals** depend on an undocumented control channel; the fallback is a reduced Claude chat.
+7. **Agent chat** (section 9.2): Claude inline approvals depend on an internal control channel (fallback: mode selector); the Free tier depends on opencode's free Zen models listing without login under PRoot (device check D1).
 8. **Localisation** is a mechanical edit across the whole app at the end of the release, with Arabic the riskiest part.
 9. **Analytics consent** reduces measured conversions; Ads optimisation will work on partial data.
 10. **`MainActivity.kt`** remains the conflict hotspot until the extractions land.
@@ -1042,7 +1515,7 @@ Rules:
 - PRoot: whether NC-PLAY's launch path still pays the 816 ms wrapper cost; hard-link, `apk` and `dpkg` behaviour without `--link2symlink`; gains from the git settings, Node and Python environment changes (none measured); whether the U11 binary exists in `termux-lib/out/` or must be rebuilt.
 - PanVK: that low-mem is on by default in 26.3.1 (release notes and strings only); the BC readback caveat in 26.3.1; meaning of the `PANVK_MEM_*` variables; required `mali_kbase` versions.
 - Turnip: effect of the present wait fence on Termux-X11 pacing; whether zink over Turnip now works under PRoot.
-- Chat: Codex `turn/interrupt` and delta notification names; Claude stream-json message shapes, interrupt and control-channel wire names; that `opencode acp` in 2.2.7 behaves as documented under PRoot.
+- Chat: see section 9.2.13 (D1–D15) and the UNVERIFIED marks in 9.2.4 (opencode no-login model list and zero-cost free rule, CLI resume flags for Open in terminal, codex sandbox under PRoot, claude `can_use_tool` on the pinned binary).
 - `ccusage` 20.0.49: sub-command names, JSON shape, per-session report, and its handling of the opencode 2.x database.
 - Firebase: exact Data safety categories, ANR minimum Android version, consent requirements for Ads conversion import (taken from memory, not from fetched pages); current plugin versions beyond BoM 35.1.0.
 - Android: `/proc/net/tcp` unreadable on both test devices (general knowledge, not tested); tile `startActivityAndCollapse(PendingIntent)` requirement on Android 14+; GPU load sysfs readability; what `CpuUtilizationProvider` falls back to.
