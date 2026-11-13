@@ -85,7 +85,6 @@ object LinuxGuestDefaults {
     internal val cliPathProfile = listOf(
         "# Managed by NativeCode: CLI self-updates must land where PATH looks first.",
         "export NPM_CONFIG_PREFIX=\"\$HOME/.local\"",
-        "export NPM_CONFIG_ALLOW_SCRIPTS=opencode-ai",
         "case \":\$PATH:\" in",
         "  \":\$HOME/.opencode/bin:\$HOME/.local/bin:\"*) ;;",
         "  \":\$HOME/.local/bin:\"*) PATH=\"\$HOME/.opencode/bin:\$PATH\" ;;",
@@ -114,8 +113,18 @@ object LinuxGuestDefaults {
 
     internal fun applyToRootfs(rootfs: File) {
         installCliPaths(rootfs)
+        installNpmrc(rootfs)
         installZshStub(rootfs)
         pruneAgyBackups(rootfs)
+    }
+
+    /** 1.8.0 rootfs ships ~/.npmrc with prefix=~/.local; give older rootfs the same when the user has none. */
+    private fun installNpmrc(rootfs: File) {
+        val home = File(rootfs, "home/flux")
+        val npmrc = File(home, ".npmrc")
+        if (!home.isDirectory || npmrc.exists()) return
+        npmrc.writeText("prefix=/home/flux/.local\n")
+        npmrc.setReadable(true, false)
     }
 
     private fun installCliPaths(rootfs: File) {

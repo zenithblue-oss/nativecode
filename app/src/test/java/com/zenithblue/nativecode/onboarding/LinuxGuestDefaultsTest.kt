@@ -26,7 +26,8 @@ class LinuxGuestDefaultsTest {
         val out = path("/usr/bin:/bin")
         assertEquals(want, out[0])
         assertEquals("/home/x/.local", out[1])
-        assertEquals("opencode-ai", out[2])
+        // npm 12 rejects NPM_CONFIG_ALLOW_SCRIPTS in project installs (`npm ci` fails with EALLOWSCRIPTS)
+        assertEquals("", out[2])
         // /etc/profile.d/termux-profile.sh already put ~/.local/bin first
         assertEquals(want, path("/home/x/.local/bin:/usr/bin:/bin")[0])
         assertEquals(want, path(want)[0])
@@ -72,6 +73,31 @@ class LinuxGuestDefaultsTest {
             File(root, "home/flux/.zshrc").writeText("# user\n") // user file is never overwritten
             LinuxGuestDefaults.applyToRootfs(root)
             assertEquals("# user\n", File(root, "home/flux/.zshrc").readText())
+            assertEquals("prefix=/home/flux/.local\n", File(root, "home/flux/.npmrc").readText())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    /** 1.8.0 rootfs already has the new PATH line, ~/.npmrc and (user) shell files: nothing may be rewritten. */
+    @Test
+    fun newRootfsIsLeftAlone() {
+        val root = Files.createTempDirectory("rootfs18").toFile()
+        try {
+            File(root, "usr/bin").mkdirs(); File(root, "usr/bin/zsh").writeText("x")
+            File(root, "home/flux/.config/fluxlinux").mkdirs()
+            val env = File(root, "home/flux/.config/fluxlinux/cli-tools.env")
+            val newEnv = "# Managed by NativeCode prebuilt rootfs\n" +
+                "export PATH=\"\$HOME/.opencode/bin:\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH\"\n"
+            env.writeText(newEnv)
+            File(root, "home/flux/.npmrc").writeText("prefix=/home/flux/.local\nfoo=bar\n")
+            File(root, "home/flux/.opencode/bin").mkdirs()
+            File(root, "home/flux/.opencode/bin/opencode").writeText("v2")
+
+            LinuxGuestDefaults.applyToRootfs(root)
+            assertEquals(newEnv, env.readText())
+            assertEquals("prefix=/home/flux/.local\nfoo=bar\n", File(root, "home/flux/.npmrc").readText())
+            assertEquals("v2", File(root, "home/flux/.opencode/bin/opencode").readText())
         } finally {
             root.deleteRecursively()
         }

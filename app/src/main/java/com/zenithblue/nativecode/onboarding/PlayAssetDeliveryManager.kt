@@ -14,14 +14,17 @@ object PlayAssetDeliveryManager {
     private const val TAG = "PlayAssetDelivery"
     const val PACK_RUNTIME = "nativecode_runtime"
     const val PACK_ANDROID_DEV = "nativecode_android_dev"
+    const val PACK_UPDATE_CORE = "nativecode_update_core"
 
     private fun archiveName(packName: String): String = when (packName) {
         PACK_ANDROID_DEV -> AndroidDevPackManager.ARCHIVE_NAME
+        PACK_UPDATE_CORE -> RuntimeUpdatePack.ARCHIVE_NAME
         else -> RootfsSourceResolver.ALPAQUITA_NAME
     }
 
     private fun checksumName(packName: String): String = when (packName) {
         PACK_ANDROID_DEV -> AndroidDevPackManager.SHA_NAME
+        PACK_UPDATE_CORE -> RuntimeUpdatePack.SHA_NAME
         else -> RootfsSourceResolver.ALPAQUITA_SHA_NAME
     }
 

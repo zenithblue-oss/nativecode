@@ -75,12 +75,16 @@ for c in opencode codex qwen agy claude grok kiro-cli; do
             *) [ -e "$ROOTFS/home/flux/.local/bin/$target" ] && { echo "OK   ai:$c"; continue; } ;;
         esac
     fi
-    if [ -x "$ROOTFS/home/flux/.local/bin/$c" ] || [ -x "$ROOTFS/usr/local/bin/$c" ]; then
+    if [ -x "$ROOTFS/home/flux/.opencode/bin/$c" ] || [ -x "$ROOTFS/home/flux/.local/bin/$c" ] || [ -x "$ROOTFS/usr/local/bin/$c" ]; then
         echo "OK   ai:$c"
     else
         echo "MISS ai:$c"
         FAIL=1
     fi
+done
+# Hermes is not part of the rootfs (install skill later).
+for h in "$ROOTFS/home/flux/.local/bin/hermes" "$ROOTFS/opt/hermes" "$ROOTFS/home/flux/.hermes"; do
+    [ ! -e "$h" ] || { echo "FAIL hermes must not be in the rootfs: $h"; FAIL=1; }
 done
 
 echo "== desktop/gpu =="
@@ -159,10 +163,10 @@ else
     fi
 fi
 
-if [ "$(uname -m)" = "aarch64" ] && [ -x "$ROOTFS/bin/sh" ] && [ -x "$ROOTFS/home/flux/.local/bin/opencode" ]; then
+if [ "$(uname -m)" = "aarch64" ] && [ -x "$ROOTFS/bin/sh" ] && [ -x "$ROOTFS/home/flux/.opencode/bin/opencode" ]; then
     echo "== executing AI tools (ARM64) =="
     chroot "$ROOTFS" su -s /bin/sh flux -c '
-      export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+      export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
       opencode --version
       codex --version
       qwen --version

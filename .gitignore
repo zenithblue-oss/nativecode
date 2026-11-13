@@ -21,6 +21,7 @@ tools/rootfs/mesa-adreno/cache/
 tools/rootfs/mesa-adreno/out/
 *.tar.zst
 nativecode_android_dev/src/main/assets/*.tar.xz
+nativecode_update_core/src/main/assets/*.tgz
 # NOTE (Play release): before ./gradlew bundleRelease, stage the prebuilt
 # runtime into the on-demand asset pack (stays local, NOT committed):
 #   cp tools/rootfs/out/alpaquita_rootfs.tar.zst{,.sha256} nativecode_runtime/src/main/assets/

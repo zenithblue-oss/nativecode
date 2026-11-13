@@ -316,12 +316,19 @@ fi
 su -s /bin/sh flux -c '
   set -e
   export PATH="\$HOME/.local/bin:\$PATH"
+  # prefix=~/.local lives in ~/.npmrc on purpose: npm self-updates must land in ~/.local.
   npm config set prefix "\$HOME/.local"
-  npm install -g opencode-ai@'"${OPENCODE_VERSION:-1.18.27}"' @openai/codex@'"${CODEX_VERSION:-0.153.2}"' @qwen-code/qwen-code@'"${QWEN_VERSION:-0.23.0}"'
-  (cd "\$HOME/.local/lib/node_modules/opencode-ai" && node postinstall.mjs)
+  npm install -g @openai/codex@'"${CODEX_VERSION:-0.167.2}"' @qwen-code/qwen-code@'"${QWEN_VERSION:-0.27.3}"'
+  # opencode 2.x: pinned GitHub release binary in ~/.opencode/bin (not npm, no installer script).
+  mkdir -p "\$HOME/.opencode/bin"
+  curl -fsSL "'"${OPENCODE_URL}"'" -o /tmp/opencode.tgz
+  echo "'"${OPENCODE_SHA256}"'  /tmp/opencode.tgz" | sha256sum -c -
+  tar -xzf /tmp/opencode.tgz -C "\$HOME/.opencode/bin" opencode
+  rm -f /tmp/opencode.tgz
+  chmod 755 "\$HOME/.opencode/bin/opencode"
+  export PATH="\$HOME/.opencode/bin:\$PATH"
   command -v opencode
   opencode --version
-  rm -f "\$HOME/.npmrc"
   curl -fsSL "'"${AGY_INSTALLER_URL:-https://antigravity.google/cli/install.sh}"'" | bash || true
   command -v agy >/dev/null 2>&1 || (sleep 5; curl -fsSL "'"${AGY_INSTALLER_URL:-https://antigravity.google/cli/install.sh}"'" | bash || true)
   curl -fsSL "'"${CLAUDE_INSTALLER_URL:-https://claude.ai/install.sh}"'" | bash || true
@@ -341,7 +348,7 @@ fi
 mkdir -p /home/flux/.config/fluxlinux
 cat > /home/flux/.config/fluxlinux/cli-tools.env <<'CLIEOF'
 # Managed by NativeCode prebuilt rootfs
-export PATH="\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH"
+export PATH="\$HOME/.opencode/bin:\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH"
 CLIEOF
 
 # Android SDK minimal
@@ -438,7 +445,7 @@ chmod 644 /etc/bash/gpu-env.sh
 
 guest_log "verifying all baked AI CLIs execute"
 su -s /bin/sh flux -c '
-  export PATH="\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH"
+  export PATH="\$HOME/.opencode/bin:\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH"
   opencode --version
   codex --version
   qwen --version

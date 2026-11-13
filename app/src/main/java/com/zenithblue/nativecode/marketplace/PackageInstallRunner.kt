@@ -6,6 +6,7 @@ import com.zenithblue.nativecode.RootShell
 import com.zenithblue.nativecode.terminal.ChrootCommandBuilder
 import com.zenithblue.nativecode.terminal.HostCommandBuilder
 import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
+import com.zenithblue.nativecode.terminal.ProotCommandBuilder
 import com.zenithblue.nativecode.terminal.ShellCommandRunner
 import com.zenithblue.nativecode.terminal.TermuxHostPaths
 import java.io.File
@@ -438,15 +439,10 @@ object PackageInstallRunner {
             // root inside guest — same path as repairs chroot_guest
             return ChrootCommandBuilder.build(ctx, guestCmd, user = "root")
         }
-        // proot: bash as root (not zsh) so non-interactive scripts are reliable
-        val shell = TermuxHostPaths.libBash(ctx).absolutePath
-        val prootDistro = TermuxHostPaths.PROOT_DISTRO
+        // proot: bash as root (not zsh) so non-interactive scripts are reliable. Direct libproot.so launch,
+        // same as every terminal session: `proot-distro login alpine` named a container the Alpaquita
+        // rootfs does not have, and python/proot-distro cost ~290 ms per command.
         val escaped = guestCmd.replace("'", "'\\''")
-        val args = arrayOf(
-            shell, "-c",
-            "exec python $prootDistro login alpine --shared-tmp --user root -- /bin/bash -lc '$escaped'"
-        )
-        val envMap = HostCommandBuilder.envMap(ctx, forceHostSetup = false, includeTerm = true)
-        return args to envMap
+        return ProotCommandBuilder.build(ctx, "bash -lc '$escaped'", user = "root")
     }
 }

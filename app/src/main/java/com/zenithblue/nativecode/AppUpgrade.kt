@@ -73,9 +73,31 @@ object AppUpgrade {
         if (File(ctx.filesDir, "usr/lib/libtermux-exec.so").exists()) {
             TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir, force = true)
         }
+        refreshBootstrapProot(ctx)
         // Guest file repairs run only here (versionCode changed): direct file edits, no guest exec.
         LinuxGuestDefaults.applyOnUpdate(ctx)
         runVersionMigrations(from, to)
+    }
+
+    /**
+     * The bootstrap's usr/bin/proot is the old build without the pair-affinity patch. Everything the app
+     * starts already points PD_PROOT_BIN at the 16 KB aligned libproot.so; this keeps the stale copy
+     * (used by older host scripts) identical to it. Same-size copy is skipped; swap is a rename.
+     */
+    private fun refreshBootstrapProot(ctx: Context) {
+        val src = TermuxHostPaths.libProot(ctx)
+        val dst = File(ctx.filesDir, "usr/bin/proot")
+        if (!src.isFile || !dst.isFile) return
+        try {
+            if (src.length() == dst.length() && src.readBytes().contentEquals(dst.readBytes())) return
+            val tmp = File(dst.parentFile, ".proot.nc-new")
+            src.copyTo(tmp, overwrite = true)
+            tmp.setReadable(true, false)
+            tmp.setExecutable(true, false)
+            if (!tmp.renameTo(dst)) { tmp.delete(); Log.w(TAG, "could not replace bootstrap proot") }
+        } catch (e: Exception) {
+            Log.w(TAG, "bootstrap proot refresh failed: ${e.message}")
+        }
     }
 
     /**

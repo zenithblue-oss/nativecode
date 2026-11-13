@@ -104,6 +104,11 @@ build_zsh() {
     patch -p1 --batch -d "$SRC" < "$SCRIPT_DIR/patches/zsh-5.9-modern-ncurses.patch"
 
     cd "$SRC"
+    # GCC 15 rejects the K&R main() in zsh's runtime configure probes, so they all read "no".
+    # BROKEN_KILL_ESRCH is the one that hangs $(...): zsh_system.h then maps ESRCH to EINVAL and
+    # waitforpid() never sees its reaped child go away. Force the known-good answers.
+    export zsh_cv_sys_killesrch=yes
+    export zsh_cv_sys_sigsuspend=yes
     ./configure --prefix="$PREFIX" \
                 --bindir="$PREFIX/bin" \
                 --sysconfdir=/etc \

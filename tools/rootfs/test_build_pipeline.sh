@@ -86,7 +86,7 @@ if grep -q "HOST-BAD" "$WORK/assemble-inside.sh"; then
     echo "FAIL: assemble-inside.sh contains poisoned host ANDROID environment paths!" >&2
     exit 1
 fi
-if ! grep -qF 'export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"' "$WORK/assemble-inside.sh"; then
+if ! grep -qF 'export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"' "$WORK/assemble-inside.sh"; then
     echo "FAIL: assemble-inside.sh does not have literal guest \$HOME/\$PATH export!" >&2
     exit 1
 fi
@@ -228,9 +228,12 @@ for c in sh bash sudo git node npm python3 java javac adb fastboot gcc g++ cmake
     touch "$DUMMY_FS/usr/bin/$c" && chmod +x "$DUMMY_FS/usr/bin/$c"
 done
 
-for c in opencode codex qwen agy claude grok kiro-cli; do
+for c in codex qwen agy claude grok kiro-cli; do
     touch "$DUMMY_FS/home/flux/.local/bin/$c" && chmod +x "$DUMMY_FS/home/flux/.local/bin/$c"
 done
+# opencode 2.x lives in ~/.opencode/bin (pinned release binary), not ~/.local/bin
+mkdir -p "$DUMMY_FS/home/flux/.opencode/bin"
+touch "$DUMMY_FS/home/flux/.opencode/bin/opencode" && chmod +x "$DUMMY_FS/home/flux/.opencode/bin/opencode"
 
 mkdir -p "$DUMMY_FS/home/flux/.config"
 cp -a "$REPO_ROOT/tools/rootfs/overlay/alpaquita/home/flux/.config/xfce4" "$DUMMY_FS/home/flux/.config/"

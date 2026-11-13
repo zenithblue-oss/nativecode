@@ -65,6 +65,7 @@ import com.zenithblue.nativecode.workspace.WorkspaceTopBar
 import com.zenithblue.nativecode.telemetry.ConsentSheet
 import com.zenithblue.nativecode.telemetry.Telemetry
 import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
+import com.zenithblue.nativecode.onboarding.RuntimeUpdatePack
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
 import com.google.android.play.core.assetpacks.AssetPackStateUpdateListener
 import android.view.ContextMenu
@@ -681,6 +682,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 Log.i("AndroidDevPack", result.message)
             }
         }
+        // 1.7.x rootfs -> 1.8.0 runtime: small Play pack, applied by Kotlin file I/O (no guest scripts).
+        // PLAY_STORE_BUILD is hard-coded false since the play flavor was removed, so it cannot gate this.
+        RuntimeUpdatePack.promptIfNeeded(this)
 
         buildRootLayout()
         setContentView(drawerLayout)
