@@ -574,6 +574,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var projectGitDiffContainer: FrameLayout
     private lateinit var projectGitDiffScrollView: ScrollView
     private lateinit var projectGitDiffLayout: LinearLayout
+    private lateinit var projectGitHistoryView: com.zenithblue.nativecode.git.ui.GitHistoryView
+    private var projectGitTab = 0 // 0 = CHANGES, 1 = HISTORY
+    private var projectGitTabBtns: List<TextView> = emptyList()
+    /** Non-null while the diff viewer shows one file of a commit (from the history page). */
+    private var diffViewerCommit: String? = null
 
     private val expandedFolders = HashSet<String>()
 
@@ -8480,8 +8485,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         return s
     }
 
-    private fun showDiffViewer(name: String, backPage: Int = ID_GIT) {
+    private fun showDiffViewer(name: String, backPage: Int = ID_GIT, commit: String? = null) {
         diffViewerBackPage = backPage
+        diffViewerCommit = commit
         if (backPage == ID_PROJECT_GIT_DIFF) {
             unifiedHeader.visibility = View.GONE
             projectBottomNavigation.visibility = View.VISIBLE
@@ -8535,6 +8541,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val method = projectGitMethod()
         val gen = ++diffRequestGen
         diffRequestName = name
+        val commit = diffViewerCommit
         executor.execute {
             fun filterDiff(lines: List<String>): List<String> = lines.filter { line ->
                 line.startsWith("diff ") || line.startsWith("index ") ||
@@ -8547,7 +8554,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             fun stale(): Boolean =
                 gen != diffRequestGen || project != activeProjectPath || name != diffRequestName
             try {
-                val gitCmd = GitGuestCommands.diffFileAuto(project, name)
+                val gitCmd = if (commit != null) GitGuestCommands.commitFileDiff(project, commit, name)
+                else GitGuestCommands.diffFileAuto(project, name)
                 val (lcArgs, lcEnv) = LinuxCommandBuilder.build(this, gitCmd, method = method)
                 val env = HashMap(lcEnv).apply { putAll(GitGuestCommands.gitEnv(project)) }
                 val (rc, out) = ShellCommandRunner.runCaptureExit(this, lcArgs, env)
@@ -8769,6 +8777,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         diffViewerContainer.addView(diffCard)
 
         diffViewerContainer.addView(spacer(16))
+        // Read-only when viewing a commit from history: Discard/Commit act on the working tree.
+        if (diffViewerCommit != null) return
         val bottomBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
@@ -21656,6 +21666,28 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
         }
         projectGitDiffTopBar = createProjectSubpageTopBar()
+        projectGitHistoryView = com.zenithblue.nativecode.git.ui.GitHistoryView(this, executor) { hash, path ->
+            showDiffViewer(path, ID_PROJECT_GIT_DIFF, hash)
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
+            visibility = View.GONE
+        }
+        val gitTabRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(8), dp(12), dp(4))
+        }
+        projectGitTabBtns = listOf("CHANGES", "HISTORY").mapIndexed { i, label ->
+            TextView(this).apply {
+                text = label
+                textSize = 12f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                minHeight = dp(40)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { if (i == 1) leftMargin = dp(-1) }
+                setOnClickListener { projectGitTab = i; applyProjectGitTab() }
+            }
+        }
+        projectGitTabBtns.forEach { gitTabRow.addView(it) }
         projectGitDiffScrollView = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
             clipToPadding = false
@@ -21667,8 +21699,26 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         projectGitDiffScrollView.addView(projectGitDiffLayout)
         col.addView(projectGitDiffTopBar)
+        col.addView(gitTabRow)
         col.addView(projectGitDiffScrollView)
+        col.addView(projectGitHistoryView)
         projectGitDiffContainer.addView(col)
+    }
+
+    /** CHANGES (working tree diff) vs HISTORY (commit graph) on the project Git page. */
+    private fun applyProjectGitTab() {
+        projectGitTabBtns.forEachIndexed { i, b ->
+            val on = i == projectGitTab
+            b.setTextColor(if (on) NC.ON_PRIMARY else NC.ON_SURF_VAR)
+            b.background = GradientDrawable().apply {
+                setColor(if (on) NC.PRIMARY else NC.SURFACE_LOWEST)
+                setStroke(dp(1), if (on) NC.PRIMARY else NC.OUTLINE_VAR)
+            }
+        }
+        projectGitDiffScrollView.visibility = if (projectGitTab == 0) View.VISIBLE else View.GONE
+        projectGitHistoryView.visibility = if (projectGitTab == 1) View.VISIBLE else View.GONE
+        if (projectGitTab == 1) projectGitHistoryView.show(activeProjectPath, projectGitMethod())
+        else refreshGitDiffTree()
     }
 
     private fun openProjectGitDiff() {
@@ -21727,7 +21777,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(dp(12), dp(4), dp(12), dp(8))
         }
         projectGitDiffLayout.addView(workspaceGitDiffLayout)
-        refreshGitDiffTree()
+        applyProjectGitTab()
     }
 
     private fun setGlobalTerminalZoom(newSize: Int) {

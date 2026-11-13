@@ -66,6 +66,43 @@ object GitGuestCommands {
             "$git diff --numstat HEAD 2>/dev/null"
     }
 
+    private val SHA = Regex("^[0-9a-f]{7,64}$")
+
+    /**
+     * One streaming git call for the whole graph: one commit per line,
+     * `hash NUL parents NUL decorations(full) NUL author NUL unix-time NUL subject`.
+     * [ref] null = all branches, tags, remotes and HEAD. [skip] only for a resume after the process was killed.
+     */
+    fun logStream(projectPath: String, ref: String?, skip: Int = 0): String {
+        val scope = if (ref == null) "--branches --tags --remotes HEAD" else "--end-of-options ${shellQuote(ref)}"
+        val skipArg = if (skip > 0) "--skip=$skip " else ""
+        val args = "-c log.showSignature=false log --topo-order --decorate=full $skipArg" +
+            "--format=%H%x00%P%x00%D%x00%an%x00%at%x00%s $scope"
+        return "cd ${shellQuote(projectPath)} && ${gitCommand(projectPath, args)}"
+    }
+
+    /** Message, author, date, parents, then name-status and numstat vs first parent (root commits vs empty). */
+    fun commitDetail(projectPath: String, hash: String): String {
+        require(SHA.matches(hash))
+        val dt = "diff-tree --root --no-commit-id -r -m --first-parent"
+        return "cd ${shellQuote(projectPath)} && " +
+            gitCommand(projectPath, "show -s --format='%an <%ae>%x00%at%x00%P%x00%B' $hash") +
+            "; echo '${GitLogParse.DETAIL_FILES}'; " + gitCommand(projectPath, "$dt --name-status $hash") +
+            "; echo '${GitLogParse.DETAIL_NUM}'; " + gitCommand(projectPath, "$dt --numstat $hash")
+    }
+
+    /** Diff of one file in one commit (against its first parent; root and merge commits work). */
+    fun commitFileDiff(projectPath: String, hash: String, filePath: String): String {
+        require(SHA.matches(hash))
+        return "cd ${shellQuote(projectPath)} && " +
+            gitCommand(projectPath, "show --first-parent --format= $hash -- ${literalPathspec(filePath)}")
+    }
+
+    /** One-time background `commit-graph write` so --topo-order can stream on big repos. */
+    fun ensureCommitGraph(projectPath: String): String =
+        "cd ${shellQuote(projectPath)} && ( [ -e .git/objects/info/commit-graph ] || [ -d .git/objects/info/commit-graphs ] || " +
+            gitCommand(projectPath, "commit-graph write --reachable --split") + " ) >/dev/null 2>&1"
+
     fun isInsideWorkTree(projectPath: String): String =
         "cd ${shellQuote(projectPath)} && ${gitCommand(projectPath, "rev-parse --is-inside-work-tree")} 2>/dev/null"
 

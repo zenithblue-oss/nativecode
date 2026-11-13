@@ -91,6 +91,14 @@ object ShellCommandRunner {
         return exit to text
     }
 
+    /** Starts a process with stdout only (stderr discarded) for callers that parse raw stdout. */
+    fun startStdout(ctx: Context, cmd: Array<String>, envMap: Map<String, String>? = null): Process {
+        val pb = ProcessBuilder(*adjustHostCmd(cmd))
+        applyEnvironment(ctx, pb, envMap)
+        pb.redirectError(ProcessBuilder.Redirect.to(java.io.File("/dev/null")))
+        return pb.start()
+    }
+
     /** Runs a command and streams each output line to [onLine] on the main thread. */
     fun runStreamed(
         ctx: Context,
