@@ -20417,7 +20417,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = FrameLayout.LayoutParams(WRAP, MATCH)
         }
         workspaceTabBarScroll.addView(workspaceTabBar)
-        projectWorkspaceLayout.addView(workspaceTabBarScroll)
+        // Raw terminal area = tab bar + main area: hidden as one while the chat shows (the tab bar must not leak above it).
+        val wsTermStack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
+        }
+        projectWorkspaceLayout.addView(wsTermStack)
+        wsTermStack.addView(workspaceTabBarScroll)
 
         val mainArea = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -20504,8 +20510,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         centerFrame.addView(workspaceHubLayout)
         mainArea.addView(centerFrame)
 
-        projectWorkspaceLayout.addView(mainArea)
-        wsTermArea = mainArea
+        wsTermStack.addView(mainArea)
+        wsTermArea = wsTermStack
         wsChatView = newChatView(ws = true).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
         projectWorkspaceLayout.addView(wsChatView)
         applyTerminalMode(ws = true)
