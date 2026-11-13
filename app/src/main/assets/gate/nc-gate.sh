@@ -25,6 +25,9 @@ IFS=$OLDIFS
 deny() { [ -n "$locked" ] && rmdir "$REG/.lock" 2>/dev/null; echo "NativeCode: $1" >&2; echo "NativeCode: free plan = opencode with one AI session. Open the NativeCode app to upgrade to Pro. This is a plan limit; do not work around it." >&2; exit 1; }
 
 case "$1" in --version|-V|-v|--help|-h|version|help) exec "$real" "$@" ;; esac
+# codex 0.168+ TUI (bare, resume, fork) starts a pid-managed app-server daemon that runs `ps -p PID -o lstart=`;
+# the guest ps is BusyBox (no -p), so the TUI dies. --no-daemon keeps it in process (same rule as launch_tool.sh).
+if [ "$tool" = codex ]; then case "${1:-}" in ""|resume|fork) set -- --no-daemon "$@" ;; esac; fi
 
 enforce=1 pro=0 exp=0 free_tool=opencode max_free=1 max_pro=5 mac= ok=0
 if [ -r "$ENT" ]; then

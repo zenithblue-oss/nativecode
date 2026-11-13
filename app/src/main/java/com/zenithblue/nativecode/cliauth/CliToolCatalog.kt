@@ -60,7 +60,8 @@ object CliToolCatalog {
             terminalType = "codex",
             hideOnChroot = true,
             consoleUrl = "https://auth.openai.com/codex/device",
-            subtitle = "codex login --device-auth"
+            subtitle = "codex login --device-auth",
+            chat = ChatProtocol.CODEX_APP_SERVER
         ),
         CliToolDef(
             id = "qwen",

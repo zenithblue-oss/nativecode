@@ -29,31 +29,36 @@ class AcpRpc(
     private val write: (String) -> Boolean,
     private val onNotification: (method: String, params: JSONObject) -> Unit,
     private val onRequest: (id: Any, method: String, params: JSONObject) -> JSONObject?,
+    /** False = codex app-server dialect: no `"jsonrpc"` field either way (app-server-protocol rpc.rs). */
+    private val tagged: Boolean = true,
     private val log: (String) -> Unit = {},
 ) {
     private val next = AtomicLong(0)
     private val pending = ConcurrentHashMap<Long, CompletableFuture<JSONObject>>()
 
-    fun request(method: String, params: JSONObject): CompletableFuture<JSONObject> {
+    private fun frame() = JSONObject().apply { if (tagged) put("jsonrpc", "2.0") }
+
+    /** [params] null = no `params` key (codex unit params such as `account/rateLimits/read`). */
+    fun request(method: String, params: JSONObject?): CompletableFuture<JSONObject> {
         val id = next.getAndIncrement()
         val f = CompletableFuture<JSONObject>()
         pending[id] = f
-        val line = JSONObject().put("jsonrpc", "2.0").put("id", id).put("method", method).put("params", params).toString()
+        val line = frame().put("id", id).put("method", method).putOpt("params", params).toString()
         log(line)
         if (!write(line)) { pending.remove(id); f.completeExceptionally(IOException("agent stdin closed")) }
         return f
     }
 
-    fun notify(method: String, params: JSONObject) {
-        val line = JSONObject().put("jsonrpc", "2.0").put("method", method).put("params", params).toString()
+    fun notify(method: String, params: JSONObject?) {
+        val line = frame().put("method", method).putOpt("params", params).toString()
         log(line)
         write(line)
     }
 
-    fun reply(id: Any, result: JSONObject) = send(JSONObject().put("jsonrpc", "2.0").put("id", id).put("result", result))
+    fun reply(id: Any, result: JSONObject) = send(frame().put("id", id).put("result", result))
 
     fun replyError(id: Any, code: Int, message: String) =
-        send(JSONObject().put("jsonrpc", "2.0").put("id", id).put("error", JSONObject().put("code", code).put("message", message)))
+        send(frame().put("id", id).put("error", JSONObject().put("code", code).put("message", message)))
 
     /** Process gone: every in-flight request fails (the turn ends instead of hanging). */
     fun failAll(e: Exception) {

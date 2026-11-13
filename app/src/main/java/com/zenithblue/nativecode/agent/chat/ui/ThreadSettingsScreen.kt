@@ -198,7 +198,7 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
                         .joinToString(" · "), color = C.onVar, style = T.meta)
                 }
                 live?.rateLimit?.let { r ->
-                    Text("Provider quota: ${r.status}" + (r.resetAt?.let { " · resets " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(it)) } ?: ""),
+                    Text("Provider quota: ${r.detail ?: r.status}" + (r.resetAt?.let { " · resets " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(it)) } ?: ""),
                         color = C.tertiary, style = T.meta)
                 }
             }

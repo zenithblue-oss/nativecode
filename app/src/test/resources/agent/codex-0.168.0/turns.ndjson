@@ -1,0 +1,74 @@
+> {"id":0,"method":"initialize","params":{"clientInfo":{"name":"nativecode","title":"NativeCode","version":"1.8.0"},"capabilities":{"experimentalApi":true,"optOutNotificationMethods":["turn/diff/updated"]}}}
+< {"id":0,"result":{"userAgent":"nativecode/0.168.0 (Alpaquita Linux stream; aarch64) dumb (nativecode; 1.8.0)","codexHome":"/home/flux/.codex","platformFamily":"unix","platformOs":"linux"}}
+> {"method":"initialized"}
+< {"method":"remoteControl/status/changed","params":{"status":"disabled"}}
+> {"id":1,"method":"account/read","params":{"refreshToken":false}}
+< {"id":1,"result":{"account":{"type":"chatgpt","email":"owner@example.com","planType":"plus"},"requiresOpenaiAuth":true,"workspaceRouting":null}}
+> {"id":2,"method":"model/list","params":{}}
+< {"id":2,"result":{"data":[{"id":"gpt-5.5-codex","model":"gpt-5.5-codex","displayName":"GPT-5.5-Codex","description":"Coding","hidden":false,"isDefault":true,"defaultReasoningEffort":"medium","supportedReasoningEfforts":[{"reasoningEffort":"low","description":"Fast"},{"reasoningEffort":"medium","description":"Balanced"},{"reasoningEffort":"high","description":"Deep"}],"inputModalities":["text","image"]},{"id":"gpt-5.5","model":"gpt-5.5","displayName":"GPT-5.5","description":"General","hidden":false,"isDefault":false,"defaultReasoningEffort":"medium","supportedReasoningEfforts":[{"reasoningEffort":"minimal","description":""},{"reasoningEffort":"high","description":""}]},{"id":"internal","model":"internal","displayName":"Hidden","hidden":true,"isDefault":false,"defaultReasoningEffort":"low","supportedReasoningEfforts":[]}],"nextCursor":null}}
+> {"id":3,"method":"skills/list","params":{"cwds":["/home/flux/proj"]}}
+< {"id":3,"result":{"data":[{"cwd":"/home/flux/proj","skills":[{"name":"review-pr","description":"Review a pull request","path":"/home/flux/.codex/skills/review-pr/SKILL.md","enabled":true},{"name":"compact","description":"shadow","path":"x","enabled":true},{"name":"off","path":"y","enabled":false}],"errors":[]}]}}
+> {"id":4,"method":"thread/start","params":{"cwd":"/home/flux/proj","approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":"danger-full-access","config":{"tools.update_plan.enabled":true}}}
+< {"method":"thread/started","params":{"thread":{"id":"thr_1"}}}
+< {"id":4,"result":{"thread":{"id":"thr_1","path":"/home/flux/.codex/sessions/2026/11/14/rollout-thr_1.jsonl","source":"vscode"},"model":"gpt-5.5-codex","approvalPolicy":"untrusted","sandbox":{"type":"dangerFullAccess"},"reasoningEffort":"medium"}}
+# --- turn 1: reasoning + todo + streamed answer + usage + rate limits
+> {"id":5,"method":"turn/start","params":{"threadId":"thr_1","input":[{"type":"text","text":"hi"}]}}
+< {"id":5,"result":{"turn":{"id":"turn_1","status":"inProgress","items":[]}}}
+< {"method":"turn/started","params":{"threadId":"thr_1","turn":{"id":"turn_1","status":"inProgress"}}}
+< {"method":"item/started","params":{"threadId":"thr_1","turnId":"turn_1","item":{"type":"userMessage","id":"u1","content":[{"type":"text","text":"hi"}]},"startedAtMs":1}}
+< {"method":"item/started","params":{"threadId":"thr_1","turnId":"turn_1","item":{"type":"reasoning","id":"rs_1","summary":[],"content":[]},"startedAtMs":2}}
+< {"method":"item/reasoning/summaryTextDelta","params":{"threadId":"thr_1","turnId":"turn_1","itemId":"rs_1","delta":"**Greeting**","summaryIndex":0}}
+< {"method":"item/completed","params":{"threadId":"thr_1","turnId":"turn_1","item":{"type":"reasoning","id":"rs_1","summary":["**Greeting** the user"],"content":[]},"completedAtMs":3}}
+< {"method":"turn/plan/updated","params":{"threadId":"thr_1","turnId":"turn_1","explanation":null,"plan":[{"step":"Say hello","status":"completed"},{"step":"Offer help","status":"inProgress"}]}}
+< {"method":"item/started","params":{"threadId":"thr_1","turnId":"turn_1","item":{"type":"agentMessage","id":"msg_1","text":"","phase":"final_answer"},"startedAtMs":4}}
+< {"method":"item/agentMessage/delta","params":{"threadId":"thr_1","turnId":"turn_1","itemId":"msg_1","delta":"Hello"}}
+< {"method":"item/agentMessage/delta","params":{"threadId":"thr_1","turnId":"turn_1","itemId":"msg_1","delta":" there"}}
+< {"method":"item/completed","params":{"threadId":"thr_1","turnId":"turn_1","item":{"type":"agentMessage","id":"msg_1","text":"Hello there!","phase":"final_answer"},"completedAtMs":5}}
+< {"method":"thread/tokenUsage/updated","params":{"threadId":"thr_1","turnId":"turn_1","tokenUsage":{"total":{"totalTokens":1200,"inputTokens":1000,"cachedInputTokens":400,"cacheWriteInputTokens":0,"outputTokens":200,"reasoningOutputTokens":50},"last":{"totalTokens":1200,"inputTokens":1000,"cachedInputTokens":400,"cacheWriteInputTokens":0,"outputTokens":200,"reasoningOutputTokens":50},"modelContextWindow":258400}}}
+< {"method":"account/rateLimits/updated","params":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":42,"windowDurationMins":300,"resetsAt":1800000000},"secondary":{"usedPercent":13,"windowDurationMins":10080,"resetsAt":1800500000},"credits":null,"planType":"plus","rateLimitReachedType":null}}}
+< {"method":"turn/completed","params":{"threadId":"thr_1","turn":{"id":"turn_1","status":"completed","error":null,"durationMs":900}}}
+# --- turn 2: command approval (accept) with output, then a patch approval (decline)
+> {"id":6,"method":"turn/start","params":{"threadId":"thr_1","input":[{"type":"text","text":"run it"}]}}
+< {"id":6,"result":{"turn":{"id":"turn_2","status":"inProgress","items":[]}}}
+< {"method":"item/started","params":{"threadId":"thr_1","turnId":"turn_2","item":{"type":"commandExecution","id":"call_1","command":"/bin/bash -lc 'echo it'\\''s ok'","cwd":"/home/flux/proj","status":"inProgress","commandActions":[],"aggregatedOutput":null,"exitCode":null,"durationMs":null},"startedAtMs":10}}
+< {"method":"item/commandExecution/requestApproval","id":0,"params":{"kind":"command","threadId":"thr_1","turnId":"turn_2","itemId":"call_1","command":"/bin/bash -lc 'echo it'\\''s ok'","cwd":"/home/flux/proj","reason":null,"commandActions":[{"type":"unknown","command":"echo"}],"proposedExecpolicyAmendment":["/bin/bash","-lc","echo"],"availableDecisions":["accept",{"acceptWithExecpolicyAmendment":{"execpolicy_amendment":["/bin/bash","-lc","echo"]}},"cancel"]}}
+> {"id":0,"result":{"decision":"accept"}}
+< {"method":"serverRequest/resolved","params":{"threadId":"thr_1","requestId":0}}
+< {"method":"item/commandExecution/outputDelta","params":{"threadId":"thr_1","turnId":"turn_2","itemId":"call_1","delta":"it's ok\n"}}
+< {"method":"item/completed","params":{"threadId":"thr_1","turnId":"turn_2","item":{"type":"commandExecution","id":"call_1","command":"/bin/bash -lc 'echo it'\\''s ok'","cwd":"/home/flux/proj","status":"completed","commandActions":[],"aggregatedOutput":"it's ok\n","exitCode":0,"durationMs":12},"completedAtMs":11}}
+< {"method":"item/started","params":{"threadId":"thr_1","turnId":"turn_2","item":{"type":"fileChange","id":"call_2","status":"inProgress","changes":[{"path":"/home/flux/proj/a.txt","kind":{"type":"add"},"diff":"one\ntwo\n"},{"path":"/home/flux/proj/b.txt","kind":{"type":"update","move_path":null},"diff":"@@ -1 +1 @@\n-old\n+new\n"}]},"startedAtMs":12}}
+< {"method":"item/fileChange/requestApproval","id":1,"params":{"threadId":"thr_1","turnId":"turn_2","itemId":"call_2","reason":null,"grantRoot":null,"startedAtMs":12}}
+> {"id":1,"result":{"decision":"decline"}}
+< {"method":"item/completed","params":{"threadId":"thr_1","turnId":"turn_2","item":{"type":"fileChange","id":"call_2","status":"declined","changes":[{"path":"/home/flux/proj/a.txt","kind":{"type":"add"},"diff":"one\ntwo\n"},{"path":"/home/flux/proj/b.txt","kind":{"type":"update","move_path":null},"diff":"@@ -1 +1 @@\n-old\n+new\n"}]},"completedAtMs":13}}
+< {"method":"thread/tokenUsage/updated","params":{"threadId":"thr_1","turnId":"turn_2","tokenUsage":{"total":{"totalTokens":3200,"inputTokens":2800,"cachedInputTokens":1000,"cacheWriteInputTokens":0,"outputTokens":400,"reasoningOutputTokens":60},"last":{"totalTokens":2000,"inputTokens":1800,"cachedInputTokens":600,"cacheWriteInputTokens":0,"outputTokens":200,"reasoningOutputTokens":10},"modelContextWindow":258400}}}
+< {"method":"turn/completed","params":{"threadId":"thr_1","turn":{"id":"turn_2","status":"completed","error":null}}}
+# --- turn 3: interrupt while a command runs
+> {"id":7,"method":"turn/start","params":{"threadId":"thr_1","input":[{"type":"text","text":"sleep"}]}}
+< {"id":7,"result":{"turn":{"id":"turn_3","status":"inProgress","items":[]}}}
+< {"method":"item/started","params":{"threadId":"thr_1","turnId":"turn_3","item":{"type":"commandExecution","id":"call_3","command":"sleep 30","cwd":"/home/flux/proj","status":"inProgress","commandActions":[]},"startedAtMs":20}}
+> {"id":8,"method":"turn/interrupt","params":{"threadId":"thr_1","turnId":"turn_3"}}
+< {"id":8,"result":{}}
+< {"method":"turn/completed","params":{"threadId":"thr_1","turn":{"id":"turn_3","status":"interrupted","error":null}}}
+# --- turn 4: requestUserInput, web search, mcp tool, compaction
+> {"id":9,"method":"turn/start","params":{"threadId":"thr_1","input":[{"type":"text","text":"ask me"}]}}
+< {"id":9,"result":{"turn":{"id":"turn_4","status":"inProgress","items":[]}}}
+< {"method":"item/tool/requestUserInput","id":2,"params":{"threadId":"thr_1","turnId":"turn_4","itemId":"call_4","isBlocking":true,"questions":[{"id":"color","header":"Color","question":"Pick a color","isOther":true,"isSecret":false,"options":[{"label":"Red","description":"warm"},{"label":"Blue","description":"cool"}]}]}}
+> {"id":2,"result":{"answers":{"color":{"answers":["Blue"]}}}}
+< {"method":"item/completed","params":{"threadId":"thr_1","turnId":"turn_4","item":{"type":"webSearch","id":"ws_1","query":"kotlin","action":{"type":"search","query":"kotlin coroutines","queries":["kotlin coroutines"]}},"completedAtMs":30}}
+< {"method":"item/completed","params":{"threadId":"thr_1","turnId":"turn_4","item":{"type":"mcpToolCall","id":"mcp_1","server":"docs","tool":"lookup","status":"completed","arguments":{"q":"x"},"result":{"content":[{"type":"text","text":"found"}]}},"completedAtMs":31}}
+< {"method":"item/started","params":{"threadId":"thr_1","turnId":"turn_4","item":{"type":"contextCompaction","id":"cc_1"},"startedAtMs":32}}
+< {"method":"item/completed","params":{"threadId":"thr_1","turnId":"turn_4","item":{"type":"contextCompaction","id":"cc_1"},"completedAtMs":33}}
+< {"method":"turn/completed","params":{"threadId":"thr_1","turn":{"id":"turn_4","status":"completed","error":null}}}
+# --- turn 5: 401 retries then failure (the spike's logged-out path)
+> {"id":10,"method":"turn/start","params":{"threadId":"thr_1","input":[{"type":"text","text":"x"}]}}
+< {"id":10,"result":{"turn":{"id":"turn_5","status":"inProgress","items":[]}}}
+< {"method":"error","params":{"threadId":"thr_1","turnId":"turn_5","error":{"message":"Reconnecting... 1/5","codexErrorInfo":{"responseStreamDisconnected":{"httpStatusCode":401}},"additionalDetails":null},"willRetry":true}}
+< {"method":"error","params":{"threadId":"thr_1","turnId":"turn_5","error":{"message":"Reconnecting... 2/5","codexErrorInfo":{"responseStreamDisconnected":{"httpStatusCode":401}},"additionalDetails":null},"willRetry":true}}
+< {"method":"error","params":{"threadId":"thr_1","turnId":"turn_5","error":{"message":"unexpected status 401 Unauthorized","codexErrorInfo":{"httpConnectionFailed":{"httpStatusCode":401}},"additionalDetails":null},"willRetry":false}}
+< {"method":"thread/status/changed","params":{"threadId":"thr_1","status":{"type":"systemError"}}}
+< {"method":"turn/completed","params":{"threadId":"thr_1","turn":{"id":"turn_5","status":"failed","error":{"message":"unexpected status 401 Unauthorized","codexErrorInfo":{"httpConnectionFailed":{"httpStatusCode":401}}},"durationMs":18624}}}
+# --- turn 6: usage limit
+> {"id":11,"method":"turn/start","params":{"threadId":"thr_1","input":[{"type":"text","text":"y"}]}}
+< {"id":11,"result":{"turn":{"id":"turn_6","status":"inProgress","items":[]}}}
+< {"method":"error","params":{"threadId":"thr_1","turnId":"turn_6","error":{"message":"You've hit your usage limit.","codexErrorInfo":"usageLimitExceeded","additionalDetails":null},"willRetry":false}}
+< {"method":"turn/completed","params":{"threadId":"thr_1","turn":{"id":"turn_6","status":"failed","error":{"message":"You've hit your usage limit.","codexErrorInfo":"usageLimitExceeded"}}}}
