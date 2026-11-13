@@ -2521,7 +2521,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
      */
     private fun refreshTermTabStrip() {
         val strip = termTabStrip ?: return
-        val out = (sessionClient as? NativeCodeTerminalSessionClient)?.lastOutputAt
+        // Called from onCreate before the first terminal session creates sessionClient.
+        val out = (if (::sessionClient.isInitialized) sessionClient as? NativeCodeTerminalSessionClient else null)?.lastOutputAt
         val now = android.os.SystemClock.uptimeMillis()
         val chat = if (chatBetaOn()) listOf(TermTabStrip.Tab("", "CHAT", null, live = false, selected = false, home = true)) else emptyList()
         strip.submit(chat + sessionsList.mapIndexed { i, s ->
