@@ -72,7 +72,7 @@ new file mode 100644
 index 0000000..10d4d6e
 --- /dev/null
 +++ b/src/tracee/affinity.c
-@@ -0,0 +1,380 @@
+@@ -0,0 +1,398 @@
 +/* NativeCode: co-locate syscall-dense tracees with the tracer.
 + *
 + * Every traced syscall is a tracee -> tracer -> tracee round trip.  When the
@@ -114,10 +114,16 @@ index 0000000..10d4d6e
 +#define AFF_SLOTS         128
 +#define AFF_MAX_CPUS      64
 +
-+enum { SLOT_FREE = 0, SLOT_PINNED = 1, SLOT_RELEASED = 2 };
++/* Slot word: generation (bumped on every pin) | state in the low 2 bits.
++ * The generation lets the helper's CAS fail when the slot was recycled
++ * after it read the tid.  RELEASING: the helper is restoring the mask.  */
++enum { SLOT_FREE = 0, SLOT_PINNED = 1, SLOT_RELEASED = 2, SLOT_RELEASING = 3 };
++#define ST(w)     ((w) & 3u)
++#define GEN(w)    ((w) & ~3u)
++#define GEN_STEP  4u
 +
 +typedef struct {
-+	_Atomic int state;
++	_Atomic unsigned state;
 +	_Atomic pid_t tid;
 +	_Atomic uint64_t resume_ns;   /* last restart */
 +} Slot;
@@ -177,18 +183,24 @@ index 0000000..10d4d6e
 +			now = now_ns();
 +			active = 0;
 +			for (i = 0; i < AFF_SLOTS; i++) {
-+				uint64_t resumed = atomic_load(&slots[i].resume_ns);
-+				pid_t tid = atomic_load(&slots[i].tid);
-+				int expected = SLOT_PINNED;
++				unsigned w = atomic_load(&slots[i].state);
++				uint64_t resumed;
++				pid_t tid;
 +
-+				if (atomic_load(&slots[i].state) != SLOT_PINNED)
++				if (ST(w) != SLOT_PINNED)
 +					continue;
++				resumed = atomic_load(&slots[i].resume_ns);
++				tid = atomic_load(&slots[i].tid);
 +				if (now < resumed || now - resumed < AFF_IDLE_NS) {
 +					active++;
 +					continue;
 +				}
-+				if (atomic_compare_exchange_strong(&slots[i].state, &expected, SLOT_RELEASED))
++				/* Fails if the slot was freed or recycled since
++				 * @w was read; forget_slot() waits out RELEASING.  */
++				if (atomic_compare_exchange_strong(&slots[i].state, &w, GEN(w) | SLOT_RELEASING)) {
 +					set_all(tid);
++					atomic_store(&slots[i].state, GEN(w) | SLOT_RELEASED);
++				}
 +			}
 +		} while (active > 0);
 +
@@ -299,9 +311,18 @@ index 0000000..10d4d6e
 +
 +static void forget_slot(Tracee *tracee)
 +{
-+	Slot *slot = &slots[tracee->aff_slot];
++	_Atomic unsigned *word = &slots[tracee->aff_slot].state;
 +
-+	atomic_store(&slot->state, SLOT_FREE);
++	/* Let an in-flight helper set_all() land first, so it cannot
++	 * override a mask installed after this (ours or the guest's).  */
++	for (;;) {
++		unsigned w = atomic_load(word);
++
++		if (ST(w) == SLOT_RELEASING)
++			sched_yield();
++		else if (atomic_compare_exchange_strong(word, &w, GEN(w) | SLOT_FREE))
++			break;
++	}
 +	atomic_fetch_sub(&pinned_count, 1);
 +	tracee->aff_pinned = false;
 +	tracee->aff_dense = 0;
@@ -335,7 +356,7 @@ index 0000000..10d4d6e
 +	}
 +
 +	for (i = 0; i < AFF_SLOTS; i++)
-+		if (atomic_load(&slots[i].state) == SLOT_FREE)
++		if (ST(atomic_load(&slots[i].state)) == SLOT_FREE)
 +			break;
 +	if (i == AFF_SLOTS || (apply && set_one(tracee->pid, pin_cpu) < 0)) {
 +		if (i != AFF_SLOTS)
@@ -349,7 +370,7 @@ index 0000000..10d4d6e
 +
 +	atomic_store(&slots[i].tid, tracee->pid);
 +	atomic_store(&slots[i].resume_ns, now);
-+	atomic_store(&slots[i].state, SLOT_PINNED);
++	atomic_store(&slots[i].state, (GEN(atomic_load(&slots[i].state)) + GEN_STEP) | SLOT_PINNED);
 +	tracee->aff_slot = i;
 +	tracee->aff_pinned = true;
 +	ever_pinned = true;
@@ -391,9 +412,8 @@ index 0000000..10d4d6e
 +	if (tracee->aff_pinned) {
 +		Slot *slot = &slots[tracee->aff_slot];
 +
-+		if (atomic_load(&slot->state) == SLOT_RELEASED) {
-+			/* The helper let it go; make sure of it, the slot
-+			 * may have been recycled under the helper's feet.  */
++		if (ST(atomic_load(&slot->state)) != SLOT_PINNED) {
++			/* The helper let it go (or is doing so).  */
 +			unpin(tracee);
 +		} else if (!atomic_load(&tracer_pinned) && set_one(0, pin_cpu) == 0) {
 +			/* The helper released the tracer just before this
@@ -444,11 +464,9 @@ index 0000000..10d4d6e
 +{
 +	if (target == NULL)
 +		return;
-+	if (target->aff_pinned) {
-+		/* The kernel is about to install the guest's mask.  */
-+		forget_slot(target);
-+		unpin_tracer_if_idle();
-+	}
++	/* Restore the full mask first: if the kernel rejects the guest's
++	 * mask, the tracee must not keep the pin.  */
++	unpin(target);
 +	target->aff_user = true;
 +}
 +
