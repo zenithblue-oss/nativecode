@@ -19,7 +19,6 @@ interface ChatHost {
     fun openShellHere(cwd: String, workspace: Boolean)
     fun pickImage(cb: (Uri) -> Unit)
     fun pickFile(cb: (Uri) -> Unit)
-    fun openFile(path: String)
     /** Flip this surface to the Terminal / Chat position. */
     fun showTerminal(workspace: Boolean)
     fun showChat(workspace: Boolean)

@@ -89,6 +89,13 @@ import com.zenithblue.nativecode.media.MediaCodecEncodeBenchmark
 import com.zenithblue.nativecode.agent.AgentBridgeServer
 import com.zenithblue.nativecode.agent.AgentBridgeProtocol
 import com.zenithblue.nativecode.agent.chat.AgentChats
+import com.zenithblue.nativecode.agent.chat.ChatGate
+import com.zenithblue.nativecode.agent.chat.ChatNotifications
+import com.zenithblue.nativecode.agent.chat.ui.AgentChatView
+import com.zenithblue.nativecode.agent.chat.ui.ChatHost
+import com.zenithblue.nativecode.agent.chat.ui.ChatLogic
+import com.zenithblue.nativecode.agent.chat.ui.StoreBackend
+import com.zenithblue.nativecode.agent.chat.ui.TermTab
 import org.json.JSONObject
 import com.zenithblue.nativecode.media.MediaBridgeServer
 import com.zenithblue.nativecode.cliauth.*
@@ -613,7 +620,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private val termImagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri -> uri?.let { handleImageAttachment(it, isWorkspace = false) } }
+    ) { uri -> val cb = chatPick.also { chatPick = null }; uri?.let { if (cb != null) cb(it) else handleImageAttachment(it, isWorkspace = false) } }
 
     private val wsImagePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -621,7 +628,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private val termDocumentPickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
-    ) { uri -> uri?.let { handleFileAttachment(it, isWorkspace = false) } }
+    ) { uri -> val cb = chatPick.also { chatPick = null }; uri?.let { if (cb != null) cb(it) else handleFileAttachment(it, isWorkspace = false) } }
+
+    /** One-shot: the chat composer's pick goes to the chat (ChatAttachments), not into the terminal. */
+    private var chatPick: ((Uri) -> Unit)? = null
 
     private val wsDocumentPickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -647,6 +657,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Pro: connect Play Billing (queries products + purchases)
         BillingRepository.init(this)
         AgentChats.onChanged = chatsChanged
+        AgentChats.gate = chatGate // chat sends pass the same aiLaunchAllowed / FeatureGate as terminal tabs
         if (AgentChats.liveCount() + AgentChats.startingCount() > 0) chatsChanged() // chats outlived a recreate
 
         // Enable fullscreen/immersive mode
@@ -775,9 +786,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     contentFrame.setPadding(0, 0, 0, if (isKeyboardOpen) ime.bottom else bars.bottom)
                 }
             }
-            if (currentPage == ID_TERMINAL) {
+            // Chat position: the IME padding above resizes the composer; the hidden TerminalView is left alone.
+            if (currentPage == ID_TERMINAL && !isChatMode(ws = false)) {
                 forceTerminalResize(if (::terminalView.isInitialized) terminalView else null)
-            } else if (currentPage == ID_PROJECT_WORKSPACE) {
+            } else if (currentPage == ID_PROJECT_WORKSPACE && !isChatMode(ws = true)) {
                 forceTerminalResize(if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null)
             }
             insets
@@ -816,6 +828,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     override fun onResume() {
         super.onResume()
+        chatResumed = true
+        updateChatShown()
         NativeCodeBridge.agentUiDelegate = this
         applyKeepAwake()
         // Login may have finished in the browser or terminal: re-read the auth files.
@@ -834,6 +848,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     override fun onPause() {
         super.onPause()
+        chatResumed = false
+        updateChatShown()
         if (NativeCodeBridge.agentUiDelegate === this) {
             NativeCodeBridge.agentUiDelegate = null
         }
@@ -918,6 +934,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             if (targetPage != -1) {
                 navigateToPage(targetPage)
+            }
+            // Chat notification: open the thread in the Chat position (one-shot, not replayed on recreate).
+            it.getStringExtra(ChatNotifications.EXTRA_THREAD_ID)?.let { threadId ->
+                it.removeExtra(ChatNotifications.EXTRA_THREAD_ID)
+                if (!projBlocked) openChatThreadFromIntent(threadId, if (targetPage == ID_PROJECT_WORKSPACE) ID_PROJECT_WORKSPACE else ID_TERMINAL)
             }
             val createTerm = it.getStringExtra("CREATE_TERM")
             if (createTerm != null) {
@@ -1078,6 +1099,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         currentPageId = id
+        updateChatShown()
 
         updateNavigationVisibility(id)
         updateCustomBottomNavSelection(id)
@@ -2284,8 +2306,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
             return
         }
+        setTerminalMode(ws = false, chat = false) // every new tab (card, +, intent, login, Open in terminal) shows the Terminal
         maybeToastHeavyToolLaunch(type)
         val ticket = captureTerminalLaunch(app = true, type)
+        val workDir = chatTermCwd.also { chatTermCwd = null } // chat "Open terminal here" / "Open in terminal": thread cwd
         val user = LinuxCommandBuilder.sessionUserForType(type)
         // Warm RootShell su cache so ChrootCommandBuilder.shellRootCommand uses discovered path
         if (!BuildConfig.PLAY_STORE_BUILD && ticket.method == "chroot") {
@@ -2295,7 +2319,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val prepared = try {
                 ensureBootstrapExtracted()
                 if (!bootstrapReady) error("Failed to extract bootstrap")
-                terminalLaunchSpec(type, user, workDir = null, ticket.method)
+                terminalLaunchSpec(type, user, workDir = workDir, ticket.method)
             } catch (e: Exception) {
                 mainHandler.post {
                     if (!releaseTerminalLaunch(ticket)) return@post
@@ -2592,6 +2616,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     bottomMargin = dp(8)
                 }
                 setOnClickListener {
+                    setTerminalMode(ws = false, chat = false)
                     switchTerminalSession(i)
                     drawerLayout.closeDrawer(sidebarLayout)
                 }
@@ -2849,15 +2874,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (!::terminalToolSelectorScrollView.isInitialized) return
         if (!::terminalWorkspaceLayout.isInitialized) return
         val oldVis = terminalToolSelectorScrollView.visibility
-        val idx = terminalWorkspaceLayout.indexOfChild(terminalToolSelectorScrollView)
-        terminalWorkspaceLayout.removeView(terminalToolSelectorScrollView)
+        val parent = (terminalToolSelectorScrollView.parent as? ViewGroup) ?: terminalWorkspaceLayout
+        val idx = parent.indexOfChild(terminalToolSelectorScrollView)
+        parent.removeView(terminalToolSelectorScrollView)
         terminalToolSelectorScrollView = buildTerminalToolSelectorView().apply {
             visibility = oldVis
         }
         if (idx >= 0) {
-            terminalWorkspaceLayout.addView(terminalToolSelectorScrollView, idx)
+            parent.addView(terminalToolSelectorScrollView, idx)
         } else {
-            terminalWorkspaceLayout.addView(terminalToolSelectorScrollView)
+            parent.addView(terminalToolSelectorScrollView)
         }
     }
 
@@ -4161,8 +4187,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         sessionRef: () -> TerminalSession?,
         modState: ModifierState,
     ): ExtraKeysBar = ExtraKeysBar(this, modState, object : ExtraKeysBar.Host {
-        override fun send(key: String, ctrl: Boolean, alt: Boolean, shift: Boolean) =
+        override fun send(key: String, ctrl: Boolean, alt: Boolean, shift: Boolean) {
+            if (tvRef()?.isShown == false) return // Chat position: never inject into the hidden session
             injectKey(tvRef(), key, ctrl, alt, shift)
+        }
 
         override fun action(id: String) {
             when (id) {
@@ -4231,15 +4259,25 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         terminalTopBar.addView(menuTerminalBtn)
         terminalTopBar.addView(termStats)
-        terminalTopBar.addView(ToolRail(this).also { fillToolRail(it, workspace = false) })
+        terminalTopBar.addView(ToolRail(this).also { fillToolRail(it, workspace = false); it.addView(buildChatSwitch(ws = false), 0) })
         terminalTopBar.addView(addTerminalWorkspaceBtn)
         terminalWorkspaceLayout.addView(terminalTopBar)
         applyKeepAwake()
 
+        // Terminal position (unchanged views) and the Chat position: siblings, one GONE (item 12 switch).
+        val termStack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
+        }
+        appTermStack = termStack
+        terminalWorkspaceLayout.addView(termStack)
+        appChatView = newChatView(ws = false).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
+        terminalWorkspaceLayout.addView(appChatView)
+
         terminalToolSelectorScrollView = buildTerminalToolSelectorView().apply {
             visibility = View.VISIBLE
         }
-        terminalWorkspaceLayout.addView(terminalToolSelectorScrollView)
+        termStack.addView(terminalToolSelectorScrollView)
 
         terminalViewContainer = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -4254,7 +4292,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         terminalViewContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             forceTerminalResize(if (::terminalView.isInitialized) terminalView else null)
         }
-        terminalWorkspaceLayout.addView(terminalViewContainer)
+        termStack.addView(terminalViewContainer)
 
         terminalKeyboardToolbar = buildExtraKeysBar(
             tvRef = { if (::terminalView.isInitialized) terminalView else null },
@@ -4263,7 +4301,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         ).apply {
             visibility = if (showExtraKeys) View.VISIBLE else View.GONE
         }
-        terminalWorkspaceLayout.addView(terminalKeyboardToolbar)
+        termStack.addView(terminalKeyboardToolbar)
+        applyTerminalMode(ws = false)
     }
 
     private fun toggleKeepAwake() {
@@ -4282,6 +4321,160 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         skillsPicker = com.zenithblue.nativecode.skills.SkillsPickerSheet(this, contentFrame) {
             skillsPicker = null
         }
+    }
+
+    // ---------------- Agent chat (item 12): Chat | Terminal per page ----------------
+    private var appChatView: AgentChatView? = null
+    private var wsChatView: AgentChatView? = null
+    private var appTermStack: View? = null
+    private var wsTermArea: View? = null
+    private val chatSwitches = HashMap<Boolean, Pair<TextView, TextView>>() // ws → (CHAT, TERM)
+    private val chatVisible = HashMap<Boolean, String?>()
+    /** Backgrounded = no thread is "on screen" (notifications must show). */
+    private var chatResumed = false
+    /** One-shot guest cwd for the next app terminal tab (chat "Open terminal here" / "Open in terminal"). */
+    private var chatTermCwd: String? = null
+    private val chatBackend by lazy { StoreBackend(this) }
+
+    private fun chatPrefs() = getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
+    private fun chatBetaOn() = chatPrefs().getBoolean(ChatLogic.PREF_BETA, true)
+    private fun isChatMode(ws: Boolean) = ChatLogic.isChatMode(
+        chatPrefs().getString(if (ws) ChatLogic.PREF_MODE_WS else ChatLogic.PREF_MODE_APP, null), chatBetaOn())
+
+    /** Remember the position per page (Q3) and show it. Chat is refused while the beta switch is off. */
+    private fun setTerminalMode(ws: Boolean, chat: Boolean) {
+        if (chat && !chatBetaOn()) return
+        chatPrefs().edit().putString(if (ws) ChatLogic.PREF_MODE_WS else ChatLogic.PREF_MODE_APP,
+            if (chat) ChatLogic.MODE_CHAT else ChatLogic.MODE_TERMINAL).apply()
+        applyTerminalMode(ws)
+    }
+
+    private fun applyTerminalMode(ws: Boolean) {
+        val chat = isChatMode(ws)
+        val (term, view) = if (ws) wsTermArea to wsChatView else appTermStack to appChatView
+        if (term == null || view == null) return
+        val wasChat = view.visibility == View.VISIBLE
+        term.visibility = if (chat) View.GONE else View.VISIBLE
+        view.visibility = if (chat) View.VISIBLE else View.GONE
+        chatSwitches[ws]?.let { (c, t) ->
+            (c.parent as? View)?.visibility = if (chatBetaOn()) View.VISIBLE else View.GONE
+            listOf(c to chat, t to !chat).forEach { (tv, on) ->
+                tv.setTextColor(if (on) NC.ON_PRIMARY else NC.ON_SURF_VAR)
+                tv.setBackgroundColor(if (on) NC.PRIMARY else Color.TRANSPARENT)
+                tv.isSelected = on
+            }
+        }
+        if (wasChat != chat) currentFocus?.let { f ->
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(f.windowToken, 0)
+        }
+        if (!chat) forceTerminalResize(if (ws) (if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null)
+            else if (::terminalView.isInitialized) terminalView else null)
+        updateChatShown()
+    }
+
+    /** Page / position / scope → each chat view (visibleThreadId, Terminal-position snackbar). */
+    private fun updateChatShown() {
+        val resumed = chatResumed
+        if (currentPageId == ID_PROJECT_WORKSPACE) wsChatView?.setScope(activeProjectPath.ifBlank { null })
+        appChatView?.setShown(resumed && currentPageId == ID_TERMINAL, isChatMode(ws = false))
+        wsChatView?.setShown(resumed && currentPageId == ID_PROJECT_WORKSPACE, isChatMode(ws = true))
+    }
+
+    /** [Chat|Terminal] segmented control: one rail child, no layout rebuild (R4 10.4). Hidden when the beta is off. */
+    private fun buildChatSwitch(ws: Boolean): View {
+        fun seg(label: String, chat: Boolean) = TextView(this).apply {
+            text = label
+            textSize = 10f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(dp(7), 0, dp(7), 0)
+            contentDescription = if (chat) "Chat view" else "Terminal view"
+            layoutParams = LinearLayout.LayoutParams(WRAP, MATCH)
+            setOnClickListener { setTerminalMode(ws, chat) }
+        }
+        val c = seg("CHAT", true)
+        val t = seg("TERM", false)
+        chatSwitches[ws] = c to t
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = GradientDrawable().apply { setStroke(dp(1), NC.OUTLINE_VAR) }
+            setPadding(dp(1), dp(1), dp(1), dp(1))
+            layoutParams = LinearLayout.LayoutParams(WRAP, dp(28)).apply { rightMargin = dp(4) }
+            visibility = if (chatBetaOn()) View.VISIBLE else View.GONE
+            addView(c); addView(t)
+        }
+    }
+
+    private fun newChatView(ws: Boolean) = AgentChatView(this, executor, ws, chatHost, chatBackend) { id ->
+        chatVisible[ws] = id
+        AgentChats.visibleThreadId = chatVisible[false] ?: chatVisible[true]
+    }.apply { isClickable = true } // blank areas never fall through
+
+    /** Same count as the gate: AI terminal tabs (all projects) + pending launches + live/starting chats. */
+    private fun aiSessionCount(): Int {
+        val others = projectTabNamesMap.filterKeys { it != workspaceLoadedPath }.values.flatten()
+        val tabs = (terminalSessionTypes + workspaceTabNames + others).count { ToolLauncherCatalog.isAiToolType(it) }
+        return tabs + pendingAiTerminalLaunches + AgentChats.liveCount() + AgentChats.startingCount()
+    }
+
+    private val chatGate = object : ChatGate {
+        override fun allowLaunch(tool: String, projectPath: String?) = aiLaunchAllowed(tool)
+        override fun canUseTool(tool: String) = FeatureGate.canLaunchAiTool(isPro(), tool) is GateResult.Allow
+        override fun showUpsell(tool: String) { gateAllows(FeatureGate.canLaunchAiTool(isPro(), tool)) }
+    }
+
+    private val chatHost = object : ChatHost {
+        override fun isPro() = this@MainActivity.isPro()
+        override fun canUseTool(tool: String) = !aiToolLocked(tool)
+        override fun showUpgradeSheet(reason: String?) = this@MainActivity.showUpgradeSheet(reason)
+        override fun openCliLoginPage(id: String) = this@MainActivity.openCliLoginPage(id)
+        override fun openTerminal(tool: String, args: List<String>, cwd: String?, workspace: Boolean) {
+            // ponytail: resume flags unverified for opencode/agy/grok → [args] unused, fresh start (plan 9.2.8).
+            if (workspace) { createWorkspaceTerminalTab(tool); return }
+            chatTermCwd = cwd
+            createNewTerminalSession(tool)
+            chatTermCwd = null
+        }
+        override fun openShellHere(cwd: String, workspace: Boolean) = openTerminal("shell", emptyList(), cwd, workspace) // shell gate = Pro upsell (Q1)
+        override fun pickImage(cb: (Uri) -> Unit) { chatPick = cb; termImagePickerLauncher.launch("image/*") }
+        override fun pickFile(cb: (Uri) -> Unit) { chatPick = cb; termDocumentPickerLauncher.launch(arrayOf("*/*")) }
+        override fun showTerminal(workspace: Boolean) = setTerminalMode(workspace, chat = false)
+        override fun showChat(workspace: Boolean) = setTerminalMode(workspace, chat = true)
+        override fun terminalTabs(workspace: Boolean) =
+            (if (workspace) workspaceTabNames else terminalSessionTypes).mapIndexed { i, n -> TermTab(i, "$n · ${i + 1}") }
+        override fun openTerminalTab(index: Int, workspace: Boolean) {
+            setTerminalMode(workspace, chat = false)
+            if (workspace) switchWorkspaceTab(index) else switchTerminalSession(index)
+        }
+        override fun sessionUsage() = aiSessionCount() to
+            if (isPro() || !BuildConfig.MONETISATION_ENFORCE) com.zenithblue.nativecode.entitlements.FeatureLimits.PRO_MAX_AI_SESSIONS
+            else com.zenithblue.nativecode.entitlements.FeatureLimits.FREE_MAX_AI_SESSIONS
+        override fun guestHome() = ProjectPathResolver.guestHomeDir(this@MainActivity)
+        override fun aiToolsInstalled() = AiCliProvisionState.shouldShowAiToolLaunchers(this@MainActivity)
+        override fun openInstallTools() {
+            if (pageStack.isEmpty() || pageStack.peek() != ID_CLI_AUTH) pageStack.push(ID_CLI_AUTH)
+            navigateToPage(ID_CLI_AUTH)
+        }
+        override fun projects() = if (proLocked()) emptyList() else getProjects().map { it.name to it.path }
+        override fun approvalWhileInTerminal(threadTitle: String, open: () -> Unit) {
+            com.google.android.material.snackbar.Snackbar.make(contentFrame, "Approval needed · $threadTitle", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                .setAction("OPEN") { open() }.show()
+        }
+    }
+
+    /** Notification deep link: page 3, or 10 + PROJECT_PATH (already applied by handleIntent), then the thread in Chat. */
+    private fun openChatThreadFromIntent(threadId: String, page: Int) {
+        val ws = page == ID_PROJECT_WORKSPACE
+        if (!chatBetaOn()) return
+        setTerminalMode(ws, chat = true)
+        (if (ws) wsChatView else appChatView)?.openThread(threadId)
+    }
+
+    /** Project removed: its chats stop (A: stopProject in stopProjectSessions) and its threads + checkpoint refs go. */
+    private fun deleteProjectThreads(path: String) {
+        if (path.isEmpty()) return
+        val store = AgentChats.store(this)
+        store.read({ threads(path) }) { list -> list.forEach { AgentChats.deleteThread(this, it.id) } }
     }
 
     /** Tool rails (terminal + project workspace top bars); same tools, all visible, no popup. */
@@ -5489,11 +5682,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         GuestGate.syncAsync(this)
         if (!ToolLauncherCatalog.isAiToolType(type)) return gateAllows(FeatureGate.canOpenShell(isPro()))
         if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), type))) return false
-        val others = projectTabNamesMap.filterKeys { it != workspaceLoadedPath }.values.flatten()
-        val tabs = (terminalSessionTypes + workspaceTabNames + others).count { ToolLauncherCatalog.isAiToolType(it) }
         // Launches still starting count too, or fast taps (or a chat handshake) pass the cap together.
-        val aiCount = tabs + pendingAiTerminalLaunches + AgentChats.liveCount() + AgentChats.startingCount()
-        val ok = gateAllows(FeatureGate.canOpenAiSession(isPro(), aiCount))
+        val ok = gateAllows(FeatureGate.canOpenAiSession(isPro(), aiSessionCount()))
         if (ok) {
             Telemetry.logOnce(this, Telemetry.Event.FIRST_AI_SESSION, Telemetry.Param.TOOL to type)
             Telemetry.log(this, Telemetry.Event.AI_SESSION_START, Telemetry.Param.TOOL to type)
@@ -14549,6 +14739,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         resourceMonitorRunnable?.let { mainHandler.removeCallbacks(it) }
         desktop.onHostDestroyed(isChangingConfigurations)
         if (AgentChats.onChanged === chatsChanged) AgentChats.onChanged = null
+        if (AgentChats.gate === chatGate) AgentChats.gate = null
         // Terminal tabs are Activity-owned (views, session clients), so they end with it; the manifest's
         // configChanges keeps theme, font scale, density and locale changes from recreating it at all.
         // Workspace and background-project tabs too, or they run on uncounted (R4 B5). Chats are
@@ -19948,6 +20139,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
             return
         }
+        setTerminalMode(ws = true, chat = false)
         maybeToastHeavyToolLaunch(type)
         val ticket = captureTerminalLaunch(app = false, type)
         // shell-root: login at /root (no project cwd — avoid root-owned files under flux home)
@@ -20244,6 +20436,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     bottomMargin = dp(4)
                 }
                 setOnClickListener {
+                    setTerminalMode(ws = true, chat = false)
                     switchWorkspaceTab(i)
                 }
             }
@@ -20349,6 +20542,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         workspaceProjectNameTv = topBar.titleView
         topBar.stats.onCustomize = { openTopBarPage() }
         fillToolRail(topBar.rail, workspace = true)
+        topBar.rail.addView(buildChatSwitch(ws = true), 0)
         projectWorkspaceLayout.addView(topBar)
 
         workspaceTabBarScroll = HorizontalScrollView(this).apply {
@@ -20455,6 +20649,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         mainArea.addView(centerFrame)
 
         projectWorkspaceLayout.addView(mainArea)
+        wsTermArea = mainArea
+        wsChatView = newChatView(ws = true).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
+        projectWorkspaceLayout.addView(wsChatView)
+        applyTerminalMode(ws = true)
         projectWorkspaceContainer.addView(projectWorkspaceLayout)
 
     }
@@ -21226,6 +21424,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 saveProjects(list)
                 Toast.makeText(this@MainActivity, "Project removed.", Toast.LENGTH_SHORT).show()
                 stopProjectSessions(activeProjectPath) // else they run on, counted, with no tab to close (R4 B20)
+                deleteProjectThreads(activeProjectPath) // its chat threads + checkpoint refs go with it (plan 9.2.8)
                 activeProjectName = ""
                 activeProjectPath = ""
                 while (pageStack.isNotEmpty() && (
@@ -21819,6 +22018,34 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         toggleRow.addView(toggleLabelLayout)
         toggleRow.addView(switchToggle)
         card.addView(toggleRow)
+
+        // Item 12 kill switch: off = both terminal surfaces exactly as 1.7.x (switch hidden, terminal only).
+        card.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, 0)
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(12) }
+                addView(TextView(this@MainActivity).apply {
+                    text = "CHAT VIEW (BETA)"
+                    textSize = 13f
+                    setTextColor(Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = "Agent chat on the Terminal tab and the project workspace, with a Chat/Terminal switch. Off = terminal only."
+                    textSize = 11f
+                    setTextColor(NC.ON_SURF_VAR)
+                    typeface = Typeface.MONOSPACE
+                })
+            })
+            addView(CustomBrutalistToggle(this@MainActivity, chatBetaOn()) { on ->
+                chatPrefs().edit().putBoolean(ChatLogic.PREF_BETA, on).apply()
+                applyTerminalMode(ws = false)
+                applyTerminalMode(ws = true)
+            })
+        })
 
         // 3. Extra keys preset (simple choice; no key editor)
         val presetRow = LinearLayout(this).apply {
