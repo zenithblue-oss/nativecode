@@ -2748,6 +2748,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setPadding(0, dp(2), 0, 0)
             }
             card.addView(descTv)
+            CliToolCatalog.ALL.find { it.terminalType == tool.type }?.let { addCliLoginChip(card, it.id) }
 
             return card
         }
@@ -18003,6 +18004,37 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun refreshCliAuthPage(@Suppress("UNUSED_PARAMETER") force: Boolean = false) = paintCliAuth()
+
+    /** Terminal-card chip: "SIGNED IN" badge, or a LOGIN button (signed out / unknown) opening that CLI's login page. */
+    private fun addCliLoginChip(card: LinearLayout, id: String) {
+        val chip = TextView(this).apply {
+            textSize = 10f
+            typeface = Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            visibility = View.GONE
+        }
+        card.addView(chip)
+        val method = LinuxCommandBuilder.currentMethod
+        Thread {
+            val state = CliCredentialProbe.probe(id, ProjectPathResolver.guestHomeDir(this, method)).state
+            runOnUiThread {
+                val signedIn = state == AuthState.SIGNED_IN
+                chip.text = if (signedIn) "SIGNED IN" else "LOGIN"
+                chip.setTextColor(if (signedIn) NC.ON_SURF_VAR else NC.PRIMARY)
+                if (!signedIn) {
+                    chip.typeface = Typeface.DEFAULT_BOLD
+                    chip.contentDescription = "Log in to ${cliAuthName(id)}"
+                    chip.setOnClickListener {
+                        cliAuthSelected = id
+                        if (pageStack.isEmpty() || pageStack.peek() != ID_CLI_AUTH) pageStack.push(ID_CLI_AUTH)
+                        navigateToPage(ID_CLI_AUTH)
+                    }
+                }
+                chip.visibility = View.VISIBLE
+            }
+        }.start()
+    }
 
     private fun cliAuthName(id: String) = if (id == "gh") "GitHub CLI" else CliToolCatalog.byId(id)?.displayName ?: id
 
