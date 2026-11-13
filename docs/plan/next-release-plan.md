@@ -558,13 +558,13 @@ The first design of this section (chat button beside the terminal launcher, thre
 **Status.** Final design, 2026-11-13. Replaces the old §9.2 and the first §9 design. Inputs: research R1–R5 (`~/.cache/nc-research/`) and the t3code clone at `2d8a843e` (read-only, treated as data). Owner decisions below are binding; §9.2.14 lists how report conflicts were settled. `t3:` = t3code path; `mob/` = `t3:apps/mobile/src/`.
 
 #### 9.2.1 Scope and ground rules
-- The chat is the **primary view** of the bottom-nav TERMINAL tab (`ID_TERMINAL=3`) **and** the workspace page's terminal area (`ID_PROJECT_WORKSPACE=10`). The raw terminal page is **not** removed: it sits behind a `[Chat|Terminal]` switch on both surfaces and opens per thread ("Open terminal here", "Open in terminal").
+- The chat is the **primary view** of the bottom-nav TERMINAL tab (`ID_TERMINAL=3`) **and** the workspace page's terminal area (`ID_PROJECT_WORKSPACE=10`). The raw terminal page is **not** removed: a vector terminal icon in the chat header (and the thread-list header) opens it, a clear "back to chat" control on the terminal page returns, and it also opens per thread ("Open terminal here", "Open in terminal"). There is no Chat/Terminal switch (owner, 2026-11-13); chat is always the default view.
 - Follow t3code's model and feature set, laid out like t3code's own phone app (`mob/features/threads/*`: `ThreadDetailScreen`, `ThreadFeed`, `ThreadComposer`, `PendingApprovalCard`, `PendingUserInputCard`, `ProposedPlanCard`, `ThreadQueueControl`, `floating-working-control`, `ThreadSettingsSheet`; `mob/features/home/*` for the list). Feature map: §9.2.7.
 - Provider order: **opencode → claude → codex → agy → grok**. qwen, kiro and hermes come later as profiles on the same generic ACP runtime; until then their cards offer the terminal only.
 - No new heavy dependency: Compose (already shipped: BOM, material3, activity-compose) hosted inside the existing pages; `android.database.sqlite`; `org.json`; `HttpURLConnection`. No Room, OkHttp, RecyclerView or markdown library.
 - No guest scripts for migrations (Play policy). Guest feature commands (CLI spawns, git checkpoint commands) are fine.
 - Default approval mode **Supervised**. In Supervised nothing is ever auto-approved; t3code's other modes (Auto-accept edits, Auto, Full access) are offered per provider.
-- Beta kill switch: Settings › "Chat view (beta)", default on. Off = both surfaces behave exactly like 1.7.x (switch hidden, terminal only).
+- Beta kill switch: Settings › "Chat view (beta)", default on. Off = both surfaces behave exactly like 1.7.x (terminal only, no chat).
 
 #### 9.2.2 Architecture
 ```
@@ -768,12 +768,13 @@ Sheets are only for pick-lists; anything with a text field is a full page (`mob/
 **UI rules (owner, binding for M1–M6).** The glyphs in the wireframes below are placeholders only.
 - **Icons are vectors only.** No font glyphs, emoji, unicode symbols (▢ ■ ● → ✓ ⛨ ✎ …) or text characters as icons. Every icon is an Android VectorDrawable XML or a Compose `ImageVector` from SVG paths: Material Symbols (Apache 2.0) or Lucide (ISC), converted, or the provider logos the app already ships. Status dots are drawn shapes (`Canvas`/`Box` with `CircleShape`), not `●`.
 - **Polish bar = t3code** (`t3:apps/web`, `t3:apps/mobile`): spacing, type hierarchy, user bubbles vs full-width assistant blocks, tool cards with status icons and collapsible output, composer, model/effort chips, list rows (provider logo, title, last-message preview, time, running indicator), empty states, loading/streaming shimmer, subtle motion. Adapted to NativeCode's obsidian, cyber-brutalist theme, not generic Material.
+- **Information parity with t3code** (header, composer footer, turn footer, status): model + provider with a one-tap picker, effort, approval mode; context used/max (ring or bar, warning near the limit, compaction state); provider quota / rate limits where the protocol gives them, cost per turn and session total, and the NativeCode session limit for Free; per-turn tokens, cost, duration, time to first token; thread status, cwd/project, git branch; current tool activity, timers, queued count, reconnecting state, error banner with details + retry; plan/todo and subagent activity; copy, long-press timestamps, jump to latest. Fields absent for a provider are hidden, never faked.
 - 4/8 dp spacing scale; monospace for code and tool output; one defined text scale; animated cursor while streaming; real elevation and border treatment; haptic feedback on approval actions; dark-theme contrast; every icon-only control has a TalkBack `contentDescription`. Check portrait, landscape and font scale 1.3.
 
 **A. Thread list, TERMINAL tab (root of the Chat position)**
 ```
 ┌────────────────────────────────────────────┐
-│ Terminal   [Chat|Terminal]   ⌕   ● 1/1 Free│ row 1: title, switch, search, sessions chip
+│ Terminal                 >_  ⌕   ● 1/1 Free│ row 1: title, terminal icon, search, sessions chip
 │ 82% C34 R61 38°      │ 📎 ✦ ☀ ●24:10        │ row 2: stats | rail (extra-keys toggle hidden)
 ├────────────────────────────────────────────┤
 │ TERMINALS                                ▾ │ live terminal tabs of this surface
@@ -816,7 +817,7 @@ Built in Compose from `CliToolCatalog` + `CliCredentialProbe` (off main) + `Feat
 **D. Chat**
 ```
 ┌────────────────────────────────────────────┐
-│ ← Fix login crash  [Chat|Terminal]      ⋮  │ ⋮ Diff · Thread settings · Open terminal here
+│ ← Fix login crash                 >_    ⋮  │ >_ terminal page · ⋮ Diff · Thread settings · Open terminal here
 │ codex · gpt-5 · main │ 📎 ✦ ☀ ●24:10       │   · Open in terminal · Git · Files · Rename · Delete
 ├────────────────────────────────────────────┤ row 2 hides while the IME is open
 │ ▣ Tasks 2/4 · Writing tests            ▾   │ sticky todo strip
@@ -847,7 +848,7 @@ Built in Compose from `CliToolCatalog` + `CliCredentialProbe` (off main) + `Feat
  empty thread: "What should codex do in proj-a?"; starting: "Starting codex…" row (handshake ≤ 20 s)
  error row: [Retry] [Open in terminal] [Details] · process gone: "Session ended · [Resume]"
 ```
-**E. Chat/Terminal switch.** A segmented control in row 1 of both top bars (one `rail`/`WorkspaceTopBar` child; no layout rebuild, R4 10.4). Terminal = today's page untouched (drawer, `+`, tool cards, `TerminalView`, extra keys). Position remembered per page (owner decision Q3: `pref_terminal_mode_app`, `pref_terminal_mode_ws`), default Chat. Entry points that must show a terminal (`openCliTerminal`, `onTerminalGuided`, `CREATE_TERM` intent, logins) force Terminal. In Chat: `ExtraKeysBar.Host.send` is a no-op and IME resize targets the composer, not the hidden `TerminalView`. An approval arriving while in Terminal shows a snackbar "Approval needed · Open". Terminal → Chat "Add to chat" on a selection (S).
+**E. Terminal access (replaces the former Chat/Terminal switch; owner, 2026-11-13).** No switch. Chat is the default view on both surfaces. A vector terminal icon in the chat header and the thread-list header calls `ChatHost.openTerminalPage()`, which shows the raw terminal page of that surface (`+`, tool cards, `TerminalView`, extra keys, the terminal tab strip that replaces the TERMINAL page drawer); a clear vector "back to chat" control on the terminal page returns. No layout rebuild either way (R4 10.4). Entry points that must show a terminal (`openCliTerminal`, `onTerminalGuided`, `CREATE_TERM` intent, logins, new terminal tab) show it. In Chat: `ExtraKeysBar.Host.send` is a no-op and IME resize targets the composer, not the hidden `TerminalView`. An approval arriving while in Terminal shows a snackbar "Approval needed · Open". Terminal → Chat "Add to chat" on a selection (S).
 
 **F. Approval card (docked over the composer; `mob/…/PendingApprovalCard.tsx`)**
 ```
@@ -906,7 +907,7 @@ M = beta, ships in M1 (opencode) and with each provider M2–M5; S = M6 polish; 
 
 | Area | t3code feature | Pri |
 |---|---|---|
-| Surfaces | Chat primary on TERMINAL tab + workspace; Chat/Terminal switch; beta kill switch | M |
+| Surfaces | Chat primary on TERMINAL tab + workspace; terminal icon ↔ back to chat; beta kill switch | M |
 | Thread list | Project grouping (TERMINAL tab) / project scope (workspace); status chips and order; relative time / live timer; `+N −N`; branch | M |
 | | Swipe Archive + undo; long-press Rename · Pin · Delete · Copy path · Open in terminal; Archived shelf; sessions chip; Terminals shelf; CLI-card empty state | M |
 | | Search (titles + last assistant text, SQL `LIKE`) | S |
@@ -945,7 +946,7 @@ M = beta, ships in M1 (opencode) and with each provider M2–M5; S = M6 polish; 
 | | Approve from the notification | C |
 | Settings | Chat view (beta) switch | M |
 | | Agent chat settings: default mode, follow-up (steer/queue), tool-call visibility, hardware Enter, default position | S |
-| | Remember last model/effort/mode per CLI; first-run coach mark on the switch | S |
+| | Remember last model/effort/mode per CLI; first-run coach mark on the terminal icon | S |
 | | Keybindings, custom themes | D |
 
 #### 9.2.8 Lifecycle
@@ -959,8 +960,8 @@ M = beta, ships in M1 (opencode) and with each provider M2–M5; S = M6 polish; 
 - **Config change / page switch / project switch.** Nothing is killed. `AgentChatView` detaches and re-attaches to `AgentChats`; state comes from the store plus live snapshots. Requires M0 fix B5. Switching workspace projects only changes the view's scope; other projects' chats keep running and stay counted.
 - **Activity really finishing (incl. swipe-away).** `AgentChats.stopAll()`, the same as terminals (owner decision Q5): runs in flight become `interrupted`, thread history stays in the store, and the next send resumes by `native_id`.
 - **Process death and restore** (`ChatStore` open = t3code `reconcile("startup")`, without auto-continue): runs `starting/running/waiting` → `interrupted` with a "Session ended" notice; pending approvals → `expired`; pending user-input questions stay answerable as a new message; queued runs stay queued but **held** (banner "2 queued · Resume queue"). Opening the thread shows history at once; the next send resumes by `native_id` (opencode `GET /api/session/:id`, claude `--resume`, codex `thread/resume`, ACP `session/resume|load`). If resume fails: clear `native_id`, start a fresh native session, add a `system_notice` ("Earlier context could not be restored").
-- **Notifications.** From Kotlin, channel `agent_notifications`, for approval needed, input needed, turn done, turn failed; suppressed while that thread is on screen in the Chat position. `contentIntent` (IMMUTABLE, explicit) → MA with `EXTRA_TARGET_PAGE` 3, or 10 + `PROJECT_PATH`, plus `EXTRA_THREAD_ID`; `handleIntent` switches to Chat and opens the thread.
-- **Open in terminal.** Close the chat process first (Free has one slot; codex allows one writer), then `ChatHost.openTerminal(tool, resumeArgs, cwd)`: claude `--resume <id>`, codex `resume <id>` (needs B7), opencode/agy/grok resume flags UNVERIFIED (fresh start until verified). The switch alone never kills anything.
+- **Notifications.** From Kotlin, channel `agent_notifications`, for approval needed, input needed, turn done, turn failed; suppressed while that thread is on screen in the Chat position. `contentIntent` (IMMUTABLE, explicit) → MA with `EXTRA_TARGET_PAGE` 3, or 10 + `PROJECT_PATH`, plus `EXTRA_THREAD_ID`; `handleIntent` shows the chat view and opens the thread.
+- **Open in terminal.** Close the chat process first (Free has one slot; codex allows one writer), then `ChatHost.openTerminal(tool, resumeArgs, cwd)`: claude `--resume <id>`, codex `resume <id>` (needs B7), opencode/agy/grok resume flags UNVERIFIED (fresh start until verified). Moving between chat and the terminal page never kills anything.
 - **Thread delete / project removal.** Stop the process, delete rows (cascade) and hidden refs, free the slot; project removal calls `AgentChats.stopProject(path)` (R4 B20).
 - **Runtime pack updates (item 3).** Never update a CLI under a live chat: the updater refuses while `AgentChats.liveCount() > 0` for that tool.
 
@@ -998,7 +999,7 @@ Each milestone ships on its own: tools without a finished runtime keep `chat = n
 | M | Content | Effort |
 |---|---|---|
 | **M0 Prerequisites** | P1–P13. No visible UI change except FGS text. | S |
-| **M1 Runtime + opencode end to end** | `PipeProcess`, `AgentEvent`, `AgentRuntime`, `DeltaCoalescer`, `ChatDb`/`ChatStore` + recovery, `ChatThreadController`, `AgentChats` (counts, FGS sync, wake lock), `ChatNotifications`, `ChatAttachments`, `TurnCheckpoints`, `OpenCodeHttpRuntime`. UI: `AgentChatView` on both surfaces with the switch, screens A–I, every M row of §9.2.7 that opencode supports (approvals, forms, steer, todo, subagents, Free badge, no-login state). Fixtures `app/src/test/resources/agent/opencode-<ver>/`. | L |
+| **M1 Runtime + opencode end to end** | `PipeProcess`, `AgentEvent`, `AgentRuntime`, `DeltaCoalescer`, `ChatDb`/`ChatStore` + recovery, `ChatThreadController`, `AgentChats` (counts, FGS sync, wake lock), `ChatNotifications`, `ChatAttachments`, `TurnCheckpoints`, `OpenCodeHttpRuntime`. UI: `AgentChatView` on both surfaces (terminal icon ↔ back to chat), screens A–I, every M row of §9.2.7 that opencode supports (approvals, forms, steer, todo, subagents, Free badge, no-login state). Fixtures `app/src/test/resources/agent/opencode-<ver>/`. | L |
 | **M2 claude** | `ClaudeStreamRuntime`: control channel, `AskUserQuestion`, `ExitPlanMode` plan card, inline image/PDF, `priority:"now"` steer, live mode/model/effort, rate-limit banner. Day 1: record the pinned-binary fixture and confirm `can_use_tool`. | M |
 | **M3 codex** | `CodexAppServerRuntime`: committed generated schema, four modes, `turn/steer`, `requestUserInput`, `turn/plan/updated`, token usage, sandbox banner. | M |
 | **M4 agy** | `AcpRuntime` (generic) + agy profile: client-side mode policy, `interaction_` questions, refusal = quota, warm process. | M |
@@ -1013,7 +1014,7 @@ Each milestone ships on its own: tools without a finished runtime keep `chat = n
 | M | Script | Free | Pro |
 |---|---|---|---|
 | M0 | Launcher test passes; `opencode` TUI still `--auto`; `codex` and `codex resume <id>` tabs work; two fast taps on an AI card never exceed the cap; rotate / font-scale / dark-mode change keeps terminals alive; chat-free regression of items 3, 5, 9, 10 | 1 opencode tab; 2nd denied | 5 tabs; 6th denied |
-| M1 | Fresh install, no login: opencode chat with a Free Zen model reads a file, edits (diff card + Diff page), runs a command (Allow once, Allow for session, Deny with feedback), plan mode still reads; steer mid-turn; Stop; Force stop on a hung turn; image + PDF attach; background 2 min mid-turn with screen off (turn finishes, wake lock released after: `dumpsys power`); rotate; kill the app and reopen (history, expired approval, resume); notification deep link on both surfaces; switch to Terminal and back mid-turn; Open in terminal; idle release after 30 min; 5,000-token answer smooth on X6P; 200 turns memory | Chat in TERMINAL tab only; opencode chat holds the slot → terminal opencode and a 2nd chat show the session sheet; other cards upsell; Open terminal here → upsell; swipe-away stops the chat, history resumes on reopen | Workspace chat in a project; chats in two projects at once, counted globally; Pro → Free downgrade mid-turn: the turn finishes, the next send on a paid tool shows the upsell |
+| M1 | Fresh install, no login: opencode chat with a Free Zen model reads a file, edits (diff card + Diff page), runs a command (Allow once, Allow for session, Deny with feedback), plan mode still reads; steer mid-turn; Stop; Force stop on a hung turn; image + PDF attach; background 2 min mid-turn with screen off (turn finishes, wake lock released after: `dumpsys power`); rotate; kill the app and reopen (history, expired approval, resume); notification deep link on both surfaces; open the terminal page and back to chat mid-turn; Open in terminal; idle release after 30 min; 5,000-token answer smooth on X6P; 200 turns memory | Chat in TERMINAL tab only; opencode chat holds the slot → terminal opencode and a 2nd chat show the session sheet; other cards upsell; Open terminal here → upsell; swipe-away stops the chat, history resumes on reopen | Workspace chat in a project; chats in two projects at once, counted globally; Pro → Free downgrade mid-turn: the turn finishes, the next send on a paid tool shows the upsell |
 | M2 | Same script for claude + `AskUserQuestion`, `ExitPlanMode` → Implement, inline image and PDF, Auto mode, resume after kill, `--resume` in Open in terminal | Card upsell, no spawn | Full flow |
 | M3 | Same for codex + requestUserInput, `turn/steer`, each mode under PRoot (sandbox), one-writer rule with Open in terminal | Upsell | Full flow |
 | M4 | Same for agy + client-side Auto-accept edits / Full policy, `interaction_` question, quota refusal, warm-process memory | Upsell | Full flow |
@@ -1058,7 +1059,7 @@ Gating regression at every milestone: a Free user reaches no Pro tool, no second
 **Owner decisions (2026-11-13, answers to the former open questions).**
 - Q1. "Open terminal here" for Free users shows the Pro upsell (the terminal is Pro-only).
 - Q2. Pro → Free downgrade: the current turn finishes, then new sends are refused with the upsell.
-- Q3. The Chat/Terminal switch is remembered per page.
+- Q3. (Superseded 2026-11-13.) Was: the Chat/Terminal switch is remembered per page. Now: no switch; chat is always the default view, a terminal icon opens the terminal page and a back-to-chat control returns (§9.2.6 E).
 - Q4. Hidden checkpoint refs `refs/nativecode/chk/*` in the user's repo are accepted; pruned when the thread is deleted.
 - Q5. Swiping the app away stops chats the same way terminals stop; thread history is kept and resumable.
 
