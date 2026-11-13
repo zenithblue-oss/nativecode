@@ -140,6 +140,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
     Column(Modifier.fillMaxSize()) {
         ChatTopBar(v, t, status, d.runs, imeOpen = WindowInsets.isImeVisible)
         todo?.let { TodoStrip(it) }
+        DelegationStrip(v, threadId) // M7: delegated tasks / back-link to the parent
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val list = rememberLazyListState()
@@ -180,7 +181,6 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
             // Floating working pill (t3code floating-working-control).
             androidx.compose.animation.AnimatedVisibility(
                 running && startedAt != null, Modifier.align(Alignment.BottomCenter).padding(bottom = S.m),
-        DelegationStrip(v, threadId) // M7: delegated tasks / back-link to the parent
                 enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut(),
             ) {
                 WorkingPill(
