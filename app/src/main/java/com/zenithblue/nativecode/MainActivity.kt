@@ -1769,6 +1769,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         rootLayout = LinearLayout(this).apply {
             orientation = if (initLandscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            // Baseline alignment measures weighted children with an UNSPECIFIED width (Compose horizontalScroll throws).
+            isBaselineAligned = false
             setBackgroundColor(NC.BG)
             layoutParams = ViewGroup.LayoutParams(MATCH, MATCH)
             addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
