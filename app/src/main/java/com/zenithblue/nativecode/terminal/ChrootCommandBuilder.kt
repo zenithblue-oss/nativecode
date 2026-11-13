@@ -28,7 +28,7 @@ object ChrootCommandBuilder {
     /** Session executable — must be a system binary (SELinux blocks exec of app-data scripts). */
     const val SESSION_EXEC = "/system/bin/sh"
 
-    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v6"
+    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v7"
     private const val TERM_WRAPPER_VERSION = "nativecode-chroot-term-wrapper v3"
     private val launcherPrepLock = Any()
     private var launcherPrepGeneration = 0L
@@ -248,7 +248,38 @@ exit ${'$'}?
      */
     fun ensureLauncherScript(ctx: Context): Boolean {
         val scriptPath = "${ctx.filesDir}/usr/tmp/launch_tool.sh"
-        val script = """#!/bin/bash
+        val script = launcherScript()
+        return synchronized(launcherPrepLock) {
+            val generation = ++launcherPrepGeneration
+            var tmp: File? = null
+            try {
+                val f = File(scriptPath)
+                val parent = f.parentFile ?: return@synchronized false
+                parent.mkdirs()
+                val stamp = File(parent, ".launch_tool.gen")
+                val gen = "$LAUNCH_TOOL_VERSION:${ctx.filesDir}"
+                if (f.isFile && f.canExecute() && stamp.isFile && stamp.readText() == gen) {
+                    return@synchronized true
+                }
+                val staged = File(parent, ".launch_tool.sh.$generation.tmp")
+                tmp = staged
+                staged.writeText(script)
+                if (!staged.setExecutable(true, false)) return@synchronized false
+                if (generation != launcherPrepGeneration) return@synchronized false
+                if (!staged.renameTo(f) || !f.isFile || !f.canExecute()) return@synchronized false
+                tmp = null
+                stamp.writeText(gen)
+                true
+            } catch (_: Exception) {
+                false
+            } finally {
+                tmp?.delete()
+            }
+        }
+    }
+
+    /** launch_tool.sh text; pure so a JVM test can run it against stub CLIs. */
+    internal fun launcherScript(): String = """#!/bin/bash
 # $LAUNCH_TOOL_VERSION
 export HOME=/home/flux
 export TERM="${'$'}{TERM:-xterm-256color}"
@@ -303,12 +334,17 @@ cmd="${'$'}1"
 shift
 case "${'$'}cmd" in
   opencode)
-    exec opencode --auto "${'$'}@"
+    # --auto is a TUI flag: only the bare tab launch gets it; serve, acp, run... stay plain.
+    if [ ${'$'}# -eq 0 ]; then exec opencode --auto; fi
+    exec opencode "${'$'}@"
     ;;
   codex)
     # codex 0.168+ spawns a pid-managed app-server daemon and dies in PRoot (cannot read its start time).
-    # --no-daemon is a TUI-only flag: tab launches (no args) get it, subcommands (login, app-server...) do not.
-    if [ ${'$'}# -eq 0 ]; then exec codex --no-daemon; fi
+    # --no-daemon is a TUI-only flag: the tab launch and the TUI subcommands (resume, fork) get it,
+    # everything else (login, app-server...) stays plain.
+    case "${'$'}{1:-}" in
+      ""|resume|fork) exec codex --no-daemon "${'$'}@" ;;
+    esac
     exec codex "${'$'}@"
     ;;
   *)
@@ -316,34 +352,6 @@ case "${'$'}cmd" in
     ;;
 esac
 """.trimIndent()
-        return synchronized(launcherPrepLock) {
-            val generation = ++launcherPrepGeneration
-            var tmp: File? = null
-            try {
-                val f = File(scriptPath)
-                val parent = f.parentFile ?: return@synchronized false
-                parent.mkdirs()
-                val stamp = File(parent, ".launch_tool.gen")
-                val gen = "$LAUNCH_TOOL_VERSION:${ctx.filesDir}"
-                if (f.isFile && f.canExecute() && stamp.isFile && stamp.readText() == gen) {
-                    return@synchronized true
-                }
-                val staged = File(parent, ".launch_tool.sh.$generation.tmp")
-                tmp = staged
-                staged.writeText(script)
-                if (!staged.setExecutable(true, false)) return@synchronized false
-                if (generation != launcherPrepGeneration) return@synchronized false
-                if (!staged.renameTo(f) || !f.isFile || !f.canExecute()) return@synchronized false
-                tmp = null
-                stamp.writeText(gen)
-                true
-            } catch (_: Exception) {
-                false
-            } finally {
-                tmp?.delete()
-            }
-        }
-    }
 
     /** Bash-safe fallback environment for legacy callers; launch_tool.sh is preferred. */
     fun toolEnvInit(): String =
