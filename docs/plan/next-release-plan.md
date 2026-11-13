@@ -134,6 +134,11 @@ The login controls are not built at all when the tool is signed in; the account 
 
 **Effort.** M. Depends on item 3 for Hermes and opencode 2.x paths.
 
+### 2.x Open issues (TODO, not fixed yet)
+
+- [ ] (a) Typing bare `codex` in a terminal tab crashes in PRoot: "failed to read start time for pid-managed app-server". The card launch already passes `--no-daemon`. Likely cause: PRoot's `/proc` start time. Options: the gate shim adds `--no-daemon`, or fix `/proc` under PRoot.
+- [ ] (b) A kiro tab was alive at about 50 s, then gone. May be a stray-tap artifact. Re-test before treating it as a bug.
+
 ---
 
 ## 3. Update CLIs, add Hermes, rebuild the rootfs, update existing users

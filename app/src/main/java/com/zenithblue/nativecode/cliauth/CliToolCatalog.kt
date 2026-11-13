@@ -28,7 +28,9 @@ data class CliToolDef(
     /** Console URL for API key / account signup. */
     val consoleUrl: String? = null,
     val envKey: String? = null,
-    val subtitle: String = ""
+    val subtitle: String = "",
+    /** Works without login (free built-in models): cards show no LOGIN prompt unless already signed in. */
+    val loginOptional: Boolean = false
 )
 
 object CliToolCatalog {
@@ -71,7 +73,8 @@ object CliToolCatalog {
             strategy = CliLoginStrategy.TERMINAL_GUIDED,
             terminalType = "opencode",
             consoleUrl = "https://opencode.ai/auth",
-            subtitle = "opencode auth login · providers"
+            subtitle = "opencode auth login · providers",
+            loginOptional = true
         ),
         CliToolDef(
             id = "agy",

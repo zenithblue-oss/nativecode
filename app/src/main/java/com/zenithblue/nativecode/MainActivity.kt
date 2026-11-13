@@ -2992,6 +2992,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setPadding(0, dp(2), 0, 0)
             }
             card.addView(descTv)
+            CliToolCatalog.ALL.find { it.terminalType == tool.type }?.let { addCliLoginChip(card, it.id) }
 
             return card
         }
@@ -18005,33 +18006,78 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun refreshCliAuthPage(@Suppress("UNUSED_PARAMETER") force: Boolean = false) = paintCliAuth()
 
-    /** Terminal-card chip: "SIGNED IN" badge, or a LOGIN button (signed out / unknown) opening that CLI's login page. */
-    private fun addCliLoginChip(card: LinearLayout, id: String) {
-        val chip = TextView(this).apply {
-            textSize = 10f
+    /** Last probed login state per CLI id; a change rebuilds the card grids (see paintCliAuth). */
+    private val cliAuthStates = HashMap<String, AuthState>()
+
+    /**
+     * ONE shared login status row for every AI CLI card (terminal grid, workspace hub, Settings list):
+     * hairline divider, state dot + label, and a LOGIN action on the right. 48dp touch target.
+     * Returns null when the CLI works without login ([CliToolDef.loginOptional]) and is not signed in.
+     */
+    private fun cliLoginControl(id: String, state: AuthState, onClick: () -> Unit): View? {
+        val signedIn = state == AuthState.SIGNED_IN
+        if (!signedIn && CliToolCatalog.byId(id)?.loginOptional == true) return null
+        val name = cliAuthName(id)
+        fun label(t: String, color: Int, size: Float, bold: Boolean) = TextView(this).apply {
+            text = t
+            textSize = size
             typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            setPadding(dp(8), dp(6), dp(8), dp(6))
-            visibility = View.GONE
+            paint.isFakeBoldText = bold
+            maxLines = 1
+            includeFontPadding = false
+            setTextColor(color)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        card.addView(chip)
+        val dotColor = when (state) {
+            AuthState.SIGNED_IN -> NC.PRIMARY
+            AuthState.SIGNED_OUT -> NC.TERTIARY_CON
+            AuthState.UNKNOWN -> NC.OUTLINE
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(48)
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
+            // hairline divider on top, same rule colour as the section dividers
+            background = LayerDrawable(arrayOf(
+                android.graphics.drawable.ColorDrawable(NC.OUTLINE_VAR),
+                android.graphics.drawable.ColorDrawable(NC.SURFACE_LOW)
+            )).apply { setLayerInset(1, 0, dp(1), 0, 0) }
+            setPadding(0, dp(1), 0, 0)
+            isClickable = true
+            isFocusable = true
+            contentDescription = if (signedIn) "Signed in to $name. Open login page" else "Log in to $name"
+            tooltipText = contentDescription
+            setOnClickListener { onClick() }
+            addView(View(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(6), dp(6)).apply { rightMargin = dp(8) }
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(dotColor) }
+            })
+            addView(label(
+                when (state) { AuthState.SIGNED_IN -> "SIGNED IN"; AuthState.SIGNED_OUT -> "NOT SIGNED IN"; AuthState.UNKNOWN -> "UNKNOWN" },
+                NC.ON_SURF_VAR, 10f, false
+            ).apply {
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            if (!signedIn) addView(label("LOGIN", NC.PRIMARY, 11f, true))
+        }
+    }
+
+    private fun openCliLoginPage(id: String) {
+        cliAuthSelected = id
+        if (pageStack.isEmpty() || pageStack.peek() != ID_CLI_AUTH) pageStack.push(ID_CLI_AUTH)
+        navigateToPage(ID_CLI_AUTH)
+    }
+
+    /** Card pill: probes login state off-thread, then appends the shared pill to [card]. */
+    private fun addCliLoginChip(card: LinearLayout, id: String) {
         val method = LinuxCommandBuilder.currentMethod
         Thread {
             val state = CliCredentialProbe.probe(id, ProjectPathResolver.guestHomeDir(this, method)).state
             runOnUiThread {
-                val signedIn = state == AuthState.SIGNED_IN
-                chip.text = if (signedIn) "SIGNED IN" else "LOGIN"
-                chip.setTextColor(if (signedIn) NC.ON_SURF_VAR else NC.PRIMARY)
-                if (!signedIn) {
-                    chip.typeface = Typeface.DEFAULT_BOLD
-                    chip.contentDescription = "Log in to ${cliAuthName(id)}"
-                    chip.setOnClickListener {
-                        cliAuthSelected = id
-                        if (pageStack.isEmpty() || pageStack.peek() != ID_CLI_AUTH) pageStack.push(ID_CLI_AUTH)
-                        navigateToPage(ID_CLI_AUTH)
-                    }
-                }
-                chip.visibility = View.VISIBLE
+                cliAuthStates[id] = state
+                cliLoginControl(id, state) { openCliLoginPage(id) }?.let { card.addView(it) }
             }
         }.start()
     }
@@ -18054,6 +18100,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val infos = ids.associateWith { CliCredentialProbe.probe(it, home) }
             runOnUiThread {
                 if (cliAuthBody !== body || cliAuthSelected != sel) return@runOnUiThread
+                // Login state changed since last look: rebuild the card grids so their pills update.
+                val changed = infos.any { (k, v) -> cliAuthStates[k]?.let { it != v.state } == true }
+                infos.forEach { (k, v) -> cliAuthStates[k] = v.state }
+                if (changed) {
+                    refreshTerminalToolSelector()
+                    refreshWorkspaceHubTools()
+                }
                 body.removeAllViews()
                 if (sel == null) paintCliAuthList(body, infos)
                 else paintCliToolPage(body, sel, infos.getValue(sel), method)
@@ -18079,14 +18132,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             })
-            row.addView(
-                textBadge(
-                    info.state.name.replace('_', ' '),
-                    if (signedIn) NC.PRIMARY else NC.SURFACE_HIGHEST,
-                    if (signedIn) Color.parseColor("#0A0A0A") else NC.ON_SURF_VAR
-                )
-            )
+            val ctl = cliLoginControl(id, info.state) { cliAuthSelected = id; paintCliAuth() }
             card.addView(row)
+            if (ctl != null) card.addView(ctl)
             cliAuthDetail(info)?.let {
                 card.addView(TextView(this).apply {
                     text = it

@@ -18,7 +18,7 @@ object ToolLauncherCatalog {
     )
 
     val FREE: List<LauncherToolDef> = listOf(
-        LauncherToolDef("opencode", "opencode", "Claude Agent")
+        LauncherToolDef("opencode", "opencode", "Open Source")
     )
 
     val PAID: List<LauncherToolDef> = listOf(
