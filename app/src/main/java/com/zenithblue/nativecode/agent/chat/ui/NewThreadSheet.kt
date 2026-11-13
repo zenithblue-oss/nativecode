@@ -89,7 +89,7 @@ internal fun ToolCards(v: AgentChatView, project: String?) {
                             else -> if (def.loginOptional) AuthLine("Free models", C.onVar) else Text(def.subtitle, color = C.outline, style = T.meta, maxLines = 1)
                         }
                     }
-                    if (locked) Row(Modifier.card(C.tertiary.copy(alpha = 0.1f), C.tertiary.copy(alpha = 0.6f)).padding(horizontal = S.s - S.xxs, vertical = S.xxs),
+                    if (locked) Row(Modifier.card(C.tertiary.copy(alpha = 0.1f), C.tertiary.copy(alpha = 0.6f)).padding(horizontal = S.s, vertical = S.xs),
                         verticalAlignment = Alignment.CenterVertically) {
                         NcIcon(Ic.Lock, null, tint = C.tertiary, size = 12.dp)
                         Label("PRO", Modifier.padding(start = S.xs), color = C.tertiary, size = 10, bold = true)
@@ -120,11 +120,11 @@ internal fun ToolCards(v: AgentChatView, project: String?) {
 @Composable
 private fun AuthLine(text: String, color: androidx.compose.ui.graphics.Color, link: Boolean = false, onClick: (() -> Unit)? = null) {
     Row(
-        (if (onClick != null) Modifier.clickable(onClickLabel = text, onClick = onClick) else Modifier).heightIn(min = 24.dp).padding(top = S.xxs),
+        (if (onClick != null) Modifier.clickable(onClickLabel = text, onClick = onClick) else Modifier).heightIn(min = 24.dp).padding(top = S.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (link) Ring(color, size = 8.dp) else StatusDot(color, size = 6.dp)
-        Text(text, Modifier.padding(start = S.s - S.xxs), color = color, style = T.meta)
+        Text(text, Modifier.padding(start = S.gap), color = color, style = T.meta)
         if (link) NcIcon(Ic.ChevronRight, null, tint = color, size = 12.dp)
     }
 }

@@ -90,16 +90,29 @@ internal object C {
     val delBg = Color(0x22FFB4AB)
 }
 
-/** 4/8 dp spacing scale. */
-internal object S {
-    val xxs = 2.dp
+/**
+ * The one spacing scale (4/8/12/16/24 dp) of the chat screens, public so other Compose chrome (the terminal
+ * tab strip) uses the same values. Use the role names where one fits; no other spacing values.
+ */
+object Space {
     val xs = 4.dp
     val s = 8.dp
     val m = 12.dp
     val l = 16.dp
     val xl = 24.dp
-    val xxl = 32.dp
+
+    /** Left/right inset of every screen, header, list row and message. */
+    val edge = l
+    /** Padding inside a card, chip row, sheet section or the composer. */
+    val inset = m
+    /** Between consecutive items in a row or column, and between an icon and its label. */
+    val gap = s
+    /** Between message blocks (turns, user vs assistant) and between sections. */
+    val block = l
 }
+
+/** Short alias inside this package. */
+internal val S = Space
 
 internal val Mono = FontFamily.Monospace
 internal val Square = RoundedCornerShape(0.dp)
@@ -174,9 +187,9 @@ internal fun Chip(
             .background(if (on) C.primary.copy(alpha = 0.14f) else C.low)
             .border(1.dp, if (on) C.primary else C.border)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-            .padding(horizontal = S.s + S.xxs, vertical = S.xs + S.xxs),
+            .padding(horizontal = S.inset, vertical = S.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(S.xs + S.xxs),
+        horizontalArrangement = Arrangement.spacedBy(S.gap),
     ) {
         icon?.let { NcIcon(it, null, tint = fg, size = 14.dp) }
         Text(text, color = fg, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
@@ -261,11 +274,11 @@ internal fun Ring(color: Color, modifier: Modifier = Modifier, size: Dp = 14.dp,
 internal fun StatusChip(text: String, color: Color, modifier: Modifier = Modifier, pulse: Boolean = false) {
     Row(
         modifier.semantics(mergeDescendants = true) { contentDescription = "Status: $text" }
-            .background(color.copy(alpha = 0.12f)).padding(horizontal = S.s - S.xxs, vertical = S.xxs),
+            .background(color.copy(alpha = 0.12f)).padding(horizontal = S.s, vertical = S.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StatusDot(color, size = 6.dp, pulse = pulse)
-        Text(text, Modifier.padding(start = S.xs + S.xxs), color = color, style = T.meta.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+        Text(text, Modifier.padding(start = S.gap), color = color, style = T.meta.copy(fontWeight = FontWeight.Bold), maxLines = 1)
     }
 }
 

@@ -66,7 +66,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val ROW_PAD = Modifier.fillMaxWidth().padding(horizontal = S.l, vertical = S.xs + S.xxs)
+/** Every timeline row: screen edge inset, half a gap above and below so consecutive rows sit one gap apart. */
+private val ROW_PAD = Modifier.fillMaxWidth().padding(horizontal = S.edge, vertical = S.xs)
 
 /**
  * One timeline row. [liveRun] = the run streaming now (its work group stays expanded, its text carries the caret).
@@ -110,7 +111,7 @@ private fun Divider(label: String, icon: ImageVector, shimmer: Boolean = false) 
         Hairline(Modifier.weight(1f))
         Row(Modifier.padding(horizontal = S.s).shimmer(shimmer), verticalAlignment = Alignment.CenterVertically) {
             NcIcon(icon, null, tint = C.outline, size = 12.dp)
-            Text(label, Modifier.padding(start = S.xs + S.xxs), color = C.outline, style = T.meta)
+            Text(label, Modifier.padding(start = S.gap), color = C.outline, style = T.meta)
         }
         Hairline(Modifier.weight(1f))
     }
@@ -145,14 +146,14 @@ internal fun UserBubble(p: ItemPayload.UserMessage, at: Long, modifier: Modifier
         Column(
             Modifier.widthIn(max = maxW).background(C.high).border(1.dp, C.borderVar)
                 .combinedClickable(onClickLabel = null, onLongClickLabel = "Show time", onLongClick = { stamp = !stamp }, onClick = {})
-                .padding(horizontal = S.m, vertical = S.s + S.xxs)
+                .padding(S.inset)
                 .animateContentSize(),
         ) {
             if (p.intent != "start") Row(Modifier.padding(bottom = S.xs), verticalAlignment = Alignment.CenterVertically) {
                 NcIcon(if (p.intent == "steer") Ic.Steer else Ic.Clock, null, tint = C.tertiary, size = 12.dp)
                 Overline(if (p.intent == "steer") "Steer" else "Queued", Modifier.padding(start = S.xs), color = C.tertiary)
             }
-            if (p.attachments.isNotEmpty()) Row(Modifier.padding(bottom = S.s).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.s - S.xxs)) {
+            if (p.attachments.isNotEmpty()) Row(Modifier.padding(bottom = S.s).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
                 p.attachments.forEach { AttachmentThumb(it) }
             }
             Text(if (expanded || !isFolded) p.text else folded, color = C.on, style = T.body)
@@ -174,9 +175,9 @@ internal fun AttachmentThumb(a: ChatAttachment) {
     }
     val b = bmp
     if (b != null) Image(b, a.name, Modifier.size(64.dp).border(1.dp, C.border), contentScale = ContentScale.Crop)
-    else Row(Modifier.card(C.container).padding(horizontal = S.s, vertical = S.xs + S.xxs), verticalAlignment = Alignment.CenterVertically) {
+    else Row(Modifier.card(C.container).padding(horizontal = S.s, vertical = S.xs), verticalAlignment = Alignment.CenterVertically) {
         NcIcon(if (a.isImage) Ic.Image else Ic.FileText, null, tint = C.onVar, size = 14.dp)
-        Text(a.name, Modifier.padding(start = S.xs + S.xxs).widthIn(max = 160.dp), color = C.on, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(a.name, Modifier.padding(start = S.gap).widthIn(max = 160.dp), color = C.on, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -206,7 +207,7 @@ private fun Reasoning(p: ItemPayload.Reasoning, running: Boolean, modifier: Modi
                 color = C.onVar, style = T.label)
             if (p.text.isNotBlank()) Chevron(open, size = 14.dp)
         }
-        if (open && p.text.isNotBlank()) Row(Modifier.height(IntrinsicSize.Min).padding(start = S.xs + S.xxs, top = S.xs)) {
+        if (open && p.text.isNotBlank()) Row(Modifier.height(IntrinsicSize.Min).padding(start = S.gap, top = S.xs)) {
             Box(Modifier.width(2.dp).fillMaxHeight().background(C.border))
             Text(p.text, Modifier.padding(start = S.m), color = C.onVar, style = T.bodySm)
         }
@@ -416,7 +417,7 @@ private fun MetaRow(run: Run, text: String?, ttft: Long?) {
             .padding(start = S.l, end = S.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.xxs)) {
+        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.xs)) {
             parts.forEach { Text(it, color = C.outline, style = T.meta) }
             if (run.status != RunStatus.COMPLETED) StatusChip(
                 run.status.wire.replaceFirstChar { it.uppercase() },
@@ -439,7 +440,7 @@ internal fun DiffLines(lines: List<DiffLine>) {
             }
             Row(Modifier.background(bg).height(IntrinsicSize.Min)) {
                 Box(Modifier.width(2.dp).fillMaxHeight().background(bar))
-                Text((l.newNo ?: l.oldNo)?.toString()?.padStart(4) ?: "    ", Modifier.padding(start = S.xs + S.xxs, end = S.s), color = C.outline, style = T.codeSm)
+                Text((l.newNo ?: l.oldNo)?.toString()?.padStart(4) ?: "    ", Modifier.padding(start = S.gap, end = S.s), color = C.outline, style = T.codeSm)
                 Text(if (l.kind == '@') l.text else "${l.kind} ${l.text}", Modifier.padding(end = S.m), color = fg, style = T.codeSm, softWrap = false,
                     fontWeight = if (l.kind == '@') FontWeight.Bold else FontWeight.Normal)
             }

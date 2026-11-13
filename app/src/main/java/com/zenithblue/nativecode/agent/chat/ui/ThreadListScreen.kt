@@ -159,7 +159,7 @@ private fun GroupHeader(title: String, count: Int, collapsed: Boolean, icon: Ima
         Chevron(!collapsed, size = 14.dp)
         NcIcon(icon, null, Modifier.padding(start = S.xs), tint = C.outline, size = 14.dp)
         Overline(title, Modifier.weight(1f).padding(start = S.s), color = C.onVar)
-        Box(Modifier.background(C.container).padding(horizontal = S.s - S.xxs, vertical = S.xxs)) { Label("$count", color = C.onVar, size = 10, bold = true) }
+        Box(Modifier.background(C.container).padding(horizontal = S.s, vertical = S.xs)) { Label("$count", color = C.onVar, size = 10, bold = true) }
     }
 }
 
@@ -225,8 +225,8 @@ private fun ThreadRowView(v: AgentChatView, r: ThreadRow, now: Long, onArchive: 
                         else ChatLogic.relativeTime(now, t.updatedAt)
                         Label(time.orEmpty(), Modifier.padding(start = S.s), color = if (r.status == ThreadStatus.WORKING) C.primary else C.outline)
                     }
-                    if (r.preview != null) Text(r.preview, Modifier.padding(top = S.xxs), color = C.onVar, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(Modifier.padding(top = S.xs + S.xxs), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(S.s)) {
+                    if (r.preview != null) Text(r.preview, Modifier.padding(top = S.xs), color = C.onVar, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(Modifier.padding(top = S.xs), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(S.s)) {
                         st?.let { (s, c) -> StatusChip(s, c, pulse = r.status == ThreadStatus.WORKING) }
                         Label(t.tool, color = C.outline)
                         if (!v.isWorkspace && t.projectPath != null) Label(ChatLogic.baseName(t.projectPath), Modifier.weight(1f, fill = false), color = C.outline)
@@ -300,12 +300,12 @@ private fun SessionsChip(v: AgentChatView) {
             Modifier.heightIn(min = 36.dp).card(if (used > 0) C.primary.copy(alpha = 0.1f) else C.low, if (full) C.tertiary else if (used > 0) C.primary else C.border)
                 .combinedClickable(onClickLabel = "Live sessions") { open = true }
                 .semantics(mergeDescendants = true) { contentDescription = "$used of $max AI sessions in use" + if (!v.host.isPro()) ", Free plan" else "" }
-                .padding(horizontal = S.m - S.xxs),
+                .padding(horizontal = S.inset),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             StatusDot(if (full) C.tertiary else if (used > 0) C.primary else C.outline, size = 6.dp, pulse = used > 0)
-            Label("$used/$max", Modifier.padding(start = S.s - S.xxs), color = C.on, size = 12, bold = true)
-            if (!v.host.isPro()) Label("FREE", Modifier.padding(start = S.s - S.xxs), color = C.tertiary, size = 10, bold = true)
+            Label("$used/$max", Modifier.padding(start = S.gap), color = C.on, size = 12, bold = true)
+            if (!v.host.isPro()) Label("FREE", Modifier.padding(start = S.gap), color = C.tertiary, size = 10, bold = true)
         }
         DropdownMenu(open, { open = false }, containerColor = C.low) {
             val live = v.backend.liveThreadIds()

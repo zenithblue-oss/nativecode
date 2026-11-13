@@ -96,7 +96,7 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
                                     Text(listOfNotNull(m.id, m.contextLimit?.let { "${ChatLogic.tokens(it)} ctx" }).joinToString(" · "),
                                         color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
-                                if (m.free) Box(Modifier.background(C.primary.copy(alpha = 0.14f)).padding(horizontal = S.s - S.xxs, vertical = S.xxs)) {
+                                if (m.free) Box(Modifier.background(C.primary.copy(alpha = 0.14f)).padding(horizontal = S.s, vertical = S.xs)) {
                                     Label("FREE", color = C.primary, size = 10, bold = true)
                                 }
                             }

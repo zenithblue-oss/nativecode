@@ -69,7 +69,7 @@ internal fun DiffScreen(v: AgentChatView, threadId: String) {
         when {
             f == null -> LoadingRows()
             f.isEmpty() -> Column(Modifier.fillMaxSize().padding(S.xl), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.padding(top = S.xxl).size(48.dp).card(C.low), contentAlignment = Alignment.Center) { NcIcon(Ic.FileDiff, null, tint = C.outline, size = 22.dp) }
+                Box(Modifier.padding(top = S.xl).size(48.dp).card(C.low), contentAlignment = Alignment.Center) { NcIcon(Ic.FileDiff, null, tint = C.outline, size = 22.dp) }
                 Text(if (scope == DiffScope.UNCOMMITTED) "No uncommitted changes" else "No changes recorded", Modifier.padding(top = S.l), color = C.on, style = T.heading)
                 Text(if (scope == DiffScope.UNCOMMITTED) "The working tree matches HEAD, or this is not a git repository." else "This turn did not edit files, or the project is not a git repository.",
                     Modifier.padding(top = S.xs), color = C.onVar, style = T.bodySm, textAlign = TextAlign.Center)

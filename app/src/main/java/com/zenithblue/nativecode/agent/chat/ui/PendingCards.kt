@@ -82,7 +82,7 @@ internal fun ApprovalCard(v: AgentChatView, t: ChatThread, req: ChatRequest, fee
         Column(Modifier.heightIn(max = maxH).verticalScroll(rememberScrollState()).padding(top = S.m), verticalArrangement = Arrangement.spacedBy(S.s)) {
             d.command?.let {
                 Row(Modifier.fillMaxWidth().card(C.lowest).padding(S.m), verticalAlignment = Alignment.Top) {
-                    NcIcon(Ic.Terminal, null, tint = C.primary, size = 14.dp, modifier = Modifier.padding(top = S.xxs))
+                    NcIcon(Ic.Terminal, null, tint = C.primary, size = 14.dp, modifier = Modifier.padding(top = S.xs))
                     Text(it, Modifier.padding(start = S.s).horizontalScroll(rememberScrollState()), color = C.on, style = T.code, softWrap = false)
                 }
             }

@@ -312,7 +312,7 @@ private fun ChatTopBar(v: AgentChatView, t: ChatThread, status: HeaderStatus, ru
                 Text(t.title.ifBlank { "New thread" }, color = C.on, style = T.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(Modifier.semantics(mergeDescendants = true) { contentDescription = "Status: ${status.text}" }, verticalAlignment = Alignment.CenterVertically) {
                     StatusDot(status.color, size = 6.dp, pulse = status.pulse)
-                    Text(status.text, Modifier.padding(start = S.xs + S.xxs), color = status.color, style = T.meta, maxLines = 1)
+                    Text(status.text, Modifier.padding(start = S.gap), color = status.color, style = T.meta, maxLines = 1)
                 }
             }
             IconBtn(Ic.Terminal, "Open terminal page", tint = C.onVar) { v.host.showTerminal(v.isWorkspace) }
@@ -355,7 +355,7 @@ private fun InfoBit(icon: ImageVector, text: String, color: Color = C.onVar, onC
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NcIcon(icon, null, tint = C.outline, size = 12.dp)
-        Text(text, Modifier.padding(start = S.xs + S.xxs), color = color, style = T.meta, maxLines = 1)
+        Text(text, Modifier.padding(start = S.gap), color = color, style = T.meta, maxLines = 1)
     }
 }
 

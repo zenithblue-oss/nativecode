@@ -129,7 +129,7 @@ internal fun Composer(
             val hits = all.filter { it.name.startsWith(slash.drop(1), ignoreCase = true) }.distinctBy { it.name }
             if (hits.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().padding(start = S.m, end = S.m, top = S.s).heightIn(max = 220.dp).brutal(3.dp).card(C.low)) {
                 items(hits, key = { it.name }) { c ->
-                    Row(Modifier.fillMaxWidth().clickable { onSlash(c.name) }.heightIn(min = 44.dp).padding(horizontal = S.m, vertical = S.xs + S.xxs),
+                    Row(Modifier.fillMaxWidth().clickable { onSlash(c.name) }.heightIn(min = 44.dp).padding(horizontal = S.m, vertical = S.gap),
                         verticalAlignment = Alignment.CenterVertically) {
                         Text("/" + c.name, color = C.primary, style = T.codeSm)
                         Text(c.description.orEmpty(), Modifier.padding(start = S.m), color = C.onVar, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -141,12 +141,12 @@ internal fun Composer(
             Modifier.fillMaxWidth().padding(horizontal = S.m, vertical = S.s).card(C.low, if (focused) C.primary else C.border).animateContentSize(),
         ) {
             if (s.chips.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = S.s, end = S.s, top = S.s),
-                horizontalArrangement = Arrangement.spacedBy(S.s - S.xxs)) {
+                horizontalArrangement = Arrangement.spacedBy(S.gap)) {
                 s.chips.forEach { c -> AttachChip(v, t, s, c) }
             }
             BasicTextField(
                 s.text, { s.text = it.take(120_000) },
-                Modifier.fillMaxWidth().heightIn(min = 44.dp, max = 168.dp).padding(horizontal = S.m, vertical = S.m - S.xxs),
+                Modifier.fillMaxWidth().heightIn(min = 44.dp, max = 168.dp).padding(horizontal = S.m, vertical = S.inset),
                 textStyle = T.body.copy(color = C.on),
                 cursorBrush = SolidColor(C.primary),
                 interactionSource = focus,
@@ -166,7 +166,7 @@ internal fun Composer(
                         MItem("File", Ic.FileText) { plus = false; v.host.pickFile { s.add(v, t, it, false) } }
                     }
                 }
-                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.s - S.xxs)) {
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
                     Chip(
                         listOfNotNull(t.model?.substringAfterLast('/') ?: "Default model", t.effort, "free".takeIf { freeModel }).joinToString(" · "),
                         Modifier.widthIn(max = 200.dp).semantics { contentDescription = "Model ${t.model ?: "default"}, change" },
@@ -218,7 +218,7 @@ private fun AttachChip(v: AgentChatView, t: ChatThread, s: ComposerState, c: Pen
             else -> NcIcon(if (c.image) Ic.Image else Ic.FileText, null, tint = if (failed) C.error else C.onVar, size = 14.dp)
         }
         Text(c.error ?: (c.name + (c.att?.let { " · " + size(it.sizeBytes) } ?: " · copying")),
-            Modifier.padding(start = S.xs + S.xxs).widthIn(max = 180.dp), color = if (failed) C.error else C.on, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Modifier.padding(start = S.gap).widthIn(max = 180.dp), color = if (failed) C.error else C.on, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (failed && c.uri != null) IconBtn(Ic.Retry, "Retry attachment", tint = C.primary, size = 14.dp, box = 36.dp) { s.chips.remove(c); s.add(v, t, c.uri, c.image) }
         IconBtn(Ic.Close, "Remove attachment", tint = C.onVar, size = 14.dp, box = 36.dp) { s.chips.remove(c) }
     }
