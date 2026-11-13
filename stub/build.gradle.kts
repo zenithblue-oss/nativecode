@@ -22,5 +22,5 @@ android {
 }
 
 dependencies {
-    implementation("androidx.annotation:annotation:1.7.1")
+    implementation("androidx.annotation:annotation:1.11.0")
 }

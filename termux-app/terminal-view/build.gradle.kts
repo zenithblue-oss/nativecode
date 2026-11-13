@@ -17,6 +17,6 @@ android {
 }
 
 dependencies {
-    implementation("androidx.annotation:annotation:1.7.1")
+    implementation("androidx.annotation:annotation:1.11.0")
     compileOnly(files("${rootProject.projectDir}/app/libs/terminal-emulator-v0.118.0-16k.aar"))
 }

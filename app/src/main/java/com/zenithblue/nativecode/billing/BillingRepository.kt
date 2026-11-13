@@ -1,5 +1,6 @@
 package com.zenithblue.nativecode.billing
 
+import com.zenithblue.nativecode.telemetry.Telemetry
 import android.app.Activity
 import android.content.Context
 import android.os.Handler
@@ -89,6 +90,16 @@ object BillingRepository : PurchasesUpdatedListener {
             )
             if (r.responseCode == BillingResponseCode.OK) {
                 res.productDetailsList.forEach { products[it.productId] = it }
+                if (type == ProductType.SUBS) res.productDetailsList.forEach { pd ->
+                    val chosen = subOffer(pd)
+                    Log.i(
+                        TAG,
+                        "offers ${pd.productId}: " + subOffers(pd).joinToString(" ") { o ->
+                            "[id=${o.offerId} base=${o.basePlanId} tags=${o.tags} phases=" +
+                                o.phases.joinToString(",") { "${it.formattedPrice}/${it.priceMicros}/${it.period}" } + "]"
+                        } + " chosen=${chosen?.offerId} trial=${chosen?.isTrial} label=\"${planLabel("PLAN", chosen, "/period", "fallback")}\""
+                    )
+                }
                 changed()
             }
         }
@@ -131,10 +142,19 @@ object BillingRepository : PurchasesUpdatedListener {
 
     override fun onPurchasesUpdated(result: BillingResult, purchases: MutableList<Purchase>?) {
         Log.i(TAG, "purchasesUpdated code=${result.responseCode} n=${purchases?.size ?: 0}")
+        val trialSku = pendingTrialSku
+        pendingTrialSku = null
         if (result.responseCode != BillingResponseCode.OK && result.responseCode != BillingResponseCode.ITEM_ALREADY_OWNED) return
         purchases.orEmpty().forEach {
-            Log.i(TAG, "purchase ${it.products} state=${it.purchaseState}")
-            if (isOwned(it)) acknowledge(it)
+            Log.i(TAG, "purchase ${it.products} state=${it.purchaseState} trial=${trialSku in it.products}")
+            if (isOwned(it)) {
+                if (!it.isAcknowledged) {
+                    val sku = Telemetry.Param.SKU to it.products.firstOrNull()
+                    if (trialSku in it.products) Telemetry.log(app, Telemetry.Event.TRIAL_START, sku)
+                    Telemetry.log(app, Telemetry.Event.PRO_PURCHASE, sku)
+                }
+                acknowledge(it)
+            }
         }
         refresh()
     }
@@ -145,13 +165,32 @@ object BillingRepository : PurchasesUpdatedListener {
         return if (sku == SKU_LIFETIME) {
             pd.oneTimePurchaseOfferDetailsList?.firstOrNull()?.formattedPrice
         } else {
-            subOffer(pd)?.pricingPhases?.pricingPhaseList?.lastOrNull()?.formattedPrice
+            subOffer(pd)?.recurringPrice
         }
     }
 
-    /** Base-plan offer (no offerId) first, else any offer. */
-    private fun subOffer(pd: ProductDetails) =
-        pd.subscriptionOfferDetails?.let { offers -> offers.firstOrNull { it.offerId == null } ?: offers.firstOrNull() }
+    /** Paywall button text; subscriptions with an eligible free trial say so ("7-day free trial, then …/mo"). */
+    fun label(label: String, sku: String, unit: String, fallback: String): String =
+        if (sku == SKU_LIFETIME) "$label · ${price(sku) ?: fallback}"
+        else planLabel(label, products[sku]?.let(::subOffer), unit, fallback)
+
+    /** True when Play returned a free-trial offer for a subscription (i.e. this account is eligible). */
+    fun hasTrial(): Boolean = SUBS.any { products[it]?.let(::subOffer)?.trialPhase != null }
+
+    private fun subOffers(pd: ProductDetails) = pd.subscriptionOfferDetails.orEmpty().map { o ->
+        SubOffer(
+            o.offerId, o.basePlanId, o.offerTags,
+            o.pricingPhases.pricingPhaseList.map { OfferPhase(it.priceAmountMicros, it.formattedPrice, it.billingPeriod) },
+            o.offerToken
+        )
+    }
+
+    /** Eligible free-trial offer first, else the base plan (see [pickOffer]). */
+    private fun subOffer(pd: ProductDetails) = pickOffer(subOffers(pd))
+
+    // ponytail: in-memory only; process death during the Play sheet loses trial_start (pro_purchase
+    // is still logged). Persist to prefs if the funnel numbers ever look short.
+    @Volatile private var pendingTrialSku: String? = null
 
     /** Returns an error message, or null if the Play purchase sheet launched. */
     fun launch(activity: Activity, sku: String): String? {
@@ -160,8 +199,11 @@ object BillingRepository : PurchasesUpdatedListener {
         val token = if (sku == SKU_LIFETIME) {
             pd.oneTimePurchaseOfferDetailsList?.firstOrNull()?.offerToken
         } else {
-            subOffer(pd)?.offerToken ?: return "No subscription offer available"
+            val offer = subOffer(pd) ?: return "No subscription offer available"
+            pendingTrialSku = sku.takeIf { offer.isTrial }
+            offer.token
         }
+        if (sku == SKU_LIFETIME) pendingTrialSku = null
         val pdp = BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(pd)
         token?.let { pdp.setOfferToken(it) }
         val r = c.launchBillingFlow(activity, BillingFlowParams.newBuilder().setProductDetailsParamsList(listOf(pdp.build())).build())

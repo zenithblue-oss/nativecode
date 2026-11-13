@@ -46,6 +46,7 @@
 | **B20** | Release hardening (R8 off, secrets in Gradle) | **FOLLOWED (optional)** | — | Optional hygiene; accepted deferred for this rev. |
 | — | Device smoke C5/C10 | optional | before ship | Mail app, vendor link, clear-all, suite flag, CLI→Safety→back nav. |
 | **P2-21** | Marketplace first-use consent | **FOLLOWED (code)** | — | `MarketplaceConsent` + dialog before open; full script signing still optional later. |
+| **D1** | Firebase Crashlytics + Analytics (1.8.0) | **CODE DONE / CONSOLE OPEN** | **before 1.8.0 ship** | Opt-in only: manifest collection flags `false`, AD_ID permission removed, consent dialog (onboarding + Settings), `telemetry/Telemetry.kt` enum-only events. **Owner TODO:** (1) create Firebase project, add Android app `com.zenithblue.nativecode`, put `google-services.json` in `app/` (without it the SDKs are inert); (2) update Play **Data safety**: Crash logs, Diagnostics, App interactions, Device or other IDs — collected, optional, not shared for advertising, purposes Analytics + App functionality (confirm against Google's SDK disclosure pages); (3) publish `docs/privacy-policy.md` §2.5 to the hosted policy; (4) add Firebase SDKs to the in-app licences list. |
 
 **Done / not open:** C5 · C10 · B12 · **B13** allowBackup=false · **B14** X11 not exported · **B15** merged perms clean · B19 · B20 optional · C1–C4 · C7–C9 · C11–C12 · Console · **B11/C6 ACCEPTED**.
 
@@ -183,7 +184,7 @@ Items below are **followed** relative to the guide and current code.
 |-------|--------|
 | **Guide §** | §4.4 Selling data prohibited |
 | **Status** | **FOLLOWED** (as designed) |
-| **Evidence** | No analytics/ad SDKs that sell data; tokens used for GitHub/AI auth only. |
+| **Evidence** | No ad SDKs. Firebase Analytics/Crashlytics (1.8.0) are opt-in, ad consent always denied, AD_ID removed — data is not sold (see D1). Tokens used for GitHub/AI auth only. |
 | **Reason** | No data brokerage path observed. |
 | **How to keep fixed** | Any future analytics must be disclosed; never sell personal data. |
 

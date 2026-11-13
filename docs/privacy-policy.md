@@ -11,7 +11,8 @@ This Privacy Policy describes how NativeCode handles information when you use th
 
 ## 1. Summary
 
-- NativeCode is **local-first**. We do not operate an advertising, analytics, or telemetry backend.
+- NativeCode is **local-first**. We show no ads and operate no advertising backend.
+- **Optional, off by default (1.8.0+):** crash reports (Firebase Crashlytics) and anonymous usage statistics (Google Analytics for Firebase). Nothing is collected until you opt in during onboarding or in Settings → Crash reports & usage stats, and you can turn either off there at any time. See §2.5.
 - Your files, projects, packages, and credentials are stored **on this device** inside the Alpaquita Linux **PRoot** guest and app-private storage.
 - Optional GitHub, AI CLI, and guest package-manager features contact **third parties you choose**. AI providers may receive prompts, selected source code or files, account identifiers, tool diagnostics, and generated output when you invoke their tools.
 - The Play build receives the rootfs through Google Play Asset Delivery. It does not download executable marketplace scripts or request superuser access.
@@ -60,6 +61,17 @@ If you sign in to GitHub or an AI CLI:
 ### 2.4 Permissions
 
 NativeCode may request Android permissions for its features (e.g. notifications for foreground services that keep terminal/AI sessions alive, network access). Permissions are used only for the stated in-app purpose.
+
+### 2.5 Optional diagnostics (Google Firebase) — off until you opt in
+
+DRAFT for 1.8.0 — publish to the hosted policy with the release; confirm categories against Google's SDK disclosure pages at submission.
+
+| Switch | SDK | What is sent when ON | Purpose |
+|--------|-----|----------------------|---------|
+| Send crash reports | Firebase Crashlytics (+ NDK) | Stack traces of app crashes (Kotlin and the app's own native libraries), device model, OS version, app version, a Crashlytics installation ID, and two settings keys (Linux backend, GPU mode) | Fixing crashes |
+| Share anonymous usage statistics | Google Analytics for Firebase | A fixed list of events: `setup_complete`, `first_ai_session`, `ai_session_start`, `free_limit_hit`, `paywall_view`, `pro_purchase`, `desktop_start`, plus Analytics' automatic events (e.g. `first_open`), with short identifiers only (tool id, product id, limit name) and an app-instance ID | Understanding which features are used |
+
+Never sent: project names, file paths or contents, prompts, terminal input/output, account names, tokens or keys. The advertising ID is not collected (permission removed, ad-ID collection disabled) and ad-personalisation consent is always denied. Data is processed by Google under the Firebase terms; it is not sold and not used for advertising. Guest Linux processes (PRoot) are separate processes and are not covered by crash reporting.
 
 ---
 

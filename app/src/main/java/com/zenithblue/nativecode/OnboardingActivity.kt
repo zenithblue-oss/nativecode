@@ -293,7 +293,7 @@ class OnboardingActivity : AppCompatActivity() {
         card.addView(
             bullet(
                 "01 · NO NATIVECODE CLOUD",
-                "NativeCode does not operate an analytics or advertising backend and does not collect device identifiers or telemetry."
+                "No ads and no NativeCode servers. Crash reports and anonymous usage statistics (Google Firebase) are off unless you turn them on in the next step or in Settings."
             )
         )
         card.addView(
@@ -344,7 +344,8 @@ class OnboardingActivity : AppCompatActivity() {
                     .edit()
                     .putBoolean("privacy_accepted", true)
                     .apply()
-                showPage(1)
+                // Optional crash/usage opt-in (both off by default), then continue.
+                com.zenithblue.nativecode.telemetry.ConsentSheet.show(this) { showPage(1) }
             }
         )
 
@@ -2725,6 +2726,7 @@ class OnboardingActivity : AppCompatActivity() {
     private fun verifyRuntimeSentinel() {
         val rootfsDir = ProjectPathResolver.prootRootfsDir(this)
         check(LinuxGuestDefaults.apply(this)) { "Guest defaults could not be applied" }
+        LinuxGuestDefaults.applyOnUpdate(this) // fresh rootfs: same file-only repairs as an app update
         val releaseFile = File(rootfsDir, "etc/nativecode/rootfs-release")
         check(releaseFile.canRead()) { "Sentinel check failed: /etc/nativecode/rootfs-release not readable" }
         val releaseText = releaseFile.readText()
@@ -2904,6 +2906,12 @@ class OnboardingActivity : AppCompatActivity() {
 
         File(filesDir, "setup_complete").createNewFile()
         getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit().putBoolean("onboarding_completed", true).apply()
+        com.zenithblue.nativecode.telemetry.Telemetry.apply(this)
+        com.zenithblue.nativecode.telemetry.Telemetry.logOnce(
+            this,
+            com.zenithblue.nativecode.telemetry.Telemetry.Event.SETUP_COMPLETE,
+            com.zenithblue.nativecode.telemetry.Telemetry.Param.BACKEND to selectedIsolationMethod
+        )
         HostServerController.ensureServers(this)
 
         val btn = primaryButton("Launch Environment", R.drawable.ic_arrow_right) {

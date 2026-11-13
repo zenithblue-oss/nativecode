@@ -73,6 +73,8 @@ object AppUpgrade {
         if (File(ctx.filesDir, "usr/lib/libtermux-exec.so").exists()) {
             TermuxHostPaths.applyPackageToExtractedPrefix(ctx.filesDir, force = true)
         }
+        // Guest file repairs run only here (versionCode changed): direct file edits, no guest exec.
+        LinuxGuestDefaults.applyOnUpdate(ctx)
         runVersionMigrations(from, to)
     }
 

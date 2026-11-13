@@ -25,6 +25,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Firebase is live only with app/google-services.json (Firebase console, package
+// com.zenithblue.nativecode). Without it the build still succeeds and Telemetry is a no-op.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
 android {
     namespace = "com.zenithblue.nativecode"
     compileSdk = 37
@@ -33,8 +40,8 @@ android {
         applicationId = "com.zenithblue.nativecode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 16
-        versionName = "1.7.1"
+        versionCode = 17
+        versionName = "1.8.0"
         buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
         // Freemium gates (docs/monetisation/plan.md). On with Play Billing (PR5).
         buildConfigField("boolean", "MONETISATION_ENFORCE", "true")
@@ -128,19 +135,19 @@ android {
 dependencies {
     testImplementation("junit:junit:4.13.2")
 
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.appcompat:appcompat:1.8.0")
+    implementation("com.google.android.material:material:1.14.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.2.2")
+    implementation("androidx.core:core-splashscreen:1.2.0")
 
     // Compose dependencies
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.activity:activity-compose:1.13.0")
 
     // Keep the upstream app/shared APIs, but replace terminal-emulator and
     // terminal-view with local modules.
@@ -161,6 +168,16 @@ dependencies {
 
     // Play Billing (NativeCode Pro)
     implementation("com.android.billingclient:billing-ktx:9.1.0")
+
+    // Firebase (opt-in; collection off in the manifest until consent). Only telemetry/Telemetry.kt imports it.
+    // BoM 35.x ships Kotlin 2.4 metadata: needs the Kotlin 2.4 plugin pinned in the root build.gradle.kts.
+    implementation(platform("com.google.firebase:firebase-bom:35.2.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-crashlytics")
+    implementation("com.google.firebase:firebase-crashlytics-ndk")
+    // Analytics pulls guava 31.1-android over termux-shared's 24.1-jre; the android flavour lacks
+    // com.google.common.io.MoreFiles (termux FileUtils.clearDirectory). Keep a -jre flavour on top.
+    implementation("com.google.guava:guava:33.8.0-jre")
 }
 
 tasks.register<Exec>("checkJni16kbAlignment") {

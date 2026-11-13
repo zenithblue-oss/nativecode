@@ -6,9 +6,6 @@ import java.io.File
 /** Builds shell arguments and environment map for proot Debian sessions. */
 object ProotCommandBuilder {
 
-    private const val GIT_SAFE_DIRECTORY =
-        "export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=\"\$PWD\"; "
-
     private const val ANDROID_DEV_ENV =
         "export ANDROID_HOME=/opt/android-sdk ANDROID_SDK_ROOT=/opt/android-sdk; " +
             "export PATH=/opt/android-sdk/build-tools/36.1.0:/opt/android-sdk/platform-tools:\$PATH; "
@@ -17,32 +14,18 @@ object ProotCommandBuilder {
     private const val GPU_ENV =
         "[ -r /etc/profile.d/flux-gpu.sh ] && . /etc/profile.d/flux-gpu.sh; "
 
-    private fun resolveDistro(ctx: Context): String {
-        val alpaquita = File(
-            ctx.filesDir,
-            "usr/var/lib/proot-distro/containers/alpaquita/rootfs"
-        )
-        if (alpaquita.isDirectory) return "alpaquita"
-
-        val alpine = File(
-            ctx.filesDir,
-            "usr/var/lib/proot-distro/containers/alpine/rootfs"
-        )
-        if (alpine.isDirectory) return "alpine"
-
-        return ProjectPathResolver.DEFAULT_DISTRO
-    }
-
     private fun resolveRootfsDir(ctx: Context): File {
+        // Not ctx.filesDir: that is /data/user/0/…, which the guest cannot see. link2symlink
+        // stores this path in every hard-link symlink, so it must be the bound /data/data one.
         val alpaquita = File(
-            ctx.filesDir,
-            "usr/var/lib/proot-distro/containers/alpaquita/rootfs"
+            TermuxHostPaths.PREFIX,
+            "var/lib/proot-distro/containers/alpaquita/rootfs"
         )
         if (alpaquita.isDirectory) return alpaquita
 
         val alpine = File(
-            ctx.filesDir,
-            "usr/var/lib/proot-distro/containers/alpine/rootfs"
+            TermuxHostPaths.PREFIX,
+            "var/lib/proot-distro/containers/alpine/rootfs"
         )
         if (alpine.isDirectory) return alpine
 
@@ -67,20 +50,36 @@ object ProotCommandBuilder {
     ): Pair<Array<String>, HashMap<String, String>> {
         // Payload is one argv element. Guest bash interprets it; do not re-escape.
         // Linker prefix is added once by ShellCommandRunner.adjustHostCmd / sessionExec.
-        val args = buildList {
-            add("${TermuxHostPaths.BIN}/python")
-            add(TermuxHostPaths.PROOT_DISTRO)
-            add("login")
-            add(resolveDistro(ctx))
-            if (useSharedTmp) add("--shared-tmp")
-            add("--user"); add(user)
-            add("--")
-            add("/bin/bash"); add("--noprofile"); add("--norc")
-            add("-c")
-            add(ANDROID_DEV_ENV + GPU_ENV + shellCmd)
-        }.toTypedArray()
-        return args to prootHostEnv(ctx)
+        // Direct libproot.so launch: the python proot-distro wrapper cost ~290 ms per
+        // command (381 vs 86 ms for `true`, MT6897). Same proot flags and binds.
+        val (args, env) = buildDirect(
+            ctx, user, null, useSharedTmp,
+            listOf("/bin/bash", "--noprofile", "--norc", "-c", ANDROID_DEV_ENV + GPU_ENV + shellCmd)
+        )
+        // ShellCommandRunner merges the host env (LD_LIBRARY_PATH, PREFIX…) under this map and
+        // cannot unset keys, so pin the exact env in argv like proot-distro's clean execvpe did.
+        val guestEnv = legacyGuestEnv(env)
+        val argv = listOf("/system/bin/env", "-i") + guestEnv.map { (k, v) -> "$k=$v" } +
+            "/system/bin/linker64" + args
+        return argv.toTypedArray() to guestEnv
     }
+
+    private val LEGACY_ENV_KEYS = setOf(
+        "ANDROID_ART_ROOT", "ANDROID_DATA", "ANDROID_I18N_ROOT", "ANDROID_ROOT",
+        "ANDROID_RUNTIME_ROOT", "ANDROID_TZDATA_ROOT", "BOOTCLASSPATH", "DEX2OATBOOTCLASSPATH",
+        "EXTERNAL_STORAGE", "MOZ_FAKE_NO_SANDBOX", "PULSE_SERVER", "HOME", "USER", "TERM",
+        "PROOT_LOADER", "PROOT_TMP_DIR", "PROOT_L2S_DIR", "PROOT_NO_SECCOMP", "PROOT_VERBOSE"
+    )
+
+    /** Guest env that `proot-distro login` gave automation commands: no host vars, its PATH. */
+    internal fun legacyGuestEnv(env: Map<String, String>): HashMap<String, String> =
+        HashMap(env.filterKeys { it in LEGACY_ENV_KEYS }).apply {
+            put(
+                "PATH",
+                "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" +
+                    "/usr/local/games:/usr/games:/system/bin:/system/xbin:${TermuxHostPaths.BIN}"
+            )
+        }
 
     private fun ensureSysdata(sysdataDir: File) {
         if (sysdataDir.exists() && File(sysdataDir, "stat").exists()) return
@@ -271,6 +270,7 @@ object ProotCommandBuilder {
         // Shared storage
         val sdcard = File("/storage/emulated/0")
         if (sdcard.isDirectory && sdcard.canRead()) {
+            argsList.add("--bind=/storage/emulated/0")
             argsList.add("--bind=/storage/emulated/0:/sdcard")
             argsList.add("--bind=/storage/emulated/0:/mnt/sdcard")
         }
@@ -303,6 +303,8 @@ object ProotCommandBuilder {
 
         // Host prefix & tmp
         argsList.add("--bind=${TermuxHostPaths.PREFIX}")
+        // Hard links made by 1.7.x shells point at /data/user/0/…/.l2s; keep them resolvable.
+        argsList.add("--bind=${TermuxHostPaths.PREFIX}:/data/user/0/${TermuxHostPaths.PACKAGE}/files/usr")
         if (useSharedTmp) {
             val hostTmp = File(TermuxHostPaths.TMPDIR)
             try { hostTmp.mkdirs() } catch (_: Exception) {}
@@ -347,7 +349,10 @@ object ProotCommandBuilder {
 
             val basePath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             val sdkPath = "/opt/android-sdk/build-tools/36.1.0:/opt/android-sdk/platform-tools"
-            val userBins = "$guestHome/.local/bin:$guestHome/bin:$guestHome/.cargo/bin:/opt/nodejs/bin"
+            // CLI self-update targets first (opencode 2.x -> ~/.opencode/bin, npm -g, claude, grok, agy, kiro -> ~/.local/bin).
+            put("NPM_CONFIG_PREFIX", "$guestHome/.local")
+            put("NPM_CONFIG_ALLOW_SCRIPTS", "opencode-ai")
+            val userBins = "$guestHome/.opencode/bin:$guestHome/.local/bin:$guestHome/bin:$guestHome/.cargo/bin:/opt/nodejs/bin"
             put("PATH", "$userBins:$sdkPath:$basePath:${TermuxHostPaths.BIN}")
         }
 

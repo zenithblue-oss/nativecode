@@ -43,12 +43,10 @@ class NativeCodeTerminalSessionClient(
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString() ?: return
         val view = terminalViewRef()
-        val apply = Runnable {
-            view?.setTopRow(0)
-            session.emulator?.paste(text) ?: session.write(text)
-        }
-        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) apply.run()
-        else view?.post(apply) ?: android.os.Handler(android.os.Looper.getMainLooper()).post(apply)
+        view?.post { view.setTopRow(0) }
+        // Never write on the UI thread: session.write blocks when the 4 KB input queue is full, and
+        // the echoed output that would drain it needs the UI thread (deadlock -> ANR).
+        executor.execute { session.emulator?.paste(text) ?: session.write(text) }
     }
 
     override fun onBell(session: TerminalSession) {}

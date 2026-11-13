@@ -198,7 +198,7 @@ mkdir -p "$ENV_DIR"
 cat > "$ENV_FILE" <<'ENVEOF'
 # Managed by NativeCode setup_cli_tools (prebuilt rootfs: Node 24 system)
 # Runtime only. NVM functions and completion load for interactive shells below.
-export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 
 if [ -n "${FLUX_NODE_BIN:-}" ] && [ -x "$FLUX_NODE_BIN" ] && "$FLUX_NODE_BIN" -v >/dev/null 2>&1; then
@@ -511,7 +511,7 @@ ensure_source_line "$FLUX_HOME/.profile" "profile"
 echo ""
 echo ">>> Verification (as $FLUX_USER):"
 as_flux '
-    export PATH="$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+    export PATH="$HOME/.opencode/bin:$HOME/.local/bin:$HOME/.grok/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 || true
     if [ -d "$NVM_DIR/versions/node" ]; then

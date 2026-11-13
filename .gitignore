@@ -10,6 +10,8 @@ local.properties
 key.properties
 *.jks
 *.keystore
+# Firebase config (local only)
+app/google-services.json
 
 # Ignore large bootstrap assets and packaging roots
 bootstrap.tar

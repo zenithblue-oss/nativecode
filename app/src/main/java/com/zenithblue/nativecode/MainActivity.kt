@@ -56,7 +56,14 @@ import com.zenithblue.nativecode.entitlements.EntitlementStore
 import com.zenithblue.nativecode.entitlements.FeatureGate
 import com.zenithblue.nativecode.entitlements.GateResult
 import com.zenithblue.nativecode.entitlements.ProFeature
-import com.zenithblue.nativecode.entitlements.XfceBudget
+import com.zenithblue.nativecode.desktop.DesktopController
+import com.zenithblue.nativecode.desktop.DesktopPill
+import com.zenithblue.nativecode.workspace.StatStrip
+import com.zenithblue.nativecode.workspace.StatsEditor
+import com.zenithblue.nativecode.workspace.ToolRail
+import com.zenithblue.nativecode.workspace.WorkspaceTopBar
+import com.zenithblue.nativecode.telemetry.ConsentSheet
+import com.zenithblue.nativecode.telemetry.Telemetry
 import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
 import com.google.android.play.core.assetpacks.AssetPackStateUpdateListener
@@ -68,6 +75,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
 import com.zenithblue.nativecode.terminal.*
 import com.zenithblue.nativecode.terminal.ui.*
+import com.zenithblue.nativecode.terminal.keys.ExtraKeysBar
+import com.zenithblue.nativecode.terminal.keys.KeyLayouts
+import com.zenithblue.nativecode.terminal.keys.KeyPreset
 import com.zenithblue.nativecode.marketplace.*
 import com.zenithblue.nativecode.github.*
 import com.zenithblue.nativecode.bridge.NativeCodeBridge
@@ -108,7 +118,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var sidebarListContainer: LinearLayout
 
     private lateinit var menuBtn: ImageView
-    private lateinit var displayBtn: ImageView
     private lateinit var addTerminalBtn: ImageView
     private lateinit var backBtn: ImageView
     private lateinit var scriptInstallBackBtn: ImageView
@@ -117,9 +126,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val sessionsList = ArrayList<TerminalSession>()
     private val terminalSessionTypes = ArrayList<String>()
     private lateinit var terminalToolSelectorScrollView: ScrollView
-    private lateinit var toggleExtraKeysBtn: ImageView
-    private lateinit var keepAwakeBtn: ImageView
-    private lateinit var terminalSkillsBtn: ImageView
     private var keepAwake = false
     private var skillsPicker: com.zenithblue.nativecode.skills.SkillsPickerSheet? = null
     private var activeSessionIndex = -1
@@ -333,18 +339,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var startGuiBtn: TextView
     private lateinit var stopGuiBtn: TextView
 
-    /** Streamed capture job for start/stop GUI scripts (never touches isScriptRunning). */
-    private var guiShellJob: ShellJob? = null
-
-    /** True while user-initiated STOP owns the card flip (ignore start cancel onDone). */
-    @Volatile private var guiUserStopping: Boolean = false
-
-    /** True after first healthy start log line (STOP shown). */
-    @Volatile private var guiDesktopRunning: Boolean = false
-
-    /** One X11 Activity launch per START attempt. */
-    @Volatile private var guiX11Launched: Boolean = false
-
     private val composeCpuState = androidx.compose.runtime.mutableIntStateOf(34)
     private val composeMemState = androidx.compose.runtime.mutableIntStateOf(82)
     private val composeRamUsedState = androidx.compose.runtime.mutableLongStateOf(0L)
@@ -443,6 +437,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val ID_X11_SETTINGS = 25
     private val ID_PROOT_FILES = 26
     private val ID_SKILLS = 27
+    private val ID_TOPBAR = 28
+    private lateinit var topBarScrollView: ScrollView
 
     private var fileViewerBackPage = ID_FILES
     private var diffViewerBackPage = ID_GIT
@@ -593,8 +589,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private var activeWorkspaceTabIndex = -1
 
     private lateinit var workspaceTerminalContainer: LinearLayout
-    private lateinit var workspaceKeyboardToolbar: LinearLayout
-    private lateinit var terminalKeyboardToolbar: LinearLayout
+    private lateinit var workspaceKeyboardToolbar: ExtraKeysBar
+    private lateinit var terminalKeyboardToolbar: ExtraKeysBar
 
     private val termModState = ModifierState()
     private val wsModState   = ModifierState()
@@ -690,6 +686,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         setContentView(drawerLayout)
         applyKeepAwake()
         ensurePostNotificationsPermission()
+        Telemetry.apply(this)
+        ConsentSheet.showOnceIfUnasked(this)
 
         // Apply Insets
         ViewCompat.setOnApplyWindowInsetsListener(drawerLayout) { _, insets ->
@@ -799,6 +797,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         super.onResume()
         NativeCodeBridge.agentUiDelegate = this
         applyKeepAwake()
+        if (desktop.isRunning) desktop.syncUi() // desktop started by a previous (recreated) Activity
         if (lastProState == null) lastProState = isPro() // state the onCreate-built views reflect
         if (!panvkChecked && ::componentsScrollView.isInitialized) {
             panvkChecked = true
@@ -860,6 +859,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun handleIntent(intent: Intent?) {
         intent?.let {
+            // Desktop notification "Stop": through the controller like every other entry point.
+            if (it.action == BackgroundService.ACTION_DESKTOP_STOP) {
+                it.action = null // one-shot: not replayed if this Activity is recreated
+                desktop.stop()
+            }
             // Chroot uninstall script deep-link: nativecode://callback?result=success&name=distro_uninstall_...
             val data = it.data
             if (!BuildConfig.PLAY_STORE_BUILD && data != null && data.scheme == "nativecode" && data.host == "callback") {
@@ -917,15 +921,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun startNativeCodeFgs(intent: Intent) {
         NativeCodeFgs.start(this, intent)
-    }
-
-    private fun acquireDesktopFgs() {
-        ensurePostNotificationsPermission()
-        NativeCodeFgs.acquire(this, NativeCodeFgs.OWNER_DESKTOP, BackgroundService.desktopIntent(this))
-    }
-
-    private fun releaseDesktopFgs() {
-        NativeCodeFgs.release(this, NativeCodeFgs.OWNER_DESKTOP)
     }
 
     private fun updateAppTerminalService() {
@@ -1103,6 +1098,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         if (::componentsScrollView.isInitialized) {
             componentsScrollView.visibility = View.GONE
+        }
+        if (::topBarScrollView.isInitialized) {
+            topBarScrollView.visibility = View.GONE
         }
         if (::hardwareScrollView.isInitialized) {
             hardwareScrollView.visibility = View.GONE
@@ -1299,6 +1297,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     refreshAiSafetyPage()
                 }
             }
+            ID_TOPBAR -> {
+                if (::topBarScrollView.isInitialized) {
+                    topBarScrollView.visibility = View.VISIBLE
+                    topBarScrollView.scrollTo(0, 0)
+                }
+            }
             ID_COMPONENTS -> {
                 if (::componentsScrollView.isInitialized) {
                     componentsScrollView.visibility = View.VISIBLE
@@ -1458,6 +1462,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             navigateBackFromSubpage(ID_COMPONENTS, fallback = ID_SETTINGS)
             return
         }
+        if (::topBarScrollView.isInitialized && topBarScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_TOPBAR, fallback = ID_SETTINGS)
+            return
+        }
         if (::aiSafetyScrollView.isInitialized && aiSafetyScrollView.visibility == View.VISIBLE) {
             navigateBackFromSubpage(ID_AI_SAFETY, fallback = ID_SETTINGS)
             return
@@ -1597,7 +1605,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             id == ID_CHROOT_SETTINGS || id == ID_PROOT_SETTINGS ||
             id == ID_SOFTWARE_MANAGER || id == ID_MARKETPLACE || id == ID_APPS || id == ID_MP_INSTALLER ||
             id == ID_CLI_AUTH || id == ID_AI_SAFETY || id == ID_PRIVACY_POLICY || id == ID_COMPONENTS ||
-            id == ID_HARDWARE || id == ID_X11_SETTINGS || id == ID_SKILLS
+            id == ID_HARDWARE || id == ID_X11_SETTINGS || id == ID_SKILLS || id == ID_TOPBAR
         ) {
             showGlobalNav = false
             showProjectNav = false
@@ -1855,106 +1863,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
         }
-        val spacer = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, 1, 1f)
-        }
-        displayBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_display)
-            setColorFilter(NC.SECONDARY)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            visibility = View.GONE
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply {
-                rightMargin = dp(8)
-            }
-            setOnClickListener {
-                val intent = Intent(this@MainActivity, com.termux.x11.MainActivity::class.java)
-                startActivity(intent)
-            }
-        }
 
-        // System Telemetry Badge (Top Right)
-        val fontNarrow = Typeface.createFromAsset(assets, "fonts/font.ttf")
-
-        val statusPlate = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = Color.parseColor("#3c4a3f"),
-                shadowColor = NC.SHADOW_GREEN,
-                offsetDp = 6
-            )
-            setPadding(dp(10), dp(2), dp(10), dp(2))
-            layoutParams = LinearLayout.LayoutParams(WRAP, dp(37))
+        // Phone stats (user-ordered, drop-to-fit): workspace/StatStrip
+        val headerStats = StatStrip(this).apply {
+            alignEnd = true
+            onCustomize = { openTopBarPage() }
+            layoutParams = LinearLayout.LayoutParams(0, dp(24), 1f).apply { leftMargin = dp(12) }
         }
-
-        val batIcon = ImageView(this).apply {
-            tag = "HEADER_BAT_ICON"
-            setImageResource(if (isBatteryCharging()) R.drawable.ic_battery_charging else R.drawable.ic_battery_discharging)
-            setColorFilter(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply {
-                rightMargin = dp(4)
-                gravity = Gravity.CENTER_VERTICAL
-            }
-        }
-        val batTv = TextView(this).apply {
-            tag = "HEADER_BAT"
-            text = "${readBatteryUsage()}%"
-            textSize = 12f
-            setTextColor(Color.WHITE)
-            typeface = fontNarrow
-        }
-        val batContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(batIcon)
-            addView(batTv)
-        }
-
-        val divider1 = View(this).apply {
-            setBackgroundColor(Color.parseColor("#26FFFFFF"))
-            layoutParams = LinearLayout.LayoutParams(dp(1), dp(12)).apply {
-                leftMargin = dp(6)
-                rightMargin = dp(6)
-            }
-        }
-
-        val terminalGreen = Color.parseColor("#3DDC84")
-
-        val cpuTvHeader = TextView(this).apply {
-            tag = "HEADER_CPU"
-            text = "C: ${readCpuUsage()}%"
-            textSize = 12f
-            setTextColor(terminalGreen)
-            typeface = fontNarrow
-        }
-
-        val divider2 = View(this).apply {
-            setBackgroundColor(Color.parseColor("#26FFFFFF"))
-            layoutParams = LinearLayout.LayoutParams(dp(1), dp(12)).apply {
-                leftMargin = dp(6)
-                rightMargin = dp(6)
-            }
-        }
-
-        val ramTvHeader = TextView(this).apply {
-            tag = "HEADER_RAM"
-            text = "R: ${readMemUsage()}"
-            textSize = 12f
-            setTextColor(terminalGreen)
-            typeface = fontNarrow
-        }
-
-        statusPlate.addView(batContainer)
-        statusPlate.addView(divider1)
-        statusPlate.addView(cpuTvHeader)
-        statusPlate.addView(divider2)
-        statusPlate.addView(ramTvHeader)
 
         unifiedHeader.addView(logoContainer)
-        unifiedHeader.addView(spacer)
-        unifiedHeader.addView(displayBtn)
-        unifiedHeader.addView(statusPlate)
+        unifiedHeader.addView(headerStats)
+        // Desktop start / view / stop from every page: desktop/DesktopPill
+        unifiedHeader.addView(DesktopPill(this, desktop).apply {
+            (layoutParams as LinearLayout.LayoutParams).leftMargin = dp(8)
+        })
         mainContentLayout.addView(unifiedHeader)
 
         startResourceMonitoring()
@@ -2086,6 +2008,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         buildCliAuthPage()
         buildAiSafetyPage()
         buildComponentsPage()
+        buildTopBarPage()
         buildPrivacyPolicyPage()
         buildHardwarePage()
         buildProotSettingsPage()
@@ -2117,6 +2040,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         contentFrame.addView(cliAuthScrollView)
         contentFrame.addView(aiSafetyScrollView)
         contentFrame.addView(componentsScrollView)
+        contentFrame.addView(topBarScrollView)
         contentFrame.addView(privacyPolicyScrollView)
         contentFrame.addView(hardwareScrollView)
         contentFrame.addView(x11SettingsScrollView)
@@ -2478,9 +2402,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             if (::terminalKeyboardToolbar.isInitialized) {
                 terminalKeyboardToolbar.visibility = if (showExtraKeys) View.VISIBLE else View.GONE
-            }
-            if (::toggleExtraKeysBtn.isInitialized) {
-                toggleExtraKeysBtn.visibility = View.VISIBLE
             }
             terminalView.attachSession(session)
             terminalView.onScreenUpdated()
@@ -3513,92 +3434,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     
-    private fun createSystemTelemetryPlate(
-        batTag: String = "HEADER_BAT",
-        cpuTag: String = "HEADER_CPU",
-        ramTag: String = "HEADER_RAM"
-    ): LinearLayout {
-        val fontNarrow = try { Typeface.createFromAsset(assets, "fonts/font.ttf") } catch (e: Exception) { Typeface.MONOSPACE }
-        val terminalGreen = Color.parseColor("#3DDC84")
-
-        val statusPlate = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = Color.parseColor("#3c4a3f"),
-                shadowColor = NC.SHADOW_GREEN,
-                offsetDp = 4,
-                cornerRadiusDp = 0
-            )
-            setPadding(dp(8), dp(2), dp(8), dp(2))
-            layoutParams = LinearLayout.LayoutParams(WRAP, dp(34))
-        }
-
-        val batIcon = ImageView(this).apply {
-            tag = "${batTag}_ICON"
-            setImageResource(if (isBatteryCharging()) R.drawable.ic_battery_charging else R.drawable.ic_battery_discharging)
-            setColorFilter(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(dp(16), dp(16)).apply {
-                rightMargin = dp(4)
-                gravity = Gravity.CENTER_VERTICAL
-            }
-        }
-        val batTv = TextView(this).apply {
-            tag = batTag
-            text = "${readBatteryUsage()}%"
-            textSize = 12f
-            setTextColor(Color.WHITE)
-            typeface = fontNarrow
-        }
-        val batContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(batIcon)
-            addView(batTv)
-        }
-
-        val divider1 = View(this).apply {
-            setBackgroundColor(Color.parseColor("#26FFFFFF"))
-            layoutParams = LinearLayout.LayoutParams(dp(1), dp(12)).apply {
-                leftMargin = dp(6)
-                rightMargin = dp(6)
-            }
-        }
-
-        val cpuTvHeader = TextView(this).apply {
-            tag = cpuTag
-            text = "C: ${readCpuUsage()}%"
-            textSize = 12f
-            setTextColor(terminalGreen)
-            typeface = fontNarrow
-        }
-
-        val divider2 = View(this).apply {
-            setBackgroundColor(Color.parseColor("#26FFFFFF"))
-            layoutParams = LinearLayout.LayoutParams(dp(1), dp(12)).apply {
-                leftMargin = dp(6)
-                rightMargin = dp(6)
-            }
-        }
-
-        val ramTvHeader = TextView(this).apply {
-            tag = ramTag
-            text = "R: ${readMemUsage()}"
-            textSize = 12f
-            setTextColor(terminalGreen)
-            typeface = fontNarrow
-        }
-
-        statusPlate.addView(batContainer)
-        statusPlate.addView(divider1)
-        statusPlate.addView(cpuTvHeader)
-        statusPlate.addView(divider2)
-        statusPlate.addView(ramTvHeader)
-
-        return statusPlate
-    }
-
     private fun cyberBrutalistBg(
         fillColor: Int,
         strokeColor: Int = Color.parseColor("#3c4a3f"),
@@ -4288,332 +4123,27 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (seen) picker() else showAttachmentTutorial(picker)
     }
 
-    private fun makeToolbarKeyBtn(label: String, widePad: Boolean = false, cornerRadius: Int = dp(5), marginRight: Int = dp(5), height: Int = WRAP, exactWidth: Int? = null, iconResId: Int? = null): TextView {
-        return TextView(this).apply {
-            text = if (iconResId != null) "" else label
-            if (iconResId != null) {
-                setCompoundDrawablesWithIntrinsicBounds(iconResId, 0, 0, 0)
-                compoundDrawableTintList = android.content.res.ColorStateList.valueOf(NC.ON_SURF_VAR)
-            }
-            textSize = 11f
-            typeface = Typeface.MONOSPACE
-            setTextColor(NC.ON_SURF_VAR)
-            background = roundedBg(NC.SURFACE, NC.BORDER, cornerRadius)
-            val hp = if (widePad) dp(10) else dp(8)
-            setPadding(hp, dp(6), hp, dp(6))
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(exactWidth ?: WRAP, height).apply { rightMargin = marginRight }
-        }
-    }
-
-    private fun makeModifierBtn(label: String, state: () -> Boolean, cornerRadius: Int = dp(5), marginRight: Int = dp(5), onPress: () -> Unit, onLongPress: () -> Unit): TextView {
-        val btn = TextView(this).apply {
-            text = label
-            textSize = 11f
-            typeface = Typeface.MONOSPACE
-            setTextColor(NC.ON_SURF_VAR)
-            background = roundedBg(NC.SURFACE, NC.BORDER, cornerRadius)
-            setPadding(dp(9), dp(6), dp(9), dp(6))
-            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = marginRight }
-        }
-        fun updateStyle() {
-            if (state()) {
-                btn.setTextColor(NC.PRIMARY)
-                btn.background = roundedBg(
-                    (NC.PRIMARY and 0x00FFFFFF) or 0x33000000, NC.PRIMARY, cornerRadius
-                )
-            } else {
-                btn.setTextColor(NC.ON_SURF_VAR)
-                btn.background = roundedBg(NC.SURFACE, NC.BORDER, cornerRadius)
-            }
-        }
-        btn.setOnClickListener { onPress(); updateStyle() }
-        btn.setOnLongClickListener { onLongPress(); updateStyle(); true }
-        return btn
-    }
-
-    // ── Shared special-keys toolbar builder ────────────────────────────────────
-    // Returns a LinearLayout (vertical, 2 rows + optional F-keys row)
-    @Suppress("UNUSED_PARAMETER")
-    private fun buildSpecialKeysToolbar(
+    /** Extra keys: terminal/keys/ExtraKeysBar (own design). This activity only routes keys and actions. */
+    private fun buildExtraKeysBar(
         tvRef: () -> TerminalView?,
         sessionRef: () -> TerminalSession?,
         modState: ModifierState,
-        onPickImage: () -> Unit,
-        onPickDocument: () -> Unit
-    ): LinearLayout {
-        val wrapper = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-            background = roundedBg(NC.SURFACE, NC.BORDER, 0)
-        }
-        
-        val metrics = resources.displayMetrics
-        val keyWidth = metrics.widthPixels / 8
+    ): ExtraKeysBar = ExtraKeysBar(this, modState, object : ExtraKeysBar.Host {
+        override fun send(key: String, ctrl: Boolean, alt: Boolean, shift: Boolean) =
+            injectKey(tvRef(), key, ctrl, alt, shift)
 
-        // ── Row 1: Modifiers + core keys + attach ──────────────────────────
-        val row1 = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, 0)
-        }
-
-        fun consumeModifiers() {
-            if (!modState.ctrlLocked) modState.ctrlActive = false
-            if (!modState.altLocked)  modState.altActive  = false
-            if (!modState.shiftLocked) modState.shiftActive = false
-        }
-
-        // Modifier buttons — we hold refs so we can refresh them
-        val ctrlBtn = makeModifierBtn(
-            "CTRL", { modState.ctrlActive }, cornerRadius = 0, marginRight = 0,
-            onPress = {
-                if (modState.ctrlLocked) {
-                    modState.ctrlActive = false; modState.ctrlLocked = false
-                } else {
-                    modState.ctrlActive = !modState.ctrlActive
-                    if (!modState.ctrlActive) modState.ctrlLocked = false
+        override fun action(id: String) {
+            when (id) {
+                KeyLayouts.ACTION_COPY -> TerminalScrollViewHelper.copyTranscript(this@MainActivity, sessionRef())
+                KeyLayouts.ACTION_PASTE -> sessionRef()?.onPasteTextFromClipboard()
+                KeyLayouts.ACTION_TRANSCRIPT -> {
+                    val customTf = try { Typeface.createFromAsset(assets, "fonts/font.ttf") } catch (_: Exception) { null }
+                    TerminalScrollViewHelper.showScrollViewDialog(this@MainActivity, sessionRef(), customTf)
                 }
-            },
-            onLongPress = { modState.ctrlActive = true; modState.ctrlLocked = true }
-        ).apply {
-            layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = 0 }
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 0)
-        }
-        val altBtn = makeModifierBtn(
-            "ALT", { modState.altActive }, cornerRadius = 0, marginRight = 0,
-            onPress = {
-                if (modState.altLocked) {
-                    modState.altActive = false; modState.altLocked = false
-                } else {
-                    modState.altActive = !modState.altActive
-                    if (!modState.altActive) modState.altLocked = false
-                }
-            },
-            onLongPress = { modState.altActive = true; modState.altLocked = true }
-        ).apply {
-            layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = 0 }
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 0)
-        }
-        val shiftBtn = makeModifierBtn(
-            "SHFT", { modState.shiftActive }, cornerRadius = 0, marginRight = 0,
-            onPress = {
-                if (modState.shiftLocked) {
-                    modState.shiftActive = false; modState.shiftLocked = false
-                } else {
-                    modState.shiftActive = !modState.shiftActive
-                    if (!modState.shiftActive) modState.shiftLocked = false
-                }
-            },
-            onLongPress = { modState.shiftActive = true; modState.shiftLocked = true }
-        ).apply {
-            layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = 0 }
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 0)
-        }
-
-        // Helper: refresh modifier button appearances (called after a key is consumed)
-        fun refreshModBtns() {
-            listOf(ctrlBtn to { modState.ctrlActive },
-                   altBtn  to { modState.altActive },
-                   shiftBtn to { modState.shiftActive }).forEach { (btn, activeGetter) ->
-                if (activeGetter()) {
-                    btn.setTextColor(NC.PRIMARY)
-                    btn.background = roundedBg((NC.PRIMARY and 0x00FFFFFF) or 0x33000000, NC.PRIMARY, 0)
-                } else {
-                    btn.setTextColor(NC.ON_SURF_VAR)
-                    btn.background = roundedBg(NC.SURFACE, NC.BORDER, 0)
-                }
+                KeyLayouts.ACTION_LIVE -> tvRef()?.setTopRow(0)
             }
         }
-        modState.onStateChanged = { runOnUiThread { refreshModBtns() } }
-
-        // Core key row 1: ESC TAB ENTER BKSP
-        data class KeyDef(val label: String, val key: String)
-        val coreKeys1 = listOf(
-            KeyDef("ESC", "ESC"), KeyDef("TAB", "TAB"), KeyDef("ENT", "ENTER"), KeyDef("BKSP", "BKSP")
-        )
-        val coreBtn1 = coreKeys1.map { kd ->
-            makeToolbarKeyBtn(kd.label, cornerRadius = 0, marginRight = 0).apply {
-                layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = 0 }
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, 0)
-            }.also { btn ->
-                btn.setOnClickListener {
-                    injectKey(tvRef(), kd.key, modState.ctrlActive, modState.altActive, modState.shiftActive)
-                    consumeModifiers(); refreshModBtns()
-                }
-            }
-        }
-
-        // Image attach button
-        val attachBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_attach_image)
-            setColorFilter(NC.ON_SURF_VAR)
-            contentDescription = "Attach image to Linux"
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            background = roundedBg(NC.SURFACE, NC.BORDER, 0)
-            setPadding(dp(13), dp(13), dp(13), dp(13))
-            layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = 0 }
-            setOnClickListener { pickAttachmentWithTutorial(onPickImage) }
-            setOnLongClickListener { showAttachmentTutorial(); true }
-        }
-
-        val documentBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_attach_file)
-            setColorFilter(NC.ON_SURF_VAR)
-            contentDescription = "Attach file to Linux"
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            background = roundedBg(NC.SURFACE, NC.BORDER, 0)
-            setPadding(dp(13), dp(13), dp(13), dp(13))
-            layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = 0 }
-            setOnClickListener { pickAttachmentWithTutorial(onPickDocument) }
-            setOnLongClickListener { showAttachmentTutorial(); true }
-        }
-
-        row1.addView(ctrlBtn); row1.addView(altBtn); row1.addView(shiftBtn)
-        coreBtn1.forEach { row1.addView(it) }
-        row1.addView(attachBtn)
-        row1.addView(documentBtn)
-
-        // ── Row 2: Scrollable special keys ────────────────────────────────
-        val row2scroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-        }
-        val row2 = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, 0)
-        }
-
-        // Arrow cluster
-        val arrowKeys = listOf(
-            Triple(R.drawable.ic_arrow_left, "LEFT", "←"),
-            Triple(R.drawable.ic_arrow_up, "UP", "↑"),
-            Triple(R.drawable.ic_arrow_down, "DOWN", "↓"),
-            Triple(R.drawable.ic_arrow_right, "RIGHT", "→")
-        )
-        arrowKeys.forEach { (iconId, key, label) ->
-            val btn = makeToolbarKeyBtn(label, marginRight = 0, height = dp(44), exactWidth = keyWidth, iconResId = iconId)
-            btn.setOnClickListener {
-                injectKey(tvRef(), key, modState.ctrlActive, modState.altActive, modState.shiftActive)
-                consumeModifiers(); refreshModBtns()
-            }
-            row2.addView(btn)
-        }
-
-        // Nav cluster divider
-        val div2 = View(this).apply {
-            setBackgroundColor(NC.BORDER)
-            layoutParams = LinearLayout.LayoutParams(dp(1), dp(44))
-        }
-        // row2.addView(div2)
-
-        val navKeys = listOf(
-            Triple(R.drawable.ic_backspace, "DEL", "⌦"),
-            Triple(null, "INS", "Ins")
-        )
-        navKeys.forEach { (iconId, key, label) ->
-            val btn = makeToolbarKeyBtn(label, marginRight = 0, height = dp(44), exactWidth = keyWidth, iconResId = iconId)
-            btn.setOnClickListener {
-                injectKey(tvRef(), key, modState.ctrlActive, modState.altActive, modState.shiftActive)
-                consumeModifiers(); refreshModBtns()
-            }
-            row2.addView(btn)
-        }
-
-        // Symbol cluster divider
-        val div3 = View(this).apply {
-            setBackgroundColor(NC.BORDER)
-            layoutParams = LinearLayout.LayoutParams(dp(1), dp(44))
-        }
-        // row2.addView(div3)
-
-        val symKeys = listOf("/", "|", "~", "-", "_", "\\")
-        symKeys.forEach { sym ->
-            val btn = makeToolbarKeyBtn(sym, marginRight = 0, height = dp(44), exactWidth = keyWidth)
-            btn.setOnClickListener {
-                injectKey(tvRef(), sym, modState.ctrlActive, modState.altActive, modState.shiftActive)
-                consumeModifiers(); refreshModBtns()
-            }
-            row2.addView(btn)
-        }
-
-        // F-key toggle
-        val div4 = View(this).apply {
-            setBackgroundColor(NC.BORDER)
-            layoutParams = LinearLayout.LayoutParams(dp(1), dp(44))
-        }
-        // row2.addView(div4)
-
-        var fRowVisible = false
-        val fnBtn = makeToolbarKeyBtn("Fn", marginRight = 0, height = dp(44), exactWidth = keyWidth)
-        row2.addView(fnBtn)
-
-        val copyAllBtn = makeToolbarKeyBtn("COPY", marginRight = 0, height = dp(44), exactWidth = (keyWidth * 1.3).toInt()).apply {
-            setTextColor(NC.PRIMARY)
-            setOnClickListener {
-                TerminalScrollViewHelper.copyTranscript(this@MainActivity, sessionRef())
-            }
-        }
-        row2.addView(copyAllBtn)
-
-        val scrollBtn = makeToolbarKeyBtn("Transcript", marginRight = 0, height = dp(44), exactWidth = (keyWidth * 2.2).toInt()).apply {
-            setTextColor(NC.PRIMARY)
-            setOnClickListener {
-                val customTf = try { Typeface.createFromAsset(assets, "fonts/font.ttf") } catch (_: Exception) { null }
-                TerminalScrollViewHelper.showScrollViewDialog(this@MainActivity, sessionRef(), customTf)
-            }
-        }
-        row2.addView(scrollBtn)
-
-        val liveBtn = makeToolbarKeyBtn("Jump to live", marginRight = 0, height = dp(44), exactWidth = (keyWidth * 2.4).toInt()).apply {
-            setTextColor(NC.PRIMARY)
-            setOnClickListener { tvRef()?.setTopRow(0) }
-        }
-        row2.addView(liveBtn)
-
-        // F-keys row (hidden by default)
-        val fRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            visibility = View.GONE
-        }
-        val fScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-            setPadding(0, 0, 0, 0)
-        }
-        (1..12).forEach { n ->
-            val btn = makeToolbarKeyBtn("F$n", marginRight = 0, height = dp(44), exactWidth = keyWidth)
-            btn.setOnClickListener {
-                injectKey(tvRef(), "F$n", modState.ctrlActive, modState.altActive, modState.shiftActive)
-                consumeModifiers(); refreshModBtns()
-            }
-            fRow.addView(btn)
-        }
-        fScroll.addView(fRow)
-
-        fnBtn.setOnClickListener {
-            fRowVisible = !fRowVisible
-            fScroll.visibility = if (fRowVisible) View.VISIBLE else View.GONE
-            fnBtn.setTextColor(if (fRowVisible) NC.PRIMARY else NC.ON_SURF_VAR)
-            fnBtn.background = if (fRowVisible)
-                roundedBg((NC.PRIMARY and 0x00FFFFFF) or 0x33000000, NC.PRIMARY, dp(5))
-            else roundedBg(NC.SURFACE, NC.BORDER, dp(5))
-        }
-
-        row2scroll.addView(row2)
-
-        wrapper.addView(row1)
-        wrapper.addView(row2scroll)
-        wrapper.addView(fScroll)
-
-        return wrapper
-    }
+    }).apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP) }
 
     private fun buildTerminalLayout() {
         terminalWorkspaceLayout = LinearLayout(this).apply {
@@ -4647,13 +4177,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
         }
-        val termSysPlate = createSystemTelemetryPlate("TERM_HEADER_BAT", "TERM_HEADER_CPU", "TERM_HEADER_RAM").apply {
-            layoutParams = LinearLayout.LayoutParams(WRAP, dp(34)).apply {
+        // Stretched strip: drops the chips that do not fit instead of pushing the rail out
+        val termStats = StatStrip(this).apply {
+            onCustomize = { openTopBarPage() }
+            layoutParams = LinearLayout.LayoutParams(0, dp(24), 1f).apply {
                 leftMargin = dp(8)
+                rightMargin = dp(8)
             }
-        }
-        val spacerTerminal = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, dp(1), 1f)
         }
         val addTerminalWorkspaceBtn = ImageView(this).apply {
             tag = "ADD_TERM_BTN"
@@ -4667,35 +4197,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
         }
-        keepAwakeBtn = ImageView(this).apply {
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(4) }
-            setOnClickListener { toggleKeepAwake() }
-        }
-        terminalSkillsBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_smart_toy)
-            setColorFilter(NC.ON_SURFACE)
-            contentDescription = "Skills"
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(4) }
-            setOnClickListener { showSkillsPicker() }
-        }
-        toggleExtraKeysBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_keyboard)
-            setColorFilter(if (showExtraKeys) NC.PRIMARY else NC.ON_SURF_VAR)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(4) }
-            setOnClickListener {
-                setExtraKeysEnabled(!showExtraKeys)
-                setColorFilter(if (showExtraKeys) NC.PRIMARY else NC.ON_SURF_VAR)
-            }
-        }
         terminalTopBar.addView(menuTerminalBtn)
-        terminalTopBar.addView(termSysPlate)
-        terminalTopBar.addView(spacerTerminal)
-        terminalTopBar.addView(keepAwakeBtn)
-        terminalTopBar.addView(terminalSkillsBtn)
-        terminalTopBar.addView(toggleExtraKeysBtn)
+        terminalTopBar.addView(termStats)
+        terminalTopBar.addView(ToolRail(this).also { fillToolRail(it, workspace = false) })
         terminalTopBar.addView(addTerminalWorkspaceBtn)
         terminalWorkspaceLayout.addView(terminalTopBar)
         applyKeepAwake()
@@ -4720,15 +4224,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         terminalWorkspaceLayout.addView(terminalViewContainer)
 
-        // Full special-keys toolbar (replaces old dummy bar + attach bar)
-        terminalKeyboardToolbar = buildSpecialKeysToolbar(
+        terminalKeyboardToolbar = buildExtraKeysBar(
             tvRef = { if (::terminalView.isInitialized) terminalView else null },
             sessionRef = { terminalSession },
             modState = termModState,
-            onPickImage = {
-                termImagePickerLauncher.launch("image/*")
-            },
-            onPickDocument = { termDocumentPickerLauncher.launch(arrayOf("*/*")) }
         ).apply {
             visibility = if (showExtraKeys) View.VISIBLE else View.GONE
         }
@@ -4753,83 +4252,45 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
-    private fun showWorkspaceToolsMenu(anchor: View) {
-        val popupView = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_CONTAINER,
-                strokeColor = NC.PRIMARY,
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 4,
-                cornerRadiusDp = 0,
-                rightFaceColor = NC.OUTLINE_VAR
-            )
-        }
-        val popupWindow = PopupWindow(
-            popupView,
-            dp(220),
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            true
-        ).apply {
-            isOutsideTouchable = true
-            isFocusable = true
-            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-            elevation = dp(10).toFloat()
-        }
-        fun row(icon: Int, label: String, on: Boolean, tinted: Boolean, click: () -> Unit): LinearLayout {
-            return LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(12), dp(11), dp(12), dp(11))
-                background = roundedBg(NC.SURFACE_CONTAINER, Color.TRANSPARENT, 0)
-                addView(ImageView(this@MainActivity).apply {
-                    setImageResource(icon)
-                    if (tinted) setColorFilter(if (on) NC.PRIMARY else NC.ON_SURF_VAR)
-                    layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(12) }
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                })
-                addView(TextView(this@MainActivity).apply {
-                    text = label
-                    textSize = 12f
-                    typeface = Typeface.MONOSPACE
-                    paint.isFakeBoldText = true
-                    setTextColor(if (on) NC.PRIMARY else NC.ON_SURFACE)
-                    layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-                })
-                if (on) {
-                    addView(TextView(this@MainActivity).apply {
-                        text = "ON"
-                        textSize = 10f
-                        typeface = Typeface.MONOSPACE
-                        paint.isFakeBoldText = true
-                        setTextColor(Color.parseColor("#0A0A0A"))
-                        background = GradientDrawable().apply {
-                            shape = GradientDrawable.RECTANGLE
-                            setColor(NC.PRIMARY)
-                        }
-                        setPadding(dp(6), dp(2), dp(6), dp(2))
-                    })
-                }
-                setOnClickListener {
-                    popupWindow.dismiss()
-                    click()
-                }
+    /** Tool rails (terminal + project workspace top bars); same tools, all visible, no popup. */
+    private val toolRails = ArrayList<ToolRail>()
+
+    private fun fillToolRail(rail: ToolRail, workspace: Boolean) {
+        rail.add(
+            icon = { R.drawable.ic_keyboard },
+            desc = { if (showExtraKeys) "Extra keys: on" else "Extra keys: off" },
+            active = { showExtraKeys },
+        ) { setExtraKeysEnabled(!showExtraKeys) }
+        // Attach lives here now (was two keys in the extra-keys row). Hold = how it works.
+        rail.add(
+            icon = { R.drawable.ic_attach_image },
+            desc = { "Attach image to Linux" },
+            onLongClick = { showAttachmentTutorial() },
+        ) {
+            pickAttachmentWithTutorial {
+                (if (workspace) wsImagePickerLauncher else termImagePickerLauncher).launch("image/*")
             }
         }
-        popupView.addView(row(R.drawable.ic_keyboard, "EXTRA KEYS", showExtraKeys, true) {
-            setExtraKeysEnabled(!showExtraKeys)
-        })
-        popupView.addView(row(
-            if (keepAwake) R.drawable.ic_visibility else R.drawable.ic_visibility_off,
-            "KEEP AWAKE",
-            keepAwake,
-            true
-        ) { toggleKeepAwake() })
-        popupView.addView(row(R.drawable.ic_smart_toy, "COPY SKILL", false, true) {
-            showSkillsPicker()
-        })
-        popupWindow.showAsDropDown(anchor, 0, dp(4))
+        rail.add(
+            icon = { R.drawable.ic_attach_file },
+            desc = { "Attach file to Linux" },
+            onLongClick = { showAttachmentTutorial() },
+        ) {
+            pickAttachmentWithTutorial {
+                (if (workspace) wsDocumentPickerLauncher else termDocumentPickerLauncher).launch(arrayOf("*/*"))
+            }
+        }
+        rail.add(
+            icon = { R.drawable.ic_smart_toy },
+            desc = { "Copy skill" },
+        ) { showSkillsPicker() }
+        rail.add(
+            icon = { if (keepAwake) R.drawable.ic_visibility else R.drawable.ic_visibility_off },
+            desc = { if (keepAwake) "Keep awake: on" else "Keep awake: off" },
+            active = { keepAwake },
+        ) { toggleKeepAwake() }
+        rail.addControl(DesktopPill(this, desktop))
+        toolRails += rail
     }
 
     /** Play-safe keep-awake: FLAG_KEEP_SCREEN_ON only. No WAKE_LOCK. Off when user toggles or app backgrounds. */
@@ -4839,14 +4300,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         } else {
             window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
-        if (::keepAwakeBtn.isInitialized) {
-            keepAwakeBtn.setImageResource(
-                if (keepAwake) R.drawable.ic_visibility else R.drawable.ic_visibility_off
-            )
-            keepAwakeBtn.setColorFilter(if (keepAwake) NC.PRIMARY else NC.ON_SURF_VAR)
-            keepAwakeBtn.contentDescription =
-                if (keepAwake) "Keep screen on" else "Allow screen sleep"
-        }
+        toolRails.forEach { it.refresh() }
     }
 
     private fun buildGitOperationsLayout() {
@@ -4961,6 +4415,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(buildTerminalSettingsCard())
         settingsHubLayout.addView(spacer(16))
 
+        // Top bar phone stats: own page (pick + reorder + live preview)
+        settingsHubLayout.addView(
+            settingsHubNavRow(
+                iconRes = R.drawable.ic_tune_thick,
+                title = "TOP BAR",
+                subtitle = "Phone stats · order",
+                pageId = ID_TOPBAR
+            )
+        )
+        settingsHubLayout.addView(spacer(16))
+
         // GitHub account
         settingsHubLayout.addView(buildSettingsGithubCard())
         settingsHubLayout.addView(spacer(16))
@@ -4999,6 +4464,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         // Privacy Policy — opens public GitHub markdown
         settingsHubLayout.addView(buildPrivacyPolicyCard())
+        settingsHubLayout.addView(spacer(16))
+        // Opt-in crash reports / usage statistics (telemetry/ConsentSheet)
+        settingsHubLayout.addView(secondaryButton("CRASH REPORTS & USAGE STATS") { ConsentSheet.show(this) })
         settingsHubLayout.addView(spacer(20))
 
         // App version code + commit from gradle BuildConfig
@@ -5977,6 +5445,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun gateAllows(result: GateResult): Boolean {
         if (result is GateResult.Deny) {
             Log.i("NCBilling", "gate deny ${result.upsell}: ${result.reason}")
+            Telemetry.log(this, Telemetry.Event.FREE_LIMIT_HIT, Telemetry.Param.LIMIT to result.upsell.name)
             showUpgradeSheet(result.reason)
         }
         return result is GateResult.Allow
@@ -5988,29 +5457,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), type))) return false
         val others = projectTabNamesMap.filterKeys { it != activeProjectPath }.values.flatten()
         val aiCount = (terminalSessionTypes + workspaceTabNames + others).count { ToolLauncherCatalog.isAiToolType(it) }
-        return gateAllows(FeatureGate.canOpenAiSession(isPro(), aiCount))
-    }
-
-    private val xfceBudgetStop = Runnable {
-        if (isPro() || !guiDesktopRunning && guiShellJob == null) return@Runnable
-        Toast.makeText(this, "Free desktop time used for today", Toast.LENGTH_LONG).show()
-        guiUserStopping = true
-        setGuiStopBusy()
-        stopGui()
-        showUpgradeSheet("Free desktop time used for today")
-    }
-
-    private fun startXfceBudget() {
-        XfceBudget.start(this)
-        mainHandler.removeCallbacks(xfceBudgetStop)
-        if (BuildConfig.MONETISATION_ENFORCE && !isPro()) {
-            mainHandler.postDelayed(xfceBudgetStop, XfceBudget.remainingMs(this))
+        val ok = gateAllows(FeatureGate.canOpenAiSession(isPro(), aiCount))
+        if (ok) {
+            Telemetry.logOnce(this, Telemetry.Event.FIRST_AI_SESSION, Telemetry.Param.TOOL to type)
+            Telemetry.log(this, Telemetry.Event.AI_SESSION_START, Telemetry.Param.TOOL to type)
         }
-    }
-
-    private fun stopXfceBudget() {
-        mainHandler.removeCallbacks(xfceBudgetStop)
-        XfceBudget.stop(this)
+        return ok
     }
 
     private var proCardStatusTv: TextView? = null
@@ -6064,6 +5516,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     /** One shared Upgrade sheet: 3 plans (Play-localized prices), restore, manage. */
     private fun showUpgradeSheet(reason: String?) {
+        Telemetry.log(this, Telemetry.Event.PAYWALL_VIEW)
         val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
         fun line(t: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
             text = t
@@ -6087,16 +5540,24 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 12f, NC.ON_SURFACE
             )
         )
-        fun buy(label: String, sku: String, fallback: String) = primaryButton(
-            "$label · ${BillingRepository.price(sku) ?: fallback}"
+        fun buy(label: String, sku: String, unit: String, fallback: String) = primaryButton(
+            BillingRepository.label(label, sku, unit, fallback)
         ) {
             BillingRepository.launch(this, sku)?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
             sheet.dismiss()
         }.apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) } }
         if (!isPro()) {
-            col.addView(buy("MONTHLY", BillingRepository.SKU_MONTHLY, "$3.99/mo"))
-            col.addView(buy("YEARLY", BillingRepository.SKU_YEARLY, "$29.99/yr"))
-            col.addView(buy("LIFETIME", BillingRepository.SKU_LIFETIME, "$19.99"))
+            col.addView(buy("MONTHLY", BillingRepository.SKU_MONTHLY, "/mo", "$3.99/mo"))
+            col.addView(buy("YEARLY", BillingRepository.SKU_YEARLY, "/yr", "$29.99/yr"))
+            col.addView(buy("LIFETIME", BillingRepository.SKU_LIFETIME, "", "$19.99"))
+            // Play subscription policy: trial terms visible before purchase.
+            if (BillingRepository.hasTrial()) col.addView(
+                line(
+                    "Free trial for new subscribers. Renews at the price shown unless cancelled " +
+                        "in Google Play before the trial ends.",
+                    11f, NC.ON_SURF_VAR
+                ).apply { setPadding(0, dp(10), 0, 0) }
+            )
         }
         col.addView(secondaryButton("RESTORE PURCHASES") {
             BillingRepository.refresh { ok ->
@@ -9603,29 +9064,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 false
             }
 
-            setOnClickListener {
-                // Do not flip to STOP yet — wait for first start log line (healthy start)
-                if (!gateAllows(FeatureGate.canStartXfce(isPro(), XfceBudget.usedTodayMs(this@MainActivity)))) return@setOnClickListener
-                guiUserStopping = false
-                setGuiStartBusy()
-                startGui()
-            }
+            // Does not flip to STOP yet — waits for first start log line (healthy start)
+            setOnClickListener { desktop.start() }
         }
         startGuiBtn.isEnabled = false
         startGuiBtn.alpha = 0.5f
         startGuiBtn.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
 
-        stopGuiBtn = dangerButton("STOP PHOSH DESKTOP") {
-            guiUserStopping = true
-            setGuiStopBusy()
-            stopGui()
-            mainHandler.postDelayed({
-                if (guiUserStopping) {
-                    guiUserStopping = false
-                    setGuiCardIdle()
-                }
-            }, 6000)
-        }.apply {
+        stopGuiBtn = dangerButton("STOP PHOSH DESKTOP") { desktop.stop() }.apply {
             setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_stop_thick, 0, 0, 0)
             compoundDrawablePadding = dp(8)
             setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(Color.WHITE))
@@ -12968,13 +12414,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             Toast.makeText(this, "Not a launchable app", Toast.LENGTH_SHORT).show()
             return
         }
-        if (!guiDesktopRunning) {
+        if (!desktop.isRunning) {
             Toast.makeText(this, "Start Graphical Desktop for best results", Toast.LENGTH_SHORT).show()
         }
         try {
-            val intent = Intent(this, Class.forName("com.termux.x11.MainActivity"))
-            intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            startActivity(intent)
+            desktop.view(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         } catch (_: Exception) { /* ignore */ }
         if (mpBusy || isScriptRunning) {
             Toast.makeText(this, "Busy — try again", Toast.LENGTH_SHORT).show()
@@ -14525,9 +13969,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Require GUI already running (locked product decision)
         Toast.makeText(this, "Ensure Graphical Desktop is running", Toast.LENGTH_SHORT).show()
         try {
-            val intent = Intent(this, Class.forName("com.termux.x11.MainActivity"))
-            intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            startActivity(intent)
+            desktop.view(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         } catch (_: Exception) { /* ignore */ }
         mpBusy = true
         appendMpLog("Launch ${pkg.launch?.command} …")
@@ -14689,7 +14131,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun onSetupComplete() {
         mainHandler.post {
-            setGuiCardIdle()
+            desktop.syncUi()
             if (::stopGuiBtn.isInitialized) {
                 stopGuiBtn.isEnabled = true; stopGuiBtn.alpha = 1f
             }
@@ -14788,31 +14230,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
-    // ── Graphical Desktop log capture (VIEW LOGS / COPY) ─────────────────────
-    private val GUI_LOG_MAX_BYTES = 512L * 1024L
-
-    /** Host-only log file (app cache); never enters guest / isolation runners. */
-    private fun guiLogFile(): File = File(cacheDir, "gui_desktop.log")
-
-    /** Append one line with a ring cap: once over 512 KB, keep only the tail half. */
-    private fun guiLogAppend(line: String) {
-        try {
-            val f = guiLogFile()
-            val text = "$line\n"
-            if (f.exists() && f.length() + text.length > GUI_LOG_MAX_BYTES) {
-                val tail = f.readText().takeLast((GUI_LOG_MAX_BYTES / 2).toInt())
-                f.writeText(tail + text)
-            } else {
-                f.appendText(text)
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun guiLogHeader(action: String, script: String, method: String) {
-        guiLogAppend("")
-        guiLogAppend("=== $action method=$method script=$script ===")
-    }
+    // ── Graphical Desktop card painting (logic lives in desktop/DesktopController) ──
 
     /** Disable START on Settings + Home while desktop start is in flight. */
     private fun setGuiStartBusy() {
@@ -14829,9 +14247,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             stopGuiBtn.isEnabled = false
             stopGuiBtn.alpha = 0.5f
             stopGuiBtn.text = "STOPPING..."
-        }
-        if (::displayBtn.isInitialized) {
-            displayBtn.visibility = View.GONE
         }
     }
 
@@ -14862,7 +14277,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             startGuiBtn.markProLocked(false)
             return
         }
-        val min = (XfceBudget.remainingMs(this) + 59_999) / 60_000
+        val min = (desktop.remainingMs + 59_999) / 60_000
         startGuiBtn.text = "START PHOSH DESKTOP\n$min min left today"
         startGuiBtn.markProLocked(min == 0L)
     }
@@ -14870,7 +14285,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Idle: full-width START only (no VIEW LOGS). */
     private fun setGuiCardIdle() {
         if (!::startGuiBtn.isInitialized || !::stopGuiBtn.isInitialized) return
-        guiDesktopRunning = false
         startGuiBtn.visibility = View.VISIBLE
         val installed = isXfceInstalled()
         if (installed) {
@@ -14893,7 +14307,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Running: full-width STOP. Log capture stays; no VIEW LOGS button. */
     private fun setGuiCardRunning() {
         if (!::startGuiBtn.isInitialized || !::stopGuiBtn.isInitialized) return
-        guiDesktopRunning = true
         startGuiBtn.visibility = View.GONE
         stopGuiBtn.visibility = View.VISIBLE
         stopGuiBtn.isEnabled = true
@@ -14902,175 +14315,27 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopGuiBtn.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
     }
 
-    /**
-     * First healthy start/stop log line while STOP row is (or should be) active:
-     * show STOP, open display shortcut + X11 once.
-     */
-    private fun onGuiStreamHealthyLine() {
-        if (guiUserStopping) {
-            if (guiDesktopRunning || (::stopGuiBtn.isInitialized && stopGuiBtn.visibility == View.VISIBLE)) {
-                setGuiCardRunning()
-            }
-            return
-        }
-        setGuiCardRunning()
-        if (::displayBtn.isInitialized) {
-            displayBtn.visibility = View.VISIBLE
-        }
-        if (!guiX11Launched) {
-            guiX11Launched = true
-            mainHandler.postDelayed({
-                if (guiUserStopping || !guiDesktopRunning) return@postDelayed
-                val x11 = Intent(this, com.termux.x11.MainActivity::class.java)
-                x11.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                startActivity(x11)
-            }, 400)
-        }
-    }
-
-    /** Host bash + script argv (same isolation branch as before; not LinuxCommandBuilder). */
-    private fun guiHostScriptArgs(scriptName: String): Array<String> {
-        val bash = TermuxHostPaths.libBash(this).absolutePath
-        val script = File(TermuxHostPaths.HOME, scriptName)
-        val gpu = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("flux_gpu", "virgl") ?: "virgl"
-        return arrayOf(bash, script.absolutePath, ProjectPathResolver.DEFAULT_DISTRO, gpu)
-    }
-
-    /** Start XFCE: proot → start_gui.sh; chroot → start_gui_chroot.sh (host X11 + root DE). */
-    private fun startGui() {
-        ensurePostNotificationsPermission()
-        acquireDesktopFgs()
-
-        // Streamed capture, NOT runScriptInTerminal: GUI is long-lived so it must
-        // never hold isScriptRunning (marketplace/back/other scripts stay free).
-        guiShellJob?.cancel()
-        guiUserStopping = false
-        guiDesktopRunning = false
-        guiX11Launched = false
-        startXfceBudget()
-
-        executor.execute {
-            ensureBootstrapExtracted()
-            deployScripts()
-
-            val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
-            if (method == "chroot" && !ProjectPathResolver.isChrootInstalled()) {
-                mainHandler.post {
-                    Toast.makeText(
-                        this,
-                        "Chroot not installed. Settings → Chroot Settings or Onboarding.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-
-            val scriptName = if (method == "chroot") "start_gui_chroot.sh" else "start_gui.sh"
-            val script = File(TermuxHostPaths.HOME, scriptName)
-            if (!script.isFile) {
-                guiLogHeader("START", scriptName, method)
-                guiLogAppend("ERROR: missing host script ${script.absolutePath} (deployScripts failed?)")
-                mainHandler.post {
-                    Toast.makeText(this, "GUI script missing", Toast.LENGTH_LONG).show()
-                    setGuiCardIdle()
-                    releaseDesktopFgs()
-                }
-                return@execute
-            }
-            Log.i("GUI", "startGui method=$method script=${script.absolutePath}")
-            guiLogHeader("START", scriptName, method)
-            val supportLib = File(TermuxHostPaths.LIB, "libandroid-support.so")
-            if (!supportLib.isFile) {
-                guiLogAppend("WARN: missing ${supportLib.absolutePath} — libbash may fail to link; re-run host setup")
-            }
-
-            val args = guiHostScriptArgs(scriptName)
-            mainHandler.post {
-                if (guiUserStopping) return@post
-                guiShellJob = ShellCommandRunner.runStreamedCancelable(
-                    this,
-                    args,
-                    onLine = { line ->
-                        guiLogAppend(line)
-                        onGuiStreamHealthyLine()
-                    },
-                    onDone = { code ->
-                        guiLogAppend("[exit $code]")
-                        when {
-                            // Cancelled by user STOP — stop click owns flip
-                            code == -1 || guiUserStopping -> { /* leave card */ }
-                            code != 0 -> {
-                                Toast.makeText(
-                                    this,
-                                    "Desktop start failed (exit $code)",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                revertGuiCardToStart()
-                            }
-                            else -> {
-                                // Clean desktop exit (session ended)
-                                revertGuiCardToStart()
-                            }
-                        }
-                    }
-                )
-            }
-        }
-        // X11 opens from onGuiStreamHealthyLine (first script output) — not blind 500ms
-    }
-
-    /** Stop XFCE: proot → stop_gui.sh; chroot → stop_gui_chroot.sh (no proot pkill). */
-    private fun stopGui() {
-        val stopBroadcast = Intent("com.termux.x11.ACTION_STOP")
-        stopBroadcast.setPackage(packageName)
-        sendBroadcast(stopBroadcast)
-        releaseDesktopFgs()
-        stopXfceBudget()
-
-        guiShellJob?.cancel()
-
-        executor.execute {
-            deployScripts()
-            val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
-            val scriptName = if (method == "chroot") "stop_gui_chroot.sh" else "stop_gui.sh"
-            val script = File(TermuxHostPaths.HOME, scriptName)
-            Log.i("GUI", "stopGui method=$method script=${script.absolutePath}")
-            guiLogHeader("STOP", scriptName, method)
-            val args = guiHostScriptArgs(scriptName)
-
-            mainHandler.post {
-                guiShellJob = ShellCommandRunner.runStreamedCancelable(
-                    this,
-                    args,
-                    onLine = { line ->
-                        guiLogAppend(line)
-                        if (!guiUserStopping) {
-                            onGuiStreamHealthyLine()
-                        }
-                    },
-                    onDone = { code ->
-                        guiLogAppend("[exit $code]")
-                        guiUserStopping = false
-                        setGuiCardIdle()
-                    }
-                )
-            }
-        }
-    }
-
-    /** Start stream failed → card back to START (not stuck on STOP). */
-    private fun revertGuiCardToStart() {
-        guiDesktopRunning = false
-        stopXfceBudget()
-        setGuiCardIdle()
-        if (::displayBtn.isInitialized) {
-            displayBtn.visibility = View.GONE
-        }
-        releaseDesktopFgs()
+    /** Desktop start/stop/view/state/budget: desktop/DesktopController. This activity only paints. */
+    private val desktop: DesktopController by lazy {
+        DesktopController(this, executor, mainHandler, object : DesktopController.Host {
+            override fun isPro() = this@MainActivity.isPro()
+            override fun gateAllows(result: GateResult) = this@MainActivity.gateAllows(result)
+            override fun showUpgradeSheet(reason: String?) = this@MainActivity.showUpgradeSheet(reason)
+            override fun ensureBootstrapExtracted() = this@MainActivity.ensureBootstrapExtracted()
+            override fun deployScripts() = this@MainActivity.deployScripts()
+            override fun paintStartBusy() = setGuiStartBusy()
+            override fun paintStopBusy() = setGuiStopBusy()
+            override fun paintIdle() = setGuiCardIdle()
+            override fun paintRunning() = setGuiCardRunning()
+            override fun stopRowVisible() = ::stopGuiBtn.isInitialized && stopGuiBtn.visibility == View.VISIBLE
+            override fun desktopInstalled() = isXfceInstalled()
+            override fun openLogs() = openGuiLogPage()
+        })
     }
 
     /** VIEW LOGS from Graphical Desktop card → short host cat on the script page. */
     private fun openGuiLogPage() {
-        val f = guiLogFile()
+        val f = desktop.logFile()
         if (!f.exists() || f.length() == 0L) {
             Toast.makeText(this, "No desktop log yet", Toast.LENGTH_SHORT).show()
             return
@@ -15244,7 +14509,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         dismissGithubAuthOverlay()
         super.onDestroy()
         resourceMonitorRunnable?.let { mainHandler.removeCallbacks(it) }
-        releaseDesktopFgs()
+        // Recreation (font scale, theme): the desktop keeps running, so its notification must too.
+        if (!isChangingConfigurations) desktop.releaseFgs()
         stopService(Intent(this, TerminalService::class.java))
         for (session in sessionsList) {
             session.finishIfRunning()
@@ -15869,36 +15135,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     cpuTv?.text = "$cpuUsage%"
                     memTv?.text = memUsage
                     diskTv?.text = "$diskUsage%"
-                    if (::unifiedHeader.isInitialized) {
-                        val headerCpu = unifiedHeader.findViewWithTag<TextView>("HEADER_CPU")
-                        val headerRam = unifiedHeader.findViewWithTag<TextView>("HEADER_RAM")
-                        val headerBat = unifiedHeader.findViewWithTag<TextView>("HEADER_BAT")
-                        val headerBatIcon = unifiedHeader.findViewWithTag<ImageView>("HEADER_BAT_ICON")
-                        headerCpu?.text = "C: $cpuUsage%"
-                        headerRam?.text = "R: $memUsage"
-                        headerBat?.text = "$batUsage%"
-                        headerBatIcon?.setImageResource(batDrawableRes)
-                    }
-                    if (::terminalWorkspaceLayout.isInitialized) {
-                        val termCpu = terminalWorkspaceLayout.findViewWithTag<TextView>("TERM_HEADER_CPU")
-                        val termRam = terminalWorkspaceLayout.findViewWithTag<TextView>("TERM_HEADER_RAM")
-                        val termBat = terminalWorkspaceLayout.findViewWithTag<TextView>("TERM_HEADER_BAT")
-                        val termBatIcon = terminalWorkspaceLayout.findViewWithTag<ImageView>("TERM_HEADER_BAT_ICON")
-                        termCpu?.text = "C: $cpuUsage%"
-                        termRam?.text = "R: $memUsage"
-                        termBat?.text = "$batUsage%"
-                        termBatIcon?.setImageResource(batDrawableRes)
-                    }
-                    if (::projectWorkspaceLayout.isInitialized) {
-                        val projCpu = projectWorkspaceLayout.findViewWithTag<TextView>("PROJ_HEADER_CPU")
-                        val projRam = projectWorkspaceLayout.findViewWithTag<TextView>("PROJ_HEADER_RAM")
-                        val projBat = projectWorkspaceLayout.findViewWithTag<TextView>("PROJ_HEADER_BAT")
-                        val projBatIcon = projectWorkspaceLayout.findViewWithTag<ImageView>("PROJ_HEADER_BAT_ICON")
-                        projCpu?.text = "C: $cpuUsage%"
-                        projRam?.text = "R: $memUsage"
-                        projBat?.text = "$batUsage%"
-                        projBatIcon?.setImageResource(batDrawableRes)
-                    }
                     val memStats = readMemDetails()
                     if (::homeLayout.isInitialized) {
                         composeCpuState.intValue = cpuUsage
@@ -15945,36 +15181,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         cpuTv?.text = "$cpuUsage%"
                         memTv?.text = memUsage
                         diskTv?.text = "$diskUsage%"
-                        if (::unifiedHeader.isInitialized) {
-                            val headerCpu = unifiedHeader.findViewWithTag<TextView>("HEADER_CPU")
-                            val headerRam = unifiedHeader.findViewWithTag<TextView>("HEADER_RAM")
-                            val headerBat = unifiedHeader.findViewWithTag<TextView>("HEADER_BAT")
-                            val headerBatIcon = unifiedHeader.findViewWithTag<ImageView>("HEADER_BAT_ICON")
-                            headerCpu?.text = "C: $cpuUsage%"
-                            headerRam?.text = "R: $memUsage"
-                            headerBat?.text = "$batUsage%"
-                            headerBatIcon?.setImageResource(batDrawableRes)
-                        }
-                        if (::terminalWorkspaceLayout.isInitialized) {
-                            val termCpu = terminalWorkspaceLayout.findViewWithTag<TextView>("TERM_HEADER_CPU")
-                            val termRam = terminalWorkspaceLayout.findViewWithTag<TextView>("TERM_HEADER_RAM")
-                            val termBat = terminalWorkspaceLayout.findViewWithTag<TextView>("TERM_HEADER_BAT")
-                            val termBatIcon = terminalWorkspaceLayout.findViewWithTag<ImageView>("TERM_HEADER_BAT_ICON")
-                            termCpu?.text = "C: $cpuUsage%"
-                            termRam?.text = "R: $memUsage"
-                            termBat?.text = "$batUsage%"
-                            termBatIcon?.setImageResource(batDrawableRes)
-                        }
-                        if (::projectWorkspaceLayout.isInitialized) {
-                            val projCpu = projectWorkspaceLayout.findViewWithTag<TextView>("PROJ_HEADER_CPU")
-                            val projRam = projectWorkspaceLayout.findViewWithTag<TextView>("PROJ_HEADER_RAM")
-                            val projBat = projectWorkspaceLayout.findViewWithTag<TextView>("PROJ_HEADER_BAT")
-                            val projBatIcon = projectWorkspaceLayout.findViewWithTag<ImageView>("PROJ_HEADER_BAT_ICON")
-                            projCpu?.text = "C: $cpuUsage%"
-                            projRam?.text = "R: $memUsage"
-                            projBat?.text = "$batUsage%"
-                            projBatIcon?.setImageResource(batDrawableRes)
-                        }
                         val memStats = readMemDetails()
                         if (::homeLayout.isInitialized) {
                             composeCpuState.intValue = cpuUsage
@@ -21331,61 +20537,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setBackgroundColor(NC.BG)
         }
 
-        val topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(NC.SURFACE_LOWEST)
-                setStroke(dp(1), Color.parseColor("#3C4A3F"))
-            }
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+        // Title / stats / tool rail: workspace/WorkspaceTopBar (title has priority, stats drop to fit)
+        val topBar = WorkspaceTopBar(this) { onBackPressed() }.apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         }
-
-        val backWorkspaceBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_arrow_back)
-            setColorFilter(NC.ON_SURFACE)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
-            setOnClickListener {
-                onBackPressed()
-            }
-        }
-
-        workspaceProjectIconIv = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { rightMargin = dp(8) }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-        }
-
-        workspaceProjectNameTv = TextView(this).apply {
-            text = ""
-            textSize = 16f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        }
-
-        val projSysPlate = createSystemTelemetryPlate("PROJ_HEADER_BAT", "PROJ_HEADER_CPU", "PROJ_HEADER_RAM").apply {
-            layoutParams = LinearLayout.LayoutParams(WRAP, dp(34)).apply {
-                rightMargin = dp(8)
-            }
-        }
-
-        val workspaceMoreBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_more_vert)
-            setColorFilter(NC.ON_SURFACE)
-            contentDescription = "Workspace tools"
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
-            setOnClickListener { showWorkspaceToolsMenu(this) }
-        }
-
-        topBar.addView(backWorkspaceBtn)
-        topBar.addView(workspaceProjectIconIv)
-        topBar.addView(workspaceProjectNameTv)
-        topBar.addView(projSysPlate)
-        topBar.addView(workspaceMoreBtn)
+        workspaceProjectIconIv = topBar.iconView
+        workspaceProjectNameTv = topBar.titleView
+        topBar.stats.onCustomize = { openTopBarPage() }
+        fillToolRail(topBar.rail, workspace = true)
         projectWorkspaceLayout.addView(topBar)
 
         workspaceTabBarScroll = HorizontalScrollView(this).apply {
@@ -21454,12 +20613,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         workspaceTerminalContainer.addView(termViewContainer)
 
-        workspaceKeyboardToolbar = buildSpecialKeysToolbar(
+        workspaceKeyboardToolbar = buildExtraKeysBar(
             tvRef = { if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null },
             sessionRef = { if (activeWorkspaceTabIndex >= 0 && activeWorkspaceTabIndex < workspaceSessions.size) workspaceSessions[activeWorkspaceTabIndex] else null },
             modState = wsModState,
-            onPickImage = { wsImagePickerLauncher.launch("image/*") },
-            onPickDocument = { wsDocumentPickerLauncher.launch(arrayOf("*/*")) }
         ).apply {
             visibility = if (showExtraKeys) View.VISIBLE else View.GONE
         }
@@ -22541,6 +21698,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (::workspaceKeyboardToolbar.isInitialized) {
             workspaceKeyboardToolbar.visibility = if (enabled) View.VISIBLE else View.GONE
         }
+        toolRails.forEach { it.refresh() }
         forceTerminalResize(if (::terminalView.isInitialized) terminalView else null)
         forceTerminalResize(if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null)
     }
@@ -22794,13 +21952,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(12) }
         }
         val toggleTitle = TextView(this).apply {
-            text = "EXTRA 2 KEYBOARD ROWS"
+            text = "EXTRA KEYS BAR"
             textSize = 13f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
         }
         val toggleSub = TextView(this).apply {
-            text = "Show special key rows (CTRL, ALT, ESC, Arrows, symbols) on terminal screens."
+            text = "ESC, TAB, sticky CTRL/ALT/SHIFT, arrows, symbols. Hold arrows to repeat; swipe a key up for its corner alternate; • switches page."
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -22816,8 +21974,70 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         toggleRow.addView(switchToggle)
         card.addView(toggleRow)
 
+        // 3. Extra keys preset (simple choice; no key editor)
+        val presetRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        val prefs = getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
+        fun paintPresets() {
+            val current = KeyPreset.byId(prefs.getString(KeyLayouts.PREF_PRESET, null))
+            for (i in 0 until presetRow.childCount) {
+                val tv = presetRow.getChildAt(i) as TextView
+                val on = tv.tag == current
+                tv.setTextColor(if (on) NC.PRIMARY else NC.ON_SURF_VAR)
+                tv.background = roundedBg(if (on) (NC.PRIMARY and 0x00FFFFFF) or 0x33000000 else NC.SURFACE, if (on) NC.PRIMARY else NC.BORDER, 0)
+                tv.isSelected = on
+            }
+        }
+        KeyPreset.values().forEach { preset ->
+            presetRow.addView(TextView(this).apply {
+                tag = preset
+                text = preset.title.uppercase(Locale.US)
+                contentDescription = "Extra keys layout: ${preset.title}"
+                textSize = 11f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                minimumHeight = dp(44)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
+                setOnClickListener {
+                    prefs.edit().putString(KeyLayouts.PREF_PRESET, preset.id).apply()
+                    paintPresets()
+                    if (::terminalKeyboardToolbar.isInitialized) terminalKeyboardToolbar.reloadPreset()
+                    if (::workspaceKeyboardToolbar.isInitialized) workspaceKeyboardToolbar.reloadPreset()
+                }
+            })
+        }
+        paintPresets()
+        card.addView(presetRow)
+
         return card
     }
+
+    /** Dedicated "Top bar" page: live preview + stat toggles/reorder (workspace/StatsEditor). */
+    private fun buildTopBarPage() {
+        topBarScrollView = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            visibility = View.GONE
+            setBackgroundColor(NC.BG)
+        }
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        topBarScrollView.addView(page)
+        page.addView(
+            buildSubPageHeader(
+                title = "TOP BAR",
+                subtitle = "// PHONE STATS IN THE TOP BAR",
+                iconRes = R.drawable.ic_tune_thick,
+                pageId = ID_TOPBAR
+            ) { badge -> badge.visibility = View.GONE }
+        )
+        page.addView(StatsEditor.buildPage(this, "my-project") { fillToolRail(it, workspace = true) })
+    }
+
+    private fun openTopBarPage() = navigateToPage(ID_TOPBAR)
 
     
     // CustomBrutalistToggle is imported as an alias of the shared ui.BrutalistToggle.
