@@ -123,11 +123,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var unifiedHeader: LinearLayout
 
     private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
-    private lateinit var sidebarLayout: LinearLayout
-    private lateinit var sidebarScrollView: ScrollView
-    private lateinit var sidebarListContainer: LinearLayout
+    /** TERMINAL page tab strip (replaces the old terminal-list drawer; item 12 M1). */
+    private var termTabStrip: TermTabStrip? = null
+    private val termTabTitles = HashMap<TerminalSession, String>()
+    private val cliIconCache = HashMap<String, android.graphics.Bitmap?>()
 
-    private lateinit var menuBtn: ImageView
     private lateinit var addTerminalBtn: ImageView
     private lateinit var backBtn: ImageView
     private lateinit var scriptInstallBackBtn: ImageView
@@ -729,9 +729,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
             unifiedHeader.setPadding(dp(16), dp(12), dp(16), dp(12))
             
-            // Adjust sidebar layout padding to respect notification/status bar
-            sidebarLayout.setPadding(dp(16), dp(16), dp(16), dp(16))
-            
             if (::projectWorkspaceLayout.isInitialized) {
                 val workspaceTopBar = projectWorkspaceLayout.getChildAt(0) as? LinearLayout
                 workspaceTopBar?.setPadding(dp(12), dp(10), dp(12), dp(10))
@@ -1205,7 +1202,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         if (id == ID_TERMINAL) {
             unifiedHeader.visibility = View.GONE
-            if (::drawerLayout.isInitialized) drawerLayout.setDrawerLockMode(androidx.drawerlayout.widget.DrawerLayout.LOCK_MODE_UNLOCKED)
+            if (::drawerLayout.isInitialized) drawerLayout.setDrawerLockMode(androidx.drawerlayout.widget.DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
         } else if (id == ID_SCRIPT_INSTALL || id == ID_MP_INSTALLER) {
             unifiedHeader.visibility = View.GONE
             if (::bottomNavigation.isInitialized) bottomNavigation.menu.findItem(bottomNavigation.selectedItemId)?.isChecked = false
@@ -1804,62 +1801,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         rootLayout.addView(mainContentLayout)
 
-        // Sidebar container
-        sidebarLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(NC.SURFACE_LOWEST)
-            val params = androidx.drawerlayout.widget.DrawerLayout.LayoutParams(dp(260), MATCH).apply {
-                gravity = androidx.core.view.GravityCompat.START
-            }
-            layoutParams = params
-            setPadding(dp(16), dp(20), dp(16), dp(16))
-        }
-
-        // Add header to sidebar
-        val sidebarHeaderRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(16))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-        }
-        val sidebarTitle = TextView(this).apply {
-            text = "Active Terminals"
-            textSize = 18f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.MONOSPACE
-            paint.isFakeBoldText = true
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        }
-        val sidebarAddBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_add)
-            setColorFilter(NC.PRIMARY)
-            setPadding(dp(4), dp(4), dp(4), dp(4))
-            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
-            setOnClickListener {
-                drawerLayout.closeDrawer(sidebarLayout)
-                val topBarAddBtn = terminalWorkspaceLayout.findViewWithTag<View>("ADD_TERM_BTN")
-                showNewTerminalDropdown(topBarAddBtn ?: it) { type ->
-                    createNewTerminalSession(type)
-                }
-            }
-        }
-        sidebarHeaderRow.addView(sidebarTitle)
-        sidebarHeaderRow.addView(sidebarAddBtn)
-        sidebarLayout.addView(sidebarHeaderRow)
-
-        // Scroll view for terminal list
-        sidebarScrollView = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
-        }
-        sidebarListContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = FrameLayout.LayoutParams(MATCH, WRAP)
-        }
-        sidebarScrollView.addView(sidebarListContainer)
-        sidebarLayout.addView(sidebarScrollView)
-
-        drawerLayout.addView(sidebarLayout)
-
         // ── Unified Top Bar ──────────────────────────────────────────────────
         unifiedHeader = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1897,20 +1838,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 onBackPressed()
             }
         }
-        menuBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_menu)
-            setColorFilter(NC.ON_SURFACE)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
-            setOnClickListener {
-                if (drawerLayout.isDrawerOpen(sidebarLayout)) {
-                    drawerLayout.closeDrawer(sidebarLayout)
-                } else {
-                    drawerLayout.openDrawer(sidebarLayout)
-                }
-            }
-        }
-
         // Phone stats (user-ordered, drop-to-fit): workspace/StatStrip
         val headerStats = StatStrip(this).apply {
             alignEnd = true
@@ -2463,7 +2390,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             terminalView.isFocusableInTouchMode = true
             terminalView.requestFocus()
             forceTerminalResize(terminalView)
-            updateSidebarTerminalsList()
+            refreshTermTabStrip()
         }
     }
 
@@ -2558,9 +2485,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         terminateSessionProcesses(session)
         session.finishIfRunning()
         sessionsList.removeAt(index)
+        termTabTitles.remove(session)
         if (index < terminalSessionTypes.size) {
             terminalSessionTypes.removeAt(index)
         }
+        // Closing a tab left of the active one shifts it (strip × on a background tab).
+        if (index < activeSessionIndex) activeSessionIndex--
 
         if (sessionsList.isEmpty()) {
             activeSessionIndex = -1
@@ -2580,93 +2510,47 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             switchTerminalSession(activeSessionIndex)
         }
-        updateSidebarTerminalsList()
+        refreshTermTabStrip()
         updateAppTerminalService()
     }
 
-    private fun updateSidebarTerminalsList() {
-        if (!::sidebarListContainer.isInitialized) return
-        sidebarListContainer.removeAllViews()
-        for (i in 0 until sessionsList.size) {
-            val isSelected = (i == activeSessionIndex)
+    /**
+     * Tab strip contents (no layout rebuild; [TermTabStrip.submit] no-ops when nothing changed).
+     * Raw terminal page only (chat has its own thread list): a leading CHAT cell (back to chat; beta on), then one
+     * tab per app terminal session. Dot = output in the last 2 s.
+     */
+    private fun refreshTermTabStrip() {
+        val strip = termTabStrip ?: return
+        val out = (sessionClient as? NativeCodeTerminalSessionClient)?.lastOutputAt
+        val now = android.os.SystemClock.uptimeMillis()
+        val chat = if (chatBetaOn()) listOf(TermTabStrip.Tab("", "CHAT", null, live = false, selected = false, home = true)) else emptyList()
+        strip.submit(chat + sessionsList.mapIndexed { i, s ->
             val type = terminalSessionTypes.getOrNull(i) ?: "shell"
-            val toolLabel = when (type) {
-                "opencode"    -> "opencode"
-                "codex"       -> "codex"
-                "agy"         -> "agy"
-                "claude-code" -> "claude-code"
-                "qwen-code"   -> "qwen-code"
-                "grok"        -> "grok"
-                "kiro"        -> "kiro"
-                "shell-root"  -> "Rooted Linux Shell"
-                else          -> "Linux Shell"
-            }
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(12), dp(10), dp(12), dp(10))
-                background = cyberBrutalistBg(
-                    fillColor = if (isSelected) NC.SURFACE_HIGH else NC.SURFACE_LOW,
-                    strokeColor = if (isSelected) NC.PRIMARY else Color.parseColor("#3c4a3f"),
-                    shadowColor = if (isSelected) NC.SHADOW_GREEN else NC.SHADOW_DARK,
-                    offsetDp = if (isSelected) 4 else 2,
-                    cornerRadiusDp = 0
-                )
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
-                    bottomMargin = dp(8)
-                }
-                setOnClickListener {
-                    setTerminalMode(ws = false, chat = false)
-                    switchTerminalSession(i)
-                    drawerLayout.closeDrawer(sidebarLayout)
-                }
-            }
+            val name = termTabTitles[s] ?: when (type) { "shell" -> "shell"; "shell-root" -> "root shell"; else -> type }
+            TermTabStrip.Tab(i.toString(), name, cliIcon(type), live = now - (out?.get(s) ?: 0L) < 2000, selected = i == activeSessionIndex)
+        })
+    }
 
-            val terminalIcon = ImageView(this@MainActivity).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply {
-                    rightMargin = dp(10)
-                }
-                scaleType = ImageView.ScaleType.FIT_CENTER
-            }
-            val filename = cliToolAssetFilename(type)
-            try {
-                assets.open("images/cli/$filename").use { input ->
-                    val bmp = android.graphics.BitmapFactory.decodeStream(input)
-                    if (bmp != null) {
-                        terminalIcon.setImageBitmap(bmp)
-                        // Full-color PNGs (e.g. shell.png) must not use setColorFilter — it solid-fills them
-                    } else {
-                        terminalIcon.setImageResource(R.drawable.ic_terminal)
-                        terminalIcon.setColorFilter(if (isSelected) NC.PRIMARY else NC.ON_SURF_VAR)
-                    }
-                }
-            } catch (_: Exception) {
-                terminalIcon.setImageResource(R.drawable.ic_terminal)
-                terminalIcon.setColorFilter(if (isSelected) NC.PRIMARY else NC.ON_SURF_VAR)
-            }
+    private fun cliIcon(type: String) = cliIconCache.getOrPut(type) {
+        runCatching { assets.open("images/cli/${cliToolAssetFilename(type)}").use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
+    }
 
-            val nameTv = TextView(this@MainActivity).apply {
-                text = "${i + 1}. $toolLabel"
-                textSize = 14f
-                setTextColor(if (isSelected) NC.ON_SURFACE else NC.ON_SURF_VAR)
-                typeface = Typeface.MONOSPACE
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+    private fun buildTermTabStrip() = TermTabStrip(this) { anchor ->
+        showNewTerminalDropdown(anchor) { type -> createNewTerminalSession(type) }
+    }.apply {
+        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+        onTick = { refreshTermTabStrip() }
+        onTap = { t ->
+            if (t.home) setTerminalMode(ws = false, chat = true)
+            else t.key.toIntOrNull()?.let { if (it != activeSessionIndex) switchTerminalSession(it) }
+        }
+        onClose = { t -> t.key.toIntOrNull()?.let { closeTerminalSession(it) } }
+        onRename = { t, name -> t.key.toIntOrNull()?.let { sessionsList.getOrNull(it) }?.let { termTabTitles[it] = name; refreshTermTabStrip() } }
+        onCloseOthers = { t ->
+            t.key.toIntOrNull()?.let { sessionsList.getOrNull(it) }?.let { keep ->
+                for (j in sessionsList.indices.reversed()) if (sessionsList[j] !== keep) closeTerminalSession(j)
+                switchTerminalSession(sessionsList.indexOf(keep))
             }
-
-            val closeBtn = ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.ic_close)
-                setColorFilter(NC.ERROR)
-                setPadding(dp(4), dp(4), dp(4), dp(4))
-                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
-                setOnClickListener {
-                    closeTerminalSession(i)
-                }
-            }
-
-            row.addView(terminalIcon)
-            row.addView(nameTv)
-            row.addView(closeBtn)
-            sidebarListContainer.addView(row)
         }
     }
 
@@ -4224,51 +4108,25 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(dp(12), dp(8), dp(12), dp(8))
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         }
-        val menuTerminalBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_menu)
-            setColorFilter(NC.ON_SURFACE)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
-            setOnClickListener {
-                if (drawerLayout.isDrawerOpen(sidebarLayout)) {
-                    drawerLayout.closeDrawer(sidebarLayout)
-                } else {
-                    drawerLayout.openDrawer(sidebarLayout)
-                }
-            }
-        }
         // Stretched strip: drops the chips that do not fit instead of pushing the rail out
         val termStats = StatStrip(this).apply {
             onCustomize = { openTopBarPage() }
             layoutParams = LinearLayout.LayoutParams(0, dp(24), 1f).apply {
-                leftMargin = dp(8)
                 rightMargin = dp(8)
             }
         }
-        val addTerminalWorkspaceBtn = ImageView(this).apply {
-            tag = "ADD_TERM_BTN"
-            setImageResource(R.drawable.ic_add)
-            setColorFilter(NC.ON_SURFACE)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
-            setOnClickListener {
-                showNewTerminalDropdown(this) { type ->
-                    createNewTerminalSession(type)
-                }
-            }
-        }
-        terminalTopBar.addView(menuTerminalBtn)
         terminalTopBar.addView(termStats)
-        terminalTopBar.addView(ToolRail(this).also { fillToolRail(it, workspace = false); it.addView(buildChatSwitch(ws = false), 0) })
-        terminalTopBar.addView(addTerminalWorkspaceBtn)
+        terminalTopBar.addView(ToolRail(this).also { fillToolRail(it, workspace = false) })
         terminalWorkspaceLayout.addView(terminalTopBar)
         applyKeepAwake()
 
-        // Terminal position (unchanged views) and the Chat position: siblings, one GONE (item 12 switch).
+        // Raw terminal page and the chat view (default): siblings, one GONE (item 12, §9.2.6 E).
         val termStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
         }
+        // Tab strip heads the raw terminal page (replaces the drawer): CHAT cell, terminal tabs, "+".
+        termTabStrip = buildTermTabStrip().also { termStack.addView(it) }
         appTermStack = termStack
         terminalWorkspaceLayout.addView(termStack)
         appChatView = newChatView(ws = false).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
@@ -4328,7 +4186,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private var wsChatView: AgentChatView? = null
     private var appTermStack: View? = null
     private var wsTermArea: View? = null
-    private val chatSwitches = HashMap<Boolean, Pair<TextView, TextView>>() // ws → (CHAT, TERM)
+    /** ws → raw terminal page showing. Chat is the default view; not persisted (no Chat/Terminal switch, §9.2.6 E). */
+    private val termShown = HashMap<Boolean, Boolean>()
+    /** Workspace "back to chat" rail button (the TERMINAL page uses the tab strip's CHAT cell). */
+    private var wsBackToChat: View? = null
     private val chatVisible = HashMap<Boolean, String?>()
     /** Backgrounded = no thread is "on screen" (notifications must show). */
     private var chatResumed = false
@@ -4338,14 +4199,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun chatPrefs() = getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
     private fun chatBetaOn() = chatPrefs().getBoolean(ChatLogic.PREF_BETA, true)
-    private fun isChatMode(ws: Boolean) = ChatLogic.isChatMode(
-        chatPrefs().getString(if (ws) ChatLogic.PREF_MODE_WS else ChatLogic.PREF_MODE_APP, null), chatBetaOn())
+    private fun isChatMode(ws: Boolean) = chatBetaOn() && termShown[ws] != true
 
-    /** Remember the position per page (Q3) and show it. Chat is refused while the beta switch is off. */
+    /** Show chat or the raw terminal page of a surface. Chat is refused while the beta switch is off. */
     private fun setTerminalMode(ws: Boolean, chat: Boolean) {
         if (chat && !chatBetaOn()) return
-        chatPrefs().edit().putString(if (ws) ChatLogic.PREF_MODE_WS else ChatLogic.PREF_MODE_APP,
-            if (chat) ChatLogic.MODE_CHAT else ChatLogic.MODE_TERMINAL).apply()
+        termShown[ws] = !chat
         applyTerminalMode(ws)
     }
 
@@ -4356,20 +4215,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val wasChat = view.visibility == View.VISIBLE
         term.visibility = if (chat) View.GONE else View.VISIBLE
         view.visibility = if (chat) View.VISIBLE else View.GONE
-        chatSwitches[ws]?.let { (c, t) ->
-            (c.parent as? View)?.visibility = if (chatBetaOn()) View.VISIBLE else View.GONE
-            listOf(c to chat, t to !chat).forEach { (tv, on) ->
-                tv.setTextColor(if (on) NC.ON_PRIMARY else NC.ON_SURF_VAR)
-                tv.setBackgroundColor(if (on) NC.PRIMARY else Color.TRANSPARENT)
-                tv.isSelected = on
-            }
-        }
+        if (ws) wsBackToChat?.visibility = if (!chat && chatBetaOn()) View.VISIBLE else View.GONE
         if (wasChat != chat) currentFocus?.let { f ->
             (getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(f.windowToken, 0)
         }
         if (!chat) forceTerminalResize(if (ws) (if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null)
             else if (::terminalView.isInitialized) terminalView else null)
         updateChatShown()
+        if (!ws) refreshTermTabStrip()
     }
 
     /** Page / position / scope → each chat view (visibleThreadId, Terminal-position snackbar). */
@@ -4380,29 +4233,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         wsChatView?.setShown(resumed && currentPageId == ID_PROJECT_WORKSPACE, isChatMode(ws = true))
     }
 
-    /** [Chat|Terminal] segmented control: one rail child, no layout rebuild (R4 10.4). Hidden when the beta is off. */
-    private fun buildChatSwitch(ws: Boolean): View {
-        fun seg(label: String, chat: Boolean) = TextView(this).apply {
-            text = label
-            textSize = 10f
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            setPadding(dp(7), 0, dp(7), 0)
-            contentDescription = if (chat) "Chat view" else "Terminal view"
-            layoutParams = LinearLayout.LayoutParams(WRAP, MATCH)
-            setOnClickListener { setTerminalMode(ws, chat) }
-        }
-        val c = seg("CHAT", true)
-        val t = seg("TERM", false)
-        chatSwitches[ws] = c to t
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            background = GradientDrawable().apply { setStroke(dp(1), NC.OUTLINE_VAR) }
-            setPadding(dp(1), dp(1), dp(1), dp(1))
-            layoutParams = LinearLayout.LayoutParams(WRAP, dp(28)).apply { rightMargin = dp(4) }
-            visibility = if (chatBetaOn()) View.VISIBLE else View.GONE
-            addView(c); addView(t)
-        }
+    /** Workspace terminal area "back to chat": one rail child, shown only while the raw terminal is (no layout rebuild). */
+    private fun buildWsBackToChat(): View = ImageView(this).apply {
+        setImageResource(R.drawable.ic_tab_chat)
+        setColorFilter(NC.ON_PRIMARY)
+        setBackgroundColor(NC.PRIMARY)
+        setPadding(dp(6), dp(6), dp(6), dp(6))
+        contentDescription = "Back to chat"
+        layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { rightMargin = dp(4) }
+        visibility = if (!isChatMode(ws = true) && chatBetaOn()) View.VISIBLE else View.GONE
+        setOnClickListener { setTerminalMode(ws = true, chat = true) }
+        wsBackToChat = this
     }
 
     private fun newChatView(ws: Boolean) = AgentChatView(this, executor, ws, chatHost, chatBackend) { id ->
@@ -20542,7 +20383,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         workspaceProjectNameTv = topBar.titleView
         topBar.stats.onCustomize = { openTopBarPage() }
         fillToolRail(topBar.rail, workspace = true)
-        topBar.rail.addView(buildChatSwitch(ws = true), 0)
+        topBar.rail.addView(buildWsBackToChat(), 0)
         projectWorkspaceLayout.addView(topBar)
 
         workspaceTabBarScroll = HorizontalScrollView(this).apply {

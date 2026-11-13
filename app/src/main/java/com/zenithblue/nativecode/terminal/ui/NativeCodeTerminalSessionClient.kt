@@ -20,7 +20,11 @@ class NativeCodeTerminalSessionClient(
     private val onSessionFinishedCallback: ((TerminalSession) -> Unit)? = null
 ) : TerminalSessionClient {
 
+    /** Last output time per session (tab strip running/idle dot). Main thread only. */
+    val lastOutputAt = java.util.WeakHashMap<TerminalSession, Long>()
+
     override fun onTextChanged(session: TerminalSession) {
+        lastOutputAt[session] = android.os.SystemClock.uptimeMillis()
         if (session == activeSessionRef()) {
             terminalViewRef()?.onScreenUpdated()
         }
