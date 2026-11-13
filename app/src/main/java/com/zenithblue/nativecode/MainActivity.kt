@@ -14535,8 +14535,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         dismissGithubAuthOverlay()
         super.onDestroy()
         resourceMonitorRunnable?.let { mainHandler.removeCallbacks(it) }
-        // Recreation (font scale, theme): the desktop keeps running, so its notification must too.
-        if (!isChangingConfigurations) desktop.releaseFgs()
+        desktop.onHostDestroyed(isChangingConfigurations)
         stopService(Intent(this, TerminalService::class.java))
         for (session in sessionsList) {
             session.finishIfRunning()

@@ -147,9 +147,19 @@ class StatStrip(context: Context) : ViewGroup(context), SharedPreferences.OnShar
 
     private val tick = object : Runnable {
         override fun run() {
+            // Hidden page or stopped Activity: stop polling; onVisibilityAggregated restarts it.
+            if (!visibleNow()) return
             StatReader.refresh(context) { if (isAttachedToWindow) bind(it) }
             postDelayed(this, 2000)
         }
+    }
+
+    private fun visibleNow() = isShown && windowVisibility == VISIBLE
+
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        removeCallbacks(tick)
+        if (isVisible && isAttachedToWindow) post(tick)
     }
 
     /** Long-press: open the "Top bar" page (set by the host). */
@@ -247,7 +257,7 @@ class StatStrip(context: Context) : ViewGroup(context), SharedPreferences.OnShar
         context.statPrefs().registerOnSharedPreferenceChangeListener(this)
         reload()
         removeCallbacks(tick)
-        post(tick)
+        if (visibleNow()) post(tick)
     }
 
     override fun onDetachedFromWindow() {

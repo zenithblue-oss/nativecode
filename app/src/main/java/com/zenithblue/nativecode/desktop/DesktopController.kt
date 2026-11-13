@@ -111,12 +111,12 @@ class DesktopController(
     fun stop() {
         userStopping = true
         host.paintStopBusy()
-        stopGui()
+        val g = stopGui()
         notifyState()
         mainHandler.postDelayed({
-            if (userStopping) {
+            if (userStopping && g == gen) {
                 userStopping = false
-                live.markIdle()
+                markIdleLive()
             }
         }, 6000)
     }
@@ -184,29 +184,33 @@ class DesktopController(
         )
     }
 
-    /** Also called by the host on destroy (desktop process keeps running; only the FGS claim drops). */
     fun releaseFgs() {
         NativeCodeFgs.release(activity, NativeCodeFgs.OWNER_DESKTOP)
+    }
+
+    /**
+     * Host Activity destroyed. Recreation (font scale, theme): keep everything, the next controller takes over.
+     * Real exit: drop the FGS claim and the static ref; a free session is stopped, because its budget timer
+     * needs a live screen and an unmetered desktop must not keep running.
+     */
+    fun onHostDestroyed(changingConfigurations: Boolean) {
+        if (changingConfigurations) return
+        if (free && (running || starting) && !userStopping) {
+            userStopping = true
+            stopGui()
+        } else {
+            releaseFgs()
+        }
+        mainHandler.removeCallbacks(budgetStop)
+        mainHandler.removeCallbacks(minuteTick)
+        if (active === this) active = null
     }
 
     // ── Log capture (host-only file in app cache; never enters the guest) ─────
 
     fun logFile(): File = File(activity.cacheDir, "gui_desktop.log")
 
-    /** Append one line with a ring cap: once over 512 KB, keep only the tail half. */
-    private fun logAppend(line: String) {
-        try {
-            val f = logFile()
-            val text = "$line\n"
-            if (f.exists() && f.length() + text.length > LOG_MAX_BYTES) {
-                val tail = f.readText().takeLast((LOG_MAX_BYTES / 2).toInt())
-                f.writeText(tail + text)
-            } else {
-                f.appendText(text)
-            }
-        } catch (_: Exception) {
-        }
-    }
+    private fun logAppend(line: String) = appendLog(logFile(), line)
 
     private fun logHeader(action: String, script: String, method: String) {
         logAppend("")
@@ -232,8 +236,9 @@ class DesktopController(
      * show STOP, open X11 once.
      */
     private fun onHealthyLine() {
+        if (running) return // only the first line repaints; a chatty log must not redraw every pill per line
         if (userStopping) {
-            if (running || host.stopRowVisible()) markRunning()
+            if (host.stopRowVisible()) markRunning()
             return
         }
         markRunning()
@@ -251,12 +256,15 @@ class DesktopController(
         // Streamed capture, NOT runScriptInTerminal: GUI is long-lived so it must
         // never hold isScriptRunning (marketplace/back/other scripts stay free).
         job?.cancel()
+        val g = ++gen
         userStopping = false
         running = false
         starting = true
         x11Launched = false
         startBudget()
         acquireFgs()
+        val log = logFile()
+        val app = activity.applicationContext
 
         executor.execute {
             host.ensureBootstrapExtracted()
@@ -292,30 +300,26 @@ class DesktopController(
             }
 
             val args = hostScriptArgs(scriptName)
+            // Callbacks below outlive this Activity: they capture only locals and companion state.
             mainHandler.post {
-                if (userStopping) return@post
+                // A stop (or newer start) since this start was queued owns the desktop now.
+                if (userStopping || g != gen) return@post
                 job = ShellCommandRunner.runStreamedCancelable(
-                    activity.applicationContext,
+                    app,
                     args,
                     onLine = { line ->
-                        logAppend(line)
-                        live.onHealthyLine()
+                        appendLog(log, line)
+                        active?.onHealthyLine()
                     },
                     onDone = { code ->
-                        logAppend("[exit $code]")
+                        appendLog(log, "[exit $code]")
                         when {
                             // Cancelled by user STOP — stop click owns flip
-                            code == -1 || userStopping -> { /* leave card */ }
-                            code != 0 -> {
-                                Toast.makeText(
-                                    activity.applicationContext,
-                                    "Desktop start failed (exit $code)",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                live.revertToStart()
+                            code == -1 || userStopping || g != gen -> { /* leave card */ }
+                            else -> {
+                                if (code != 0) Toast.makeText(app, "Desktop start failed (exit $code)", Toast.LENGTH_LONG).show()
+                                active?.revertToStart() ?: run { running = false; starting = false; XfceBudget.stop(app) }
                             }
-                            // Clean desktop exit (session ended)
-                            else -> live.revertToStart()
                         }
                     }
                 )
@@ -325,7 +329,8 @@ class DesktopController(
     }
 
     /** proot → stop_gui.sh; chroot → stop_gui_chroot.sh (no proot pkill). */
-    private fun stopGui() {
+    /** Returns the generation this stop owns; a start after it bumps [gen] and wins. */
+    private fun stopGui(): Int {
         val stopBroadcast = Intent("com.termux.x11.ACTION_STOP")
         stopBroadcast.setPackage(activity.packageName)
         activity.sendBroadcast(stopBroadcast)
@@ -334,6 +339,9 @@ class DesktopController(
         starting = false
 
         job?.cancel()
+        val g = ++gen
+        val log = logFile()
+        val app = activity.applicationContext
 
         executor.execute {
             host.deployScripts()
@@ -345,21 +353,25 @@ class DesktopController(
             val args = hostScriptArgs(scriptName)
 
             mainHandler.post {
+                if (g != gen) return@post // a start was tapped meanwhile; do not kill it
                 job = ShellCommandRunner.runStreamedCancelable(
-                    activity.applicationContext,
+                    app,
                     args,
                     onLine = { line ->
-                        logAppend(line)
-                        if (!userStopping) live.onHealthyLine()
+                        appendLog(log, line)
+                        if (!userStopping && g == gen) active?.onHealthyLine()
                     },
                     onDone = { code ->
-                        logAppend("[exit $code]")
-                        userStopping = false
-                        live.markIdle()
+                        appendLog(log, "[exit $code]")
+                        if (g == gen) {
+                            userStopping = false
+                            markIdleLive()
+                        }
                     }
                 )
             }
         }
+        return g
     }
 
     /** Start stream failed → card back to START (not stuck on STOP). */
@@ -399,18 +411,43 @@ class DesktopController(
         /** One X11 Activity launch per START attempt. */
         @Volatile private var x11Launched = false
 
-        /** Newest controller; owns the UI for a session an older Activity started. */
+        /** Newest controller; owns the UI for a session an older Activity started. Cleared on a real exit. */
         @Volatile private var active: DesktopController? = null
+
+        /** Bumped by every start and stop; queued work from an older one is dropped (stop/start race). */
+        @Volatile private var gen = 0
+
+        /** Session ended: idle state even when no screen is alive. */
+        private fun markIdleLive() {
+            active?.markIdle() ?: run { running = false; starting = false }
+        }
+
+        /** Serial, off the main thread: log I/O (incl. the 512 KB trim) must not jank the UI. */
+        private val logExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+        /** Append one line with a ring cap: once over 512 KB, keep only the tail half. */
+        private fun appendLog(f: File, line: String) = logExecutor.execute {
+            try {
+                val text = "$line\n"
+                if (f.exists() && f.length() + text.length > LOG_MAX_BYTES) {
+                    val tail = f.readText().takeLast((LOG_MAX_BYTES / 2).toInt())
+                    f.writeText(tail + text)
+                } else {
+                    f.appendText(text)
+                }
+            } catch (_: Exception) {
+            }
+        }
 
         private val budgetStop = Runnable {
             val c = active ?: return@Runnable
             if (!c.free || !running && job == null) return@Runnable
-            Toast.makeText(c.activity, "Free desktop time used for today", Toast.LENGTH_LONG).show()
+            Toast.makeText(c.activity.applicationContext, "Free desktop time used for today", Toast.LENGTH_LONG).show()
             userStopping = true
             c.host.paintStopBusy()
             c.stopGui()
             c.notifyState()
-            c.host.showUpgradeSheet("Free desktop time used for today")
+            if (!c.activity.isFinishing && !c.activity.isDestroyed) c.host.showUpgradeSheet("Free desktop time used for today")
         }
 
         /** Free users: minutes left on the pills and the notification, once a minute. */
