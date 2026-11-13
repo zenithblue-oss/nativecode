@@ -44,10 +44,8 @@ object LinuxGuestDefaults {
             renameLegacyHostProfile(rootfs)
             pinXfceTerminalFont(rootfs)
             AgentConfigInstaller.install(context)
-            // The managed PATH file carries the gate dir; refresh with the shims, not only on app update.
-            writeIfChanged(File(rootfs, CLI_PROFILE.removePrefix("/")), cliPathProfile)
-            installGateLast(rootfs)
-            GuestGate.sync(context)
+            // Gate files (PATH profile, gate-last blocks, shims) are fixed on app update only (applyOnUpdate);
+            // the entitlement state follows billing changes and every AI launch (GuestGate.syncAsync).
             true
         }.onFailure {
             Log.w(TAG, "Could not apply Linux guest defaults: ${it.message}", it)
@@ -143,7 +141,7 @@ object LinuxGuestDefaults {
     fun applyOnUpdate(context: Context): Boolean {
         val rootfs = ProjectPathResolver.prootRootfsDir(context)
         if (!rootfs.isDirectory) return true // nothing installed yet; onboarding calls this again
-        return runCatching { applyToRootfs(rootfs); true }
+        return runCatching { applyToRootfs(rootfs); GuestGate.sync(context); true }
             .onFailure { Log.w(TAG, "Could not apply guest config update: ${it.message}", it) }
             .getOrDefault(false)
     }

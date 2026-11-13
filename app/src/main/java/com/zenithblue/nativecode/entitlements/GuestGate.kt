@@ -7,6 +7,7 @@ import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.File
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.Executors
 
 /**
  * Free/Pro gate inside the guest (item 9). The app cannot see what a CLI's shell tool runs, so the AI CLI
@@ -33,7 +34,15 @@ object GuestGate {
     /** Every guest command name that starts an AI session. */
     val GATED_TOOLS = listOf("opencode", "codex", "claude", "qwen", "agy", "grok", "kiro", "kiro-cli", "hermes")
 
-    /** Rewrites shims and state when they differ. Cheap enough for cold start, resume and every tab open. */
+    private val io = Executors.newSingleThreadExecutor()
+
+    /** [sync] off the main thread; one worker, so syncs never overlap and run in call order. */
+    fun syncAsync(ctx: Context) {
+        val app = ctx.applicationContext
+        io.execute { sync(app) }
+    }
+
+    /** Rewrites shims and state when they differ (check first, write only what is wrong). */
     fun sync(ctx: Context) {
         runCatching {
             val rootfs = ProjectPathResolver.prootRootfsDir(ctx)

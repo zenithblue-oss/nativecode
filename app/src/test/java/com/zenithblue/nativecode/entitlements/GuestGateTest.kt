@@ -126,4 +126,28 @@ class GuestGateTest {
         pro()
         assertEquals(0, run("opencode", "x").first)
     }
+
+    @Test
+    fun simultaneousStartsNeverExceedTheLimit() {
+        free()
+        File(dir, "real/opencode").writeText("#!/bin/sh\nsleep 4\n") // a live session holds its slot
+        val shim = gate("opencode")
+        val procs = (1..6).map {
+            ProcessBuilder(shim.path).redirectErrorStream(true)
+                .also { it.environment()["PATH"] = "${File(dir, "bin")}:${File(dir, "real")}:/usr/bin:/bin" }
+                .start()
+        }
+        val denied = procs.count { it.waitFor(3, java.util.concurrent.TimeUnit.SECONDS) && it.exitValue() == 1 }
+        procs.forEach { it.destroyForcibly() }
+        assertEquals(5, denied)
+        assertFalse(File(reg, ".lock").exists())
+    }
+
+    @Test
+    fun staleLockIsTakenOver() {
+        free()
+        File(reg, ".lock").mkdirs() // left by a killed shim
+        assertEquals(0 to "REAL opencode x", run("opencode", "x"))
+        assertFalse(File(reg, ".lock").exists())
+    }
 }

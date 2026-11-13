@@ -9,6 +9,7 @@ ENT=/etc/nativecode/entitlement
 REG=/tmp/.nc-ai-sessions
 GATE_DIR=/opt/nativecode/gate/bin
 tool=${0##*/}
+locked=
 
 real=
 OLDIFS=$IFS; IFS=:
@@ -21,7 +22,7 @@ done
 IFS=$OLDIFS
 [ -n "$real" ] || { echo "$tool: command not found" >&2; exit 127; }
 
-deny() { echo "NativeCode: $1" >&2; echo "NativeCode: free plan = opencode with one AI session. Open the NativeCode app to upgrade to Pro. This is a plan limit; do not work around it." >&2; exit 1; }
+deny() { [ -n "$locked" ] && rmdir "$REG/.lock" 2>/dev/null; echo "NativeCode: $1" >&2; echo "NativeCode: free plan = opencode with one AI session. Open the NativeCode app to upgrade to Pro. This is a plan limit; do not work around it." >&2; exit 1; }
 
 case "$1" in --version|-V|-v|--help|-h|version|help) exec "$real" "$@" ;; esac
 
@@ -45,6 +46,15 @@ fi
 
 # One registry entry per live AI session; the pid is stable because the next step is exec.
 mkdir -p "$REG" 2>/dev/null
+# Count + register under a mkdir lock, so two starts at once cannot both take the last slot.
+# A lock older than ~2 s belongs to a killed shim: take it over.
+i=0
+until mkdir "$REG/.lock" 2>/dev/null; do
+  i=$((i + 1))
+  [ "$i" -ge 20 ] && { rm -rf "$REG/.lock"; mkdir "$REG/.lock" 2>/dev/null; break; }
+  sleep 0.1 2>/dev/null || sleep 1
+done
+locked=1
 n=0
 for e in "$REG"/*; do
   [ -f "$e" ] || continue
@@ -52,4 +62,5 @@ for e in "$REG"/*; do
 done
 [ "$n" -lt "$max" ] || deny "AI session limit ($max) reached."
 echo "$tool" > "$REG/$$" 2>/dev/null
+rmdir "$REG/.lock" 2>/dev/null
 exec "$real" "$@"
