@@ -12,7 +12,9 @@ tool=${0##*/}
 
 real=
 OLDIFS=$IFS; IFS=:
-for d in $PATH:/home/flux/.opencode/bin:/home/flux/.local/bin:/home/flux/.grok/bin:/opt/nodejs/bin:/usr/local/bin:/usr/bin; do
+# Literal ':' in the for-list is not split by IFS (only expansions are), so the fallback dirs must come via a variable.
+dirs=$PATH:/home/flux/.opencode/bin:/home/flux/.local/bin:/home/flux/.grok/bin:/opt/nodejs/bin:/usr/local/bin:/usr/bin
+for d in $dirs; do
   [ -n "$d" ] && [ "$d" != "$GATE_DIR" ] && [ -x "$d/$tool" ] && [ ! -d "$d/$tool" ] && { real=$d/$tool; break; }
 done
 IFS=$OLDIFS

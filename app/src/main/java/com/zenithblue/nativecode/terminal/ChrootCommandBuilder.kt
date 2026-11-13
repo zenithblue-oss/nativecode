@@ -28,7 +28,7 @@ object ChrootCommandBuilder {
     /** Session executable — must be a system binary (SELinux blocks exec of app-data scripts). */
     const val SESSION_EXEC = "/system/bin/sh"
 
-    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v5"
+    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v6"
     private const val TERM_WRAPPER_VERSION = "nativecode-chroot-term-wrapper v3"
     private val launcherPrepLock = Any()
     private var launcherPrepGeneration = 0L
@@ -304,6 +304,12 @@ shift
 case "${'$'}cmd" in
   opencode)
     exec opencode --auto "${'$'}@"
+    ;;
+  codex)
+    # codex 0.168+ spawns a pid-managed app-server daemon and dies in PRoot (cannot read its start time).
+    # --no-daemon is a TUI-only flag: tab launches (no args) get it, subcommands (login, app-server...) do not.
+    if [ ${'$'}# -eq 0 ]; then exec codex --no-daemon; fi
+    exec codex "${'$'}@"
     ;;
   *)
     exec "${'$'}cmd" "${'$'}@"
