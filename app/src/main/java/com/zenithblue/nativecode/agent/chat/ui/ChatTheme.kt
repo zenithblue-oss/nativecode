@@ -342,28 +342,53 @@ internal fun RowScope.AddDel(add: Int, del: Int, size: Int = 11) {
 @Composable
 internal fun ProviderLogo(tool: String, modifier: Modifier = Modifier, size: Dp = 28.dp) {
     val ctx = LocalContext.current
-    val bmp by produceState(Logos.cache[tool], tool) {
+    val logo by produceState(Logos.cache[tool], tool) {
         if (value == null) value = withContext(Dispatchers.IO) { Logos.load(ctx, tool) }
     }
-    Box(modifier.size(size).background(C.lowest).border(1.dp, C.border), contentAlignment = Alignment.Center) {
-        bmp?.let { Image(it, null, Modifier.size(size - 6.dp)) } ?: NcIcon(Ic.Bot, null, tint = C.outline, size = size * 0.6f)
+    // A dark logo (grok, opencode) sits on a light tile so it keeps >= 3:1 contrast (WCAG non-text).
+    val tile = if (logo?.second == true) C.on else C.lowest
+    Box(modifier.size(size).background(tile).border(1.dp, C.border), contentAlignment = Alignment.Center) {
+        logo?.let { Image(it.first, null, Modifier.size(size - S.s)) } ?: NcIcon(Ic.Bot, null, tint = C.outline, size = size * 0.6f)
     }
 }
 
+/** WCAG contrast of a logo against its tile; pure, unit-tested over the shipped logos. */
+internal object LogoContrast {
+    private fun ch(c: Int): Double = (c / 255.0).let { if (it <= 0.04045) it / 12.92 else Math.pow((it + 0.055) / 1.055, 2.4) }
+    fun lum(argb: Int): Double = 0.2126 * ch(argb shr 16 and 255) + 0.7152 * ch(argb shr 8 and 255) + 0.0722 * ch(argb and 255)
+    fun ratio(a: Double, b: Double): Double = (maxOf(a, b) + 0.05) / (minOf(a, b) + 0.05)
+    val DARK_TILE = lum(NC_SURFACE_LOWEST)
+    val LIGHT_TILE = lum(NC_ON_SURFACE)
+
+    /** Median luminance of the opaque pixels (the logo's ink); null for a blank image. */
+    fun ink(px: IntArray): Double? = px.filter { it ushr 24 > 128 }.map(::lum).sorted().let { if (it.isEmpty()) null else it[it.size / 2] }
+
+    /** True when the ink fails 3:1 on the dark tile, so the logo gets the light tile. */
+    fun lightTile(px: IntArray): Boolean = ink(px)?.let { ratio(it, DARK_TILE) < 3.0 } ?: false
+}
+
+// DesignTokens.NC values as plain ints (NC uses android.graphics.Color.parseColor, not available in JVM tests).
+private const val NC_SURFACE_LOWEST = 0xFF0E0E0E.toInt()
+private const val NC_ON_SURFACE = 0xFFE5E2E1.toInt()
+
 private object Logos {
-    val cache = ConcurrentHashMap<String, ImageBitmap>()
+    /** Logo bitmap + whether it needs the light tile. */
+    val cache = ConcurrentHashMap<String, Pair<ImageBitmap, Boolean>>()
     fun file(tool: String) = when (tool) {
         "qwen-code" -> "qwen-code.webp"
         "shell", "shell-root" -> "shell.png"
         else -> "$tool.png"
     }
-    fun load(ctx: Context, tool: String): ImageBitmap? = cache[tool] ?: runCatching {
+    fun load(ctx: Context, tool: String): Pair<ImageBitmap, Boolean>? = cache[tool] ?: runCatching {
         val path = "images/cli/${file(tool)}"
         val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         ctx.assets.open(path).use { BitmapFactory.decodeStream(it, null, o) }
         var s = 1
         while (o.outWidth / (s * 2) >= 96) s *= 2
-        ctx.assets.open(path).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = s }) }?.asImageBitmap()
+        ctx.assets.open(path).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = s }) }?.let { b ->
+            val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+            b.asImageBitmap() to LogoContrast.lightTile(px)
+        }
     }.getOrNull()?.also { cache[tool] = it }
 }
 

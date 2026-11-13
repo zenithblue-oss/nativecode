@@ -85,7 +85,8 @@ internal fun TimelineRow(v: AgentChatView, t: ChatThread, row: Row, liveRun: Str
 @Composable
 private fun ItemRow(v: AgentChatView, t: ChatThread, item: TurnItem, live: Boolean) {
     when (val p = item.payload) {
-        is ItemPayload.UserMessage -> UserBubble(p, item.updatedAt, ROW_PAD)
+        // A user message opens a turn: one block (not one gap) from what came before.
+        is ItemPayload.UserMessage -> UserBubble(p, item.updatedAt, ROW_PAD.padding(top = S.block - S.gap))
         is ItemPayload.AssistantMessage -> Markdown(p.text, streaming = live && item.status == ItemStatus.RUNNING, modifier = ROW_PAD)
         is ItemPayload.Reasoning -> Reasoning(p, item.status == ItemStatus.RUNNING, ROW_PAD)
         is ItemPayload.ProposedPlan -> PlanCard(v, t, p.markdown, ROW_PAD)
@@ -100,7 +101,7 @@ private fun ItemRow(v: AgentChatView, t: ChatThread, item: TurnItem, live: Boole
             Box(Modifier.size(4.dp).background(C.outline))
             Text(p.text, Modifier.padding(start = S.s), color = C.outline, style = T.meta)
         }
-        else -> WorkItem(v, t, item, Modifier.padding(horizontal = S.l, vertical = S.xs).card(C.low))
+        else -> WorkItem(v, t, item, ROW_PAD.card(C.low))
     }
 }
 

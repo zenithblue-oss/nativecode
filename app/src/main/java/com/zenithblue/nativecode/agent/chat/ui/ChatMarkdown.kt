@@ -314,8 +314,8 @@ internal fun Markdown(text: String, streaming: Boolean, modifier: Modifier = Mod
 
 private const val CARET = "caret"
 private val caretContent = mapOf(
-    CARET to InlineTextContent(Placeholder(0.55.em, 1.15.em, PlaceholderVerticalAlign.TextCenter)) {
-        BlinkCaret(Modifier.padding(start = 2.dp).fillMaxSize())
+    CARET to InlineTextContent(Placeholder(0.7.em, 1.15.em, PlaceholderVerticalAlign.TextCenter)) {
+        BlinkCaret(Modifier.padding(start = S.xs).fillMaxSize())
     },
 )
 

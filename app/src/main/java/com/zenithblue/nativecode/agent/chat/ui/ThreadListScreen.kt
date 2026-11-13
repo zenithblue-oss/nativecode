@@ -105,7 +105,7 @@ internal fun ThreadListScreen(v: AgentChatView) {
             Hairline()
             val groups = ChatLogic.group(rows.map { it.thread }, byProject = !v.isWorkspace)
             val byId = rows.associateBy { it.thread.id }
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = FAB_CLEAR)) {
                 if (!v.loaded.value) item("loading") { LoadingRows() }
                 if (tabs.isNotEmpty()) {
                     item("term-h") { GroupHeader("Terminals", tabs.size, !termOpen, Ic.Terminal) { termOpen = !termOpen } }
@@ -143,11 +143,15 @@ internal fun ThreadListScreen(v: AgentChatView) {
             NcIcon(Ic.SquarePen, null, tint = C.onPrimary, size = 18.dp)
             Text("NEW THREAD", Modifier.padding(start = S.s), color = C.onPrimary, style = T.overline)
         }
-        SnackbarHost(snack, Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp)) { d ->
+        SnackbarHost(snack, Modifier.align(Alignment.BottomCenter).padding(bottom = FAB_CLEAR)) { d ->
             Snackbar(d, shape = Square, containerColor = C.high, contentColor = C.on, actionColor = C.primary)
         }
     }
 }
+
+private val ROW_LOGO = 36.dp
+/** Room the list and snackbar keep free under the NEW THREAD button (48 dp + its 16 dp margins + shadow). */
+private val FAB_CLEAR = 48.dp + S.l * 2 + S.s
 
 @Composable
 private fun GroupHeader(title: String, count: Int, collapsed: Boolean, icon: ImageVector, onClick: () -> Unit) {
@@ -208,8 +212,8 @@ private fun ThreadRowView(v: AgentChatView, r: ThreadRow, now: Long, onArchive: 
         ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = S.l, vertical = S.m), verticalAlignment = Alignment.Top) {
                 Box {
-                    ProviderLogo(t.tool, size = 36.dp)
-                    if (st != null) Box(Modifier.align(Alignment.BottomEnd).offset(4.dp, 4.dp).size(12.dp).background(C.bg, CircleShape), contentAlignment = Alignment.Center) {
+                    ProviderLogo(t.tool, size = ROW_LOGO)
+                    if (st != null) Box(Modifier.align(Alignment.BottomEnd).offset(S.xs, S.xs).size(12.dp).background(C.bg, CircleShape), contentAlignment = Alignment.Center) {
                         StatusDot(st.second, size = 8.dp, pulse = r.status == ThreadStatus.WORKING)
                     }
                 }
@@ -235,7 +239,7 @@ private fun ThreadRowView(v: AgentChatView, r: ThreadRow, now: Long, onArchive: 
                     }
                 }
             }
-            Hairline(Modifier.padding(start = 68.dp), color = C.borderVar)
+            Hairline(Modifier.padding(start = S.edge + ROW_LOGO + S.m), color = C.borderVar) // under the text column
         }
         DropdownMenu(menu, { menu = false }, containerColor = C.low) {
             MItem("Rename", Ic.Pencil) { menu = false; rename = true }
