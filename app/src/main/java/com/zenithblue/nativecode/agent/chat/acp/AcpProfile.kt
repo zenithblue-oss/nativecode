@@ -89,7 +89,8 @@ data class AcpProfile(
             interactionQuestions = true,
             refusalIsQuota = true,
             embedDocs = true,
-            dropCommands = setOf("logout"),
+            // t3 AntigravityAdapterV2: supportsCompaction false, so agy's own `compact` is hidden too
+            dropCommands = setOf("logout", "compact"),
             options = ::agyOptions,
         )
 

@@ -83,8 +83,27 @@ object AcpWire {
         }
 
     fun commands(a: JSONArray?, drop: Set<String> = emptySet()): List<SlashCommand> = objects(a)
-        .mapNotNull { c -> c.optString("name").trim().removePrefix("/").ifEmpty { null }?.takeIf { it !in drop }?.let { SlashCommand(it, c.optString("description").ifBlank { null }) } }
+        .mapNotNull { c ->
+            c.optString("name").trim().removePrefix("/").ifEmpty { null }?.takeIf { it !in drop }?.let {
+                SlashCommand(it, c.optString("description").ifBlank { null }, c.optJSONObject("input")?.optString("hint")?.ifBlank { null })
+            }
+        }
         .distinctBy { it.name }
+
+    /**
+     * M7 hook: the app's NC tools MCP server as an ACP `mcpServers` http entry, only when the agent advertises
+     * `mcpCapabilities.http` (R6 4.2); else none.
+     */
+    fun mcpServers(agentCaps: JSONObject?, nc: com.zenithblue.nativecode.agent.chat.core.McpEndpoint?): JSONArray {
+        val out = JSONArray()
+        if (nc == null || agentCaps?.optJSONObject("mcpCapabilities")?.optBoolean("http") != true) return out
+        val headers = JSONArray().apply { nc.headers.forEach { (k, v) -> put(JSONObject().put("name", k).put("value", v)) } }
+        out.put(JSONObject().put("type", "http").put("name", nc.name).put("url", nc.url).put("headers", headers))
+        return out
+    }
+
+    /** Protocol-log copy of a line without bearer tokens. */
+    fun redact(line: String): String = line.replace(Regex("""Bearer [^"\s]+"""), "Bearer <redacted>")
 
     // ---------------- prompt ----------------
 

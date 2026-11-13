@@ -90,6 +90,17 @@ class AcpRpcTest {
         assertTrue(plain.getJSONObject(0).getString("text").contains("attach_p.png"))
     }
 
+    @Test fun commandHintsAndMcpHook() {
+        val c = AcpWire.commands(org.json.JSONArray("""[{"name":"goal","description":"Run","input":{"hint":"<objective>"}},{"name":"context","input":null},{"name":"compact"}]"""), setOf("context"))
+        assertEquals(listOf("goal" to "<objective>", "compact" to null), c.map { it.name to it.argumentHint })
+        val nc = com.zenithblue.nativecode.agent.chat.core.McpEndpoint("nc", "http://127.0.0.1:5000/mcp", mapOf("Authorization" to "Bearer tok"))
+        assertEquals(0, AcpWire.mcpServers(JSONObject(), nc).length()) // agy 1.5.8 advertises no mcpCapabilities
+        val s = AcpWire.mcpServers(JSONObject("""{"mcpCapabilities":{"http":true}}"""), nc).getJSONObject(0)
+        assertEquals("http", s.getString("type"))
+        assertEquals("Bearer tok", s.getJSONArray("headers").getJSONObject(0).getString("value"))
+        assertEquals(false, AcpWire.redact(s.toString()).contains("tok\""))
+    }
+
     @Test fun toolPayloads() {
         fun tool(json: String) = AcpWire.Tool("t").apply { merge(JSONObject(json)) }
         val cmd = AcpWire.toolPayload(tool("""{"kind":"execute","title":"Run","rawInput":{"CommandLine":"echo hi"},"rawOutput":{"combinedOutput":"hi\n","exitCode":0}}""")) as ItemPayload.CommandExecution

@@ -85,7 +85,7 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
             ready = false
             sink(AgentEvent.SessionState(AgentEvent.Phase.STARTING))
             val myGen = synchronized(lock) { ++gen }
-            val r = AcpRpc({ proc?.writeLine(it) == true }, { m, p -> onNotification(myGen, m, p) }, { id, m, p -> onRequest(myGen, id, m, p) }) { host.log("NATIVE", it) }
+            val r = AcpRpc({ proc?.writeLine(it) == true }, { m, p -> onNotification(myGen, m, p) }, { id, m, p -> onRequest(myGen, id, m, p) }) { host.log("NATIVE", AcpWire.redact(it)) }
             rpc = r
             proc = host.spawn(profile.argv(cfg.runtimeMode), profile.env, cfg.cwd,
                 { line -> if (!ProtocolNoise.isDelta(line)) host.log("NATIVE", line); r.onLine(line) },
@@ -150,7 +150,8 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
     /** New, or resume (`session/resume` when the profile prefers it and it is advertised, else `session/load`). */
     private fun openSession(resumeId: String?, agentCaps: JSONObject): JSONObject {
         val r = rpc ?: throw IOException("agent not running")
-        val base = JSONObject().put("cwd", cfg.cwd).put("mcpServers", JSONArray())
+        val nc = com.zenithblue.nativecode.agent.chat.core.ChatMcp.endpoint(cfg.threadId, profile.id)
+        val base = JSONObject().put("cwd", cfg.cwd).put("mcpServers", AcpWire.mcpServers(agentCaps, nc))
         if (resumeId != null) {
             val canResume = agentCaps.optJSONObject("sessionCapabilities")?.has("resume") == true
             val canLoad = agentCaps.optBoolean("loadSession")
