@@ -658,6 +658,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         BillingRepository.init(this)
         AgentChats.onChanged = chatsChanged
         AgentChats.gate = chatGate // chat sends pass the same aiLaunchAllowed / FeatureGate as terminal tabs
+        com.zenithblue.nativecode.agent.chat.tools.NcMcp.install(this) // M7: NC tools MCP hooks (server binds on first chat spawn)
         if (AgentChats.liveCount() + AgentChats.startingCount() > 0) chatsChanged() // chats outlived a recreate
 
         // Enable fullscreen/immersive mode

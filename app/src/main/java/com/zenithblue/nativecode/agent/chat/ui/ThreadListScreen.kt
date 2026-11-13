@@ -233,6 +233,7 @@ private fun ThreadRowView(v: AgentChatView, r: ThreadRow, now: Long, onArchive: 
                     Row(Modifier.padding(top = S.xs), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(S.s)) {
                         st?.let { (s, c) -> StatusChip(s, c, pulse = r.status == ThreadStatus.WORKING) }
                         Label(t.tool, color = C.outline)
+                        DelegatedChip(t.id) // M7
                         if (!v.isWorkspace && t.projectPath != null) Label(ChatLogic.baseName(t.projectPath), Modifier.weight(1f, fill = false), color = C.outline)
                         Box(Modifier.weight(1f))
                         if (r.add + r.del > 0) Row { AddDel(r.add, r.del) }

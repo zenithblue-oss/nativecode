@@ -83,7 +83,7 @@ internal class ProtocolLog(private val file: File, private val cap: Long = 1L sh
         if (isDelta(line)) return
         runCatching {
             val o = out ?: run { file.parentFile?.mkdirs(); FileOutputStream(file, true) }.also { out = it }
-            o.write("$direction $line\n".toByteArray(Charsets.UTF_8))
+            o.write("$direction ${redact(line)}\n".toByteArray(Charsets.UTF_8))
             if (file.length() > cap) {
                 o.close(); out = null
                 file.renameTo(File(file.path + ".1"))
@@ -97,6 +97,10 @@ internal class ProtocolLog(private val file: File, private val cap: Long = 1L sh
     companion object {
         // ponytail: substring heuristic for streaming frames (text_delta, session.text.delta, outputDelta); exact per-runtime filter if logs get noisy
         fun isDelta(line: String) = line.contains("delta\"", ignoreCase = true)
+
+        /** Bearer tokens (the M7 tools server's per-thread token rides in MCP configs) never reach the log. */
+        private val BEARER = Regex("""(?i)bearer\s+[^"\s,}\]]+""")
+        fun redact(line: String) = if (line.contains("earer", ignoreCase = true)) BEARER.replace(line, "Bearer <redacted>") else line
 
         private val open = java.util.concurrent.ConcurrentHashMap<String, ProtocolLog>()
 

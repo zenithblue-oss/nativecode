@@ -86,7 +86,8 @@ internal fun TimelineRow(v: AgentChatView, t: ChatThread, row: Row, liveRun: Str
 private fun ItemRow(v: AgentChatView, t: ChatThread, item: TurnItem, live: Boolean) {
     when (val p = item.payload) {
         // A user message opens a turn: one block (not one gap) from what came before.
-        is ItemPayload.UserMessage -> UserBubble(p, item.updatedAt, ROW_PAD.padding(top = S.block - S.gap))
+        is ItemPayload.UserMessage -> com.zenithblue.nativecode.agent.chat.tools.NcToolSpec.parseIncoming(p.text) // M7 cross-thread
+            ?.let { CrossThreadCard(v, it, ROW_PAD.padding(top = S.block - S.gap)) } ?: UserBubble(p, item.updatedAt, ROW_PAD.padding(top = S.block - S.gap))
         is ItemPayload.AssistantMessage -> Markdown(p.text, streaming = live && item.status == ItemStatus.RUNNING, modifier = ROW_PAD)
         is ItemPayload.Reasoning -> Reasoning(p, item.status == ItemStatus.RUNNING, ROW_PAD)
         is ItemPayload.ProposedPlan -> PlanCard(v, t, p.markdown, ROW_PAD)
