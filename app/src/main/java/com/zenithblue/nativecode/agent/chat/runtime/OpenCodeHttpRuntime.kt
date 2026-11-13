@@ -190,7 +190,10 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
         if (!connected.await(10, TimeUnit.SECONDS)) throw IOException("opencode event stream did not open")
 
         val loc = location(cfg.cwd)
-        models = OpenCodeWire.parseModels(runCatching { client.call("GET", "/api/model?$loc")?.optJSONArray("data") }.getOrNull())
+        // The first call with a location boots opencode's instance for that directory (project scan, git, plugins):
+        // well over 15 s on a phone in a fresh project, so it alone gets the long timeout.
+        models = OpenCodeWire.parseModels(runCatching { client.call("GET", "/api/model?$loc", timeoutMs = BOOT_CALL_MS)?.optJSONArray("data") }
+            .onFailure { host.log("NATIVE", "models: ${it.message}") }.getOrNull())
         val serverDefault = runCatching { OpenCodeWire.slugOf(client.call("GET", "/api/model/default?$loc")?.optJSONObject("data")) }.getOrNull()
         val default = serverDefault?.takeIf { s -> models.any { it.id == s } } ?: models.firstOrNull { it.free }?.id ?: models.firstOrNull()?.id
         commands = loadCommands()
@@ -202,7 +205,7 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
         sessionId = sid
         mapper.root = sid
         sink(AgentEvent.NativeId(sid))
-        sink(AgentEvent.SessionState(AgentEvent.Phase.READY, caps, models, default, commands, message = OpenCodeWire.SIGN_IN.takeIf { models.isEmpty() }))
+        sink(AgentEvent.SessionState(AgentEvent.Phase.READY, caps, models, default, commands, message = OpenCodeWire.SIGN_IN.takeIf { models.isEmpty() }, model = model))
     }
 
     /** Spawn + wait for `server listening on http://…` (30 s); one retry on a new port when the bind fails. */
@@ -250,7 +253,7 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
             .put("agent", agent())
         OpenCodeWire.modelRef(model, effort, models)?.let { body.put("model", it) }
         cfg.title?.trim()?.ifEmpty { null }?.let { body.put("title", it) }
-        return api.call("POST", "/api/session", body)!!.getJSONObject("data").getString("id")
+        return api.call("POST", "/api/session", body, timeoutMs = BOOT_CALL_MS)!!.getJSONObject("data").getString("id")
     }
 
     /** Resume = GET, move if the cwd changed, re-apply rules/model/agent. Any failure: notice + fresh session. */
@@ -343,6 +346,7 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
             modes = RuntimeMode.entries.toList(), effort = true, slashCommands = true, resume = true,
         )
         private const val READY_TIMEOUT_S = 30L
+        private const val BOOT_CALL_MS = 120_000
         private const val SILENCE_MS = 45_000
         private const val RECONNECT_ATTEMPTS = 5
         private const val RECONNECT_DELAY_MS = 2_000L
