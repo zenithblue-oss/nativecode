@@ -765,6 +765,11 @@ Item `type` (t3code `TurnItem` subset): `user_message {text, attachments[], inte
 #### 9.2.6 Screens (360 dp portrait; t3code phone layout)
 Sheets are only for pick-lists; anything with a text field is a full page (`mob/features/layout/route-options.ts`: Android form sheets cannot host the keyboard). At ≥ 720 dp (landscape, tablet, DeX) list and chat sit side by side (S).
 
+**UI rules (owner, binding for M1–M6).** The glyphs in the wireframes below are placeholders only.
+- **Icons are vectors only.** No font glyphs, emoji, unicode symbols (▢ ■ ● → ✓ ⛨ ✎ …) or text characters as icons. Every icon is an Android VectorDrawable XML or a Compose `ImageVector` from SVG paths: Material Symbols (Apache 2.0) or Lucide (ISC), converted, or the provider logos the app already ships. Status dots are drawn shapes (`Canvas`/`Box` with `CircleShape`), not `●`.
+- **Polish bar = t3code** (`t3:apps/web`, `t3:apps/mobile`): spacing, type hierarchy, user bubbles vs full-width assistant blocks, tool cards with status icons and collapsible output, composer, model/effort chips, list rows (provider logo, title, last-message preview, time, running indicator), empty states, loading/streaming shimmer, subtle motion. Adapted to NativeCode's obsidian, cyber-brutalist theme, not generic Material.
+- 4/8 dp spacing scale; monospace for code and tool output; one defined text scale; animated cursor while streaming; real elevation and border treatment; haptic feedback on approval actions; dark-theme contrast; every icon-only control has a TalkBack `contentDescription`. Check portrait, landscape and font scale 1.3.
+
 **A. Thread list, TERMINAL tab (root of the Chat position)**
 ```
 ┌────────────────────────────────────────────┐
