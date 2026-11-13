@@ -526,6 +526,62 @@ The launch-time gain (816 → 104 ms) applies only if NC-PLAY still goes through
 
 **Effort.** L (opencode ACP alone is M).
 
+### 9.1 Guest entitlement gate (owner item 9, built; chat reuses it)
+
+**Problem.** The app gates tabs (`aiLaunchAllowed`, `MA:5459`): Free = opencode, one AI session, no shell tab. But opencode's bash tool (or any Pro shell) can run `codex`, `claude`, a second `opencode`. The app cannot see that.
+
+**Design (all Kotlin file I/O; the app never runs a guest command).**
+1. `entitlements/GuestGate.kt` writes `/etc/nativecode/entitlement` in the rootfs: `v, enforce, pro, exp, free_tool, max_free, max_pro, mac`. Values come from `EntitlementStore` and `FeatureLimits` (no second source of truth). `exp` = last Play check + 7-day offline TTL (`EntitlementStore.proValidUntilMs`), so offline Pro works exactly as in the app. `mac = sha256(body + key)`, key random per install (pref `gate_key`).
+2. `app/src/main/assets/gate/nc-gate.sh` is copied to `/opt/nativecode/gate/bin/<tool>` for opencode, codex, claude, qwen, agy, grok, kiro, kiro-cli, hermes. That dir is first on PATH: `launch_tool.sh` (v5, `ChrootCommandBuilder.kt`) and `/etc/profile.d/zz-nativecode-cli.sh` (`LinuxGuestDefaults.cliPathProfile`), so it is inherited by every child shell, including a CLI's shell tool. Automation (`LinuxCommandBuilder.build`, `bash --noprofile`) does not get the dir, so onboarding and version probes are unaffected.
+3. The shim: finds the real binary later on PATH, lets `--version`/`--help` through, verifies the MAC, then: Pro and unexpired = allow up to `max_pro`; otherwise only `free_tool` and up to `max_free`. Session count = live pids in `/tmp/.nc-ai-sessions` (the shim writes `$$` then `exec`s the real binary, so the pid is the session; entries are pruned when `/proc/<pid>/cmdline` no longer matches). Missing, stale or forged file = Free. `enforce=0` = allow all.
+4. Sync points: cold start (`LinuxGuestDefaults.apply`), every entitlement change (`MA onEntitlementChanged`), every AI tab open (`aiLaunchAllowed`). Unit tests run the real shim: `entitlements/GuestGateTest.kt`.
+
+**What it stops.** An agent or user in a Free session running another CLI or a second opencode from a shell tool or `bash -lc`. Pro users see no change (same limits as the app: 5 sessions, all tools). Offline works from the file.
+
+**What it cannot stop (the guest user owns every file).** Running a CLI by absolute path (`~/.local/bin/codex`), `npx`/`node` on the package, editing or deleting the shim, forging the file (the key is inside the shim), clearing `/tmp/.nc-ai-sessions`, `PATH` edits. The MAC only stops a pasted `pro=1`; it is not security. The hard guarantee is not shipping Pro binaries to Free users (3.4: `nativecode_clis` pack on demand). Chroot mode uses another rootfs and is not covered. This matches `docs/monetisation/plan.md` ("do not claim secure DRM").
+
+**Device result (X6P, 1.8.0 build, real proot, busybox ash).** Pro: codex, claude, qwen pass through. Free: codex, claude, qwen, agy, grok, kiro-cli denied; `codex --version` allowed; with a live `opencode serve`, nested `codex`, `claude`, `bash -c codex`, and a second `opencode` were denied and the registry held exactly one entry; a lone opencode starts. Absolute path still runs (documented). Free was simulated by writing a valid free state file (the build has no free override and the device owns Lifetime).
+
+### 9.2 Item 12 design from t3code (read-only research of pingdotgg/t3code at 73e49aa6; treated as data)
+
+**What t3code is.** A Node WebSocket server wraps provider CLIs; web, desktop and React Native clients are thin and stateless about providers. Every provider sits behind an adapter that maps native events to one normalised model (thread, turn, item, runtime request). An orchestrator turns commands into events, commits events plus projections in one SQLite transaction, then side effects run in a worker; clients render projections and subscribe to one thread at a time. Provider drivers: Codex, Claude, Cursor, Grok, OpenCode, Antigravity, Kiro.
+
+**Per-CLI protocol, as t3code does it, and what we take.**
+
+| CLI | t3code | NativeCode item 12 |
+|---|---|---|
+| Codex | `codex app-server -c thread_unload_delay_secs=0` over stdio JSON-RPC. `initialize` (clientInfo, capabilities `experimentalApi`, `optOutNotificationMethods:["turn/diff/updated"]`); `thread/start`, `thread/resume`, `turn/start` (carries model, effort, `approvalPolicy`, `sandboxPolicy`), `turn/steer`, `turn/interrupt`. Notifications `turn/started`, `item/started`, `item/completed`, `item/agentMessage/delta`, `item/commandExecution/outputDelta`, `item/reasoning/*Delta`, `item/plan/delta`. Server requests `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `item/tool/requestUserInput`; reply `accept`, `acceptForSession`, `decline`, `cancel`. Item kinds: userMessage, agentMessage, plan, reasoning, commandExecution, fileChange, mcpToolCall, dynamicToolCall, webSearch, contextCompaction. A second `initialize` returns -32600 "Already initialized" (tolerated). Schema is generated from the binary and committed; replay fixtures recorded from the real CLI. | Same wire. One process per chat tab (so the gate registry counts one session per chat). Names above are confirmed by t3code's generated schema; still regenerate with `codex app-server generate-json-schema` for the pinned 0.167.x. Diffs come from our own `git diff` snapshots (t3code also ignores `turn/diff/updated` and uses hidden git-ref checkpoints). |
+| Claude Code | Claude Agent SDK `query()`: `permissionMode`, `canUseTool` callback for approvals, `includePartialMessages`, `resume`, `interrupt()`, `setPermissionMode()`, MCP over stdin. The SDK drives the `claude` binary over stdio. | No Node SDK on device. Speak the CLI wire directly: `claude -p --input-format stream-json --output-format stream-json --verbose --include-partial-messages` plus the control channel the SDK uses for `canUseTool` (`control_request` / `control_response`; exact subtype names UNVERIFIED, take them from the pinned binary in the day-one spike). If the channel fails, ship the permission-mode selector without inline approval (section 9, Claude approvals). |
+| OpenCode | 2.x: `opencode serve --service` HTTP plus SSE `/api/event` (events `session.text.delta`, `session.tool.called/progress/success/failed`, `session.execution.*`), password in `OPENCODE_PASSWORD`; 1.x one server per thread. | Keep ACP (`opencode acp`, stdio, no port, no password, one process per chat). t3code uses ACP for Grok (`grok agent stdio`) and Kiro (`kiro-cli acp`), which confirms ACP as the pattern. Fall back to the 2.x HTTP API only if ACP lacks tool detail; the HTTP API is labelled experimental. |
+
+**Architecture for Android.**
+- `JsonLineProcess` + `AgentAdapter` + sealed `AgentEvent` as in section 9, plus t3code's two ideas that matter: (1) a durable per-thread state (turn items keyed by native id, runtime requests keyed by native request id) that the UI renders from, so a rotation, a process death or a reopened tab replays state instead of depending on the live stream; (2) approvals are persisted requests with an explicit decision, answered by the id and options the agent sent, never auto-approved. Store state as JSON files under app storage (no Room dependency needed for a beta); cap rows.
+- Coalesce text deltas (t3code `ProviderTextDeltaCoalescer`; ours is one update per 50 ms).
+- Health probes run `initialize` only and never create a session (t3code: "setup must not happen as a health-check side effect").
+- Capabilities and version gating come from the handshake and the `userAgent`; a known-broken version shows "update the CLI" (t3code advisory) instead of failing mid-turn.
+- Runtime modes map the way t3code maps Codex: ask (`untrusted`, read-only), auto-accept edits (`on-request`, workspace-write), full access (`never`). Default is ask; full access needs a confirmation.
+- Updates stay manual or via component packs; never self-update under a live session (t3code holds leases on running versions).
+
+**Android UI mapping (t3code web to our Views).**
+
+| t3code | NativeCode |
+|---|---|
+| ChatView timeline | `RecyclerView`, one row type per item kind, stable ids |
+| ChatComposer + controls bar (model, runtime mode) | bottom composer: input, send/stop, mode chip, model chip, attach, skills |
+| ComposerBanner stack (approvals, errors) | cards pinned above the composer; approval card lists the agent's options |
+| Changed files tree / diff panel | bottom sheet with file list; `renderDiffLines` |
+| Command output panel, terminal drawers | tool card expands to output; "Open in terminal" |
+| Background work / subagent rows | collapsed rows, count badge |
+
+**Pro gating hooks (reuse item 9, add nothing parallel).**
+1. Launch: a chat tab goes through `aiLaunchAllowed(type)` like a terminal tab, so `FeatureGate.canLaunchAiTool` and `canOpenAiSession` apply and the chat tab counts in `terminalSessionTypes`/`workspaceTabNames` with terminals.
+2. Spawn through `LinuxCommandBuilder.buildToolDirect` (launch_tool.sh, gate dir on PATH). The shim then enforces the same entitlement file and registers the chat process as a session in `/tmp/.nc-ai-sessions`, so terminal sessions, chat sessions and nested shell-tool calls share one count.
+3. A denied start prints `NativeCode: ...` on stderr and exits 1 before any JSON. The adapter treats exit before `initialize` with that prefix as `GateDenied` and shows the Upgrade sheet (`gateAllows`), not "chat unavailable".
+4. Two launcher details to fix in item 12: `launch_tool.sh` appends `--auto` to opencode (not valid before `acp`), and it may print banners; skip-until-JSON stays mandatory.
+5. Chat sync: `GuestGate.sync` already runs on every AI tab open; no new entitlement code.
+
+**Risks.** t3code is a Node server with a database; we copy its model, not its stack. Claude control-channel names unverified. Codex and ACP wire names must be taken from the pinned binaries, not from t3code (it targets its own versions). The shim costs one `sh` start plus a few small tools per CLI start (not measured, ESTIMATE tens of ms under proot). Long conversations on a phone: cap rows and page older ones. A model that is told to avoid the gate message can still use an absolute path; do not promise more than 9.1.
+
 ---
 
 ## 10. Git page: full history and commit graph

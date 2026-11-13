@@ -23,6 +23,15 @@ object EntitlementStore {
         return isCacheValid(p.getBoolean(KEY_PRO, false), p.getLong(KEY_PRO_CHECKED_MS, 0L), System.currentTimeMillis())
     }
 
+    /** Epoch ms until which [isPro] stays true without a Play refresh; 0 when not Pro. Feeds the guest gate. */
+    fun proValidUntilMs(ctx: Context): Long {
+        val p = prefs(ctx)
+        val now = System.currentTimeMillis()
+        if (BuildConfig.DEBUG && p.getBoolean(KEY_FORCE_PRO, false)) return now + OFFLINE_TTL_MS
+        return if (isCacheValid(p.getBoolean(KEY_PRO, false), p.getLong(KEY_PRO_CHECKED_MS, 0L), now))
+            p.getLong(KEY_PRO_CHECKED_MS, 0L) + OFFLINE_TTL_MS else 0L
+    }
+
     /** Called only after Play answered OK, so a successful empty query clears Pro. */
     fun setPro(ctx: Context, pro: Boolean) {
         prefs(ctx).edit().putBoolean(KEY_PRO, pro).putLong(KEY_PRO_CHECKED_MS, System.currentTimeMillis()).apply()

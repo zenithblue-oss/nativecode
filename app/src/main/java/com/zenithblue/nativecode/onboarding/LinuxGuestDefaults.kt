@@ -2,6 +2,8 @@ package com.zenithblue.nativecode.onboarding
 
 import android.content.Context
 import android.util.Log
+import com.zenithblue.nativecode.entitlements.GuestGate
+import com.zenithblue.nativecode.entitlements.GuestGate.GATE_BIN
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.File
 import java.io.FileOutputStream
@@ -41,6 +43,9 @@ object LinuxGuestDefaults {
             renameLegacyHostProfile(rootfs)
             pinXfceTerminalFont(rootfs)
             AgentConfigInstaller.install(context)
+            // The managed PATH file carries the gate dir; refresh with the shims, not only on app update.
+            writeIfChanged(File(rootfs, CLI_PROFILE.removePrefix("/")), cliPathProfile)
+            GuestGate.sync(context)
             true
         }.onFailure {
             Log.w(TAG, "Could not apply Linux guest defaults: ${it.message}", it)
@@ -85,10 +90,12 @@ object LinuxGuestDefaults {
     internal val cliPathProfile = listOf(
         "# Managed by NativeCode: CLI self-updates must land where PATH looks first.",
         "export NPM_CONFIG_PREFIX=\"\$HOME/.local\"",
+        "# The Free/Pro gate shims must win over the real CLI binaries.",
         "case \":\$PATH:\" in",
-        "  \":\$HOME/.opencode/bin:\$HOME/.local/bin:\"*) ;;",
-        "  \":\$HOME/.local/bin:\"*) PATH=\"\$HOME/.opencode/bin:\$PATH\" ;;",
-        "  *) PATH=\"\$HOME/.opencode/bin:\$HOME/.local/bin:\$PATH\" ;;",
+        "  \":$GATE_BIN:\$HOME/.opencode/bin:\$HOME/.local/bin:\"*) ;;",
+        "  \":\$HOME/.opencode/bin:\$HOME/.local/bin:\"*) PATH=\"$GATE_BIN:\$PATH\" ;;",
+        "  \":\$HOME/.local/bin:\"*) PATH=\"$GATE_BIN:\$HOME/.opencode/bin:\$PATH\" ;;",
+        "  *) PATH=\"$GATE_BIN:\$HOME/.opencode/bin:\$HOME/.local/bin:\$PATH\" ;;",
         "esac",
         "export PATH",
     ).joinToString("\n") + "\n"

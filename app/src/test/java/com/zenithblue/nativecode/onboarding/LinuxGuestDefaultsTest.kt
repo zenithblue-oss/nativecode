@@ -22,7 +22,7 @@ class LinuxGuestDefaultsTest {
     @Test
     fun cliPathsFirstOnceAndIdempotent() {
         assumeTrue(File("/bin/sh").exists())
-        val want = "/home/x/.opencode/bin:/home/x/.local/bin:/usr/bin:/bin"
+        val want = "/opt/nativecode/gate/bin:/home/x/.opencode/bin:/home/x/.local/bin:/usr/bin:/bin"
         val out = path("/usr/bin:/bin")
         assertEquals(want, out[0])
         assertEquals("/home/x/.local", out[1])

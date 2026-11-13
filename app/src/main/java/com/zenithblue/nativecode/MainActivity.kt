@@ -53,6 +53,7 @@ import com.zenithblue.nativecode.ui.BrutalistToggle as CustomBrutalistToggle
 import com.zenithblue.nativecode.onboarding.LegacyProotDataMigrator
 import com.zenithblue.nativecode.billing.BillingRepository
 import com.zenithblue.nativecode.entitlements.EntitlementStore
+import com.zenithblue.nativecode.entitlements.GuestGate
 import com.zenithblue.nativecode.entitlements.FeatureGate
 import com.zenithblue.nativecode.entitlements.GateResult
 import com.zenithblue.nativecode.entitlements.ProFeature
@@ -5440,6 +5441,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     /** Billing hook: Pro card text always; rebuild the visible page only when Pro actually flips. */
     private fun onEntitlementChanged() {
+        GuestGate.sync(this) // guest shims read this state; keep it current before any CLI runs
         refreshProCard()
         paintGuiBudget() // also re-reads minutes on every resume
         val pro = isPro()
@@ -5462,6 +5464,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     /** AI tool + concurrent AI session gates (app tabs + all project workspaces). */
     private fun aiLaunchAllowed(type: String): Boolean {
+        GuestGate.sync(this)
         if (!ToolLauncherCatalog.isAiToolType(type)) return gateAllows(FeatureGate.canOpenShell(isPro()))
         if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), type))) return false
         val others = projectTabNamesMap.filterKeys { it != activeProjectPath }.values.flatten()

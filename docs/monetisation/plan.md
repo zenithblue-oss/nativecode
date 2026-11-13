@@ -469,7 +469,7 @@ Upgrade sheet copy: matrix bullets + 3 price buttons (mo / yr / lifetime) + Rest
 
 | Risk | Mitigation |
 |------|------------|
-| opencode itself can run shell commands via its bash tool | Accepted; can't be gated without crippling opencode |
+| opencode itself can run shell commands via its bash tool | Partly closed in 1.8.0: AI CLI names resolve to guest gate shims that read an app-written entitlement file and count sessions (`entitlements/GuestGate.kt`, `docs/plan/next-release-plan.md` 9.1). Deterrence only; absolute paths and edits by the guest user still bypass it |
 | Free desktop (30 min/day) includes a terminal app = shell access | Accepted by owner |
 | Root/shell bypass of marketplace scripts | Accept guest freedom; gate **app UI install path**; don’t claim secure DRM |
 | Users install AI CLIs via apt/npm in shell | Expected; Pro sells **integrated launchers, multi-session UX, desktop time, catalog** — not crypto lock on bins |

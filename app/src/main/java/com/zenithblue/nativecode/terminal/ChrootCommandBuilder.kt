@@ -3,6 +3,7 @@ package com.zenithblue.nativecode.terminal
 import android.content.Context
 import android.util.Log
 import com.zenithblue.nativecode.RootShell
+import com.zenithblue.nativecode.entitlements.GuestGate
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -27,7 +28,7 @@ object ChrootCommandBuilder {
     /** Session executable — must be a system binary (SELinux blocks exec of app-data scripts). */
     const val SESSION_EXEC = "/system/bin/sh"
 
-    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v4"
+    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v5"
     private const val TERM_WRAPPER_VERSION = "nativecode-chroot-term-wrapper v3"
     private val launcherPrepLock = Any()
     private var launcherPrepGeneration = 0L
@@ -286,6 +287,9 @@ else
   fi
   unset _n
 fi
+
+# Free/Pro gate shims (entitlements/GuestGate.kt) must win over the real CLIs, also for nested shell tools.
+export PATH="${GuestGate.GATE_BIN}:${'$'}PATH"
 
 if [ ${'$'}# -lt 1 ]; then
   echo "launch_tool: missing command" >&2
