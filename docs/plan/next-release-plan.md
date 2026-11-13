@@ -1059,6 +1059,15 @@ Gating regression at every milestone: a Free user reaches no Pro tool, no second
 
 No open questions remain for item 12.
 
+#### 9.2.15 Runtime extension points (as built in M1; for M2–M5)
+Adding a provider = one runtime class + one catalog line; no store, controller or UI change.
+- **Contract** (`agent/chat/core/`): `AgentRuntime` (`start(cfg, nativeId, sink)`, `send(turn, steer)`, `interrupt`, `respond(requestNativeId, RequestAnswer)`, `configure(ConfigChange)`, `close`, `kill`, `caps: RuntimeCaps`), `AgentEvent` (full-snapshot upserts keyed by native ref), `ChatModels` (`ItemPayload` variants, `RequestOption`/`RequestDetail`/`Question`, `ModelInfo`, `RuntimeMode`). Methods never block the caller; events may come from any thread.
+- **Spawn:** only through `RuntimeHost.spawn(toolArgv, extraEnv, cwd, onLine, onExit)` (`ChatRuntimes.ThreadHost`): `buildToolDirect` → `launch_tool.sh` → gate shim, registers the process in `AgentChats` as *starting*; emit `SessionState(READY)` after the handshake to mark it live. `extraEnv` reaches the guest unchanged. Protocol log via `host.log(dir, line)`, never logcat.
+- **Register:** set `CliToolDef.chat` (`CLAUDE_STREAM`, `CODEX_APP_SERVER`, `ACP` + `acpProfile`) in `CliToolCatalog`, and add the branch in `ChatRuntimes.create(tool, host)`. Cards show [Chat] only where `chat != null`.
+- **Rules the controller relies on:** `NativeId` as soon as the resume key is known; `TurnStarted` per turn (`null` id allowed); exactly one `TurnTerminal` per turn (`reusable=false` = broken session, the controller respawns + resumes on the next send); `Exited` only for the current process (suppress it for a process the runtime closed itself, e.g. respawn on mode change); `RequestUpsert` with the agent's exact options, answered by option id; steer only when `caps.steer` (else the controller queues). Gate deny is detected by the controller from `NativeCode:` in the exit stderr.
+- **Tests:** fixtures in `app/src/test/resources/agent/<tool>-<version>/`, replayed through a pure mapping object (pattern: `runtime/OpenCodeMapping.kt` + `OpenCodeMappingTest`); the reducer is covered by `ChatReducerTest` with a fake event stream.
+- **opencode (M1):** own `opencode serve --hostname=127.0.0.1 --port=<free, ≠49374>` per thread with a fresh `OPENCODE_PASSWORD`; 2.3.0's managed service (`serve --service`, 49374, used by the TUI) is never attached to or killed. Prompt ids are `msg_nc_<session>_<client>` (opencode needs `msg_` and global uniqueness). Free = `-free` suffix or zero input/output cost (`big-pickle` has no suffix).
+
 ---
 
 ## 10. Git page: full history and commit graph
