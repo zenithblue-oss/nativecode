@@ -45,7 +45,9 @@ class GitLogParseTest {
 
     @Test fun parsesDetail() {
         val out = "Ann <a@x>\u00001700000000\u0000$p1\u0000Subject\n\nbody line\n\n" +
-            "\n__FILES__\nM\tsrc/a.kt\nA\tb.txt\n__NUM__\n3\t1\tsrc/a.kt\n-\t-\tb.txt\n"
+            // -z output: unicode / tab-free paths arrive raw, never C-quoted
+            "\n__FILES__\nM\u0000src/a.kt\u0000A\u0000b.txt\u0000M\u0000docs/日本語 é.md\u0000" +
+            "\n__NUM__\n3\t1\tsrc/a.kt\u0000-\t-\tb.txt\u00002\t0\tdocs/日本語 é.md\u0000"
         val d = GitLogParse.parseDetail(out)
         assertNotNull(d)
         assertEquals("Ann <a@x>", d!!.author)
@@ -53,6 +55,8 @@ class GitLogParseTest {
         assertEquals("Subject\n\nbody line", d.message)
         assertEquals(GitFileChange('M', "src/a.kt", 3, 1), d.files[0])
         assertEquals(GitFileChange('A', "b.txt", 0, 0), d.files[1])
+        assertEquals(GitFileChange('M', "docs/日本語 é.md", 2, 0), d.files[2])
+        assertEquals(3, d.files.size)
     }
 
     @Test fun relativeTimes() {

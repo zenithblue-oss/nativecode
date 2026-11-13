@@ -75,15 +75,19 @@ object GitLogParse {
         if (iFiles < 0 || iNum < iFiles) return null
         val head = out.substring(0, iFiles).split('\u0000', limit = 4)
         if (head.size < 4) return null
+        // Both lists are -z: raw paths (no C-quoting of unicode), NUL separated.
         val nums = HashMap<String, Pair<Int, Int>>()
-        for (l in out.substring(iNum + DETAIL_NUM.length + 2).lines()) {
-            val p = l.split('\t', limit = 3)
+        for (l in out.substring(iNum + DETAIL_NUM.length + 2).split('\u0000')) {
+            val p = l.trimStart('\n').split('\t', limit = 3)
             if (p.size == 3) nums[p[2]] = (p[0].toIntOrNull() ?: 0) to (p[1].toIntOrNull() ?: 0)
         }
-        val files = out.substring(iFiles + DETAIL_FILES.length + 2, iNum).lines().mapNotNull { l ->
-            val p = l.split('\t', limit = 2)
-            if (p.size < 2 || p[0].isEmpty()) null
-            else GitFileChange(p[0][0], p[1], nums[p[1]]?.first ?: 0, nums[p[1]]?.second ?: 0)
+        val f = out.substring(iFiles + DETAIL_FILES.length + 2, iNum).split('\u0000')
+        val files = ArrayList<GitFileChange>()
+        var i = 0
+        while (i + 1 < f.size) {
+            val st = f[i].trim(); val path = f[i + 1]; i += 2
+            if (st.isEmpty() || path.isEmpty()) continue
+            files += GitFileChange(st[0], path, nums[path]?.first ?: 0, nums[path]?.second ?: 0)
         }
         return GitCommitDetail(
             author = head[0],

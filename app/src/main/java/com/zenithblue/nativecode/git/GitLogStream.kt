@@ -22,20 +22,30 @@ class GitLogStream(
     private val ref: String?,
     private val skip: Int,
     private val layout: GitGraphLayout,
+    /**
+     * Resume check: the first line git returns after [skip] must be this commit (the last row
+     * already shown). If history changed meanwhile (commit, fetch, rebase), `--skip` points
+     * elsewhere and the stream ends with [STALE] so the caller reloads from the top.
+     */
+    private val expectFirst: String?,
     private val onBatch: (rows: List<GraphRow>, resume: GitGraphLayout) -> Unit,
     private val onEnd: (finished: Boolean, exit: Int) -> Unit
 ) {
     @Volatile private var cancelled = false
     @Volatile private var proc: Process? = null
-    @Volatile private var allow = 0
+    private var allow = 0 // guarded by lock
+    private val lock = Object()
 
     /** Raise the row budget (absolute row count, including [skip]). */
     fun allowUpTo(rows: Int) {
-        if (rows > allow) allow = rows
+        synchronized(lock) {
+            if (rows > allow) { allow = rows; lock.notifyAll() }
+        }
     }
 
     fun cancel() {
         cancelled = true
+        synchronized(lock) { lock.notifyAll() }
         try { proc?.destroyForcibly() } catch (_: Exception) {}
     }
 
@@ -55,6 +65,8 @@ class GitLogStream(
             var batch = ArrayList<GraphRow>(BATCH)
             var delivered = 0
             var total = skip
+            var verify = expectFirst != null
+            var stale = false
             val buf = ByteArray(32 * 1024)
             val line = java.io.ByteArrayOutputStream(512)
             val input = p.inputStream
@@ -69,6 +81,12 @@ class GitLogStream(
                     val c = GitLogParse.parseLine(line.toString(Charsets.UTF_8.name()))
                     line.reset()
                     if (c == null) continue
+                    if (verify) {
+                        verify = false
+                        if (c.hash != expectFirst) { stale = true; break@loop }
+                        total++ // already on screen; its layout is in the resume snapshot
+                        continue
+                    }
                     batch.add(layout.add(c))
                     total++
                     if (batch.size >= (if (delivered == 0) FIRST_BATCH else BATCH)) {
@@ -76,15 +94,20 @@ class GitLogStream(
                         post(batch, layout.copy())
                         batch = ArrayList(BATCH)
                         // Backpressure: stop reading (git blocks on the full pipe) until the UI wants more.
-                        // ponytail: 40 ms poll while parked; condition variable if this ever shows in a profile.
-                        while (!cancelled && total >= allow) Thread.sleep(40)
+                        // Parked thread sleeps in wait(): no CPU until allowUpTo()/cancel() notifies.
+                        synchronized(lock) { while (!cancelled && total >= allow) lock.wait() }
                         if (cancelled) break@loop
                     }
                 }
                 line.write(buf, start, n - start)
             }
-            if (!cancelled && batch.isNotEmpty()) post(batch, layout.copy())
-            if (!cancelled) { exit = p.waitFor(); finished = true } else p.destroyForcibly()
+            if (stale || (verify && !cancelled)) {
+                // stale offset, or history now shorter than the skip: reload from the top
+                p.destroyForcibly(); exit = STALE
+            } else {
+                if (!cancelled && batch.isNotEmpty()) post(batch, layout.copy())
+                if (!cancelled) { exit = p.waitFor(); finished = true } else p.destroyForcibly()
+            }
         } catch (_: Exception) {
             proc?.destroyForcibly()
         }
@@ -98,6 +121,8 @@ class GitLogStream(
     companion object {
         const val FIRST_BATCH = 40
         const val BATCH = 500
+        /** onEnd exit code: resume offset no longer matches the shown rows. */
+        const val STALE = -2
         private val MAIN = Handler(Looper.getMainLooper())
     }
 }

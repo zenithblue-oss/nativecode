@@ -56,142 +56,121 @@ object GitPorcelainParse {
         )
     }
 
-    fun parseStatusSummaryBundle(raw: String): DiffSummaryResult {
-        val lines = raw.lines().map { it.trimEnd() }
-        if (lines.any { it.trim() == "__NOGIT__" }) {
-            return DiffSummaryResult.NotGit()
-        }
-        var section = ""
-        val statusLines = ArrayList<String>()
-        val numstatLines = ArrayList<String>()
-        for (line in lines) {
-            val t = line.trim()
-            when (t) {
-                "__STATUS__" -> {
-                    section = "status"
-                    continue
-                }
-                "__NUMSTAT__" -> {
-                    section = "numstat"
-                    continue
-                }
-                "__NOGIT__" -> return DiffSummaryResult.NotGit()
-            }
-            when (section) {
-                "status" -> if (line.isNotEmpty()) statusLines.add(line)
-                "numstat" -> if (line.isNotEmpty()) numstatLines.add(line)
-            }
-        }
-        val entries = parsePorcelain(statusLines)
-        val (locAdd, locDel) = parseNumstat(numstatLines)
-        val counts = countBuckets(entries)
-        return DiffSummaryResult.Ok(
-            DiffSummary(
-                isRepo = true,
-                modified = counts.modified,
-                added = counts.added,
-                deleted = counts.deleted,
-                untracked = counts.untracked,
-                renamed = counts.renamed,
-                linesAdded = locAdd,
-                linesDeleted = locDel,
-                entries = entries
-            )
-        )
+    // -- CHANGES page: output of GitGuestCommands.changesBundle ---------------------------------
+
+    const val M_STATUS = "__ST__"
+    const val M_UNSTAGED = "__UN__"
+    const val M_STAGED = "__CA__"
+    const val M_STATE = "__GD__"
+    const val M_FAIL = "__FAIL__"
+    private val MARKERS = listOf(M_STATUS, M_UNSTAGED, M_STAGED, M_STATE, M_FAIL)
+
+    private fun marker(m: String) = "\u0000$m\u0000"
+
+    /** Text between marker [m] and the next marker (or end). Null if [m] is absent. */
+    private fun section(raw: String, m: String): String? {
+        val i = raw.indexOf(marker(m))
+        if (i < 0) return null
+        val s = i + m.length + 2
+        // Exact markers only: a file name may itself start with "__".
+        val e = MARKERS.map { raw.indexOf(marker(it), s) }.filter { it >= 0 }.minOrNull() ?: raw.length
+        return raw.substring(s, e)
     }
 
-    fun parsePorcelain(lines: List<String>): List<GitStatusEntry> {
-        val out = ArrayList<GitStatusEntry>()
-        for (line in lines) {
-            if (line.length <= 3 || line[2] != ' ') continue
-            val x = line[0]
-            val y = line[1]
-            if (x !in XY && y !in XY) continue
-            val xy = line.substring(0, 2)
-            var path = line.substring(3).trim()
-            // rename/copy: "old -> new"
-            if (" -> " in path) {
-                path = path.substringAfterLast(" -> ").trim()
+    fun parseChangesBundle(raw: String): RepoStatusResult {
+        section(raw, M_FAIL)?.let { msg ->
+            val m = msg.trim()
+            return if (m.contains("not a git repository", true) || m.isEmpty()) RepoStatusResult.NotGit()
+            else RepoStatusResult.Error(m.take(300))
+        }
+        val st = section(raw, M_STATUS) ?: return RepoStatusResult.Error(raw.trim().take(300).ifEmpty { "git status failed" })
+        val status = parseStatusV2(st)
+        val un = parseNumstatZ(section(raw, M_UNSTAGED).orEmpty())
+        val ca = parseNumstatZ(section(raw, M_STAGED).orEmpty())
+        val files = status.files.map { f ->
+            val n = when (f.group) {
+                ChangeGroup.STAGED -> ca[f.path]
+                ChangeGroup.UNSTAGED, ChangeGroup.CONFLICT -> un[f.path]
+                ChangeGroup.UNTRACKED -> null
             }
-            // strip quotes if present
-            if (path.startsWith("\"") && path.endsWith("\"") && path.length >= 2) {
-                path = path.substring(1, path.length - 1)
+            if (n == null) f else f.copy(added = n.first, deleted = n.second)
+        }
+        val state = section(raw, M_STATE)?.trim()?.takeIf { it.isNotEmpty() }
+        return RepoStatusResult.Ok(status.copy(files = files, state = state))
+    }
+
+    /**
+     * `git status --porcelain=v2 --branch -z --show-stash`. One tracked entry can yield a STAGED
+     * and an UNSTAGED row (X and Y). Paths are relative to the repo root.
+     */
+    fun parseStatusV2(raw: String): RepoStatus {
+        var branch: String? = null
+        var oid: String? = null
+        var upstream: String? = null
+        var ahead = 0
+        var behind = 0
+        var stash = 0
+        val files = ArrayList<ChangeFile>()
+        val f = raw.split('\u0000')
+        var i = 0
+        while (i < f.size) {
+            val e = f[i++]
+            if (e.length < 2) continue
+            when (e[0]) {
+                '#' -> {
+                    val kv = e.removePrefix("# ")
+                    val k = kv.substringBefore(' ')
+                    val v = kv.substringAfter(' ', "")
+                    when (k) {
+                        "branch.oid" -> oid = v.takeIf { it != "(initial)" }
+                        "branch.head" -> branch = v.takeIf { it != "(detached)" }
+                        "branch.upstream" -> upstream = v
+                        "branch.ab" -> {
+                            val p = v.split(' ')
+                            ahead = p.getOrNull(0)?.removePrefix("+")?.toIntOrNull() ?: 0
+                            behind = p.getOrNull(1)?.removePrefix("-")?.toIntOrNull() ?: 0
+                        }
+                        "stash" -> stash = v.toIntOrNull() ?: 0
+                    }
+                }
+                '1', '2' -> {
+                    val renamed = e[0] == '2'
+                    val p = e.split(' ', limit = if (renamed) 10 else 9)
+                    if (p.size < (if (renamed) 10 else 9)) continue
+                    val xy = p[1]
+                    val path = p.last()
+                    val orig = if (renamed) f.getOrNull(i++) else null
+                    val x = xy.getOrElse(0) { '.' }
+                    val y = xy.getOrElse(1) { '.' }
+                    if (x != '.') files += ChangeFile(ChangeGroup.STAGED, x, path, orig.takeIf { x == 'R' || x == 'C' })
+                    if (y != '.') files += ChangeFile(ChangeGroup.UNSTAGED, y, path, orig.takeIf { y == 'R' || y == 'C' })
+                }
+                'u' -> {
+                    val p = e.split(' ', limit = 11)
+                    if (p.size == 11) files += ChangeFile(ChangeGroup.CONFLICT, '!', p[10])
+                }
+                '?' -> files += ChangeFile(ChangeGroup.UNTRACKED, 'U', e.substring(2))
             }
-            if (path.isEmpty()) continue
-            val statusChar = primaryStatusChar(x, y)
-            out.add(
-                GitStatusEntry(
-                    xy = xy,
-                    path = path,
-                    statusChar = statusChar,
-                    statusLabel = statusLabel(statusChar)
-                )
-            )
+        }
+        return RepoStatus(branch, oid, upstream, ahead, behind, stash, files, null)
+    }
+
+    /**
+     * `git diff --numstat -z`: `add TAB del TAB path NUL`, renames `add TAB del TAB NUL src NUL dst NUL`.
+     * Binary files (`-`) map to -1. Keyed by the destination path.
+     */
+    fun parseNumstatZ(raw: String): Map<String, Pair<Int, Int>> {
+        val out = HashMap<String, Pair<Int, Int>>()
+        val f = raw.split('\u0000')
+        var i = 0
+        while (i < f.size) {
+            val e = f[i++].trimStart('\n')
+            val p = e.split('\t', limit = 3)
+            if (p.size < 3) continue
+            var path = p[2]
+            if (path.isEmpty()) { i++; path = f.getOrNull(i++) ?: continue }
+            out[path] = (p[0].toIntOrNull() ?: -1) to (p[1].toIntOrNull() ?: -1)
         }
         return out
     }
-
-    fun parseNumstat(lines: List<String>): Pair<Int, Int> {
-        var add = 0
-        var del = 0
-        for (line in lines) {
-            val parts = line.trim().split(Regex("\\s+"), limit = 3)
-            if (parts.size < 2) continue
-            val a = parts[0]
-            val d = parts[1]
-            if (a != "-") add += a.toIntOrNull() ?: 0
-            if (d != "-") del += d.toIntOrNull() ?: 0
-        }
-        return add to del
-    }
-
-    data class Counts(
-        val modified: Int,
-        val added: Int,
-        val deleted: Int,
-        val untracked: Int,
-        val renamed: Int
-    )
-
-    fun countBuckets(entries: List<GitStatusEntry>): Counts {
-        var modified = 0
-        var added = 0
-        var deleted = 0
-        var untracked = 0
-        var renamed = 0
-        for (e in entries) {
-            val x = e.xy.getOrElse(0) { ' ' }
-            val y = e.xy.getOrElse(1) { ' ' }
-            when {
-                x == '?' || y == '?' -> untracked++
-                x == 'R' || y == 'R' || x == 'C' || y == 'C' -> renamed++
-                x == 'D' || y == 'D' -> deleted++
-                x == 'A' || y == 'A' -> added++
-                x == 'M' || y == 'M' -> modified++
-                else -> modified++
-            }
-        }
-        return Counts(modified, added, deleted, untracked, renamed)
-    }
-
-    fun statusLabel(c: Char): String = when (c) {
-        'M' -> "MOD"
-        'A' -> "ADD"
-        'D' -> "DEL"
-        'R' -> "REN"
-        'C' -> "CPY"
-        '?' -> "NEW"
-        '!' -> "IGN"
-        else -> "---"
-    }
-
-    /** Prefer worktree letter, then index; untracked wins. */
-    fun primaryStatusChar(x: Char, y: Char): Char {
-        if (x == '?' || y == '?') return '?'
-        if (y != ' ' && y != '!') return y
-        if (x != ' ' && x != '!') return x
-        return y.takeIf { it != ' ' } ?: x
-    }
-
-    private val XY = listOf('M', 'A', 'D', 'R', 'C', 'U', '?', '!', ' ')
 }

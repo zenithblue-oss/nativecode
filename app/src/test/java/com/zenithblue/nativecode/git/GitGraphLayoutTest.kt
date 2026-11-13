@@ -22,8 +22,12 @@ class GitGraphLayoutTest {
             assertTrue("forks in range", r.forks.all { it < r.after.size })
             // lane k alive after row i-1 == lane k alive before row i
             if (i > 0) assertTrue(rows[i - 1].after === r.before)
-            // after the node, lane col continues iff there are parents
-            assertEquals(r.commit.parents.isNotEmpty(), r.col < r.after.size && r.after[r.col] >= 0)
+            // a node with parents either continues its lane or bends into another lane; roots end
+            val continues = r.col < r.after.size && r.after[r.col] >= 0
+            if (r.commit.parents.isEmpty()) assertTrue(!continues && r.forks.isEmpty())
+            else assertTrue(continues || r.forks.isNotEmpty())
+            // one lane per hash: lanes never pile up waiting for the same parent
+            assertEquals("no deferred joins", 0, r.joins.size)
         }
     }
 
@@ -43,8 +47,8 @@ class GitGraphLayoutTest {
         assertEquals(listOf(1), rows[0].forks.toList()) // side lane opens at the merge
         assertEquals(1, rows[1].col)                    // x lives in lane 1
         assertEquals(0, rows[2].col)
+        assertEquals(listOf(1), rows[2].merges.toList()) // side lane bends into main below p1 (git: |/)
         assertEquals(0, rows[3].col)
-        assertEquals(listOf(1), rows[3].joins.toList()) // side lane rejoins at base
         assertEquals(2, rows.maxOf { it.laneCount })
     }
 
@@ -56,20 +60,33 @@ class GitGraphLayoutTest {
         checkInvariants(rows)
         assertEquals(listOf(1, 2, 3), rows[0].forks.toList())
         assertEquals(4, rows.maxOf { it.laneCount })
-        // all three side lanes plus nothing else end up joining at root
-        assertEquals(3, rows.last().joins.size)
+        // side lanes fold leftwards one by one as they meet the shared root
+        assertEquals(listOf(3, 2, 1), rows.subList(2, 5).map { it.merges.single() })
         assertEquals(0, rows.last().after.size)
     }
 
-    @Test fun manyParallelBranches() {
+    @Test fun manyParallelBranchesShareOneLane() {
+        // 40 tips on one base: git draws `| * h / |/` per tip, 2 lanes, not 40
         val n = 40
         val heads = (0 until n).map { c("h$it", "base") }
         val rows = layout(*heads.toTypedArray(), c("base"))
         checkInvariants(rows)
-        // every head sits in its own column, no column reused while live
-        assertEquals((0 until n).toList(), rows.take(n).map { it.col })
-        assertEquals(n, rows.maxOf { it.laneCount })
-        assertEquals(n - 1, rows.last().joins.size)
+        assertEquals(listOf(0) + List(n - 1) { 1 }, rows.take(n).map { it.col })
+        assertTrue(rows.drop(1).take(n - 1).all { it.forks.toList() == listOf(0) })
+        assertEquals(2, rows.maxOf { it.laneCount })
+    }
+
+    @Test fun snapshotsAreCappedButRoutingIsNot() {
+        // 150 tips with distinct parents: 150 live lanes at once
+        val n = 150
+        val heads = (0 until n).map { c("h$it", "b$it") }
+        val mids = (0 until n).map { c("b$it", "base") }
+        val rows = layout(*(heads + mids).toTypedArray(), c("base"))
+        assertTrue(rows.all { it.after.size <= GitGraphLayout.MAX_SNAPSHOT })
+        assertEquals(n - 1, rows[n - 1].col) // lane index itself is not capped
+        assertEquals(n - 1, rows[2 * n - 1].col) // b149 still found in its lane
+        val l = GitGraphLayout(); heads.forEach { l.add(it) }
+        assertEquals(n, l.maxLanes)
     }
 
     @Test fun multipleRoots() {
@@ -85,7 +102,7 @@ class GitGraphLayoutTest {
         checkInvariants(rows)
         assertEquals(1, rows[1].col)
         assertEquals(1, rows[3].col)
-        assertEquals(listOf(1), rows[4].joins.toList())
+        assertEquals(listOf(0), rows[3].forks.toList()) // y bends into p's lane (q already waited there)
     }
 
     @Test fun copyResumesIdentically() {

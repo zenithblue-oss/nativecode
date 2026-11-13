@@ -26,31 +26,38 @@ data class BranchInfo(
     val branches: List<String> get() = allBranches
 }
 
-/** One porcelain status line, UI-ready. */
-data class GitStatusEntry(
-    val xy: String,
+enum class ChangeGroup { CONFLICT, STAGED, UNSTAGED, UNTRACKED }
+
+/**
+ * One file row on the CHANGES page. [status] uses VS Code letters:
+ * M A D R C T, U = untracked, ! = merge conflict. [added]/[deleted] = -1 when unknown or binary.
+ */
+data class ChangeFile(
+    val group: ChangeGroup,
+    val status: Char,
     val path: String,
-    val statusChar: Char,
-    val statusLabel: String
+    val origPath: String? = null,
+    val added: Int = -1,
+    val deleted: Int = -1
 )
 
-/** Aggregated working-tree summary for Git Diff page. */
-data class DiffSummary(
-    val isRepo: Boolean,
-    val modified: Int,
-    val added: Int,
-    val deleted: Int,
-    val untracked: Int,
-    val renamed: Int,
-    val linesAdded: Int,
-    val linesDeleted: Int,
-    val entries: List<GitStatusEntry>
+/** `git status --porcelain=v2 --branch -z --show-stash` + numstat, parsed. */
+data class RepoStatus(
+    /** null = detached HEAD. */
+    val branch: String?,
+    /** null = no commits yet. */
+    val oid: String?,
+    val upstream: String?,
+    val ahead: Int,
+    val behind: Int,
+    val stash: Int,
+    val files: List<ChangeFile>,
+    /** MERGING, REBASING, CHERRY-PICKING, REVERTING, BISECTING or null. */
+    val state: String?
 )
 
-sealed class DiffSummaryResult {
-    data class Ok(val summary: DiffSummary) : DiffSummaryResult()
-    data class NotGit(
-        val message: String = "Project is not a git repository"
-    ) : DiffSummaryResult()
-    data class Error(val message: String) : DiffSummaryResult()
+sealed class RepoStatusResult {
+    data class Ok(val status: RepoStatus) : RepoStatusResult()
+    data class NotGit(val message: String = "Project is not a git repository") : RepoStatusResult()
+    data class Error(val message: String) : RepoStatusResult()
 }

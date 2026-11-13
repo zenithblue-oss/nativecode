@@ -51,20 +51,50 @@ object GitGuestCommands {
     }
 
     /**
-     * Single spawn: is-repo + porcelain status + numstat vs HEAD.
-     * Untracked LOC omitted (count-only in parse).
+     * CHANGES page refresh, one guest start, 3 git calls: porcelain v2 status (branch, upstream,
+     * ahead/behind, stash count), unstaged numstat, staged numstat. Repo state (merge, rebase...)
+     * comes from plain file tests on the git dir, not git.
+     * ponytail: state tests assume the project dir is the repo root (or a worktree with a .git file).
      */
-    fun statusSummaryBundle(projectPath: String): String {
-        val p = shellQuote(projectPath)
+    fun changesBundle(projectPath: String): String {
         val git = gitCommand(projectPath, "")
-        return "cd $p || exit 2; " +
-            "if ! $git rev-parse --is-inside-work-tree >/dev/null 2>&1; then " +
-            "echo '__NOGIT__'; exit 0; fi; " +
-            "echo '__STATUS__'; " +
-            "$git status --porcelain -uall 2>/dev/null; " +
-            "echo '__NUMSTAT__'; " +
-            "$git diff --numstat HEAD 2>/dev/null"
+        fun m(name: String) = "printf '\\000$name\\000'; "
+        val gd = "\"\$gd\""
+        return "cd ${shellQuote(projectPath)} || exit 2; " +
+            m(GitPorcelainParse.M_STATUS) +
+            "$git status --porcelain=v2 --branch -z --show-stash -uall 2>/dev/null || { " +
+            m(GitPorcelainParse.M_FAIL) + "$git rev-parse --git-dir 2>&1 | head -3; exit 0; }; " +
+            m(GitPorcelainParse.M_UNSTAGED) + "$git diff --numstat -z 2>/dev/null; " +
+            m(GitPorcelainParse.M_STAGED) + "$git diff --cached --numstat -z 2>/dev/null; " +
+            m(GitPorcelainParse.M_STATE) +
+            "gd=.git; [ -f .git ] && gd=\$(sed -n 's/^gitdir: //p' .git); " +
+            "if [ -d $gd/rebase-merge ] || [ -d $gd/rebase-apply ]; then echo REBASING; " +
+            "elif [ -f $gd/MERGE_HEAD ]; then echo MERGING; " +
+            "elif [ -f $gd/CHERRY_PICK_HEAD ]; then echo CHERRY-PICKING; " +
+            "elif [ -f $gd/REVERT_HEAD ]; then echo REVERTING; " +
+            "elif [ -f $gd/BISECT_LOG ]; then echo BISECTING; fi"
     }
+
+    /** `shortHash NUL unixTime NUL subject` of HEAD. Only run when HEAD's oid changed. */
+    fun lastCommit(projectPath: String): String =
+        "cd ${shellQuote(projectPath)} && " + gitCommand(projectPath, "log -1 --format=%h%x00%ct%x00%s")
+
+    /** Every branch, remote branch and tag with the commit it points at (tags peeled). */
+    fun refList(projectPath: String): String =
+        "cd ${shellQuote(projectPath)} && " + gitCommand(
+            projectPath,
+            "for-each-ref --format='%(refname)%00%(objectname)%00%(*objectname)' refs/heads refs/remotes refs/tags"
+        )
+
+    fun stashList(projectPath: String): String =
+        "cd ${shellQuote(projectPath)} && " + gitCommand(projectPath, "stash list --format='%gd: %s'")
+
+    /** Root-relative literal pathspec (porcelain paths are relative to the repo root). */
+    fun topPathspec(filePath: String): String = shellQuote(":(top,literal)$filePath")
+
+    /** One git subcommand run in the project dir, e.g. `add -A -- <spec>`. */
+    fun inProject(projectPath: String, args: String): String =
+        "cd ${shellQuote(projectPath)} && " + gitCommand(projectPath, args)
 
     private val SHA = Regex("^[0-9a-f]{7,64}$")
 
@@ -81,14 +111,17 @@ object GitGuestCommands {
         return "cd ${shellQuote(projectPath)} && ${gitCommand(projectPath, args)}"
     }
 
-    /** Message, author, date, parents, then name-status and numstat vs first parent (root commits vs empty). */
+    /**
+     * Message, author, date, parents, then name-status and numstat vs first parent (root commits vs empty).
+     * File lists use -z so non-ASCII paths are not C-quoted ("\303\251") and match the diff call.
+     */
     fun commitDetail(projectPath: String, hash: String): String {
         require(SHA.matches(hash))
-        val dt = "diff-tree --root --no-commit-id -r -m --first-parent"
+        val dt = "diff-tree -z --root --no-commit-id -r -m --first-parent"
         return "cd ${shellQuote(projectPath)} && " +
             gitCommand(projectPath, "show -s --format='%an <%ae>%x00%at%x00%P%x00%B' $hash") +
-            "; echo '${GitLogParse.DETAIL_FILES}'; " + gitCommand(projectPath, "$dt --name-status $hash") +
-            "; echo '${GitLogParse.DETAIL_NUM}'; " + gitCommand(projectPath, "$dt --numstat $hash")
+            "; printf '\\n${GitLogParse.DETAIL_FILES}\\n'; " + gitCommand(projectPath, "$dt --name-status $hash") +
+            "; printf '\\n${GitLogParse.DETAIL_NUM}\\n'; " + gitCommand(projectPath, "$dt --numstat $hash")
     }
 
     /** Diff of one file in one commit (against its first parent; root and merge commits work). */

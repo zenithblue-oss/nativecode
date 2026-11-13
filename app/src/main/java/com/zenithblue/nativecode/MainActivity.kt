@@ -591,7 +591,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Host for workspace hub AI tool cards; rebuilt on linux_method change. */
     private var workspaceHubToolsHost: LinearLayout? = null
     private lateinit var workspaceDirTreeLayout: LinearLayout
-    private lateinit var workspaceGitDiffLayout: LinearLayout
+    private lateinit var projectGitChangesView: com.zenithblue.nativecode.git.ui.GitChangesView
     private lateinit var workspaceProjectNameTv: TextView
     private lateinit var workspaceProjectIconIv: ImageView
 
@@ -814,6 +814,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Login may have finished in the browser or terminal: re-read the auth files.
         if (::cliAuthScrollView.isInitialized && cliAuthScrollView.visibility == View.VISIBLE) paintCliAuth()
         if (desktop.isRunning) desktop.syncUi() // desktop started by a previous (recreated) Activity
+        // Files may have changed in a terminal or another app: refresh the visible CHANGES tab.
+        if (::projectGitDiffContainer.isInitialized && projectGitDiffContainer.visibility == View.VISIBLE && projectGitTab == 0) refreshGitDiffTree()
         if (lastProState == null) lastProState = isPro() // state the onCreate-built views reflect
         if (!panvkChecked && ::componentsScrollView.isInitialized) {
             panvkChecked = true
@@ -19887,285 +19889,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         refreshToolCardsForMethod()
     }
 
-    private fun gitStatusAccent(statusChar: Char): Int = when (statusChar) {
-        'M' -> NC.PRIMARY_CON
-        'A' -> Color.parseColor("#43e188")
-        'D' -> NC.ERROR_CON
-        'R', 'C' -> NC.TERTIARY_CON
-        '?' -> NC.SECONDARY
-        else -> NC.SEC_CON
-    }
-
-    private fun buildGitDiffEmptyCard(title: String, sub: String, checkIcon: Boolean): LinearLayout {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = NC.OUTLINE_VAR,
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 8,
-                cornerRadiusDp = 0
-            )
-            setPadding(dp(16), dp(24), dp(16), dp(24))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) }
-        }
-        val icon = ImageView(this).apply {
-            setImageResource(if (checkIcon) R.drawable.ic_check_circle else R.drawable.ic_git)
-            setColorFilter(if (checkIcon) NC.PRIMARY else NC.ON_SURF_VAR)
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                bottomMargin = dp(8)
-            }
-        }
-        val titleTv = TextView(this).apply {
-            text = title
-            textSize = 14f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) }
-        }
-        val subTv = TextView(this).apply {
-            text = sub
-            textSize = 11f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) }
-        }
-        card.addView(icon)
-        card.addView(titleTv)
-        card.addView(subTv)
-        return card
-    }
-
-    private fun buildGitDiffSummaryCard(summary: DiffSummary): LinearLayout {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = NC.OUTLINE_VAR,
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 8,
-                cornerRadiusDp = 0
-            )
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
-        }
-        val titleRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        titleRow.addView(TextView(this).apply {
-            text = "DIFF SUMMARY"
-            textSize = 12f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.MONOSPACE
-            paint.isFakeBoldText = true
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        })
-        titleRow.addView(TextView(this).apply {
-            text = "// LOC + FILES"
-            textSize = 9f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-        })
-        card.addView(titleRow)
-
-        val locRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, dp(8))
-        }
-        locRow.addView(TextView(this).apply {
-            text = "+${summary.linesAdded}"
-            textSize = 18f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.MONOSPACE
-            paint.isFakeBoldText = true
-            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(12) }
-        })
-        locRow.addView(TextView(this).apply {
-            text = "−${summary.linesDeleted}"
-            textSize = 18f
-            setTextColor(NC.ERROR)
-            typeface = Typeface.MONOSPACE
-            paint.isFakeBoldText = true
-            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(10) }
-        })
-        locRow.addView(TextView(this).apply {
-            text = "LOC"
-            textSize = 11f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-        })
-        card.addView(locRow)
-
-        fun miniBadge(label: String, count: Int, color: Int): TextView {
-            return TextView(this).apply {
-                text = "$label $count"
-                textSize = 9f
-                setTextColor(NC.SURFACE_LOWEST)
-                typeface = Typeface.MONOSPACE
-                paint.isFakeBoldText = true
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    setColor(color)
-                }
-                setPadding(dp(6), dp(4), dp(6), dp(4))
-                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(6) }
-            }
-        }
-        val badgeRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        badgeRow.addView(miniBadge("MOD", summary.modified, NC.PRIMARY_CON))
-        badgeRow.addView(miniBadge("ADD", summary.added, Color.parseColor("#43e188")))
-        badgeRow.addView(miniBadge("DEL", summary.deleted, NC.ERROR_CON))
-        badgeRow.addView(miniBadge("NEW", summary.untracked, NC.SECONDARY))
-        if (summary.renamed > 0) {
-            badgeRow.addView(miniBadge("REN", summary.renamed, NC.TERTIARY_CON))
-        }
-        card.addView(badgeRow)
-
-        card.addView(TextView(this).apply {
-            text = "Untracked: ${summary.untracked}  ·  Files: ${summary.entries.size}"
-            textSize = 10f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-            setPadding(0, dp(10), 0, 0)
-        })
-        return card
-    }
-
-    private fun addGitDiffFileRow(parent: LinearLayout, entry: GitStatusEntry) {
-        val accentColor = gitStatusAccent(entry.statusChar)
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = NC.OUTLINE_VAR,
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 8,
-                cornerRadiusDp = 0
-            )
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(8) }
-            setOnClickListener { showDiffViewer(entry.path, ID_PROJECT_GIT_DIFF) }
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> v.background = cyberBrutalistBg(
-                        fillColor = NC.SURFACE_HIGH,
-                        strokeColor = NC.OUTLINE_VAR,
-                        shadowColor = NC.SHADOW_DARK,
-                        offsetDp = 8,
-                        cornerRadiusDp = 0
-                    )
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.background = cyberBrutalistBg(
-                        fillColor = NC.SURFACE_LOW,
-                        strokeColor = NC.OUTLINE_VAR,
-                        shadowColor = NC.SHADOW_DARK,
-                        offsetDp = 8,
-                        cornerRadiusDp = 0
-                    )
-                }
-                false
-            }
-        }
-        row.addView(View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(3), ViewGroup.LayoutParams.MATCH_PARENT).apply {
-                rightMargin = dp(10)
-            }
-            setBackgroundColor(accentColor)
-        })
-        row.addView(TextView(this).apply {
-            text = entry.statusLabel
-            textSize = 9f
-            setTextColor(NC.SURFACE_LOWEST)
-            typeface = Typeface.MONOSPACE
-            paint.isFakeBoldText = true
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(accentColor)
-            }
-            setPadding(dp(5), dp(3), dp(5), dp(3))
-            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(10) }
-        })
-        row.addView(TextView(this).apply {
-            text = entry.path
-            textSize = 12f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.MONOSPACE
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        })
-        row.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_chevron_right)
-            setColorFilter(NC.OUTLINE)
-            layoutParams = LinearLayout.LayoutParams(dp(16), dp(16))
-        })
-        parent.addView(row)
-    }
-
+    /** CHANGES tab refresh (3 git calls, off the main thread). */
     private fun refreshGitDiffTree() {
-        if (!::workspaceGitDiffLayout.isInitialized) return
-        workspaceGitDiffLayout.removeAllViews()
-        val loadingTv = TextView(this).apply {
-            text = "Loading diffs..."
-            setTextColor(NC.ON_SURF_VAR)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-        }
-        workspaceGitDiffLayout.addView(loadingTv)
-
-        val path = activeProjectPath
-        val method = projectGitMethod()
-        executor.execute {
-            val result = GitRepoService.loadDiffSummary(this@MainActivity, path, method)
-            mainHandler.post {
-                if (!::workspaceGitDiffLayout.isInitialized) return@post
-                workspaceGitDiffLayout.removeAllViews()
-                when (result) {
-                    is DiffSummaryResult.NotGit -> {
-                        workspaceGitDiffLayout.addView(
-                            buildGitDiffEmptyCard(
-                                "NOT A GIT REPOSITORY",
-                                "Run git init or clone a repo in this project",
-                                checkIcon = false
-                            )
-                        )
-                    }
-                    is DiffSummaryResult.Error -> {
-                        val errorTv = TextView(this@MainActivity).apply {
-                            text = result.message
-                            setTextColor(NC.ERROR)
-                            setPadding(dp(12), dp(12), dp(12), dp(12))
-                        }
-                        workspaceGitDiffLayout.addView(errorTv)
-                    }
-                    is DiffSummaryResult.Ok -> {
-                        val summary = result.summary
-                        workspaceGitDiffLayout.addView(buildGitDiffSummaryCard(summary))
-                        if (summary.entries.isEmpty()) {
-                            workspaceGitDiffLayout.addView(
-                                buildGitDiffEmptyCard(
-                                    "NO CHANGES DETECTED",
-                                    "Working tree is clean",
-                                    checkIcon = true
-                                )
-                            )
-                        } else {
-                            for (entry in summary.entries) {
-                                addGitDiffFileRow(workspaceGitDiffLayout, entry)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        if (!::projectGitChangesView.isInitialized) return
+        projectGitChangesView.refresh(activeProjectPath, projectGitMethod())
     }
 
     private fun openProjectWorkspace() {
@@ -20175,7 +19902,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         bindWorkspaceProjectIcon(workspaceProjectIconIv, iconStr)
 
         refreshWorkspaceDirTree()
-        refreshGitDiffTree()
         
         val sessions = projectSessionsMap.getOrPut(activeProjectPath) { ArrayList() }
         val tabNames = projectTabNamesMap.getOrPut(activeProjectPath) { ArrayList() }
@@ -21672,6 +21398,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
             visibility = View.GONE
         }
+        projectGitChangesView = com.zenithblue.nativecode.git.ui.GitChangesView(
+            this, executor,
+            onOpenDiff = { path -> showDiffViewer(path, ID_PROJECT_GIT_DIFF) },
+            onOpenFile = { path -> showFileViewer(path, ID_PROJECT_GIT_DIFF) }
+        )
         val gitTabRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(12), dp(8), dp(12), dp(4))
@@ -21771,12 +21502,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         gitHeader.addView(gitHeaderRow)
         gitHeader.addView(gitDivider)
         projectGitDiffLayout.addView(gitHeader)
-        
-        workspaceGitDiffLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(4), dp(12), dp(8))
-        }
-        projectGitDiffLayout.addView(workspaceGitDiffLayout)
+        (projectGitChangesView.parent as? ViewGroup)?.removeView(projectGitChangesView)
+        projectGitDiffLayout.addView(projectGitChangesView)
         applyProjectGitTab()
     }
 

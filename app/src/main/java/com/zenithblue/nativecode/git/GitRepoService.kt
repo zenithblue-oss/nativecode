@@ -44,31 +44,21 @@ object GitRepoService {
         }
     }
 
-    /** Blocking — call from bg thread. */
-    fun loadDiffSummary(
-        ctx: Context,
-        projectPath: String,
-        method: String
-    ): DiffSummaryResult {
-        if (projectPath.isBlank()) {
-            return DiffSummaryResult.NotGit("No active project")
-        }
+    /** Blocking: one guest script in the project's isolation with the git env. */
+    fun run(ctx: Context, projectPath: String, method: String, script: String): Pair<Int, String> {
+        val (args, env) = LinuxCommandBuilder.build(ctx, script, method = method)
+        return ShellCommandRunner.runCaptureExit(ctx, args, HashMap(env).apply { putAll(GitGuestCommands.gitEnv(projectPath)) })
+    }
+
+    /** Blocking — call from bg thread. CHANGES page status (3 git calls). */
+    fun loadChanges(ctx: Context, projectPath: String, method: String): RepoStatusResult {
+        if (projectPath.isBlank()) return RepoStatusResult.NotGit("No active project")
         return try {
-            val script = GitGuestCommands.statusSummaryBundle(projectPath)
-            val (args, env) = LinuxCommandBuilder.build(ctx, script, method = method)
-            val fullEnv = HashMap(env).apply { putAll(GitGuestCommands.gitEnv(projectPath)) }
-            val (exit, out) = ShellCommandRunner.runCaptureExit(ctx, args, fullEnv)
-            if (exit == 2) {
-                return DiffSummaryResult.NotGit("Project path not found")
-            }
-            // exit non-zero can still be valid porcelain (e.g. empty); parse markers first
-            val parsed = GitPorcelainParse.parseStatusSummaryBundle(out)
-            if (parsed is DiffSummaryResult.NotGit) return parsed
-            if (parsed is DiffSummaryResult.Ok) return parsed
-            if (out.contains("__NOGIT__")) return DiffSummaryResult.NotGit()
-            DiffSummaryResult.Error("git status failed (exit $exit)")
+            val (exit, out) = run(ctx, projectPath, method, GitGuestCommands.changesBundle(projectPath))
+            if (exit == 2) RepoStatusResult.NotGit("Project path not found")
+            else GitPorcelainParse.parseChangesBundle(out)
         } catch (e: Exception) {
-            DiffSummaryResult.Error(e.message ?: "git status error")
+            RepoStatusResult.Error(e.message ?: "git status error")
         }
     }
 }

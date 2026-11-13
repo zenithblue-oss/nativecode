@@ -51,7 +51,10 @@ internal class GraphCellView(context: Context) : View(context) {
             } else if (top >= 0 && bot >= 0 && top == bot && !isJoin(r, i)) {
                 line(c, x(i), 0f, x(i), h, top)
             } else {
-                if (top >= 0) curve(c, x(i), 0f, xc, cy, top)       // lane ends here (merge into node)
+                if (top >= 0) {
+                    if (has(r.merges, i)) curve(c, x(i), 0f, xc, h, top) // lane bends into the node's lane below it
+                    else curve(c, x(i), 0f, xc, cy, top)                  // lane ends here (merge into node)
+                }
                 if (bot >= 0 && !isFork(r, i)) line(c, x(i), cy, x(i), h, bot) // lane begins mid-row
             }
         }
@@ -83,8 +86,9 @@ internal class GraphCellView(context: Context) : View(context) {
         }
     }
 
-    private fun isJoin(r: GraphRow, i: Int): Boolean { for (j in r.joins) if (j == i) return true; return false }
-    private fun isFork(r: GraphRow, i: Int): Boolean { for (j in r.forks) if (j == i) return true; return false }
+    private fun has(a: IntArray, i: Int): Boolean { for (j in a) if (j == i) return true; return false }
+    private fun isJoin(r: GraphRow, i: Int) = has(r.joins, i)
+    private fun isFork(r: GraphRow, i: Int) = has(r.forks, i)
 
     private fun line(c: Canvas, x1: Float, y1: Float, x2: Float, y2: Float, col: Int) {
         stroke.color = color(col)
@@ -103,6 +107,7 @@ internal class GraphCellView(context: Context) : View(context) {
 
     companion object {
         const val LANE_DP = 12
+        /** Minimum lane cap; the history view raises it to a third of its width. */
         const val MAX_LANES = 6
         /** Obsidian-theme friendly, distinct on #131313. */
         val PALETTE = intArrayOf(
@@ -110,6 +115,6 @@ internal class GraphCellView(context: Context) : View(context) {
             0xFFFF8FB1.toInt(), 0xFF5EEAD4.toInt(), 0xFFF5E27A.toInt(), 0xFFB0B8C4.toInt()
         )
         fun widthPx(density: Float, lanes: Int): Int =
-            ((minOf(lanes, MAX_LANES).coerceAtLeast(1) * LANE_DP + 8) * density).toInt()
+            ((lanes.coerceAtLeast(1) * LANE_DP + 8) * density).toInt()
     }
 }

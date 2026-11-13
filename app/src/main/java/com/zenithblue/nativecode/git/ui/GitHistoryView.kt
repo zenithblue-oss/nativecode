@@ -6,9 +6,14 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.Editable
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextUtils
+import android.text.TextWatcher
+import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.util.Log
@@ -31,7 +36,9 @@ import com.zenithblue.nativecode.git.GitLogParse
 import com.zenithblue.nativecode.git.GitLogStream
 import com.zenithblue.nativecode.git.GitRefKind
 import com.zenithblue.nativecode.git.GitRepoService
+import com.zenithblue.nativecode.git.GitSearch
 import com.zenithblue.nativecode.git.GraphRow
+import com.zenithblue.nativecode.git.RefTarget
 import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
 import com.zenithblue.nativecode.terminal.ShellCommandRunner
 import java.text.SimpleDateFormat
@@ -81,7 +88,7 @@ internal class GitHistoryView(
     }
     private val lm = LinearLayoutManager(context)
     private val adapter = Adapter()
-    private val list = RecyclerView(context).apply {
+    private val list: RecyclerView = RecyclerView(context).apply {
         layoutManager = lm
         adapter = this@GitHistoryView.adapter
         setHasFixedSize(true)
@@ -90,9 +97,27 @@ internal class GitHistoryView(
         setPadding(0, 0, 0, dp(100))
         overScrollMode = OVER_SCROLL_NEVER
         addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) = onScrolledNearEnd()
+            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                onScrolledNearEnd()
+                topFab.visibility = if (lm.findFirstVisibleItemPosition() > FAB_AFTER) View.VISIBLE else View.GONE
+            }
         })
     }
+    private val topFab: TextView = TextView(context).apply {
+        text = "↑"; textSize = 20f; setTextColor(NC.ON_PRIMARY); gravity = Gravity.CENTER
+        typeface = Typeface.DEFAULT_BOLD
+        background = GradientDrawable().apply { setColor(NC.PRIMARY); setStroke(dp(2), NC.ON_PRIMARY_CON) }
+        contentDescription = "Scroll to top"
+        visibility = View.GONE
+        isClickable = true; isFocusable = true
+        setOnClickListener {
+            // Smooth only for short distances; a smooth scroll over thousands of rows takes seconds.
+            if (lm.findFirstVisibleItemPosition() > 60) list.scrollToPosition(0) else list.smoothScrollToPosition(0)
+            visibility = View.GONE
+        }
+    }
+    /** Row flashed after a search jump. */
+    private var highlight = -1
     private val killTask = Runnable {
         if (!finished) { stream?.cancel(); stream = null }
     }
@@ -106,6 +131,11 @@ internal class GitHistoryView(
             setPadding(dp(12), dp(6), dp(12), dp(6))
         }
         bar.addView(filterBtn)
+        val search = chip("SEARCH").apply {
+            contentDescription = "Search branches, tags and commits"
+            setOnClickListener { openSearch() }
+        }
+        bar.addView(search, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
         bar.addView(statusTv, LinearLayout.LayoutParams(0, dp(30), 1f).apply { leftMargin = dp(10); rightMargin = dp(8) })
         bar.addView(moreBtn)
         val reload = chip("RELOAD")
@@ -115,6 +145,7 @@ internal class GitHistoryView(
         col.addView(list, LinearLayout.LayoutParams(-1, 0, 1f))
         addView(col, LayoutParams(-1, -1))
         addView(msgTv, LayoutParams(-1, -2, Gravity.CENTER))
+        addView(topFab, LayoutParams(dp(48), dp(48), Gravity.BOTTOM or Gravity.END).apply { rightMargin = dp(16); bottomMargin = dp(96) })
         filterBtn.setOnClickListener { pickFilter() }
         reload.setOnClickListener { restart() }
         moreBtn.setOnClickListener { maxRows += PAGE_CAP; moreBtn.visibility = View.GONE; updateAllow() }
@@ -143,7 +174,8 @@ internal class GitHistoryView(
     fun restart() {
         stream?.cancel(); stream = null
         rows.clear(); resume = GitGraphLayout(); finished = false; maxRows = PAGE_CAP
-        cellLanes = 1; tFirst = 0; tFull = 0; startedSkip = 0
+        cellLanes = 1; tFirst = 0; tFull = 0; startedSkip = 0; highlight = -1
+        topFab.visibility = View.GONE
         adapter.notifyDataSetChanged()
         moreBtn.visibility = View.GONE
         showMsg("LOADING HISTORY...")
@@ -155,9 +187,11 @@ internal class GitHistoryView(
         if (project.isBlank()) { showMsg("NO ACTIVE PROJECT"); return }
         startedSkip = skip
         t0 = System.nanoTime()
+        // Resume overlaps one row: git must return the last shown commit first, else history moved.
         val s = GitLogStream(
-            context, project, method, ref, skip,
+            context, project, method, ref, if (skip == 0) 0 else skip - 1,
             if (skip == 0) GitGraphLayout() else resume.copy(),
+            if (skip == 0) null else rows[skip - 1].commit.hash,
             onBatch = { batch, r -> onBatch(batch, r) },
             onEnd = { fin, exit -> onEnd(fin, exit) }
         )
@@ -176,7 +210,7 @@ internal class GitHistoryView(
             Log.i(TAG, "first rows ${batch.size} in ${tFirst}ms")
             warmCommitGraph()
         }
-        val lanes = minOf(r.maxLanes, GraphCellView.MAX_LANES)
+        val lanes = minOf(r.maxLanes, laneCap)
         if (lanes != cellLanes) { cellLanes = lanes; adapter.notifyDataSetChanged() }
         else adapter.notifyItemRangeInserted(start, batch.size)
         if (rows.size >= maxRows) moreBtn.visibility = View.VISIBLE
@@ -186,6 +220,10 @@ internal class GitHistoryView(
 
     private fun onEnd(fin: Boolean, exit: Int) {
         stream = null
+        if (exit == GitLogStream.STALE) {
+            Log.i(TAG, "resume offset stale (history changed): reloading")
+            restart(); return
+        }
         if (!fin) return
         finished = true
         tFull = ms()
@@ -195,6 +233,18 @@ internal class GitHistoryView(
     }
 
     private fun ms() = (System.nanoTime() - t0) / 1_000_000L
+
+    /** Lanes drawn before the rest collapse into the last column: a third of the width, at least 6. */
+    private var laneCap = GraphCellView.MAX_LANES
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val cap = maxOf(GraphCellView.MAX_LANES, (w / 3f / (GraphCellView.LANE_DP * d)).toInt())
+        if (cap == laneCap) return
+        laneCap = cap
+        cellLanes = minOf(resume.maxLanes, cap).coerceAtLeast(1)
+        post { adapter.notifyDataSetChanged() }
+    }
 
     private fun updateStatus() {
         val sb = StringBuilder().append(rows.size).append(" commits")
@@ -260,12 +310,7 @@ internal class GitHistoryView(
                         text = label; textSize = 13f; typeface = Typeface.MONOSPACE
                         setTextColor(if (value == ref) NC.PRIMARY else NC.ON_SURFACE)
                         setPadding(dp(4), dp(12), dp(4), dp(12))
-                        setOnClickListener {
-                            sheet.dismiss()
-                            ref = value
-                            filterBtn.text = (value ?: "ALL REFS").take(24) + "  v"
-                            restart()
-                        }
+                        setOnClickListener { sheet.dismiss(); applyFilter(value) }
                     })
                 }
                 item("ALL REFS", null)
@@ -276,6 +321,147 @@ internal class GitHistoryView(
                 sheet.show()
             }
         }
+    }
+
+    private fun applyFilter(value: String?) {
+        ref = value
+        filterBtn.text = (value ?: "ALL REFS").take(24) + "  v"
+        restart()
+    }
+
+    // -- search ---------------------------------------------------------------------------------
+
+    /**
+     * Type to rank branches / remotes / tags (substring, then fuzzy) and loaded commits
+     * (subject, author, hash prefix). Tap a ref: scroll to its head if loaded, else filter by it.
+     * FILTER on a ref row always applies the branch filter.
+     */
+    private fun openSearch() {
+        val sheet = BottomSheetDialog(context)
+        val col = sheetColumn()
+        col.addView(sheetTitle("SEARCH REFS + COMMITS"))
+        val input = EditText(context).apply {
+            hint = "branch, tag, subject, author or hash"
+            textSize = 14f; typeface = Typeface.MONOSPACE
+            setTextColor(NC.ON_SURFACE); setHintTextColor(NC.OUTLINE)
+            isSingleLine = true
+            imeOptions = EditorInfo.IME_ACTION_SEARCH
+            background = GradientDrawable().apply { setColor(NC.SURFACE_LOWEST); setStroke(dp(1), NC.PRIMARY) }
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            minHeight = dp(48)
+        }
+        col.addView(input, LinearLayout.LayoutParams(-1, -2))
+        val results = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        col.addView(results)
+        var refs: List<RefTarget>? = null
+
+        fun render() {
+            results.removeAllViews()
+            val q = input.text.toString().trim()
+            val rs = refs
+            results.addView(text(if (rs == null) "// REFS  loading..." else "// REFS", 11f, NC.ON_SURF_VAR).apply {
+                setPadding(0, dp(12), 0, dp(4)); setTextIsSelectable(false)
+            })
+            if (rs != null) {
+                val ranked = GitSearch.rankRefs(q, rs, if (q.isEmpty()) 30 else 40)
+                if (ranked.isEmpty()) results.addView(text("no matching refs", 12f, NC.OUTLINE).apply { setTextIsSelectable(false) })
+                for (r in ranked) results.addView(refRow(r, { sheet.dismiss(); jumpTo(r) }, { sheet.dismiss(); applyFilter(r.name) }))
+            }
+            if (q.isEmpty()) return
+            val hits = ArrayList<Int>()
+            for (i in rows.indices) {
+                if (GitSearch.commitMatches(q, rows[i].commit)) { hits += i; if (hits.size == 50) break }
+            }
+            results.addView(text("// COMMITS  ${hits.size}${if (hits.size == 50) "+" else ""} in ${rows.size} loaded", 11f, NC.ON_SURF_VAR).apply {
+                setPadding(0, dp(16), 0, dp(4)); setTextIsSelectable(false)
+            })
+            for (i in hits) {
+                val c = rows[i].commit
+                results.addView(TextView(context).apply {
+                    val sb = SpannableStringBuilder(c.hash.take(7))
+                    sb.setSpan(ForegroundColorSpan(NC.PRIMARY), 0, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    sb.append("  ").append(c.subject)
+                    val s = sb.length
+                    sb.append("  ").append(c.author)
+                    sb.setSpan(ForegroundColorSpan(NC.ON_SURF_VAR), s, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    text = sb; textSize = 12f; typeface = Typeface.MONOSPACE; setTextColor(NC.ON_SURFACE)
+                    maxLines = 2; ellipsize = TextUtils.TruncateAt.END
+                    setPadding(dp(4), dp(10), dp(4), dp(10)); minHeight = dp(44)
+                    setOnClickListener { sheet.dismiss(); scrollToRow(i) }
+                })
+            }
+        }
+        val debounce = Runnable { if (sheet.isShowing) render() }
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) { removeCallbacks(debounce); postDelayed(debounce, 150) }
+        })
+        input.setOnEditorActionListener { _, _, _ ->
+            // Enter: open the best ref, if any
+            val best = refs?.let { GitSearch.rankRefs(input.text.toString(), it, 1) }?.firstOrNull()
+            if (best != null && input.text.isNotBlank()) { sheet.dismiss(); jumpTo(best) }
+            true
+        }
+        sheet.setContentView(ScrollView(context).apply { addView(col) })
+        sheet.behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+        sheet.show()
+        input.requestFocus()
+        sheet.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        render()
+        val p = project; val m = method
+        io.execute {
+            val list = try {
+                GitSearch.parseRefList(GitRepoService.run(context, p, m, GitGuestCommands.refList(p)).second)
+            } catch (_: Exception) { emptyList() }
+            post { if (sheet.isShowing) { refs = list; render() } }
+        }
+    }
+
+    private fun refRow(r: RefTarget, onJump: () -> Unit, onFilter: () -> Unit) = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        minimumHeight = dp(44)
+        val (fg, label) = when (r.kind) {
+            GitRefKind.LOCAL -> NC.PRIMARY to "branch"
+            GitRefKind.REMOTE -> 0xFF7FB4FF.toInt() to "remote"
+            GitRefKind.TAG -> NC.TERTIARY to "tag"
+        }
+        addView(TextView(context).apply {
+            text = label; textSize = 9f; typeface = Typeface.MONOSPACE; setTextColor(fg)
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply { setStroke(dp(1), fg) }
+            setPadding(dp(4), dp(1), dp(4), dp(1))
+        }, LinearLayout.LayoutParams(dp(52), -2))
+        addView(TextView(context).apply {
+            text = r.name; textSize = 13f; typeface = Typeface.MONOSPACE
+            setTextColor(if (r.name == ref) NC.PRIMARY else NC.ON_SURFACE)
+            maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE
+            setPadding(dp(10), dp(10), dp(8), dp(10))
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        addView(chip("FILTER").apply {
+            contentDescription = "Filter history by ${r.name}"
+            setOnClickListener { onFilter() }
+        })
+        isClickable = true; isFocusable = true
+        contentDescription = "Jump to $label ${r.name}"
+        setOnClickListener { onJump() }
+    }
+
+    private fun jumpTo(r: RefTarget) {
+        val i = rows.indexOfFirst { it.commit.hash == r.hash }
+        if (i >= 0) { scrollToRow(i); return }
+        Toast.makeText(context, "${r.name} not loaded yet: filtering", Toast.LENGTH_SHORT).show()
+        applyFilter(r.name)
+    }
+
+    private fun scrollToRow(i: Int) {
+        val old = highlight
+        highlight = i
+        if (old >= 0) adapter.notifyItemChanged(old)
+        adapter.notifyItemChanged(i)
+        lm.scrollToPositionWithOffset(i, list.height / 3)
+        updateAllow()
     }
 
     private fun sheetColumn() = LinearLayout(context).apply {
@@ -399,6 +585,8 @@ internal class GitHistoryView(
         override fun onBindViewHolder(h: VH, position: Int) {
             val r = rows[position]
             val c = r.commit
+            h.root.setBackgroundColor(if (position == highlight) NC.SURFACE_HIGH else Color.TRANSPARENT)
+            h.cell.capLanes = laneCap
             h.cell.row = r
             h.cell.layoutParams.width.let { w ->
                 val want = GraphCellView.widthPx(d, cellLanes)
@@ -438,6 +626,8 @@ internal class GitHistoryView(
     companion object {
         private const val TAG = "GitHistory"
         const val ROW_DP = 52
+        /** Scroll-to-top button shows once the first visible row is past this. */
+        private const val FAB_AFTER = 15
         /** Rows parsed ahead of the last visible row before git is left blocked on the pipe. */
         const val LOOKAHEAD = 5000
         /** Rows loaded before "LOAD MORE". */
