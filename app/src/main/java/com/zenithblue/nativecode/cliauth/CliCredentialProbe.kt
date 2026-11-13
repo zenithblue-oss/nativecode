@@ -59,7 +59,7 @@ object CliCredentialProbe {
             "codex" -> rm(".codex/auth.json")
             "opencode" -> rm(".local/share/opencode/auth.json")
             "grok" -> { rm(".grok/auth.json"); rm(".config/grok/auth.json") }
-            "agy" -> AGY_FILES.forEach { rm("$AGY_DIR/$it") }
+            "agy" -> rm(AGY_TOKEN)
             "qwen" -> {
                 rm(".qwen/oauth_creds.json")
                 val f = inHome(home, ".qwen/settings.json") ?: return n
@@ -133,20 +133,18 @@ object CliCredentialProbe {
         else CliAuthInfo(AuthState.SIGNED_OUT)
     }
 
+    /**
+     * agy 1.5.x keeps the Google OAuth token in the OS keyring, or in this JSON file when there is
+     * no D-Bus session (always in the guest). Verified against the 1.5.8 binary: it reads this
+     * path and fails with "failed to unmarshal token" on a garbage file.
+     */
     private fun agy(home: File): CliAuthInfo {
-        if (AGY_FILES.any { File(home, "$AGY_DIR/$it").let { f -> f.isFile && f.length() > 0 } }) {
-            return CliAuthInfo(AuthState.SIGNED_IN)
-        }
-        // NativeCode itself writes AGENTS.md here. Anything else means agy has run but left no
-        // credential file we recognise (unverified format or a keyring we cannot read).
-        val ran = File(home, AGY_DIR).list().orEmpty().any { it != "AGENTS.md" }
-        return CliAuthInfo(if (ran) AuthState.UNKNOWN else AuthState.SIGNED_OUT)
+        val t = File(home, AGY_TOKEN).textOrNull()
+        return if (t != null && TOKENISH.containsMatchIn(t)) CliAuthInfo(AuthState.SIGNED_IN, detail = "Google")
+        else CliAuthInfo(AuthState.SIGNED_OUT)
     }
 
-    private const val AGY_DIR = ".gemini/antigravity-cli"
-    // ponytail: agy's real file names are unverified (gemini-cli lineage guesses); unknown ones
-    // read UNKNOWN, never deleted. Add the real name once confirmed on a signed-in device.
-    private val AGY_FILES = listOf("oauth_creds.json", "gemini-credentials.json", "credentials.json", "auth.json")
+    private const val AGY_TOKEN = ".gemini/antigravity-cli/antigravity-oauth-token"
 
     private fun gh(home: File): CliAuthInfo {
         val y = File(home, ".config/gh/hosts.yml").textOrNull() ?: return CliAuthInfo(AuthState.SIGNED_OUT)

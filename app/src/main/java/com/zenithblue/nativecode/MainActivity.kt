@@ -18397,11 +18397,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             textSize = 11f
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
         }
+        val copyUrlBtn = secondaryButton("COPY") {}.apply {
+            textSize = 11f
+            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(6) }
+        }
         otpRow.addView(otpTv)
         otpRow.addView(openBrowserBtn)
+        otpRow.addView(copyUrlBtn)
         panel.addView(otpRow)
 
-        // Browser flows that end with "paste the code here" (claude auth login).
+        // Browser flows that end with "paste the code here" (claude auth login, agy acp --login).
         val pasteRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -18478,6 +18483,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val u = lastUrl
             if (!u.isNullOrBlank()) CliAuthService.openBrowser(this, u)
             else Toast.makeText(this, "No URL yet", Toast.LENGTH_SHORT).show()
+        }
+        copyUrlBtn.setOnClickListener {
+            val u = lastUrl
+            if (!u.isNullOrBlank()) {
+                CliAuthService.copyCode(this, u)
+                Toast.makeText(this, "Link copied", Toast.LENGTH_SHORT).show()
+            }
         }
 
         val listener = object : CliAuthListener {

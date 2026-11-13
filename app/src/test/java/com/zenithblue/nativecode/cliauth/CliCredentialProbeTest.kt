@@ -118,14 +118,19 @@ class CliCredentialProbeTest {
         assertEquals(AuthState.SIGNED_OUT, probe("kiro", h, kiro = false).state)
     }
 
-    @Test fun agyDirWithoutCredentialIsUnknown() {
+    @Test fun agyReadsOnlyItsOauthTokenFile() {
         val h = home()
         h.put(".gemini/antigravity-cli/AGENTS.md", "x")
-        assertEquals(AuthState.SIGNED_OUT, probe("agy", h).state)
         h.put(".gemini/antigravity-cli/conversations/c1", "x")
-        assertEquals(AuthState.UNKNOWN, probe("agy", h).state)
-        h.put(".gemini/antigravity-cli/oauth_creds.json", "{}")
-        assertEquals(AuthState.SIGNED_IN, probe("agy", h).state)
+        h.put(".gemini/antigravity-cli/oauth_creds.json", """{"access_token":"t"}""")
+        assertEquals(AuthState.SIGNED_OUT, probe("agy", h).state)
+        h.put(".gemini/antigravity-cli/antigravity-oauth-token", "{}")
+        assertEquals(AuthState.SIGNED_OUT, probe("agy", h).state)
+        h.put(".gemini/antigravity-cli/antigravity-oauth-token",
+            """{"access_token":"ya29.SECRET","token_type":"Bearer","refresh_token":"1//r","expiry":"2026-11-13T21:00:00Z"}""")
+        val i = probe("agy", h)
+        assertEquals(AuthState.SIGNED_IN, i.state)
+        assertFalse(i.toString().contains("SECRET"))
     }
 
     @Test fun ghHostsYml() {
@@ -153,13 +158,21 @@ class CliCredentialProbeTest {
         assertEquals(0, CliCredentialProbe.clearFiles("claude", h))
     }
 
-    @Test fun agyUsesExactFileNamesOnly() {
+    @Test fun agyLogoutDeletesOnlyTheTokenFile() {
         val h = home()
-        val other = h.put(".gemini/antigravity-cli/token_cache_notes.txt", "x")
-        assertEquals(AuthState.UNKNOWN, probe("agy", h).state)
-        h.put(".gemini/antigravity-cli/oauth_creds.json", """{"access_token":"t"}""")
+        val settings = h.put(".gemini/antigravity-cli/settings.json", "{}")
+        val marker = h.put(".gemini/antigravity-cli/cache/antigravity-keyring-unavailable", "x")
+        h.put(".gemini/antigravity-cli/antigravity-oauth-token", """{"refresh_token":"r"}""")
         assertEquals(1, CliCredentialProbe.clearFiles("agy", h))
-        assertTrue(other.isFile)
+        assertEquals(AuthState.SIGNED_OUT, probe("agy", h).state)
+        assertTrue(settings.isFile && marker.isFile)
+    }
+
+    @Test fun extractAuthUrlFindsAgyGoogleLink() {
+        val u = "https://accounts.google.com/o/oauth2/auth?access_type=offline&client_id=x" +
+            "&redirect_uri=https%3A%2F%2Fantigravity.google%2Foauth-callback&state=s"
+        assertEquals(u, extractAuthUrl("  $u"))
+        assertNull(extractAuthUrl("Then paste the authorization code, or the full URL of the page you land on, and press Enter:"))
     }
 
     @Test fun clearRefusesSymlinkEscapingHome() {

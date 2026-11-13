@@ -78,6 +78,13 @@ object CliGuestCommands {
         "export BROWSER=echo; claude auth login 2>&1"
     )
 
+    /**
+     * Prints a Google URL (redirect antigravity.google/oauth-callback shows the code), then reads
+     * the code or landing URL from stdin. No D-Bus in the guest, so the token goes to
+     * ~/.gemini/antigravity-cli/antigravity-oauth-token.
+     */
+    fun loginAgy(): String = wrap("agy acp --login 2>&1")
+
     fun loginKiro(): String = wrap(
         "export BROWSER=echo; if command -v kiro-cli >/dev/null 2>&1; then " +
             "kiro-cli login --use-device-flow 2>&1; else kiro login --use-device-flow 2>&1; fi"

@@ -87,10 +87,10 @@ object CliToolCatalog {
             id = "agy",
             displayName = "Antigravity",
             bin = "agy",
-            strategy = CliLoginStrategy.TERMINAL_GUIDED,
+            strategy = CliLoginStrategy.STREAM_URL,
             terminalType = "agy",
             consoleUrl = "https://accounts.google.com",
-            subtitle = "Google OAuth · paste code in terminal"
+            subtitle = "agy acp --login · Google OAuth, paste code"
         ),
         CliToolDef(
             id = "grok",

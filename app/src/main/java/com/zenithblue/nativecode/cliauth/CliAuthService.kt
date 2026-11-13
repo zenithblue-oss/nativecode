@@ -251,6 +251,7 @@ object CliAuthService {
                 phase(CliAuthPhase.LOGIN, "Starting browser login…")
                 val loginCmd = when (def.id) {
                     "claude" -> CliGuestCommands.loginClaude()
+                    "agy" -> CliGuestCommands.loginAgy()
                     else -> null
                 }
                 if (loginCmd == null) {
@@ -263,7 +264,8 @@ object CliAuthService {
                     return
                 }
                 if (!ok) {
-                    mainHandler.post { listener.onTerminalGuided(def.id, "claude auth login") }
+                    val hint = if (def.id == "agy") "agy acp --login" else "claude auth login"
+                    mainHandler.post { listener.onTerminalGuided(def.id, hint) }
                     fail("Not signed in yet; finish in the terminal if needed")
                     return
                 }
@@ -615,7 +617,7 @@ internal fun extractAuthUrl(line: String): String? {
     return null
 }
 
-/** Only a verified SIGNED_OUT is success; UNKNOWN (opencode 2.x db, agy keyring) is not. */
+/** Only a verified SIGNED_OUT is success; UNKNOWN (opencode 2.x db) is not. */
 internal fun logoutOutcome(state: AuthState, name: String): Pair<Boolean, String> = when (state) {
     AuthState.SIGNED_OUT -> true to "Logged out $name"
     AuthState.SIGNED_IN -> false to "Still signed in; open the terminal to sign out"
