@@ -25,12 +25,35 @@ class LinuxGuestDefaultsTest {
         val want = "/opt/nativecode/gate/bin:/home/x/.opencode/bin:/home/x/.local/bin:/usr/bin:/bin"
         val out = path("/usr/bin:/bin")
         assertEquals(want, out[0])
-        assertEquals("/home/x/.local", out[1])
+        // prefix lives in ~/.npmrc only: an env prefix sent root's npm -g to /root/.local and breaks nvm
+        assertEquals("", out[1])
         // npm 12 rejects NPM_CONFIG_ALLOW_SCRIPTS in project installs (`npm ci` fails with EALLOWSCRIPTS)
         assertEquals("", out[2])
         // /etc/profile.d/termux-profile.sh already put ~/.local/bin first
         assertEquals(want, path("/home/x/.local/bin:/usr/bin:/bin")[0])
         assertEquals(want, path(want)[0])
+    }
+
+    /** H1: cli-tools.env / ~/.zshrc run after profile.d and put the real CLI dirs (or a fixed PATH) first. */
+    @Test
+    fun gateBlockStaysLastAndWinsPath() {
+        assumeTrue(File("/bin/sh").exists())
+        val env = "export PATH=\"\$HOME/.opencode/bin:\$HOME/.local/bin:\$PATH\"\n"
+        val once = LinuxGuestDefaults.withGateLast(env)
+        assertEquals(once, LinuxGuestDefaults.withGateLast(once))
+        // user appends after our block: block moves back to the end, user line kept
+        val moved = LinuxGuestDefaults.withGateLast(once + "export PATH=\"/mine:\$PATH\"\n")
+        assertEquals(env + "export PATH=\"/mine:\$PATH\"\n", moved.substringBefore("# >>> NativeCode gate"))
+        assertEquals(LinuxGuestDefaults.withGateLast("x"), "x\n" + once.removePrefix(env))
+
+        val f = File.createTempFile("cli-tools", ".env").apply { writeText(moved); deleteOnExit() }
+        fun run(start: String): String {
+            val p = ProcessBuilder("sh", "-c", ". ${f.path}; echo \"\$PATH\"")
+                .also { it.environment()["HOME"] = "/home/x"; it.environment()["PATH"] = start }.start()
+            return p.inputStream.bufferedReader().readText().trim().also { p.waitFor() }
+        }
+        assertEquals("/opt/nativecode/gate/bin:/mine:/home/x/.opencode/bin:/home/x/.local/bin:/usr/bin:/bin", run("/usr/bin:/bin"))
+        assertTrue(run("/opt/nativecode/gate/bin:/usr/bin").startsWith("/opt/nativecode/gate/bin:/mine:"))
     }
 
     @Test
@@ -70,9 +93,10 @@ class LinuxGuestDefaultsTest {
             assertFalse(File(bin, "agy.123.old").exists())
             assertTrue(File(bin, "agy.keep").isFile && File(bin, "agy.old").isFile)
 
-            File(root, "home/flux/.zshrc").writeText("# user\n") // user file is never overwritten
+            File(root, "home/flux/.zshrc").writeText("# user\n") // user lines kept, only the gate block is added
             LinuxGuestDefaults.applyToRootfs(root)
-            assertEquals("# user\n", File(root, "home/flux/.zshrc").readText())
+            assertEquals(LinuxGuestDefaults.withGateLast("# user\n"), File(root, "home/flux/.zshrc").readText())
+            assertTrue(File(root, "home/flux/.zshrc").readText().startsWith("# user\n"))
             assertEquals("prefix=/home/flux/.local\n", File(root, "home/flux/.npmrc").readText())
         } finally {
             root.deleteRecursively()
@@ -95,7 +119,8 @@ class LinuxGuestDefaultsTest {
             File(root, "home/flux/.opencode/bin/opencode").writeText("v2")
 
             LinuxGuestDefaults.applyToRootfs(root)
-            assertEquals(newEnv, env.readText())
+            assertEquals(LinuxGuestDefaults.withGateLast(newEnv), env.readText())
+            assertTrue(env.readText().startsWith(newEnv))
             assertEquals("prefix=/home/flux/.local\nfoo=bar\n", File(root, "home/flux/.npmrc").readText())
             assertEquals("v2", File(root, "home/flux/.opencode/bin/opencode").readText())
         } finally {

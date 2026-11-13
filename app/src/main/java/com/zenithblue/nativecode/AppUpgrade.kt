@@ -75,8 +75,10 @@ object AppUpgrade {
         }
         refreshBootstrapProot(ctx)
         // Guest file repairs run only here (versionCode changed): direct file edits, no guest exec.
-        LinuxGuestDefaults.applyOnUpdate(ctx)
+        val guestOk = LinuxGuestDefaults.applyOnUpdate(ctx)
         runVersionMigrations(from, to)
+        // Failure leaves last_version_code unset (see runIfNeeded), so the repair retries next launch.
+        check(guestOk) { "guest config update failed" }
     }
 
     /**
@@ -102,7 +104,8 @@ object AppUpgrade {
 
     /**
      * Add one block per release that needs extra work beyond full script restage.
-     * Prefer idempotent shells under assets/scripts/migrations when needed.
+     * Guest changes are Kotlin file edits only (see LinuxGuestDefaults.applyOnUpdate): never run a
+     * script or command inside the guest (Play policy).
      */
     private fun runVersionMigrations(from: Int, to: Int) {
         if (from == 0) {
@@ -113,10 +116,6 @@ object AppUpgrade {
             migrateProotFluxRuntimeShell()
         }
         Log.i(TAG, "version steps $from→$to: none registered (full restage already done)")
-        // Future example:
-        // if (from < 2 && to >= 2) {
-        //     runMigrationScript(ctx, "scripts/migrations/migrate_to_2.sh")
-        // }
     }
 
     /** Keep legacy customized zsh as UX preference while restoring Bash for proot-distro runtime. */

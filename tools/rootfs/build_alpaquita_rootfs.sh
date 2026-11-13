@@ -349,6 +349,9 @@ mkdir -p /home/flux/.config/fluxlinux
 cat > /home/flux/.config/fluxlinux/cli-tools.env <<'CLIEOF'
 # Managed by NativeCode prebuilt rootfs
 export PATH="\$HOME/.opencode/bin:\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH"
+# >>> NativeCode gate (managed, keep last) >>>
+case ":\$PATH:" in ":/opt/nativecode/gate/bin:"*) ;; *) PATH="/opt/nativecode/gate/bin:\$PATH"; export PATH ;; esac
+# <<< NativeCode gate <<<
 CLIEOF
 
 # Android SDK minimal

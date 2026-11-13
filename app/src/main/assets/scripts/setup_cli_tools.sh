@@ -236,6 +236,9 @@ case "$-" in
         fi
         ;;
 esac
+# >>> NativeCode gate (managed, keep last) >>>
+case ":$PATH:" in ":/opt/nativecode/gate/bin:"*) ;; *) PATH="/opt/nativecode/gate/bin:$PATH"; export PATH ;; esac
+# <<< NativeCode gate <<<
 ENVEOF
 
 # PRoot vs chroot safe ownership handling

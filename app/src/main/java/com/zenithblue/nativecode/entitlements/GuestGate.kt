@@ -53,9 +53,7 @@ object GuestGate {
         for (tool in GATED_TOOLS) {
             val f = File(dir, tool)
             if (f.isFile && f.readText() == script && f.canExecute()) continue
-            f.writeText(script)
-            f.setReadable(true, false)
-            f.setExecutable(true, false)
+            writeTextAtomic(f, script, executable = true)
         }
     }
 
@@ -64,8 +62,7 @@ object GuestGate {
         if (f.isFile && f.readText() == content) return
         f.parentFile?.mkdirs()
         f.parentFile?.setExecutable(true, false)
-        f.writeText(content)
-        f.setReadable(true, false)
+        writeTextAtomic(f, content)
     }
 
     internal fun render(enforce: Boolean, proValidUntilSec: Long, key: String): String {
@@ -81,5 +78,20 @@ object GuestGate {
         val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         return p.getString(PREF_KEY, null) ?: ByteArray(16).also { SecureRandom().nextBytes(it) }
             .joinToString("") { "%02x".format(it) }.also { p.edit().putString(PREF_KEY, it).apply() }
+    }
+}
+
+/**
+ * Guest file write that a reader (shim, shell) never sees half-done: temp file in the same dir, then rename.
+ * A symlink at [file] is replaced by the regular file, so callers skip user-owned symlinked files.
+ */
+internal fun writeTextAtomic(file: File, text: String, executable: Boolean = false) {
+    val tmp = File(file.parentFile, ".${file.name}.nc-tmp")
+    tmp.writeText(text)
+    tmp.setReadable(true, false)
+    if (executable) tmp.setExecutable(true, false)
+    if (!tmp.renameTo(file)) {
+        tmp.delete()
+        error("could not replace ${file.path}")
     }
 }

@@ -1,6 +1,7 @@
 package com.zenithblue.nativecode.terminal
 
 import android.content.Context
+import com.zenithblue.nativecode.entitlements.GuestGate
 import java.io.File
 
 /** Builds shell arguments and environment map for proot Debian sessions. */
@@ -349,10 +350,10 @@ object ProotCommandBuilder {
 
             val basePath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             val sdkPath = "/opt/android-sdk/build-tools/36.1.0:/opt/android-sdk/platform-tools"
-            // CLI self-update targets first (opencode 2.x -> ~/.opencode/bin, npm -g, claude, grok, agy, kiro -> ~/.local/bin).
-            put("NPM_CONFIG_PREFIX", "$guestHome/.local")
+            // Gate shims first, then CLI self-update targets (opencode 2.x -> ~/.opencode/bin, claude, grok, agy,
+            // kiro -> ~/.local/bin). npm -g prefix comes from ~/.npmrc, not env: root's installs must reach /usr/local.
             put("NPM_CONFIG_ALLOW_SCRIPTS", "opencode-ai")
-            val userBins = "$guestHome/.opencode/bin:$guestHome/.local/bin:$guestHome/bin:$guestHome/.cargo/bin:/opt/nodejs/bin"
+            val userBins = "${GuestGate.GATE_BIN}:$guestHome/.opencode/bin:$guestHome/.local/bin:$guestHome/bin:$guestHome/.cargo/bin:/opt/nodejs/bin"
             put("PATH", "$userBins:$sdkPath:$basePath:${TermuxHostPaths.BIN}")
         }
 

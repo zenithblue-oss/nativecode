@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.zenithblue.nativecode.entitlements.GuestGate
 import com.zenithblue.nativecode.entitlements.GuestGate.GATE_BIN
+import com.zenithblue.nativecode.entitlements.writeTextAtomic
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.File
 import java.io.FileOutputStream
@@ -45,6 +46,7 @@ object LinuxGuestDefaults {
             AgentConfigInstaller.install(context)
             // The managed PATH file carries the gate dir; refresh with the shims, not only on app update.
             writeIfChanged(File(rootfs, CLI_PROFILE.removePrefix("/")), cliPathProfile)
+            installGateLast(rootfs)
             GuestGate.sync(context)
             true
         }.onFailure {
@@ -89,7 +91,7 @@ object LinuxGuestDefaults {
      */
     internal val cliPathProfile = listOf(
         "# Managed by NativeCode: CLI self-updates must land where PATH looks first.",
-        "export NPM_CONFIG_PREFIX=\"\$HOME/.local\"",
+        // npm -g prefix comes from ~/.npmrc only: an env prefix sent root's installs to /root/.local and broke nvm.
         "# The Free/Pro gate shims must win over the real CLI binaries.",
         "case \":\$PATH:\" in",
         "  \":$GATE_BIN:\$HOME/.opencode/bin:\$HOME/.local/bin:\"*) ;;",
@@ -101,6 +103,34 @@ object LinuxGuestDefaults {
     ).joinToString("\n") + "\n"
 
     private const val CLI_PROFILE = "/etc/profile.d/zz-nativecode-cli.sh"
+    private const val GATE_BEGIN = "# >>> NativeCode gate (managed, keep last) >>>"
+    private const val GATE_END = "# <<< NativeCode gate <<<"
+    private val GATE_BLOCK_RE = Regex("(?m)^" + Regex.escape(GATE_BEGIN) + "$[\\s\\S]*?^" + Regex.escape(GATE_END) + "$\\n?")
+
+    /** Gate dir first again after the file's own PATH edits; the real CLI dirs stay right behind it. */
+    private val gateBlock = listOf(
+        GATE_BEGIN,
+        "case \":\$PATH:\" in \":$GATE_BIN:\"*) ;; *) PATH=\"$GATE_BIN:\$PATH\"; export PATH ;; esac",
+        GATE_END,
+    ).joinToString("\n") + "\n"
+
+    /** [text] with the managed gate block moved (or added) to the very end; every other line is kept as is. */
+    internal fun withGateLast(text: String): String {
+        val rest = text.replace(GATE_BLOCK_RE, "")
+        return (if (rest.isEmpty() || rest.endsWith("\n")) rest else rest + "\n") + gateBlock
+    }
+
+    /**
+     * Files sourced after /etc/profile.d that put the real CLI dirs (or a fixed PATH) in front of the gate:
+     * cli-tools.env (from ~/.profile, ~/.bashrc, ~/.zshenv, ~/.zprofile, ~/.zshrc) and the alpine ~/.zshrc.
+     */
+    internal fun installGateLast(rootfs: File) {
+        val home = File(rootfs, "home/flux")
+        for (f in listOf(File(home, ".config/fluxlinux/cli-tools.env"), File(home, ".zshrc"))) {
+            if (!f.isFile || java.nio.file.Files.isSymbolicLink(f.toPath())) continue
+            writeIfChanged(f, withGateLast(f.readText()))
+        }
+    }
     private const val OLD_CLI_ENV_PATH =
         "export PATH=\"\$HOME/.local/bin:\$HOME/.grok/bin:\$HOME/bin:\$HOME/.cargo/bin:\$PATH\""
     private val AGY_BACKUP = Regex("^agy\\.\\d+\\.old$")
@@ -112,7 +142,7 @@ object LinuxGuestDefaults {
      */
     fun applyOnUpdate(context: Context): Boolean {
         val rootfs = ProjectPathResolver.prootRootfsDir(context)
-        if (!rootfs.isDirectory) return false
+        if (!rootfs.isDirectory) return true // nothing installed yet; onboarding calls this again
         return runCatching { applyToRootfs(rootfs); true }
             .onFailure { Log.w(TAG, "Could not apply guest config update: ${it.message}", it) }
             .getOrDefault(false)
@@ -122,6 +152,7 @@ object LinuxGuestDefaults {
         installCliPaths(rootfs)
         installNpmrc(rootfs)
         installZshStub(rootfs)
+        installGateLast(rootfs) // after every other edit to these files
         pruneAgyBackups(rootfs)
     }
 
@@ -143,8 +174,8 @@ object LinuxGuestDefaults {
             !(zshenv.isFile && zshenv.readText().contains(source))
         ) {
             zshenv.parentFile?.let { it.mkdirs(); it.setReadable(true, false); it.setExecutable(true, false) }
-            zshenv.appendText((if (zshenv.isFile && !zshenv.readText().endsWith("\n")) "\n" else "") + source + "\n")
-            zshenv.setReadable(true, false)
+            val old = if (zshenv.isFile) zshenv.readText() else ""
+            writeIfChanged(zshenv, old + (if (old.isEmpty() || old.endsWith("\n")) "" else "\n") + source + "\n")
         }
 
         // Rootfs-baked env file re-prepends ~/.local/bin; swap only that exact managed line.
@@ -152,7 +183,7 @@ object LinuxGuestDefaults {
         if (cliEnv.isFile) {
             val text = cliEnv.readText()
             if (text.contains(OLD_CLI_ENV_PATH)) {
-                cliEnv.writeText(text.replace(OLD_CLI_ENV_PATH, OLD_CLI_ENV_PATH.replace("=\"\$HOME/.local", "=\"\$HOME/.opencode/bin:\$HOME/.local")))
+                writeIfChanged(cliEnv, text.replace(OLD_CLI_ENV_PATH, OLD_CLI_ENV_PATH.replace("=\"\$HOME/.local", "=\"\$HOME/.opencode/bin:\$HOME/.local")))
             }
         }
     }
@@ -195,7 +226,6 @@ object LinuxGuestDefaults {
     private fun writeIfChanged(file: File, content: String) {
         if (file.isFile && file.readText() == content) return
         file.parentFile?.mkdirs()
-        file.writeText(content)
-        file.setReadable(true, false)
+        writeTextAtomic(file, content)
     }
 }

@@ -464,9 +464,8 @@ ZSHRC="$USER_HOME/.zshrc"
 echo "FluxLinux: Writing optimized .zshrc..."
 cat > "$ZSHRC" << 'ZSHEOF'
 # Guest PATH only — never inherit host PREFIX/bin (nested proot glue errors).
-export PATH="$HOME/.opencode/bin:$HOME/.local/bin:/opt/nodejs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-# CLI self-updates (npm -g, opencode upgrade) must land where PATH looks first.
-export NPM_CONFIG_PREFIX="$HOME/.local"
+# Free/Pro gate shims first; CLI self-updates (opencode upgrade, ~/.npmrc prefix) land right behind them.
+export PATH="/opt/nativecode/gate/bin:$HOME/.opencode/bin:$HOME/.local/bin:/opt/nodejs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export NPM_CONFIG_ALLOW_SCRIPTS=opencode-ai
 
 # Setup Locales
