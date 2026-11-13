@@ -242,7 +242,10 @@ internal fun DeleteDialog(title: String, dismiss: () -> Unit, ok: () -> Unit) {
 @Composable
 private fun SessionsChip(v: AgentChatView) {
     var open by remember { mutableStateOf(false) }
-    val (used, max) = remember(v.rows.value) { v.host.sessionUsage() }
+    // ponytail: 1 s poll; terminal tabs and other scopes' chats have no change feed into this view
+    var usage by remember { mutableStateOf(v.host.sessionUsage()) }
+    LaunchedEffect(Unit) { while (true) { usage = v.host.sessionUsage(); delay(1_000) } }
+    val (used, max) = usage
     Box {
         Chip("● $used/$max${if (!v.host.isPro()) " Free" else ""}", on = used > 0) { open = true }
         DropdownMenu(open, { open = false }) {
