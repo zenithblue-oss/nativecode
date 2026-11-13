@@ -5,7 +5,7 @@ aarch64 container/qemu host is available (build_alpaquita_rootfs.sh needs one).
 Streams the old alpaquita_rootfs.tar.zst and swaps only the AI CLI trees, gh, zsh and a few
 managed files; every other byte is copied verbatim. All replaced pieces are real aarch64 builds:
   - CLIs installed by their own installers in a scratch HOME on a device guest (new_home.tar)
-  - opencode 2.2.7 from the pinned GitHub release tarball -> ~/.opencode/bin
+  - opencode 2.3.0 from the pinned GitHub release tarball -> ~/.opencode/bin
   - gh from the pinned release tarball, zsh rebuilt with BROKEN_KILL_ESRCH / SIGSUSPEND forced off
 
   assemble_rootfs_from_artifact.py --old OLD.tar.zst --new-home new_home.tar --dl DIR \
@@ -13,7 +13,7 @@ managed files; every other byte is copied verbatim. All replaced pieces are real
 """
 import argparse, hashlib, io, os, subprocess, sys, tarfile, time
 
-OPENCODE_SHA256 = "c1682057f0815cb2abdd6e00305f1146ebaf1c167f0335cdb74ddc80008120e7"
+OPENCODE_SHA256 = "3207fb5cdec448d479242c0f1a14f4f7bdfcad3a79209b5eb8f9003725e93711"
 GH_VERSION = "2.104.0"
 GH_SHA256 = "cb34cefc6f4e77b90731374a2b737516bb8f3033c6ca46aa949e5344f68069e3"
 HOME = "./home/flux"

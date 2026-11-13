@@ -2,7 +2,7 @@
 """Build the small 1.8.0 runtime update pack for existing (1.7.x) installs.
 
 Applied by app-side Kotlin file I/O (RuntimeUpdatePack.kt); nothing in it runs in the guest.
-Contents: opencode 2.2.7 (release tarball, sha256 pinned), GitHub CLI, rebuilt zsh.
+Contents: opencode 2.3.0 (release tarball, sha256 pinned), GitHub CLI, rebuilt zsh.
 
   build_update_pack.py --dl DIR --zsh FILE --out DIR
 DIR must hold opencode-linux-arm64.tar.gz and gh_<ver>_linux_arm64.tar.gz.
@@ -10,7 +10,7 @@ Output: OUT/nativecode_update.tgz and OUT/nativecode_update.tgz.sha256 (USTAR, r
 """
 import argparse, gzip, hashlib, io, os, sys, tarfile
 
-OPENCODE_SHA256 = "c1682057f0815cb2abdd6e00305f1146ebaf1c167f0335cdb74ddc80008120e7"
+OPENCODE_SHA256 = "3207fb5cdec448d479242c0f1a14f4f7bdfcad3a79209b5eb8f9003725e93711"
 GH_VERSION = "2.104.0"
 GH_SHA256 = "cb34cefc6f4e77b90731374a2b737516bb8f3033c6ca46aa949e5344f68069e3"
 NAME = "nativecode_update.tgz"

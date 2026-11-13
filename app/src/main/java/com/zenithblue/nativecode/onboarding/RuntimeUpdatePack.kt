@@ -22,7 +22,7 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
 /**
- * Small 1.8.0 runtime update for installs that already have the 1.7.x rootfs: opencode 2.2.7, GitHub CLI
+ * Small 1.8.0 runtime update for installs that already have the 1.7.x rootfs: opencode 2.3.0, GitHub CLI
  * and the rebuilt zsh, delivered as one Play asset pack (`nativecode_update_core`, about 135 MB) instead
  * of the whole 1.3 GB rootfs.
  *
@@ -34,7 +34,7 @@ object RuntimeUpdatePack {
     private const val TAG = "RuntimeUpdatePack"
     const val ARCHIVE_NAME = "nativecode_update.tgz"
     const val SHA_NAME = "$ARCHIVE_NAME.sha256"
-    const val PINNED_SHA256 = "41d4dbddd4cda4c04d0e2556e379ede0f4815ca6112a5b4dd769d29f5a12e618"
+    const val PINNED_SHA256 = "112468d020ef52877f471d10dbe886fde78578716ee151ad8b9e440cca46e4b9"
     const val MARKER_REL = "etc/nativecode/update-pack-1.8.0.sha256"
 
     private const val MIN_FREE_BYTES = 400L * 1024L * 1024L // opencode alone unpacks to ~254 MB
@@ -263,7 +263,7 @@ object RuntimeUpdatePack {
         if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
             .setTitle("Runtime update")
-            .setMessage("opencode 2.2.7, GitHub CLI 2.104 and a shell fix. About 135 MB download. Replaces ~/.opencode/bin/opencode, /usr/local/bin/gh and zsh (a newer self-updated opencode is replaced too); your other files are not touched.")
+            .setMessage("opencode 2.3.0, GitHub CLI 2.104 and a shell fix. About 135 MB download. Replaces ~/.opencode/bin/opencode, /usr/local/bin/gh and zsh (a newer self-updated opencode is replaced too); your other files are not touched.")
             .setPositiveButton("Update") { _, _ -> download(activity) }
             .setNegativeButton("Later") { _, _ -> skipThisVersion(app) }
             .setOnCancelListener { skipThisVersion(app) }

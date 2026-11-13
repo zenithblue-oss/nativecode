@@ -328,7 +328,7 @@ su -s /bin/sh flux -c '
   chmod 755 "\$HOME/.opencode/bin/opencode"
   export PATH="\$HOME/.opencode/bin:\$PATH"
   command -v opencode
-  opencode --version
+  [ "\$(opencode --version)" = "'"${OPENCODE_VERSION}"'" ] || { echo "opencode != pinned '"${OPENCODE_VERSION}"'" >&2; exit 1; }
   curl -fsSL "'"${AGY_INSTALLER_URL:-https://antigravity.google/cli/install.sh}"'" | bash || true
   command -v agy >/dev/null 2>&1 || (sleep 5; curl -fsSL "'"${AGY_INSTALLER_URL:-https://antigravity.google/cli/install.sh}"'" | bash || true)
   curl -fsSL "'"${CLAUDE_INSTALLER_URL:-https://claude.ai/install.sh}"'" | bash || true
