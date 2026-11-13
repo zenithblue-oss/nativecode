@@ -120,9 +120,43 @@ class RuntimeUpdatePackTest {
             Files.createSymbolicLink(File(root, "usr").toPath(), outside.toPath())
             tgz(pack, listOf(Entry("usr/bin/gh", "gh".toByteArray())))
             assertFalse(RuntimeUpdatePack.applyTo(root, pack, sha(pack)).success)
-            assertEquals(0, outside.walk().filter { it.isFile }.count())
+            assertEquals(listOf(outside), outside.walk().toList()) // not even bin/ created through the link
         } finally {
             pack.delete(); root.deleteRecursively(); outside.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun symlinkedOpencodeDirIsRefusedWithoutTouchingTarget() {
+        val root = Files.createTempDirectory("rt6").toFile()
+        val outside = Files.createTempDirectory("sdcard").toFile()
+        val pack = File(root.parentFile, "pack-${root.name}.tgz")
+        try {
+            File(root, "home/flux").mkdirs()
+            Files.createSymbolicLink(File(root, "home/flux/.opencode").toPath(), outside.toPath())
+            tgz(pack, files)
+            val r = RuntimeUpdatePack.applyTo(root, pack, sha(pack))
+            assertFalse(r.success)
+            assertTrue(r.message, r.message.contains("home/flux/.opencode links outside"))
+            assertEquals(listOf(outside), outside.walk().toList()) // no bin/ created through the link
+            assertFalse(File(root, RuntimeUpdatePack.MARKER_REL).exists())
+        } finally {
+            pack.delete(); root.deleteRecursively(); outside.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun detectsGlibcVsMuslRootfs() {
+        val root = Files.createTempDirectory("rt7").toFile()
+        try {
+            File(root, "lib").mkdirs()
+            File(root, "lib/ld-musl-aarch64.so.1").writeText("musl")
+            assertFalse(RuntimeUpdatePack.isGlibcRootfs(root))
+            // PRoot l2s: the loader is often a symlink whose target does not resolve on the host
+            Files.createSymbolicLink(File(root, "lib/ld-linux-aarch64.so.1").toPath(), File("/nonexistent/ld").toPath())
+            assertTrue(RuntimeUpdatePack.isGlibcRootfs(root))
+        } finally {
+            root.deleteRecursively()
         }
     }
 

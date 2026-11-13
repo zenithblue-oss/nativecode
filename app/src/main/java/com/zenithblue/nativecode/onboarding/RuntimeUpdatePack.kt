@@ -3,8 +3,12 @@ package com.zenithblue.nativecode.onboarding
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import com.google.android.play.core.assetpacks.AssetPackManagerFactory
+import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.BufferedInputStream
 import java.io.File
@@ -12,6 +16,7 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
@@ -43,7 +48,12 @@ object RuntimeUpdatePack {
 
     fun isNeeded(context: Context): Boolean {
         val root = ProjectPathResolver.prootRootfsDir(context)
-        return root.isDirectory && File(root, "etc").isDirectory && !isApplied(root)
+        return root.isDirectory && File(root, "etc").isDirectory && !isApplied(root) && isGlibcRootfs(root)
+    }
+
+    /** The pack ships glibc builds (opencode, zsh): an old musl Alpine rootfs cannot run them. */
+    internal fun isGlibcRootfs(rootfs: File): Boolean = listOf("lib", "usr/lib", "lib64").any {
+        Files.exists(File(rootfs, "$it/ld-linux-aarch64.so.1").toPath(), LinkOption.NOFOLLOW_LINKS)
     }
 
     fun resolveArchive(context: Context): File? {
@@ -61,10 +71,23 @@ object RuntimeUpdatePack {
     fun apply(context: Context): ApplyResult {
         val root = ProjectPathResolver.prootRootfsDir(context)
         if (!root.isDirectory) return ApplyResult(false, "Install the Linux runtime first")
-        if (isApplied(root)) return ApplyResult(true, "Runtime already up to date")
+        if (isApplied(root)) return ApplyResult(true, "Runtime already up to date").also { removePack(context) }
+        if (!isGlibcRootfs(root)) {
+            return ApplyResult(false, "Runtime update skipped: it needs the Alpaquita (glibc) Linux runtime, not the old Alpine one")
+        }
         val archive = resolveArchive(context)
             ?: return ApplyResult(false, "Runtime update pack is not downloaded")
-        return applyTo(root, archive)
+        return applyTo(root, archive).also { if (it.success) removePack(context) }
+    }
+
+    /** Drop the ~135 MB on-demand pack once applied; the marker in the rootfs keeps [isNeeded] false. */
+    private fun removePack(context: Context) {
+        val pack = PlayAssetDeliveryManager.PACK_UPDATE_CORE
+        if (PlayAssetDeliveryManager.getInstalledPackLocation(context, pack) == null) return
+        runCatching {
+            AssetPackManagerFactory.getInstance(context).removePack(pack)
+                .addOnFailureListener { Log.w(TAG, "removePack failed: ${it.message}") }
+        }.onFailure { Log.w(TAG, "removePack failed: ${it.message}") }
     }
 
     /** Pure JVM and idempotent: used by [apply] and by the unit tests. */
@@ -123,10 +146,9 @@ object RuntimeUpdatePack {
                 val mode = octal(header, 100, 8).toInt()
                 val type = header[156].toInt().toChar()
                 val padded = (size + 511L) / 512L * 512L
-                val target = resolve(rootCanon, name)
+                val target = resolve(rootCanon, name, isDir = type == '5')
                 when (type) {
                     '5' -> {
-                        target.mkdirs()
                         target.setReadable(true, false)
                         target.setExecutable(true, false)
                     }
@@ -142,19 +164,30 @@ object RuntimeUpdatePack {
         return files
     }
 
-    /** Entry path -> file inside [rootCanon]; rejects absolute paths, "..", and parents that escape via symlinks. */
-    private fun resolve(rootCanon: File, name: String): File {
+    /**
+     * Entry path -> file inside [rootCanon]; rejects absolute paths, "..", and folders that link out of the
+     * rootfs (checked on the deepest existing folder BEFORE mkdirs, so nothing is created through the link).
+     */
+    private fun resolve(rootCanon: File, name: String, isDir: Boolean = false): File {
         val rel = name.trimEnd('/')
         if (rel.isEmpty() || rel.startsWith("/") || rel.split('/').any { it == ".." }) {
             throw IOException("unsafe path in update pack: $name")
         }
         val target = File(rootCanon, rel)
-        target.parentFile?.mkdirs()
-        val parent = target.parentFile!!.canonicalFile
-        if (parent != rootCanon && !parent.path.startsWith(rootCanon.path + File.separator)) {
-            throw IOException("path escapes rootfs: $name")
-        }
+        val dir = if (isDir) target else target.parentFile!!
+        var probe = dir
+        while (!Files.exists(probe.toPath(), LinkOption.NOFOLLOW_LINKS)) probe = probe.parentFile ?: break
+        checkInside(rootCanon, probe, rel)
+        dir.mkdirs()
+        checkInside(rootCanon, dir, rel)
         return target
+    }
+
+    private fun checkInside(rootCanon: File, dir: File, rel: String) {
+        val canon = dir.canonicalFile
+        if (canon != rootCanon && !canon.path.startsWith(rootCanon.path + File.separator)) {
+            throw IOException("${dir.relativeToOrSelf(rootCanon)} links outside the Linux runtime ($rel); replace the link with a real folder to update")
+        }
     }
 
     private fun writeFile(input: InputStream, target: File, size: Long, mode: Int) {
@@ -215,46 +248,59 @@ object RuntimeUpdatePack {
 
     // ── prompt + download + apply (existing users only) ─────────────────────────────────────────
 
-    /** Once per process: offer the update when the rootfs predates 1.8.0. */
+    /**
+     * Once per process: offer the update when the rootfs predates 1.8.0. "Later", a failed download (e.g. a
+     * sideloaded build, where Play can never deliver the pack) or a failed apply silences it until the next app version.
+     */
     fun promptIfNeeded(activity: Activity) {
-        if (promptedThisProcess || !isNeeded(activity)) return
+        val app = activity.applicationContext
+        if (promptedThisProcess || prefs(app).getInt(KEY_SKIP_VERSION, -1) == BuildConfig.VERSION_CODE || !isNeeded(app)) return
         promptedThisProcess = true
-        if (resolveArchive(activity) != null) {
-            applyAsync(activity)
+        if (resolveArchive(app) != null) {
+            applyAsync(app)
             return
         }
+        if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
             .setTitle("Runtime update")
-            .setMessage("opencode 2.2.7, GitHub CLI 2.104 and a shell fix. About 135 MB download; your files are not touched.")
+            .setMessage("opencode 2.2.7, GitHub CLI 2.104 and a shell fix. About 135 MB download. Replaces ~/.opencode/bin/opencode, /usr/local/bin/gh and zsh (a newer self-updated opencode is replaced too); your other files are not touched.")
             .setPositiveButton("Update") { _, _ -> download(activity) }
-            .setNegativeButton("Later", null)
+            .setNegativeButton("Later") { _, _ -> skipThisVersion(app) }
+            .setOnCancelListener { skipThisVersion(app) }
             .show()
     }
 
+    private const val KEY_SKIP_VERSION = "runtime_update_skip_version"
+    private fun prefs(context: Context) = context.getSharedPreferences("runtime_update_pack", Context.MODE_PRIVATE)
+    private fun skipThisVersion(context: Context) =
+        prefs(context).edit().putInt(KEY_SKIP_VERSION, BuildConfig.VERSION_CODE).apply()
+
     private fun download(activity: Activity) {
+        val app = activity.applicationContext
         var listener: com.google.android.play.core.assetpacks.AssetPackStateUpdateListener? = null
         listener = PlayAssetDeliveryManager.requestDownload(activity, PlayAssetDeliveryManager.PACK_UPDATE_CORE) { state ->
             when (state) {
                 is PlayAssetDeliveryManager.DownloadState.Completed -> {
-                    listener?.let { PlayAssetDeliveryManager.unregisterListener(activity, it) }
-                    applyAsync(activity)
+                    listener?.let { PlayAssetDeliveryManager.unregisterListener(app, it) }
+                    applyAsync(app)
                 }
                 is PlayAssetDeliveryManager.DownloadState.Failed,
                 is PlayAssetDeliveryManager.DownloadState.Canceled -> {
-                    listener?.let { PlayAssetDeliveryManager.unregisterListener(activity, it) }
-                    Toast.makeText(activity, "Runtime update download did not finish", Toast.LENGTH_LONG).show()
+                    listener?.let { PlayAssetDeliveryManager.unregisterListener(app, it) }
+                    skipThisVersion(app)
+                    Toast.makeText(app, "Runtime update download did not finish", Toast.LENGTH_LONG).show()
                 }
                 else -> Unit
             }
         }
     }
 
-    private fun applyAsync(activity: Activity) {
-        val app = activity.applicationContext
+    private fun applyAsync(app: Context) {
         Thread {
             val result = apply(app)
             Log.i(TAG, result.message)
-            activity.runOnUiThread { Toast.makeText(activity, result.message, Toast.LENGTH_LONG).show() }
+            if (!result.success) skipThisVersion(app)
+            Handler(Looper.getMainLooper()).post { Toast.makeText(app, result.message, Toast.LENGTH_LONG).show() }
         }.start()
     }
 }
