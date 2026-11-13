@@ -66,6 +66,12 @@ class TermTabStrip(context: Context, onAdd: (View) -> Unit) : LinearLayout(conte
         }, LayoutParams(dp(40), MATCH))
     }
 
+    /** Thin fixed-height rail (36 dp × font scale): MATCH-height cells in a WRAP parent otherwise grow to fill the page. */
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val h = (dp(36) * resources.configuration.fontScale.coerceAtLeast(1f)).toInt()
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY))
+    }
+
     override fun onAttachedToWindow() { super.onAttachedToWindow(); removeCallbacks(ticker); postDelayed(ticker, 1500) }
     override fun onDetachedFromWindow() { removeCallbacks(ticker); super.onDetachedFromWindow() }
 
