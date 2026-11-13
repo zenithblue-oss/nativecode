@@ -59,7 +59,7 @@ class PipeProcess(
         false
     }
 
-    /** Graceful stop off the caller's thread: stdin EOF, then SIGTERM after 2 s, then SIGKILL after 2 s more. */
+    /** Graceful stop off the caller's thread: stdin EOF, then SIGTERM to the tree after 2 s, then SIGKILL after 2 s more. */
     fun close() {
         synchronized(this) {
             runCatching { stdin?.close() }
@@ -68,15 +68,55 @@ class PipeProcess(
         val p = proc ?: return
         Thread({
             if (!p.waitFor(GRACE_MS, TimeUnit.MILLISECONDS)) {
-                p.destroy()
-                if (!p.waitFor(GRACE_MS, TimeUnit.MILLISECONDS)) p.destroyForcibly()
+                signalTree(p, TERM)
+                if (!p.waitFor(GRACE_MS, TimeUnit.MILLISECONDS)) kill()
             }
         }, "pipe-close").apply { isDaemon = true; start() }
     }
 
-    /** Force stop now (hung turn). PRoot's --kill-on-exit takes the guest tree down with it. */
+    /** Force stop now (hung turn). */
     fun kill() {
-        proc?.destroyForcibly()
+        val p = proc ?: return
+        signalTree(p, KILL)
+        p.destroyForcibly()
+    }
+
+    /**
+     * Signal every guest task, then PRoot. PRoot ignores SIGTERM and a SIGKILLed PRoot never runs --kill-on-exit,
+     * so its tracees would live on (an `opencode serve` holding the port and our stdout pipe, so [onExit] never
+     * fires). Snapshot first: once PRoot dies they are reparented and no longer traced. Same walk as the
+     * terminal tab's `terminateSessionProcesses`.
+     */
+    private fun signalTree(p: Process, sig: String) {
+        // ponytail: pid from Process.toString() ("Process[pid=N, ...]" on Android and the JVM); Process.pid() is not in the SDK
+        val root = PID.find(p.toString())?.groupValues?.get(1)?.toIntOrNull()
+        if (root != null) runCatching { // toybox/coreutils `kill`: same uid, no hidden API, works in JVM tests
+            ProcessBuilder(listOf(if (File("/system/bin/kill").exists()) "/system/bin/kill" else "kill", "-$sig") + (treeOf(root) + root).map { it.toString() }).redirectErrorStream(true).start()
+                .apply { inputStream.readBytes(); waitFor(GRACE_MS, TimeUnit.MILLISECONDS) }
+        }
+        else if (sig == TERM) p.destroy()
+    }
+
+    /** Descendants (PPid) and tracees (TracerPid) of [root], from one /proc snapshot. */
+    private fun treeOf(root: Int): List<Int> {
+        val parent = HashMap<Int, Int>()
+        val traced = ArrayList<Int>()
+        File("/proc").listFiles()?.forEach { f ->
+            val pid = f.name.toIntOrNull() ?: return@forEach
+            if (pid <= 1 || pid == root) return@forEach
+            runCatching {
+                File(f, "status").forEachLine { l ->
+                    if (l.startsWith("PPid:")) parent[pid] = l.substring(5).trim().toInt()
+                    else if (l.startsWith("TracerPid:") && l.substring(10).trim().toInt() == root) traced += pid
+                }
+            }
+        }
+        val out = LinkedHashSet(traced)
+        var frontier = setOf(root) + traced
+        while (frontier.isNotEmpty()) {
+            frontier = parent.filter { (pid, pp) -> pp in frontier && out.add(pid) }.keys
+        }
+        return out.toList()
     }
 
     fun stderrTail(): String = synchronized(errLock) { String(err, Charsets.UTF_8) }
@@ -130,6 +170,9 @@ class PipeProcess(
     companion object {
         const val STDERR_CAP = 64 * 1024
         private const val GRACE_MS = 2_000L
+        private const val TERM = "TERM"
+        private const val KILL = "KILL"
+        private val PID = Regex("""pid=(\d+)""")
         private const val NL = '\n'.code.toByte()
 
         /**

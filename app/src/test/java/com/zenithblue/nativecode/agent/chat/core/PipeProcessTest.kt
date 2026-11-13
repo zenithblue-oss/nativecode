@@ -88,4 +88,13 @@ class PipeProcessTest {
         assertEquals(137, code) // SIGKILL
         assertFalse(p.isAlive)
     }
+
+    /** A grandchild holding stdout (the orphaned guest `opencode serve` under a killed PRoot) must die too, or onExit never fires. */
+    @Test fun killTakesDescendantsHoldingStdout() {
+        val p = spawn("sh -c 'trap \"\" TERM; sleep 60' & wait")
+        Thread.sleep(300)
+        p.kill()
+        awaitExit(5)
+        assertFalse(p.isAlive)
+    }
 }
