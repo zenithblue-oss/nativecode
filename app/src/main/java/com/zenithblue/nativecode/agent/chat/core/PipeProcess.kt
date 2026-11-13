@@ -135,6 +135,8 @@ class PipeProcess(
         /**
          * A gated agent CLI the way a terminal tab starts it: PRoot → /tmp/launch_tool.sh → gate shim → CLI,
          * so the session is counted and the agent's own shell tool inherits the gate PATH (plan 9.2.9).
+         * [extraEnv] reaches the CLI: PRoot passes its env to the guest, and neither the bash -c wrapper,
+         * launch_tool.sh nor the gate shim clear it (they only export additions).
          */
         fun forTool(
             ctx: Context,
@@ -142,10 +144,11 @@ class PipeProcess(
             workDir: String?,
             onLine: (String) -> Unit,
             onExit: (code: Int, stderrTail: String) -> Unit,
+            extraEnv: Map<String, String> = emptyMap(),
         ): PipeProcess {
             val (args, env) = LinuxCommandBuilder.buildToolDirect(ctx, toolArgv, workDir = workDir)
             val argv = LinuxCommandBuilder.sessionArgs(ctx, args, method = "proot").toList()
-            val pipeEnv = HashMap(env).apply { put("NO_COLOR", "1"); put("TERM", "dumb") }
+            val pipeEnv = HashMap(env).apply { put("NO_COLOR", "1"); put("TERM", "dumb"); putAll(extraEnv) }
             return PipeProcess(argv, pipeEnv, File(ctx.filesDir, "home"), onLine, onExit)
         }
     }
