@@ -201,9 +201,12 @@ class CodexMapperTest {
         assertEquals("auto_review", p.getString("approvalsReviewer"))
         assertEquals("plan", p.getJSONObject("collaborationMode").getString("mode"))
         assertEquals("high", p.getJSONObject("collaborationMode").getJSONObject("settings").getString("reasoning_effort"))
-        val t = CodexWire.threadParams(cfg, null, com.zenithblue.nativecode.agent.chat.core.McpEndpoint("nc", "http://127.0.0.1:1/mcp", mapOf("Authorization" to "Bearer x"), "use nc"))
+        val mcp = com.zenithblue.nativecode.agent.chat.core.McpEndpoint("nc", "http://127.0.0.1:1/mcp", mapOf("Authorization" to "Bearer x"), "use nc")
+        val t = CodexWire.threadParams(cfg, null, mcp)
         assertEquals("danger-full-access", t.getString("sandbox"))
-        assertEquals("Bearer x", t.getJSONObject("config").getJSONObject("mcp_servers.nc").getJSONObject("http_headers").getString("Authorization"))
+        assertEquals("NC_MCP_H0", t.getJSONObject("config").getJSONObject("mcp_servers.nc").getJSONObject("env_http_headers").getString("Authorization"))
+        assertFalse(t.toString().contains("Bearer x")) // token only in the process env
+        assertEquals(mapOf("NC_MCP_H0" to "Bearer x"), CodexWire.mcpEnv(mcp))
         assertEquals("use nc", t.getString("developerInstructions"))
         assertFalse(CodexWire.threadParams(cfg, null).getJSONObject("config").has("mcp_servers.nc"))
     }

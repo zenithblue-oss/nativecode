@@ -5,6 +5,7 @@ import com.zenithblue.nativecode.agent.chat.acp.AcpRpc
 import com.zenithblue.nativecode.agent.chat.core.AgentEvent
 import com.zenithblue.nativecode.agent.chat.core.AgentRuntime
 import com.zenithblue.nativecode.agent.chat.core.ChatMcp
+import com.zenithblue.nativecode.agent.chat.core.McpEndpoint
 import com.zenithblue.nativecode.agent.chat.core.ConfigChange
 import com.zenithblue.nativecode.agent.chat.core.Failure
 import com.zenithblue.nativecode.agent.chat.core.FailureClass
@@ -62,6 +63,7 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
     private var skills: Set<String> = emptySet()
     private var account: String? = null
     private var interruptPending = false // guarded by lock: Stop before turn/start answered
+    private var mcp: McpEndpoint? = null // this process's M7 endpoint: env and thread config must agree
 
     override fun start(cfg: SessionConfig, nativeId: String?, sink: (AgentEvent) -> Unit) {
         this.cfg = cfg
@@ -79,7 +81,8 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
             val r = AcpRpc({ proc?.writeLine(it) == true }, { m, p -> onNotification(myGen, m, p) }, { id, m, p -> onRequest(myGen, id, m, p) },
                 tagged = false, log = { host.log("NATIVE", it.take(LOG_MAX)) })
             rpc = r
-            proc = host.spawn(CodexWire.ARGV, emptyMap(), cfg.cwd,
+            mcp = ChatMcp.endpoint(cfg.threadId, "codex") // M7 NC tools server; null = none
+            proc = host.spawn(CodexWire.ARGV, CodexWire.mcpEnv(mcp), cfg.cwd,
                 { line -> if (!isDelta(line)) host.log("NATIVE", line.take(LOG_MAX)); r.onLine(line) },
                 { code, tail -> onExit(myGen, code, tail) })
             await(r.request("initialize", CodexWire.initParams(VERSION)), INIT_S)
@@ -137,7 +140,7 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
     /** `thread/resume` (history stays in the store: `excludeTurns`), else a fresh `thread/start` with a notice. */
     private fun openThread(resumeId: String?) {
         val r = rpc!!
-        val base = CodexWire.threadParams(cfg, pickModel(), ChatMcp.endpoint(cfg.threadId, "codex"))
+        val base = CodexWire.threadParams(cfg, pickModel(), mcp)
         if (resumeId != null) try {
             await(r.request("thread/resume", JSONObject(base.toString()).put("threadId", resumeId).put("excludeTurns", true)), SETUP_S)
             threadId = resumeId
@@ -354,6 +357,7 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
         rpc?.failAll(IOException("closed"))
         proc?.close()
         io.shutdown()
+        if (::cfg.isInitialized) ChatMcp.release(cfg.threadId)
     }
 
     override fun kill() {
@@ -361,6 +365,7 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
         rpc?.failAll(IOException("killed"))
         proc?.kill()
         io.shutdownNow()
+        if (::cfg.isInitialized) ChatMcp.release(cfg.threadId)
     }
 
     // ---------------- server → client ----------------

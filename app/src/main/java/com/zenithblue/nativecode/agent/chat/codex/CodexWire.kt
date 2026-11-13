@@ -75,7 +75,8 @@ object CodexWire {
     fun threadParams(cfg: SessionConfig, model: String?, mcp: McpEndpoint? = null): JSONObject {
         val config = threadConfig()
         if (mcp != null) config.put("mcp_servers.${mcp.name}", JSONObject().put("url", mcp.url)
-            .put("http_headers", JSONObject(mcp.headers)).put("tool_timeout_sec", MCP_TIMEOUT_S))
+            .put("env_http_headers", JSONObject(mcp.headers.keys.withIndex().associate { (i, k) -> k to "NC_MCP_H$i" }))
+            .put("tool_timeout_sec", MCP_TIMEOUT_S))
         return JSONObject()
             .put("cwd", cfg.cwd)
             .put("approvalPolicy", approvalPolicy(cfg.runtimeMode))
@@ -85,6 +86,13 @@ object CodexWire {
             .putOpt("model", model)
             .putOpt("developerInstructions", mcp?.instructions)
     }
+
+    /**
+     * Header values (the per-thread bearer token) ride in the app-server's env, read by codex through
+     * `env_http_headers`: never in argv, the thread config, rollout files or ~/.codex/config.toml.
+     */
+    fun mcpEnv(mcp: McpEndpoint?): Map<String, String> =
+        mcp?.headers?.values?.withIndex()?.associate { (i, v) -> "NC_MCP_H$i" to v } ?: emptyMap()
 
     /** t3code CODEX_T3_MCP_TOOL_TIMEOUT_SEC: waits on delegated tasks can block for an hour. */
     private const val MCP_TIMEOUT_S = 65 * 60
