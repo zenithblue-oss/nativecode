@@ -29,107 +29,13 @@ object CliAuthService {
     private val executor = Executors.newCachedThreadPool()
     private val activeSession = AtomicBoolean(false)
 
-    /** toolId|method → status */
-    private val statusCache = mutableMapOf<String, CliToolStatus>()
-    /** method → last successful probeAll wall time */
-    private val cacheAtMs = mutableMapOf<String, Long>()
-
-    /** Skip guest re-probe if cache younger than this (unless force). */
-    private const val CACHE_TTL_MS = 10 * 60 * 1000L
-
     private val ANSI = Regex("\u001B\\[[0-9;?]*[A-Za-z]")
-    private val URL_PATTERN =Pattern.compile("(https?://[^\\s\"'<>\\]\\)]+)")
     private val OTP_PATTERN = Pattern.compile(
         "\\b([A-Z0-9]{4,5}-[A-Z0-9]{4,6})\\b"
     )
+    private const val LOGOUT_TIMEOUT_S = 30L
 
     fun isSessionActive(): Boolean = activeSession.get()
-
-    fun cachedStatus(toolId: String, method: String): CliToolStatus? =
-        statusCache["$toolId|$method"]
-
-    /** Full tool list from memory if every catalog entry is cached for [method]. */
-    fun cachedAll(method: String): List<CliToolStatus>? {
-        val defs = CliToolCatalog.forMethod(method)
-        if (defs.isEmpty()) return emptyList()
-        val list = defs.map { def ->
-            statusCache["${def.id}|$method"] ?: return null
-        }
-        return list
-    }
-
-    fun cacheAgeMs(method: String): Long {
-        val t = cacheAtMs[method] ?: return -1L
-        return (System.currentTimeMillis() - t).coerceAtLeast(0L)
-    }
-
-    fun isCacheFresh(method: String): Boolean {
-        val age = cacheAgeMs(method)
-        return age in 0 until CACHE_TTL_MS && cachedAll(method) != null
-    }
-
-    fun invalidateCache(method: String? = null) {
-        if (method == null) {
-            statusCache.clear()
-            cacheAtMs.clear()
-        } else {
-            val keys = statusCache.keys.filter { it.endsWith("|$method") }
-            keys.forEach { statusCache.remove(it) }
-            cacheAtMs.remove(method)
-        }
-    }
-
-    /**
-     * Probe all tools. Uses in-memory cache when fresh unless [force].
-     * [onResult] always on main. Cache hit is synchronous on caller thread
-     * if already on main from UI — still posts for consistency.
-     */
-    fun probeAll(
-        ctx: Context,
-        method: String,
-        force: Boolean = false,
-        onResult: (List<CliToolStatus>) -> Unit
-    ) {
-        if (!force && isCacheFresh(method)) {
-            val hit = cachedAll(method)
-            if (hit != null) {
-                mainHandler.post { onResult(hit) }
-                return
-            }
-        }
-        executor.execute {
-            val list = CliToolCatalog.forMethod(method).map { def ->
-                probeOneSync(ctx, method, def)
-            }
-            cacheAtMs[method] = System.currentTimeMillis()
-            mainHandler.post { onResult(list) }
-        }
-    }
-
-    fun probeOne(
-        ctx: Context,
-        method: String,
-        toolId: String,
-        force: Boolean = false,
-        onResult: (CliToolStatus) -> Unit
-    ) {
-        if (!force) {
-            val hit = statusCache["$toolId|$method"]
-            if (hit != null && isCacheFresh(method)) {
-                mainHandler.post { onResult(hit) }
-                return
-            }
-        }
-        executor.execute {
-            val def = CliToolCatalog.byId(toolId)
-            val st = if (def == null) {
-                CliToolStatus(toolId, method, false, false, error = "unknown tool")
-            } else {
-                probeOneSync(ctx, method, def)
-            }
-            mainHandler.post { onResult(st) }
-        }
-    }
 
     /**
      * Start login for [toolId]. Returns null if another session is active
@@ -151,10 +57,6 @@ object CliAuthService {
                 listener.onFailed("Use API key form for ${def.displayName}")
             }
             return null
-        }
-        if (def.strategy == CliLoginStrategy.TERMINAL_GUIDED) {
-            // Still try stream first; if binary missing fail; else may hand off
-            // Fall through for stream attempt on opencode/agy with optional terminal
         }
         if (!activeSession.compareAndSet(false, true)) {
             mainHandler.post { listener.onFailed("Auth already in progress") }
@@ -241,7 +143,11 @@ object CliAuthService {
                 try {
                     val (args, env) = fluxCmd(ctx, cmd, method)
                     mergeCliEnv(env)
-                    ShellCommandRunner.runCaptureExit(ctx, args, env)
+                    val p = ShellCommandRunner.startStdout(ctx, args, env)
+                    p.outputStream.close() // EOF for any prompt
+                    Thread { try { p.inputStream.readBytes() } catch (_: Exception) {} }
+                        .apply { isDaemon = true }.start()
+                    if (!p.waitFor(LOGOUT_TIMEOUT_S, TimeUnit.SECONDS)) p.destroyForcibly()
                 } catch (_: Exception) {
                 }
             }
@@ -254,11 +160,8 @@ object CliAuthService {
             listOfNotNull(def.envKey, "DASHSCOPE_API_KEY".takeIf { toolId == "qwen" },
                 "GROK_API_KEY".takeIf { toolId == "grok" }, "ANTHROPIC_API_KEY".takeIf { toolId == "claude" })
                 .forEach { clearAuthEnvKey(ctx, method, it) }
-            statusCache.remove("$toolId|$method")
-            val still = CliCredentialProbe.probe(toolId, home).state == AuthState.SIGNED_IN
-            mainHandler.post {
-                onResult(!still, if (still) "Still signed in; open the terminal to sign out" else "Logged out ${def.displayName}")
-            }
+            val (ok, msg) = logoutOutcome(CliCredentialProbe.probe(toolId, home).state, def.displayName)
+            mainHandler.post { onResult(ok, msg) }
         }
     }
 
@@ -365,45 +268,9 @@ object CliAuthService {
                     return
                 }
             }
-            CliLoginStrategy.TERMINAL_GUIDED -> {
-                phase(CliAuthPhase.LOGIN, "Guided terminal login…")
-                // Try short stream for URL hints first
-                val tryCmd = when (def.id) {
-                    "opencode" -> CliGuestCommands.loginOpencode()
-                    "agy" -> CliGuestCommands.loginAgy()
-                    else -> null
-                }
-                if (tryCmd != null) {
-                    streamLoginAndCapture(ctx, method, def, tryCmd, session, listener, shortTimeout = true)
-                }
-                if (session.cancelled) {
-                    mainHandler.post { listener.onCancelled() }
-                    return
-                }
-                val hint = when (def.id) {
-                    "opencode" -> "opencode auth login"
-                    "agy" -> "agy"
-                    else -> def.bin
-                }
-                mainHandler.post { listener.onTerminalGuided(def.id, hint) }
-                // Verify after short wait not possible; mark for re-probe
-                phase(CliAuthPhase.VERIFY, "Complete login in terminal, then refresh")
-                val st = probeOneSync(ctx, method, def)
-                if (st.loggedIn) {
-                    phase(CliAuthPhase.SUCCESS, "Signed in")
-                    mainHandler.post { listener.onDone(st) }
-                } else {
-                    // Soft success path: guided opened — not a hard fail if terminal opened
-                    mainHandler.post {
-                        listener.onDone(
-                            st.copy(detail = "Open terminal: $hint")
-                        )
-                    }
-                }
-                return
-            }
-            CliLoginStrategy.API_KEY_FORM -> {
-                fail("Use API key form")
+            // MainActivity routes these to the key dialog / the tool's own terminal before here.
+            CliLoginStrategy.TERMINAL_GUIDED, CliLoginStrategy.API_KEY_FORM -> {
+                fail("Sign in from the ${def.displayName} terminal or key form")
                 return
             }
         }
@@ -445,12 +312,11 @@ object CliAuthService {
         def: CliToolDef,
         loginCmd: String,
         session: CliAuthSession,
-        listener: CliAuthListener,
-        shortTimeout: Boolean = false
+        listener: CliAuthListener
     ): Boolean {
         val (args, env) = fluxCmd(ctx, loginCmd, method)
         mergeCliEnv(env)
-        val timeout = if (shortTimeout) 45_000L else CliGuestCommands.AUTH_TIMEOUT_MS
+        val timeout = CliGuestCommands.AUTH_TIMEOUT_MS
         val latch = CountDownLatch(1)
         var exitCode = -1
         val lastUrl = AtomicReference<String?>(null)
@@ -462,7 +328,7 @@ object CliAuthService {
                 if (session.cancelled) return@runStreamedCancelable
                 val line = ANSI.replace(raw, "")
                 mainHandler.post { listener.onLog(line) }
-                extractUrl(line)?.let { url ->
+                extractAuthUrl(line)?.let { url ->
                     if (lastUrl.get() != url) {
                         lastUrl.set(url)
                         mainHandler.post {
@@ -530,15 +396,10 @@ object CliAuthService {
     // ── probe ───────────────────────────────────────────────────────────────
 
     private fun probeOneSync(ctx: Context, method: String, def: CliToolDef): CliToolStatus {
-        val installed = isInstalledSync(ctx, method, def)
-        if (!installed) {
-            val st = CliToolStatus(def.id, method, false, false, detail = "not installed")
-            statusCache["${def.id}|$method"] = st
-            return st
+        if (!isInstalledSync(ctx, method, def)) {
+            return CliToolStatus(def.id, method, false, false, detail = "not installed")
         }
-        val st = hostStatus(ctx, method, def.id).copy(installed = true)
-        statusCache["${def.id}|$method"] = st
-        return st
+        return hostStatus(ctx, method, def.id).copy(installed = true)
     }
 
     /** Login state from the tool's auth file on the host (no guest process). */
@@ -620,7 +481,9 @@ object CliAuthService {
 
     private fun authEnvFile(ctx: Context, method: String): File {
         val home = ProjectPathResolver.guestHomeDir(ctx, method)
-        return File(home, CliGuestCommands.AUTH_ENV_REL)
+        // Callers catch: a path symlinked outside the guest home is never written.
+        return CliCredentialProbe.inHome(home, CliGuestCommands.AUTH_ENV_REL)
+            ?: throw java.io.IOException("auth env path escapes guest home")
     }
 
     private fun writeAuthEnvKey(
@@ -675,9 +538,9 @@ object CliAuthService {
 
     private fun writeQwenSettings(ctx: Context, method: String, apiKey: String): Boolean {
         return try {
-            val dir = File(ProjectPathResolver.guestHomeDir(ctx, method), ".qwen")
-            if (!dir.exists()) dir.mkdirs()
-            val f = File(dir, "settings.json")
+            val f = CliCredentialProbe.inHome(ProjectPathResolver.guestHomeDir(ctx, method), ".qwen/settings.json")
+                ?: return false
+            f.parentFile?.mkdirs()
             val json = JSONObject()
             val modelProviders = JSONObject()
             val openai = JSONObject()
@@ -712,27 +575,6 @@ object CliAuthService {
 
     // ── parse helpers ───────────────────────────────────────────────────────
 
-    private fun extractUrl(line: String): String? {
-        val m = URL_PATTERN.matcher(line)
-        if (!m.find()) return null
-        var u = m.group(1) ?: return null
-        // trim trailing punctuation
-        u = u.trimEnd('.', ',', ';', ')', ']', '"', '\'')
-        if (!u.startsWith("http")) return null
-        // prefer auth-related URLs
-        val lower = u.lowercase()
-        if (lower.contains("auth") || lower.contains("login") ||
-            lower.contains("oauth") || lower.contains("device") ||
-            lower.contains("openai") || lower.contains("claude") ||
-            lower.contains("kiro") || lower.contains("x.ai") ||
-            lower.contains("google") || lower.contains("anthropic")
-        ) {
-            return u
-        }
-        // still return first https for setup-token
-        return u
-    }
-
     private fun extractOtp(line: String): String? {
         // The code is alone on its line, or the line says "code" (not e.g. BUILD-TOOLS in an env dump).
         val alone = OTP_PATTERN.matcher(line.trim().uppercase()).let { it.matches() }
@@ -754,4 +596,28 @@ object CliAuthService {
     private fun mergeCliEnv(env: HashMap<String, String>) {
         CliGuestCommands.cliEnv().forEach { (k, v) -> env[k] = v }
     }
+}
+
+// Top level (not in the object) so JVM tests skip the object's Android Handler init.
+
+private val URL_PATTERN = Pattern.compile("(https?://[^\\s\"'<>\\]\\)]+)")
+private val AUTH_URL_HINTS = listOf(
+    "auth", "login", "device", "openai", "claude", "anthropic", "kiro", "aws", "x.ai", "grok", "google"
+)
+
+/** First auth-looking URL on [line]; null for other links (docs, update notices). */
+internal fun extractAuthUrl(line: String): String? {
+    val m = URL_PATTERN.matcher(line)
+    while (m.find()) {
+        val u = m.group(1).trimEnd('.', ',', ';', ')', ']', '"', '\'')
+        if (AUTH_URL_HINTS.any { u.lowercase().contains(it) }) return u
+    }
+    return null
+}
+
+/** Only a verified SIGNED_OUT is success; UNKNOWN (opencode 2.x db, agy keyring) is not. */
+internal fun logoutOutcome(state: AuthState, name: String): Pair<Boolean, String> = when (state) {
+    AuthState.SIGNED_OUT -> true to "Logged out $name"
+    AuthState.SIGNED_IN -> false to "Still signed in; open the terminal to sign out"
+    AuthState.UNKNOWN -> false to "Could not verify $name signed out; check in its terminal"
 }

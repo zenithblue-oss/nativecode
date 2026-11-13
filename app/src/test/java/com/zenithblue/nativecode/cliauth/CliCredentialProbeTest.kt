@@ -153,6 +153,43 @@ class CliCredentialProbeTest {
         assertEquals(0, CliCredentialProbe.clearFiles("claude", h))
     }
 
+    @Test fun agyUsesExactFileNamesOnly() {
+        val h = home()
+        val other = h.put(".gemini/antigravity-cli/token_cache_notes.txt", "x")
+        assertEquals(AuthState.UNKNOWN, probe("agy", h).state)
+        h.put(".gemini/antigravity-cli/oauth_creds.json", """{"access_token":"t"}""")
+        assertEquals(1, CliCredentialProbe.clearFiles("agy", h))
+        assertTrue(other.isFile)
+    }
+
+    @Test fun clearRefusesSymlinkEscapingHome() {
+        val h = home()
+        val outside = tmp.newFolder("outside")
+        val victim = outside.put("auth.json", """{"OPENAI_API_KEY":"k"}""")
+        java.nio.file.Files.createSymbolicLink(File(h, ".codex").toPath(), outside.toPath())
+        assertEquals(0, CliCredentialProbe.clearFiles("codex", h))
+        assertTrue(victim.isFile)
+    }
+
+    @Test fun envKeyWithEmptyValueDoesNotReadNextLine() {
+        val h = home()
+        h.put(CliGuestCommands.AUTH_ENV_REL, "export XAI_API_KEY=\nexport OTHER='x'\n")
+        assertEquals(AuthState.SIGNED_OUT, probe("grok", h).state)
+    }
+
+    @Test fun logoutOnlySignedOutIsSuccess() {
+        assertTrue(logoutOutcome(AuthState.SIGNED_OUT, "X").first)
+        assertFalse(logoutOutcome(AuthState.SIGNED_IN, "X").first)
+        assertFalse(logoutOutcome(AuthState.UNKNOWN, "X").first)
+    }
+
+    @Test fun extractAuthUrlSkipsNonAuthLinks() {
+        assertNull(extractAuthUrl("Update available: https://github.com/x/y/releases"))
+        assertEquals("https://auth.openai.com/codex/device",
+            extractAuthUrl("see https://docs.rs/x then https://auth.openai.com/codex/device."))
+        assertNull(extractAuthUrl("no url here"))
+    }
+
     @Test fun jwtEmailRejectsGarbage() {
         assertNull(CliCredentialProbe.jwtEmail("nope"))
         assertNull(CliCredentialProbe.jwtEmail("a.!!!.c"))

@@ -7,7 +7,7 @@ import android.util.Log
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
-import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /**
  * Decoupled and cohesive TerminalSessionClient implementation for NativeCode terminals.
@@ -17,7 +17,6 @@ class NativeCodeTerminalSessionClient(
     private val context: Context,
     private val terminalViewRef: () -> TerminalView?,
     private val activeSessionRef: () -> TerminalSession?,
-    private val executor: Executor,
     private val onSessionFinishedCallback: ((TerminalSession) -> Unit)? = null
 ) : TerminalSessionClient {
 
@@ -46,7 +45,12 @@ class NativeCodeTerminalSessionClient(
         view?.post { view.setTopRow(0) }
         // Never write on the UI thread: session.write blocks when the 4 KB input queue is full, and
         // the echoed output that would drain it needs the UI thread (deadlock -> ANR).
-        executor.execute { session.emulator?.paste(text) ?: session.write(text) }
+        // Serial: two quick pastes must not interleave (also inside bracketed-paste markers).
+        PASTE.execute { session.emulator?.paste(text) ?: session.write(text) }
+    }
+
+    private companion object {
+        val PASTE: java.util.concurrent.ExecutorService = Executors.newSingleThreadExecutor()
     }
 
     override fun onBell(session: TerminalSession) {}

@@ -1306,7 +1306,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             ID_CLI_AUTH -> {
                 if (::cliAuthScrollView.isInitialized) {
                     cliAuthScrollView.visibility = View.VISIBLE
-                    refreshCliAuthPage()
+                    paintCliAuth()
                 }
             }
             ID_AI_SAFETY -> {
@@ -6472,9 +6472,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                              if (::cliAuthScrollView.isInitialized &&
                                  cliAuthScrollView.visibility == View.VISIBLE
                              ) {
-                                 refreshCliAuthPage(force = true)
-                             } else {
-                                 rebuildCliAuthInstallCard()
+                                 paintCliAuth()
                              }
                              Toast.makeText(
                                  this@MainActivity,
@@ -14512,7 +14510,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             context = this,
             terminalViewRef = { if (::terminalView.isInitialized) terminalView else null },
             activeSessionRef = { terminalSession },
-            executor = executor,
             onSessionFinishedCallback = { session ->
                 mainHandler.post {
                     val idx = sessionsList.indexOf(session)
@@ -15114,38 +15111,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         setOnClickListener { onClick() }
     }
 
-    private fun isBatteryCharging(): Boolean {
-        return try {
-            val bm = getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && bm != null) {
-                bm.isCharging
-            } else {
-                val intent = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
-                val status = intent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
-                status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun readBatteryUsage(): Int {
-        return try {
-            val bm = getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
-            val level = bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
-            if (level in 0..100) {
-                level
-            } else {
-                val intent = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
-                val rawLevel = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-                val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
-                if (rawLevel >= 0 && scale > 0) (rawLevel * 100) / scale else 0
-            }
-        } catch (e: Exception) {
-            0
-        }
-    }
-
     private fun startResourceMonitoring(cpuTv: TextView? = null, memTv: TextView? = null, diskTv: TextView? = null) {
         if (resourceMonitorRunnable != null) {
             executor.execute {
@@ -15153,9 +15118,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 val memUsage = readMemUsage()
                 val memPercent = readMemPercent()
                 val diskUsage = readDiskUsage()
-                val batUsage = readBatteryUsage()
-                val isCharging = isBatteryCharging()
-                val batDrawableRes = if (isCharging) R.drawable.ic_battery_charging else R.drawable.ic_battery_discharging
                 mainHandler.post {
                     cpuTv?.text = "$cpuUsage%"
                     memTv?.text = memUsage
@@ -15199,9 +15161,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     val memUsage = readMemUsage()
                     val memPercent = readMemPercent()
                     val diskUsage = readDiskUsage()
-                    val batUsage = readBatteryUsage()
-                    val isCharging = isBatteryCharging()
-                    val batDrawableRes = if (isCharging) R.drawable.ic_battery_charging else R.drawable.ic_battery_discharging
                     mainHandler.post {
                         cpuTv?.text = "$cpuUsage%"
                         memTv?.text = memUsage
@@ -16619,8 +16578,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         pageLayout.addView(cliAuthBody)
     }
 
-    private fun rebuildCliAuthCredentialsCard() {}
-    private fun rebuildCliAuthInstallCard() {}
 
     // ── AI Safety & Report (C5 / B16 + C10 pointers) ─────────────────────────
 
@@ -18015,7 +17972,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
-    private fun refreshCliAuthPage(@Suppress("UNUSED_PARAMETER") force: Boolean = false) = paintCliAuth()
 
     /** Last probed login state per CLI id; a change rebuilds the card grids (see paintCliAuth). */
     private val cliAuthStates = HashMap<String, AuthState>()
@@ -18310,7 +18266,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 val key = input.text?.toString().orEmpty()
                 CliAuthService.saveApiKey(this, method, def.id, key) { ok, msg, _ ->
                     Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-                    if (ok) refreshCliAuthPage(force = true)
+                    if (ok) paintCliAuth()
                 }
             }
             .setNeutralButton("OPEN WEB") { _, _ ->
@@ -18451,7 +18407,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val cancelBtn = primaryButton("CANCEL") {
             cliAuthSession?.cancel()
             dismissCliAuthOverlay()
-            refreshCliAuthPage(force = true)
+            paintCliAuth()
         }.apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(12) }
         }
@@ -18494,7 +18450,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 appendLog("Done · loggedIn=${status.loggedIn}")
                 mainHandler.postDelayed({
                     dismissCliAuthOverlay()
-                    refreshCliAuthPage(force = true)
+                    paintCliAuth()
                     if (status.loggedIn) {
                         Toast.makeText(
                             this@MainActivity,
@@ -18510,12 +18466,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 cancelBtn.text = "CLOSE"
                 cancelBtn.setOnClickListener {
                     dismissCliAuthOverlay()
-                    refreshCliAuthPage(force = true)
+                    paintCliAuth()
                 }
             }
             override fun onCancelled() {
                 dismissCliAuthOverlay()
-                refreshCliAuthPage(force = true)
+                paintCliAuth()
             }
             override fun onTerminalGuided(toolId: String, commandHint: String) {
                 appendLog("Open terminal and run: $commandHint")
@@ -20010,7 +19966,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             context = this,
             terminalViewRef = { if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null },
             activeSessionRef = { workspaceSessions.getOrNull(activeWorkspaceTabIndex) },
-            executor = executor,
             onSessionFinishedCallback = { session ->
                 mainHandler.post {
                     if (workspaceSessions.contains(session)) {

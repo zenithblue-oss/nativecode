@@ -155,6 +155,7 @@ class ExtraKeysBar(
 
         private val repeater = object : Runnable {
             override fun run() {
+                longFired = true
                 fire(key)
                 postDelayed(this, KeyLayouts.REPEAT_INTERVAL_MS)
             }
@@ -203,7 +204,8 @@ class ExtraKeysBar(
                     down = true; altArmed = false; longFired = false; downY = e.y
                     performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     if (key.repeat) {
-                        fire(key)
+                        // With a swipe alternate (⌫ / DEL) the first fire waits for UP, so a swipe sends only the alternate.
+                        if (key.alt == null) fire(key)
                         postDelayed(repeater, KeyLayouts.REPEAT_DELAY_MS)
                     } else if (key.alt != null || isModifier(key) || key.kind == KeyKind.PAGE) {
                         postDelayed(longPress, KeyLayouts.REPEAT_DELAY_MS)
@@ -225,7 +227,7 @@ class ExtraKeysBar(
                     // rebuild() (page key) detaches this view; nothing to repaint then.
                     if (wasDown) when {
                         altArmed -> fire(key.alt!!)
-                        longFired || key.repeat -> {}
+                        longFired || key.repeat && key.alt == null -> {}
                         else -> fire(key)
                     }
                     altArmed = false

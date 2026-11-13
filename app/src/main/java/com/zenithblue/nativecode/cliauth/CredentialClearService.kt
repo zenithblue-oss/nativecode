@@ -9,7 +9,7 @@ import android.content.Context
 object CredentialClearService {
 
     /**
-     * Logout every tool in [CliToolCatalog.forMethod]; invalidate probe cache.
+     * Logout every tool in [CliToolCatalog.forMethod]; a tool whose sign-out is unverified fails.
      * Sequential guest cmds + env key wipe via [CliAuthService.logout].
      */
     fun clearAllAiCredentials(
@@ -19,14 +19,12 @@ object CredentialClearService {
     ) {
         val tools = CliToolCatalog.forMethod(method)
         if (tools.isEmpty()) {
-            CliAuthService.invalidateCache(method)
             onDone(true, "No AI tools for $method")
             return
         }
 
         fun next(index: Int, failures: MutableList<String>) {
             if (index >= tools.size) {
-                CliAuthService.invalidateCache(method)
                 val ok = failures.isEmpty()
                 val msg = if (ok) {
                     "Cleared AI credentials for ${tools.size} tool(s) ($method)"

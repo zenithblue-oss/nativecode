@@ -53,18 +53,16 @@ object CliCredentialProbe {
      */
     fun clearFiles(toolId: String, home: File): Int {
         var n = 0
-        fun rm(rel: String) { if (File(home, rel).delete()) n++ }
+        fun rm(rel: String) { if (inHome(home, rel)?.delete() == true) n++ }
         when (toolId) {
             "claude" -> rm(".claude/.credentials.json")
             "codex" -> rm(".codex/auth.json")
             "opencode" -> rm(".local/share/opencode/auth.json")
             "grok" -> { rm(".grok/auth.json"); rm(".config/grok/auth.json") }
-            "agy" -> {
-                agyFiles(home).forEach { if (it.delete()) n++ }
-            }
+            "agy" -> AGY_FILES.forEach { rm("$AGY_DIR/$it") }
             "qwen" -> {
                 rm(".qwen/oauth_creds.json")
-                val f = File(home, ".qwen/settings.json")
+                val f = inHome(home, ".qwen/settings.json") ?: return n
                 val t = f.textOrNull()
                 if (t != null) {
                     val blanked = t.replace(QWEN_KEY) { "${it.groupValues[1]}\"\"" }
@@ -136,18 +134,19 @@ object CliCredentialProbe {
     }
 
     private fun agy(home: File): CliAuthInfo {
-        if (agyFiles(home).isNotEmpty()) return CliAuthInfo(AuthState.SIGNED_IN)
+        if (AGY_FILES.any { File(home, "$AGY_DIR/$it").let { f -> f.isFile && f.length() > 0 } }) {
+            return CliAuthInfo(AuthState.SIGNED_IN)
+        }
         // NativeCode itself writes AGENTS.md here. Anything else means agy has run but left no
         // credential file we recognise (unverified format or a keyring we cannot read).
-        val ran = File(home, ".gemini/antigravity-cli").list().orEmpty().any { it != "AGENTS.md" }
+        val ran = File(home, AGY_DIR).list().orEmpty().any { it != "AGENTS.md" }
         return CliAuthInfo(if (ran) AuthState.UNKNOWN else AuthState.SIGNED_OUT)
     }
 
-    // ponytail: name heuristic; agy's real credential file name is unverified.
-    private fun agyFiles(home: File): List<File> =
-        File(home, ".gemini/antigravity-cli")
-            .listFiles { f -> f.isFile && f.length() > 0 && AGY_NAME.matches(f.name) }
-            ?.toList().orEmpty()
+    private const val AGY_DIR = ".gemini/antigravity-cli"
+    // ponytail: agy's real file names are unverified (gemini-cli lineage guesses); unknown ones
+    // read UNKNOWN, never deleted. Add the real name once confirmed on a signed-in device.
+    private val AGY_FILES = listOf("oauth_creds.json", "gemini-credentials.json", "credentials.json", "auth.json")
 
     private fun gh(home: File): CliAuthInfo {
         val y = File(home, ".config/gh/hosts.yml").textOrNull() ?: return CliAuthInfo(AuthState.SIGNED_OUT)
@@ -164,12 +163,22 @@ object CliCredentialProbe {
     private val PROVIDER = Regex(""""([A-Za-z0-9._/-]+)"\s*:\s*\{""")
     private val QWEN_KEY = Regex("""("[A-Z_]*API_KEY"\s*:\s*)"[^"]*"""")
     private val QWEN_KEY_SET = Regex(""""[A-Z_]*API_KEY"\s*:\s*"[^"]+"""")
-    private val AGY_NAME = Regex("""(?i).*(token|cred|oauth|auth).*""")
 
     /** Non-empty value of `export KEY='…'` in the managed env file. */
     private fun envHas(home: File, key: String): Boolean {
         val t = File(home, ENV_REL).textOrNull() ?: return false
-        return Regex("""(?m)^\s*(export\s+)?$key=\s*['"]?[^'"\s]""").containsMatchIn(t)
+        return Regex("""(?m)^[ \t]*(export[ \t]+)?$key=[ \t]*['"]?[^'"\s]""").containsMatchIn(t)
+    }
+
+    /**
+     * [rel] under [home], or null when symlinks resolve it outside home (an absolute guest link
+     * resolves against the Android root here). Guards every host write/delete.
+     * ponytail: refuses absolute guest links instead of re-rooting them onto the rootfs.
+     */
+    internal fun inHome(home: File, rel: String): File? = try {
+        File(home, rel).takeIf { it.canonicalFile.startsWith(home.canonicalFile) }
+    } catch (_: Exception) {
+        null
     }
 
     private fun File.textOrNull(): String? =

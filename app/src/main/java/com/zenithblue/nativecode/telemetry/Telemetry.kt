@@ -45,8 +45,18 @@ object Telemetry {
     fun asked(ctx: Context) = prefs(ctx).getBoolean(KEY_ASKED, false)
 
     fun setConsent(ctx: Context, crash: Boolean, usage: Boolean) {
+        val hadCrash = crashConsent(ctx)
+        val hadUsage = usageConsent(ctx)
         prefs(ctx).edit().putBoolean(KEY_CRASH, crash).putBoolean(KEY_USAGE, usage).putBoolean(KEY_ASKED, true).apply()
         apply(ctx)
+        // Revoke also drops what is queued on the device, not only future collection.
+        if (!available(ctx)) return
+        try {
+            if (hadCrash && !crash) FirebaseCrashlytics.getInstance().deleteUnsentReports()
+            if (hadUsage && !usage) FirebaseAnalytics.getInstance(ctx).resetAnalyticsData()
+        } catch (e: Exception) {
+            Log.w(TAG, "revoke cleanup failed", e)
+        }
     }
 
     /** Push the stored choice into the SDKs. Call at app start and after every change. */

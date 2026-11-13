@@ -83,14 +83,6 @@ object CliGuestCommands {
             "kiro-cli login --use-device-flow 2>&1; else kiro login --use-device-flow 2>&1; fi"
     )
 
-    fun loginOpencode(): String = wrap(
-        "export BROWSER=echo; opencode auth login 2>&1"
-    )
-
-    fun loginAgy(): String = wrap(
-        "export BROWSER=echo; agy 2>&1 || true"
-    )
-
     fun loginGrok(): String = wrap(
         "export BROWSER=echo; grok login 2>&1"
     )

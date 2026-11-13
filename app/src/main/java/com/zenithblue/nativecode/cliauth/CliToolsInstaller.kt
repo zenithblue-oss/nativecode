@@ -106,9 +106,6 @@ object CliToolsInstaller {
     ) {
         val ok = exitCode == 0 || treatSoftFailAsPartialOk
         AiCliProvisionState.markAiCliProvisioned(ctx, method, ok)
-        if (ok) {
-            CliAuthService.invalidateCache(method)
-        }
     }
 
     private fun runProcess(ctx: Context, cmd: Array<String>, onLine: (String) -> Unit): Int {
