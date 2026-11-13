@@ -149,7 +149,7 @@ class NcMcpServer(private val handler: Handler) {
         val params = m.optJSONObject("params") ?: JSONObject()
         return try {
             when (method) {
-                "initialize" -> result(id, JSONObject()
+                "initialize", "server/discover" -> result(id, JSONObject() // discover: claude's pre-initialize probe
                     .put("protocolVersion", negotiate(params.optString("protocolVersion")))
                     .put("capabilities", JSONObject().put("tools", JSONObject().put("listChanged", false)))
                     .put("serverInfo", JSONObject().put("name", "nativecode").put("title", "NativeCode").put("version", SERVER_VERSION))

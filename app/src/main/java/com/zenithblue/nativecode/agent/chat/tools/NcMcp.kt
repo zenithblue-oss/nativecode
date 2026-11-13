@@ -1,7 +1,6 @@
 package com.zenithblue.nativecode.agent.chat.tools
 
 import android.content.Context
-import com.zenithblue.nativecode.agent.chat.acp.AcpMcp
 import com.zenithblue.nativecode.agent.chat.core.ChatMcp
 import com.zenithblue.nativecode.agent.chat.core.McpEndpoint
 import com.zenithblue.nativecode.agent.chat.core.McpProvider
@@ -9,7 +8,7 @@ import com.zenithblue.nativecode.agent.chat.core.McpProvider
 /**
  * Per-CLI wiring of the NativeCode tools server (item 12 M7), config only (no guest scripts). The guest shares the
  * app's loopback under PRoot, so every CLI reaches `http://127.0.0.1:<port>/mcp` with its thread's bearer token.
- * Runtimes ask once per spawn through the [ChatMcp] / [AcpMcp] hooks; a new token revokes the thread's previous one.
+ * Runtimes ask once per spawn through the [ChatMcp] hook; a new token revokes the thread's previous one.
  *  - opencode: `PUT /api/experimental/mcp/nc?location[directory]=<cwd>` (t3 `client.mcp.add`);
  *  - claude: `--mcp-config` JSON with `${NC_MCP_H0}` header refs from the env + `--allowedTools mcp__nc`;
  *  - codex: `config["mcp_servers.nc"] = {url, http_headers}` on thread/start|resume;
@@ -28,7 +27,6 @@ object NcMcp {
     fun install(ctx: Context) {
         val app = ctx.applicationContext
         NcTools.init(app)
-        AcpMcp.provider = { id -> endpoint(app, id)?.let { AcpMcp.Endpoint(it.url, it.token, SERVER) } }
         ChatMcp.provider = object : McpProvider {
             override fun endpoint(threadId: String, tool: String): McpEndpoint? = endpoint(app, threadId)?.let {
                 McpEndpoint(SERVER, it.url, mapOf("Authorization" to it.authorization), NcTools.instructions(threadId))
