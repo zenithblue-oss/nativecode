@@ -17,7 +17,6 @@ import com.zenithblue.nativecode.agent.chat.core.RequestAnswer
 import com.zenithblue.nativecode.agent.chat.core.RequestKind
 import com.zenithblue.nativecode.agent.chat.core.Run
 import com.zenithblue.nativecode.agent.chat.core.RunStatus
-import com.zenithblue.nativecode.agent.chat.core.SessionConfig
 import com.zenithblue.nativecode.agent.chat.core.TurnInput
 import com.zenithblue.nativecode.agent.chat.store.ChatStore
 import com.zenithblue.nativecode.agent.chat.store.ChatWrite
@@ -68,6 +67,7 @@ class ChatThreadController internal constructor(
             .mapNotNull { r -> store.itemsOfRun(threadId, r.id).firstOrNull { it.payload is ItemPayload.UserMessage }?.let { QueuedMessage(r, it) } }
         val stale = store.openRequests(threadId).filter { it.kind == RequestKind.USER_INPUT }
         reducer = ChatReducer(initial, maxItem + 1, maxRun + 1, queued, stale)
+        ModelCache.load(ctx, initial.tool)?.let(reducer::seedModels) // picker usable before the first send
         state = reducer.state
     }
 
@@ -224,9 +224,8 @@ class ChatThreadController internal constructor(
         ready = false
         closing = false
         reducer.starting()
-        val cfg = SessionConfig(threadId, t.cwd, t.projectPath, t.model, t.effort, t.runtimeMode, t.interactionMode, t.title)
         try {
-            rt.start(cfg, t.nativeId) { e -> AgentChats.post { onEvent(e) } }
+            rt.start(reducer.sessionConfig(), t.nativeId) { e -> AgentChats.post { onEvent(e) } }
         } catch (e: Exception) {
             runtime = null
             onExit(-1, "Chat failed to start: ${e.message}")
@@ -262,9 +261,13 @@ class ChatThreadController internal constructor(
         if (e is AgentEvent.SessionState && e.phase == AgentEvent.Phase.READY) {
             ready = true
             entry?.let { if (it.starting) AgentChats.markLive(it) }
+            if (pendingTurn == null && reducer.activeRun == null) scheduleIdleRelease() // warm-up / resume without a send
         }
         if (e is AgentEvent.TurnTerminal) forceTask?.cancel(false)
         reducer.reduce(e)
+        if (e is AgentEvent.SessionState && !e.models.isNullOrEmpty()) reducer.state.let { s ->
+            ModelCache.save(ctx, thread.tool, ModelCache.Entry(s.models, s.defaultModel, s.caps))
+        }
         commit()
     }
 

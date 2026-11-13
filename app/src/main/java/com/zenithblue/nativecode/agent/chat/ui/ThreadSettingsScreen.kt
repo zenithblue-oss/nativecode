@@ -24,6 +24,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,9 +72,20 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
             val current = t.model ?: live?.defaultModel
             Section("Model", Ic.Sparkles) {
                 val models = live?.models.orEmpty()
+                // No cached list (first use of this tool): warm the session up once, through the gate (Pro, session cap).
+                var warmed by remember { mutableStateOf(false) }
+                LaunchedEffect(live != null) {
+                    if (live != null && live.models.isEmpty() && !live.alive && !warmed) { warmed = true; v.bg { v.backend.resume(threadId) } }
+                }
                 if (models.isEmpty()) {
                     Text(current ?: "Default", color = C.on, style = T.codeSm)
-                    Text("The model list loads once the session starts.", color = C.outline, style = T.meta)
+                    if (live?.alive == true) {
+                        Text("Loading models…", color = C.outline, style = T.meta)
+                        LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = C.primary, trackColor = C.border)
+                    } else {
+                        Text("Start the session to load the model list (uses an AI session slot).", color = C.outline, style = T.meta)
+                        NcButton("Load models", icon = Ic.Retry) { v.bg { v.backend.resume(threadId) } }
+                    }
                 } else {
                     Row(Modifier.fillMaxWidth().card(C.lowest).heightIn(min = 44.dp).padding(horizontal = S.m), verticalAlignment = Alignment.CenterVertically) {
                         NcIcon(Ic.Search, null, tint = C.outline, size = 16.dp)

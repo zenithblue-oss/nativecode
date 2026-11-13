@@ -16,6 +16,7 @@ import com.zenithblue.nativecode.agent.chat.core.RequestStatus
 import com.zenithblue.nativecode.agent.chat.core.Run
 import com.zenithblue.nativecode.agent.chat.core.RunStatus
 import com.zenithblue.nativecode.agent.chat.core.RuntimeCaps
+import com.zenithblue.nativecode.agent.chat.core.SessionConfig
 import com.zenithblue.nativecode.agent.chat.core.SlashCommand
 import com.zenithblue.nativecode.agent.chat.core.TurnItem
 import com.zenithblue.nativecode.agent.chat.core.Usage
@@ -227,6 +228,15 @@ class ChatReducer(
         val t = thread
         writes += ChatWrite.UpdateThread(t.id) { it.copy(model = t.model, effort = t.effort, runtimeMode = t.runtimeMode, interactionMode = t.interactionMode) }
     }
+
+    /** Last-known list for the tool ([ModelCache]): the picker works before a session; a live SessionState replaces it. */
+    fun seedModels(c: ModelCache.Entry) {
+        if (state.models.isNotEmpty()) return
+        state = state.copy(models = c.models, defaultModel = state.defaultModel ?: c.defaultModel, caps = state.caps ?: c.caps)
+    }
+
+    /** What the runtime starts with: the thread's persisted picks (model/effort chosen before the first send included). */
+    fun sessionConfig() = thread.let { SessionConfig(it.id, it.cwd, it.projectPath, it.model, it.effort, it.runtimeMode, it.interactionMode, it.title) }
 
     /**
      * The user answered request [requestId]. Returns the request and whether the live session can take the
