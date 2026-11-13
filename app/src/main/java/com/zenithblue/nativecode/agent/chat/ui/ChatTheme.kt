@@ -3,34 +3,68 @@ package com.zenithblue.nativecode.agent.chat.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zenithblue.nativecode.NC
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 /** App palette (DesignTokens.NC) for Compose: obsidian surfaces, green primary, square cyber-brutalist edges. */
 internal object C {
@@ -39,10 +73,14 @@ internal object C {
     val low = Color(NC.SURFACE_LOW)
     val container = Color(NC.SURFACE_CONTAINER)
     val high = Color(NC.SURFACE_HIGH)
+    val highest = Color(NC.SURFACE_HIGHEST)
     val on = Color(NC.ON_SURFACE)
     val onVar = Color(NC.ON_SURF_VAR)
     val outline = Color(NC.OUTLINE)
     val border = Color(NC.OUTLINE_VAR)
+    val borderVar = Color(NC.BORDER_VAR)
+    val shadow = Color(NC.SHADOW_DARK)
+    val shadowGreen = Color(NC.SHADOW_GREEN)
     val primary = Color(NC.PRIMARY)
     val onPrimary = Color(NC.ON_PRIMARY)
     val tertiary = Color(NC.TERTIARY_CON)
@@ -52,8 +90,32 @@ internal object C {
     val delBg = Color(0x22FFB4AB)
 }
 
+/** 4/8 dp spacing scale. */
+internal object S {
+    val xxs = 2.dp
+    val xs = 4.dp
+    val s = 8.dp
+    val m = 12.dp
+    val l = 16.dp
+    val xl = 24.dp
+    val xxl = 32.dp
+}
+
 internal val Mono = FontFamily.Monospace
 internal val Square = RoundedCornerShape(0.dp)
+
+/** The one text scale of the chat screens. Sizes in sp, so font scale applies. */
+internal object T {
+    val title = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.1).sp)
+    val heading = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+    val body = TextStyle(fontSize = 15.sp, lineHeight = 22.sp)
+    val bodySm = TextStyle(fontSize = 13.sp, lineHeight = 18.sp)
+    val label = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
+    val overline = TextStyle(fontFamily = Mono, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+    val meta = TextStyle(fontFamily = Mono, fontSize = 11.sp, lineHeight = 14.sp)
+    val code = TextStyle(fontFamily = Mono, fontSize = 13.sp, lineHeight = 19.sp)
+    val codeSm = TextStyle(fontFamily = Mono, fontSize = 12.sp, lineHeight = 17.sp)
+}
 
 @Composable
 internal fun ChatTheme(content: @Composable () -> Unit) {
@@ -68,43 +130,228 @@ internal fun ChatTheme(content: @Composable () -> Unit) {
     )
 }
 
-/** Small mono label: section headers, meta lines. */
+/** Small mono label: meta lines, counts, badges. */
 @Composable
 internal fun Label(text: String, modifier: Modifier = Modifier, color: Color = C.onVar, size: Int = 11, bold: Boolean = false) {
     Text(
         text, modifier = modifier, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis,
-        style = TextStyle(fontFamily = Mono, fontSize = size.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal),
+        style = TextStyle(fontFamily = Mono, fontSize = size.sp, lineHeight = (size + 4).sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal),
     )
 }
 
-/** Square outlined chip; [on] = filled primary tint. */
+/** Uppercase tracked section header. */
 @Composable
-internal fun Chip(text: String, modifier: Modifier = Modifier, on: Boolean = false, color: Color = C.onVar, onClick: (() -> Unit)? = null) {
+internal fun Overline(text: String, modifier: Modifier = Modifier, color: Color = C.onVar) =
+    Text(text.uppercase(), modifier, color = color, style = T.overline, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+/** Vector icon; [cd] null = decorative (the parent carries the description). */
+@Composable
+internal fun NcIcon(icon: ImageVector, cd: String?, modifier: Modifier = Modifier, tint: Color = C.onVar, size: Dp = 18.dp) =
+    Icon(icon, cd, modifier.size(size), tint = tint)
+
+/** 48 dp touch target, square ripple, icon-only (TalkBack label required). */
+@Composable
+internal fun IconBtn(
+    icon: ImageVector, cd: String, modifier: Modifier = Modifier, tint: Color = C.on, size: Dp = 20.dp, box: Dp = 48.dp,
+    enabled: Boolean = true, onClick: () -> Unit,
+) {
     Box(
+        modifier.size(box).clickable(enabled = enabled, role = Role.Button, onClickLabel = cd, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, cd, Modifier.size(size), tint = if (enabled) tint else C.outline) }
+}
+
+/** Square outlined chip; [on] = primary tint. */
+@Composable
+internal fun Chip(
+    text: String, modifier: Modifier = Modifier, on: Boolean = false, color: Color = C.onVar,
+    icon: ImageVector? = null, trailing: ImageVector? = null, onClick: (() -> Unit)? = null,
+) {
+    val fg = if (on) C.primary else color
+    Row(
         modifier
             .heightIn(min = 32.dp)
-            .background(if (on) C.primary.copy(alpha = 0.18f) else Color.Transparent)
+            .background(if (on) C.primary.copy(alpha = 0.14f) else C.low)
             .border(1.dp, if (on) C.primary else C.border)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) { Label(text, color = if (on) C.primary else color, size = 12) }
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .padding(horizontal = S.s + S.xxs, vertical = S.xs + S.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(S.xs + S.xxs),
+    ) {
+        icon?.let { NcIcon(it, null, tint = fg, size = 14.dp) }
+        Text(text, color = fg, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        trailing?.let { NcIcon(it, null, tint = fg, size = 14.dp) }
+    }
+}
+
+internal enum class BtnKind { PRIMARY, OUTLINE, DANGER, GHOST }
+
+/** Square button, mono caps label, optional leading icon; 40 dp min height. */
+@Composable
+internal fun NcButton(
+    text: String, modifier: Modifier = Modifier, primary: Boolean = false, danger: Boolean = false, enabled: Boolean = true,
+    icon: ImageVector? = null, kind: BtnKind = when { primary -> BtnKind.PRIMARY; danger -> BtnKind.DANGER; else -> BtnKind.OUTLINE },
+    onClick: () -> Unit,
+) {
+    val (bg, fg, stroke) = when (kind) {
+        BtnKind.PRIMARY -> Triple(C.primary, C.onPrimary, C.primary)
+        BtnKind.DANGER -> Triple(C.errorCon.copy(alpha = 0.22f), C.error, C.error.copy(alpha = 0.7f))
+        BtnKind.OUTLINE -> Triple(C.low, C.on, C.border)
+        BtnKind.GHOST -> Triple(Color.Transparent, C.primary, Color.Transparent)
+    }
+    Row(
+        modifier
+            .heightIn(min = 40.dp)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
+            .background(bg)
+            .border(1.dp, stroke)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = S.m, vertical = S.s),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(S.s, Alignment.CenterHorizontally),
+    ) {
+        icon?.let { NcIcon(it, null, tint = fg, size = 16.dp) }
+        Text(text.uppercase(), color = fg, style = T.overline.copy(fontSize = 12.sp, letterSpacing = 0.8.sp), maxLines = 1)
+    }
 }
 
 @Composable
-internal fun NcButton(text: String, modifier: Modifier = Modifier, primary: Boolean = false, danger: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    val fg = when { danger -> C.error; primary -> C.onPrimary; else -> C.on }
-    OutlinedButton(
-        onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 40.dp), shape = Square,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-        border = BorderStroke(1.dp, if (danger) C.error else if (primary) C.primary else C.border),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = if (primary) C.primary else Color.Transparent, contentColor = fg),
-    ) { Text(text.uppercase(), fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+internal fun Hairline(modifier: Modifier = Modifier, color: Color = C.border) {
+    Box(modifier.fillMaxWidth().height(1.dp).background(color))
 }
 
+/**
+ * App's cyber-brutalist elevation: a hard offset block behind the element (MainActivity.cyberBrutalistBg).
+ * Reserves [offset] at end/bottom so the block never overlaps siblings.
+ */
+internal fun Modifier.brutal(offset: Dp = 4.dp, shadow: Color = C.shadow): Modifier =
+    padding(end = offset, bottom = offset).drawBehind {
+        val o = offset.toPx()
+        drawRect(shadow, topLeft = Offset(o, o), size = size)
+    }
+
+/** Card surface: tonal fill + 1 dp border. */
+internal fun Modifier.card(fill: Color = C.low, stroke: Color = C.border): Modifier = background(fill).border(1.dp, stroke)
+
+/** Drawn status dot; [pulse] = soft breathing halo (draw phase only, no recomposition). */
 @Composable
-internal fun Hairline(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(1.dp).background(C.border))
+internal fun StatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp, pulse: Boolean = false) {
+    if (!pulse) { Box(modifier.size(size).background(color, CircleShape)); return }
+    val t = rememberInfiniteTransition(label = "dot")
+    val a by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "a")
+    Box(
+        modifier.size(size).drawBehind {
+            val r = size.toPx() / 2f
+            drawCircle(color.copy(alpha = (1f - a) * 0.5f), radius = r * (1f + a * 0.9f))
+            drawCircle(color, radius = r)
+        },
+    )
+}
+
+/** Hollow drawn circle (pending step, unselected radio). */
+@Composable
+internal fun Ring(color: Color, modifier: Modifier = Modifier, size: Dp = 14.dp, filled: Boolean = false) {
+    Box(modifier.size(size).border(1.5.dp, color, CircleShape), contentAlignment = Alignment.Center) {
+        if (filled) Box(Modifier.size(size / 2).background(color, CircleShape))
+    }
+}
+
+/** Status chip: drawn dot + label; TalkBack reads "Status: <label>". */
+@Composable
+internal fun StatusChip(text: String, color: Color, modifier: Modifier = Modifier, pulse: Boolean = false) {
+    Row(
+        modifier.semantics(mergeDescendants = true) { contentDescription = "Status: $text" }
+            .background(color.copy(alpha = 0.12f)).padding(horizontal = S.s - S.xxs, vertical = S.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        StatusDot(color, size = 6.dp, pulse = pulse)
+        Text(text, Modifier.padding(start = S.xs + S.xxs), color = color, style = T.meta.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+    }
+}
+
+/** Animated chevron (right when closed, down when open). */
+@Composable
+internal fun Chevron(open: Boolean, modifier: Modifier = Modifier, tint: Color = C.onVar, size: Dp = 16.dp) {
+    val r by animateFloatAsState(if (open) 90f else 0f, label = "chev")
+    NcIcon(Ic.ChevronRight, null, modifier.rotate(r), tint = tint, size = size)
+}
+
+/** Loading sweep over the content (draw phase only). */
+@Composable
+internal fun Modifier.shimmer(on: Boolean = true): Modifier {
+    if (!on) return this
+    val t = rememberInfiniteTransition(label = "shimmer")
+    val x by t.animateFloat(-1f, 2f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "x")
+    return graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
+        drawContent()
+        val w = size.width
+        drawRect(
+            Brush.linearGradient(
+                listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent),
+                start = Offset(w * x - w * 0.4f, 0f), end = Offset(w * x, 0f),
+            ),
+            blendMode = BlendMode.SrcAtop,
+        )
+    }
+}
+
+/** Skeleton bar for loading placeholders. */
+@Composable
+internal fun SkeletonBar(width: Dp, modifier: Modifier = Modifier, height: Dp = 10.dp) {
+    Box(modifier.width(width).height(height).background(C.high).shimmer())
+}
+
+/** Blinking block caret drawn after streaming text (alpha in the draw phase). */
+@Composable
+internal fun BlinkCaret(modifier: Modifier = Modifier, color: Color = C.primary) {
+    val t = rememberInfiniteTransition(label = "caret")
+    val a by t.animateFloat(1f, 0f, infiniteRepeatable(tween(530, easing = LinearEasing), RepeatMode.Reverse), label = "a")
+    Box(modifier.graphicsLayer { alpha = if (a > 0.5f) 1f else 0.15f }.background(color))
+}
+
+/** Menu row with a leading vector icon. */
+@Composable
+internal fun MItem(label: String, icon: ImageVector? = null, danger: Boolean = false, onClick: () -> Unit) =
+    DropdownMenuItem(
+        text = { Text(label, style = T.bodySm, color = if (danger) C.error else C.on) },
+        onClick = onClick,
+        leadingIcon = icon?.let { { NcIcon(it, null, tint = if (danger) C.error else C.onVar, size = 18.dp) } },
+    )
+
+/** Inline "+12 -3" (numbers only; minus is the U+2212 text sign). */
+@Composable
+internal fun RowScope.AddDel(add: Int, del: Int, size: Int = 11) {
+    if (add > 0 || del == 0) Label("+$add", color = C.primary, size = size, bold = true)
+    if (del > 0) Label("−$del", Modifier.padding(start = S.xs), color = C.error, size = size, bold = true)
+}
+
+/** Provider logo the app ships (assets/images/cli, same files as the terminal tool cards). */
+@Composable
+internal fun ProviderLogo(tool: String, modifier: Modifier = Modifier, size: Dp = 28.dp) {
+    val ctx = LocalContext.current
+    val bmp by produceState(Logos.cache[tool], tool) {
+        if (value == null) value = withContext(Dispatchers.IO) { Logos.load(ctx, tool) }
+    }
+    Box(modifier.size(size).background(C.lowest).border(1.dp, C.border), contentAlignment = Alignment.Center) {
+        bmp?.let { Image(it, null, Modifier.size(size - 6.dp)) } ?: NcIcon(Ic.Bot, null, tint = C.outline, size = size * 0.6f)
+    }
+}
+
+private object Logos {
+    val cache = ConcurrentHashMap<String, ImageBitmap>()
+    fun file(tool: String) = when (tool) {
+        "qwen-code" -> "qwen-code.webp"
+        "shell", "shell-root" -> "shell.png"
+        else -> "$tool.png"
+    }
+    fun load(ctx: Context, tool: String): ImageBitmap? = cache[tool] ?: runCatching {
+        val path = "images/cli/${file(tool)}"
+        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        ctx.assets.open(path).use { BitmapFactory.decodeStream(it, null, o) }
+        var s = 1
+        while (o.outWidth / (s * 2) >= 96) s *= 2
+        ctx.assets.open(path).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = s }) }?.asImageBitmap()
+    }.getOrNull()?.also { cache[tool] = it }
 }
 
 internal fun copyText(ctx: Context, text: String) {

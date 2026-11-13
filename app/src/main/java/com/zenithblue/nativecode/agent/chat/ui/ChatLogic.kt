@@ -3,6 +3,7 @@ package com.zenithblue.nativecode.agent.chat.ui
 import com.zenithblue.nativecode.agent.chat.core.ChatRequest
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.ItemPayload
+import com.zenithblue.nativecode.agent.chat.core.ItemStatus
 import com.zenithblue.nativecode.agent.chat.core.RequestKind
 import com.zenithblue.nativecode.agent.chat.core.RequestStatus
 import com.zenithblue.nativecode.agent.chat.core.Run
@@ -13,11 +14,6 @@ import com.zenithblue.nativecode.agent.chat.core.TurnItem
 enum class ThreadStatus { APPROVAL, INPUT, WORKING, FAILED, DONE, IDLE }
 
 data class ThreadGroup(val key: String, val title: String, val threads: List<ChatThread>)
-
-sealed class MdBlock {
-    data class Text(val md: String) : MdBlock()
-    data class Code(val lang: String, val code: String) : MdBlock()
-}
 
 data class DiffLine(val kind: Char, val text: String, val oldNo: Int?, val newNo: Int?)
 data class DiffFile(val path: String, val kind: Char, val add: Int, val del: Int, val lines: List<DiffLine>)
@@ -101,32 +97,59 @@ object ChatLogic {
         return if (lines.size <= max) text to false else lines.take(max).joinToString("\n") to true
     }
 
-    /** Fenced code blocks become their own blocks; an unclosed fence (streaming) is code to the end. */
-    fun splitFences(md: String): List<MdBlock> {
-        val out = ArrayList<MdBlock>()
-        val buf = StringBuilder()
-        var lang: String? = null
-        for (line in md.lines()) {
-            val t = line.trimStart()
-            if (t.startsWith("```")) {
-                if (lang == null) {
-                    if (buf.isNotBlank()) out += MdBlock.Text(buf.toString().trimEnd())
-                    buf.clear(); lang = t.removePrefix("```").trim()
-                } else {
-                    out += MdBlock.Code(lang, buf.toString().removeSuffix("\n")); buf.clear(); lang = null
-                }
-                continue
-            }
-            buf.append(line).append('\n')
-        }
-        if (lang != null) out += MdBlock.Code(lang, buf.toString().removeSuffix("\n"))
-        else if (buf.isNotBlank()) out += MdBlock.Text(buf.toString().trimEnd())
-        return out
+    /** What the agent is doing right now (working pill, t3code "Running · <cmd>"). */
+    fun activity(p: ItemPayload): String? = when (p) {
+        is ItemPayload.CommandExecution -> "Running " + p.command.lineSequence().first().take(60)
+        is ItemPayload.FileChange -> "Editing " + baseName(p.path)
+        is ItemPayload.FileSearch -> "Searching " + p.pattern.take(40)
+        is ItemPayload.WebSearch -> "Fetching " + p.query.take(40)
+        is ItemPayload.DynamicTool -> "Calling " + p.name
+        is ItemPayload.Subagent -> "Subagent · " + p.title.take(40)
+        is ItemPayload.Reasoning -> "Thinking"
+        is ItemPayload.AssistantMessage -> "Writing"
+        is ItemPayload.Compaction -> "Compacting context"
+        else -> null
     }
+
+    /** Activity of the newest running item of [runId]. */
+    fun currentActivity(items: List<TurnItem>, runId: String?): String? =
+        items.lastOrNull { it.runId == runId && it.status == ItemStatus.RUNNING }?.let { activity(it.payload) }
+
+    /** Branch name from `.git/HEAD` content, or a short sha when detached. */
+    fun branch(head: String): String? {
+        val h = head.trim()
+        return when {
+            h.startsWith("ref: refs/heads/") -> h.removePrefix("ref: refs/heads/")
+            h.matches(Regex("[0-9a-f]{7,64}")) -> h.take(7)
+            else -> null
+        }
+    }
+
+    fun duration(ms: Long): String {
+        val s = ms / 1000.0
+        return when {
+            ms < 1000 -> "${ms}ms"
+            s < 60 -> "%.1fs".format(s)
+            else -> "%dm %02ds".format(ms / 60_000, ms / 1000 % 60)
+        }
+    }
+
+    /** Cost label; null when not reported. Free models report 0. */
+    fun cost(usd: Double?): String? = when {
+        usd == null -> null
+        usd == 0.0 -> "\$0"
+        usd < 0.001 -> "<\$0.001"
+        usd < 1 -> "\$%.3f".format(usd)
+        else -> "\$%.2f".format(usd)
+    }
+
+    /** Context fill 0..1; warning ≥ 0.8, critical ≥ 0.95 (t3code warns at 80/90). */
+    fun contextFraction(used: Long?, size: Long?): Float? =
+        if (used == null || size == null || size <= 0) null else (used.toFloat() / size).coerceIn(0f, 1f)
 
     private val hunk = Regex("""^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
 
-    /** Unified diff (git or bare) → files. [fallbackPath] names a header-less single-file diff. */
+    /** Unified diff (git or bare) to files. [fallbackPath] names a header-less single-file diff. */
     fun parseUnifiedDiff(patch: String, fallbackPath: String = "file"): List<DiffFile> {
         val files = ArrayList<DiffFile>()
         var path: String? = null

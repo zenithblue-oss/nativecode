@@ -8,6 +8,8 @@ import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,7 +26,7 @@ import com.zenithblue.nativecode.agent.chat.core.TurnItem
 import java.util.concurrent.Executor
 
 /** One thread-list row. */
-data class ThreadRow(val thread: ChatThread, val status: ThreadStatus, val lastRun: Run?, val add: Int, val del: Int)
+data class ThreadRow(val thread: ChatThread, val status: ThreadStatus, val lastRun: Run?, val add: Int, val del: Int, val preview: String? = null)
 
 /** The open thread: store rows (newest 200 + pages loaded with "Load earlier"). */
 data class ThreadData(
@@ -91,11 +93,13 @@ class AgentChatView(
                         BackHandler(enabled = chatPosition.value && pageShownState.value && stack.size > 1) { pop() }
                         // No imePadding: MA pads contentFrame by the IME inset (the composer rises with it).
                         Box(Modifier.fillMaxSize().background(C.bg)) {
-                            when (val r = stack.last()) {
-                                Route.List -> ThreadListScreen(this@AgentChatView)
-                                is Route.Chat -> ChatScreen(this@AgentChatView, r.id)
-                                is Route.Diff -> DiffScreen(this@AgentChatView, r.id)
-                                is Route.Settings -> ThreadSettingsScreen(this@AgentChatView, r.id)
+                            Crossfade(stack.last(), animationSpec = tween(160), label = "route") { r ->
+                                when (r) {
+                                    Route.List -> ThreadListScreen(this@AgentChatView)
+                                    is Route.Chat -> ChatScreen(this@AgentChatView, r.id)
+                                    is Route.Diff -> DiffScreen(this@AgentChatView, r.id)
+                                    is Route.Settings -> ThreadSettingsScreen(this@AgentChatView, r.id)
+                                }
                             }
                             if (sheet.value) NewThreadSheet(this@AgentChatView)
                         }
@@ -187,7 +191,11 @@ class AgentChatView(
                     val runs = backend.runs(t.id)
                     val last = runs.lastOrNull { it.status != com.zenithblue.nativecode.agent.chat.core.RunStatus.QUEUED }
                     val stat = last?.diffStat.orEmpty()
-                    ThreadRow(t, ChatLogic.status(t, last, backend.openRequests(t.id)), last, stat.sumOf { it.add }, stat.sumOf { it.del })
+                    val preview = backend.items(t.id, 8).lastOrNull { it.payload is ItemPayload.AssistantMessage || it.payload is ItemPayload.UserMessage }?.payload?.let { p ->
+                        ((p as? ItemPayload.AssistantMessage)?.text ?: (p as ItemPayload.UserMessage).text).lineSequence().firstOrNull { it.isNotBlank() }
+                            ?.trim()?.trimStart('#', '>', '-', '*', ' ')?.take(200)?.let { Md.inline(it).text }
+                    }
+                    ThreadRow(t, ChatLogic.status(t, last, backend.openRequests(t.id)), last, stat.sumOf { it.add }, stat.sumOf { it.del }, preview)
                 }
             }.getOrDefault(emptyList())
             main.post {

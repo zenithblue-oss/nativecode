@@ -15,7 +15,7 @@ interface ChatHost {
     fun openCliLoginPage(id: String)
     /** CLI TUI in a terminal tab of this surface; [args] resume flags (empty = fresh start). Forces Terminal. */
     fun openTerminal(tool: String, args: List<String>, cwd: String?, workspace: Boolean)
-    /** Shell tab at [cwd] (Pro; Free → upsell). Forces Terminal. */
+    /** Shell tab at [cwd] (Pro; Free: upsell). Forces Terminal. */
     fun openShellHere(cwd: String, workspace: Boolean)
     fun pickImage(cb: (Uri) -> Unit)
     fun pickFile(cb: (Uri) -> Unit)

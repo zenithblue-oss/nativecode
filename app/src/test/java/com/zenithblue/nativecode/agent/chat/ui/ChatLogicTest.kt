@@ -64,10 +64,24 @@ class ChatLogicTest {
         assertEquals("1:00:05", ChatLogic.timer(3_605_000))
     }
 
-    @Test fun fencesSplitAndStreamingFence() {
-        val b = ChatLogic.splitFences("Hi\n```kotlin\nval x = 1\n```\nbye")
-        assertEquals(listOf(MdBlock.Text("Hi"), MdBlock.Code("kotlin", "val x = 1"), MdBlock.Text("bye")), b)
-        assertEquals(MdBlock.Code("", "partial"), ChatLogic.splitFences("```\npartial").single())
+    @Test fun infoHelpers() {
+        assertEquals("main", ChatLogic.branch("ref: refs/heads/main\n"))
+        assertEquals("feature/x", ChatLogic.branch("ref: refs/heads/feature/x"))
+        assertEquals("abcdef1", ChatLogic.branch("abcdef1234567890abcdef1234567890abcdef12"))
+        assertEquals(null, ChatLogic.branch("garbage"))
+        assertEquals("850ms", ChatLogic.duration(850))
+        assertEquals("4.2s", ChatLogic.duration(4_200))
+        assertEquals("1m 04s", ChatLogic.duration(64_000))
+        assertEquals(null, ChatLogic.cost(null))
+        assertEquals("\$0", ChatLogic.cost(0.0))
+        assertEquals("\$0.012", ChatLogic.cost(0.0123))
+        assertEquals(0.5f, ChatLogic.contextFraction(50, 100))
+        assertEquals(null, ChatLogic.contextFraction(50, null))
+        val cmd = TurnItem("i", "t", "r", 0, null, null, ItemStatus.RUNNING, ItemPayload.CommandExecution("npm test\nmore"), 0)
+        val done = cmd.copy(id = "j", status = ItemStatus.COMPLETED, payload = ItemPayload.FileChange("/a/b/File.kt"))
+        assertEquals("Running npm test", ChatLogic.currentActivity(listOf(cmd, done), "r"))
+        assertEquals(null, ChatLogic.currentActivity(listOf(done), "r"))
+        assertEquals("Editing File.kt", ChatLogic.activity(done.payload))
     }
 
     @Test fun unifiedDiffParse() {
