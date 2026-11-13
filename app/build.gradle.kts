@@ -40,7 +40,7 @@ android {
         applicationId = "com.zenithblue.nativecode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 18
+        versionCode = 19
         versionName = "1.8.0"
         buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
         // Freemium gates (docs/monetisation/plan.md). On with Play Billing (PR5).
