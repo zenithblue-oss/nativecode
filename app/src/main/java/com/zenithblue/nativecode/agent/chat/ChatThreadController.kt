@@ -87,10 +87,15 @@ class ChatThreadController internal constructor(
         if (ChatAttachments.checkMessage(text, attachments.size) != null) return false
         if (!preflight()) return false
         AgentChats.post {
-            if (fresh && reducer.activeRun == null) freshSession()
-            doSend(text, attachments)
+            val old = if (fresh && reducer.activeRun == null) freshSession() else null
+            afterExit(old, 0) { doSend(text, attachments) }
         }
         return true
+    }
+
+    /** /clear: the detached process still holds a guest session slot (nc-gate counts live pids) until it exits; spawn after (≤ 5 s). */
+    private fun afterExit(p: PipeProcess?, tries: Int, then: () -> Unit) {
+        if (p?.isAlive != true || tries >= 25) then() else AgentChats.schedule(200) { afterExit(p, tries + 1, then) }
     }
 
     /** Side chat (t3code `/side`): this thread's first session forks [parentNativeId] (runtime `caps.fork`). */
@@ -313,8 +318,9 @@ class ChatThreadController internal constructor(
     }
 
     /** Detach the live runtime (it closes in the background; its exit and events are ignored) and drop the native id. */
-    private fun freshSession() {
+    private fun freshSession(): PipeProcess? {
         val rt = runtime
+        val old = proc
         if (rt != null) {
             runtime = null; proc = null; entry = null; ready = false; pendingTurn = null
             idleTask?.cancel(false)
@@ -322,6 +328,7 @@ class ChatThreadController internal constructor(
             ChatMcp.release(threadId)
         }
         reducer.freshSession()
+        return old
     }
 
     private fun close(hold: Boolean) {
