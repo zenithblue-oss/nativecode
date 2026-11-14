@@ -53,6 +53,15 @@ class SlashMenuTest {
         assertEquals(SlashMenu.Trigger("rev", atStart = true), SlashMenu.trigger("/rev"))
     }
 
+    @Test fun insertPutsCaretAtEnd() {
+        val s = ComposerState(null)
+        s.input = androidx.compose.ui.text.input.TextFieldValue("/rev", androidx.compose.ui.text.TextRange(2)) // user stopped mid-word
+        s.text = SlashMenu.insert(s.text, provider[2])
+        assertEquals(androidx.compose.ui.text.TextRange(8), s.input.selection) // after "/review " = arg-hint position
+        s.text = s.text + "@src/a.kt "
+        assertEquals(androidx.compose.ui.text.TextRange(s.text.length), s.input.selection)
+    }
+
     @Test fun insertAndGhostHint() {
         val review = provider[2]
         assertEquals("/review ", SlashMenu.insert("/rev", review))

@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -66,7 +68,12 @@ internal data class Pending(val key: Long, val name: String, val uri: Uri?, val 
 
 /** Composer text + chips of one thread; persisted as `threads.draft_json` {text, attachments[]}. */
 internal class ComposerState(draftJson: String?) {
-    var text by mutableStateOf("")
+    /** Field value incl. selection; only the text field's own edits write it directly. */
+    var input by mutableStateOf(TextFieldValue(""))
+    /** Programmatic writes (slash/skill/@file/$skill inserts, restore, clear) put the caret at the end of the new text. */
+    var text: String
+        get() = input.text
+        set(v) { input = TextFieldValue(v, TextRange(v.length)) }
     val chips = mutableStateListOf<Pending>()
     /** NativeCode skills attached to the next message (chip = name; the md goes with the prompt). */
     val skills = mutableStateListOf<SkillBlocks.Block>()
@@ -201,7 +208,7 @@ internal fun Composer(
                 s.chips.forEach { c -> AttachChip(v, t, s, c) }
             }
             BasicTextField(
-                s.text, { s.text = it.take(120_000) },
+                s.input, { s.input =if (it.text.length > 120_000) TextFieldValue(it.text.take(120_000), TextRange(120_000)) else it },
                 Modifier.fillMaxWidth().heightIn(min = 44.dp, max = 168.dp).padding(horizontal = S.m, vertical = S.inset),
                 textStyle = T.body.copy(color = C.on),
                 cursorBrush = SolidColor(C.primary),
