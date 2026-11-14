@@ -133,6 +133,12 @@ class AcpMapper(private val profile: AcpProfile, private val nonce: String, priv
         sink(AgentEvent.ItemUpsert(s.ref, ItemStatus.RUNNING, segPayload(s, null)))
     }
 
+    /** grok `auto_compact_completed` (also after `/compact`): the "Context compacted" divider. */
+    fun compacted(tokensAfter: Long?) {
+        closeSeg()
+        sink(AgentEvent.ItemUpsert("$nonce:$turn:compact${segN++}", ItemStatus.COMPLETED, ItemPayload.Compaction(tokensAfter)))
+    }
+
     private fun segPayload(s: Seg, durationMs: Long?): ItemPayload =
         if (s.reasoning) ItemPayload.Reasoning(s.text.toString(), durationMs) else ItemPayload.AssistantMessage(s.text.toString())
 

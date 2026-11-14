@@ -475,6 +475,7 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
                 u.optJSONObject("usage")?.let { mapper.addUsage(AcpWire.usageOf(it, mapper.usage)) }
                 xaiComplete(u.optString("prompt_id"), u.optString("stop_reason"), null)
             }
+            "auto_compact_completed" -> mapper.compacted(u.optLong("tokens_after").takeIf { it > 0 })
             else -> if (u.optString("sessionUpdate") in setOf("tool_call", "tool_call_update", "agent_message_chunk", "agent_thought_chunk", "plan")) { wake(params); mapper.update(params) }
         }
     }
