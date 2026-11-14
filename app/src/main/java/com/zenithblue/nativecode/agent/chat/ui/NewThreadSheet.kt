@@ -67,7 +67,8 @@ internal fun NewThreadSheet(v: AgentChatView) {
 /** CLI cards from CliToolCatalog + CliCredentialProbe (off main) + FeatureGate. [Chat] only where the tool has a chat runtime. */
 @Composable
 internal fun ToolCards(v: AgentChatView, project: String?) {
-    val defs = remember { CliToolCatalog.forMethod(LinuxCommandBuilder.currentMethod) }
+    // Chat-capable CLIs first; terminal-only ones (qwen, kiro) last. Stable sort keeps catalog order within each group.
+    val defs = remember { CliToolCatalog.forMethod(LinuxCommandBuilder.currentMethod).sortedBy { it.chat == null } }
     val auth by produceState(emptyMap<String, AuthState>()) {
         val home = v.host.guestHome()
         value = withContext(Dispatchers.IO) { defs.associate { it.id to CliCredentialProbe.probe(it.id, home).state } }
@@ -88,6 +89,11 @@ internal fun ToolCards(v: AgentChatView, project: String?) {
                             else AuthLine("Sign in", C.tertiary, link = true) { v.host.openCliLoginPage(def.id) }
                             else -> if (def.loginOptional) AuthLine("Free models", C.onVar) else Text(def.subtitle, color = C.outline, style = T.meta, maxLines = 1)
                         }
+                    }
+                    if (def.chat == null) Row(Modifier.card(C.lowest, C.border).padding(horizontal = S.s, vertical = S.xs),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        NcIcon(Ic.Terminal, null, tint = C.onVar, size = 12.dp)
+                        Label("Terminal only", Modifier.padding(start = S.xs), color = C.onVar, size = 10)
                     }
                     if (locked) Row(Modifier.card(C.tertiary.copy(alpha = 0.1f), C.tertiary.copy(alpha = 0.6f)).padding(horizontal = S.s, vertical = S.xs),
                         verticalAlignment = Alignment.CenterVertically) {
