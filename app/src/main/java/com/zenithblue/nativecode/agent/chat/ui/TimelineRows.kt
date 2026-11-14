@@ -315,7 +315,7 @@ private fun SubagentCard(v: AgentChatView, t: ChatThread, item: TurnItem, childr
             Column(Modifier.weight(1f).padding(start = S.s)) {
                 children.forEach { c ->
                     when (val cp = c.payload) {
-                        is ItemPayload.AssistantMessage -> Text(cp.text, Modifier.padding(vertical = S.xs), color = C.onVar, style = T.bodySm, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                        is ItemPayload.AssistantMessage -> Text(cp.text, Modifier.padding(vertical = S.xs), color = C.onVar, style = T.bodySm)
                         is ItemPayload.Reasoning -> Reasoning(cp, c.status == ItemStatus.RUNNING, Modifier.fillMaxWidth())
                         else -> WorkItem(v, t, c, Modifier.fillMaxWidth(), kids)
                     }
