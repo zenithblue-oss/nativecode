@@ -170,7 +170,7 @@ object NcTasks {
 
     /** Child done: close its process (slot freed, history kept), then wake the parent unless already delivered. */
     private fun settled(ctx: Context, t: Task) {
-        AgentChats.peekController(t.childThreadId)?.stop()
+        AgentChats.peekController(t.childThreadId)?.stopIfIdle()
         val held = synchronized(this) { (awaited[t.id] ?: 0) > 0 }
         if (t.delivered || held || t.cancelRequested) return
         update(t.id) { it.copy(delivered = true) }

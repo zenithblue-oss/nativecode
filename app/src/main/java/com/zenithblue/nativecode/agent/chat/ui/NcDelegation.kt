@@ -109,8 +109,9 @@ private fun ChildBackLink(v: AgentChatView, t: NcTasks.Task, now: Long) {
 
 @Composable
 private fun TaskList(v: AgentChatView, tasks: List<NcTasks.Task>, now: Long) {
-    var open by rememberSaveable { mutableStateOf(true) }
     val active = tasks.count { !it.terminal }
+    // Open while a task runs; folds to one line once all settle, so it stops eating the timeline (keyboard up).
+    var open by rememberSaveable(active > 0) { mutableStateOf(active > 0) }
     Column(Modifier.fillMaxWidth().background(C.lowest)) {
         Row(
             Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "Collapse delegated tasks" else "Expand delegated tasks") { open = !open }

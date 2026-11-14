@@ -87,15 +87,20 @@ class ChatThreadController internal constructor(
         if (ChatAttachments.checkMessage(text, attachments.size) != null) return false
         if (!preflight()) return false
         AgentChats.post {
-            val old = if (fresh && reducer.activeRun == null) freshSession() else null
+            // A closing process (idle release, delegated child settled) would take the turn down with it: respawn after.
+            val old = if (fresh && reducer.activeRun == null) freshSession() else proc.takeIf { closing }
             afterExit(old, 0) { doSend(text, attachments) }
         }
         return true
     }
 
-    /** /clear: the detached process still holds a guest session slot (nc-gate counts live pids) until it exits; spawn after (≤ 5 s). */
+    /**
+     * Run [then] once [p] exited and its exit was handled (onExit clears [proc]), ≤ 5 s. /clear: the detached process still
+     * holds a guest session slot (nc-gate counts live pids); closing: its runtime must be gone so the send respawns.
+     */
     private fun afterExit(p: PipeProcess?, tries: Int, then: () -> Unit) {
-        if (p?.isAlive != true || tries >= 25) then() else AgentChats.schedule(200) { afterExit(p, tries + 1, then) }
+        val busy = p != null && (p.isAlive || p === proc)
+        if (!busy || tries >= 25) then() else AgentChats.schedule(200) { afterExit(p, tries + 1, then) }
     }
 
     /** Side chat (t3code `/side`): this thread's first session forks [parentNativeId] (runtime `caps.fork`). */
@@ -157,6 +162,9 @@ class ChatThreadController internal constructor(
 
     /** Close the process (frees the Free/Pro slot); history stays, queue is held, next send resumes. */
     fun stop() = AgentChats.post { close(hold = true) }
+
+    /** Free the slot of a finished delegated child, unless a newer message (nc_thread_send) already started a turn. */
+    fun stopIfIdle() = AgentChats.post { if (reducer.activeRun == null && reducer.state.queued.isEmpty()) close(hold = true) }
 
     /** "Session ended · Resume": respawn and resume the native session without sending. */
     fun resume(): Boolean {
