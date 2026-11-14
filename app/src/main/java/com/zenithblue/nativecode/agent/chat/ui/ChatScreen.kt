@@ -120,7 +120,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
     )
 
     // Draft persists per thread (debounced, and on leave).
-    LaunchedEffect(threadId, composer.text, composer.chips.size) { delay(800); v.bg { v.backend.setDraft(threadId, composer.draftJson()) } }
+    LaunchedEffect(threadId, composer.text, composer.chips.size, composer.skills.size) { delay(800); v.bg { v.backend.setDraft(threadId, composer.draftJson()) } }
     DisposableEffect(threadId) { onDispose { val j = composer.draftJson(); v.bg { v.backend.setDraft(threadId, j) } } }
 
     val tick by produceState(System.currentTimeMillis(), running) { while (running) { value = System.currentTimeMillis(); delay(1000) } }
@@ -146,7 +146,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
             }
             else -> {
                 // t3code built-ins typed as the whole message run here and are never sent.
-                when (val a = if (atts.isEmpty()) SlashMenu.parse(text) else null) {
+                when (val a = if (atts.isEmpty() && composer.skills.isEmpty()) SlashMenu.parse(text) else null) {
                     SlashMenu.Action.Clear -> if (slashCtx.fresh) { freshArmed = true; composer.clear(); return }
                     SlashMenu.Action.UsageLimits -> { usageSheet = true; composer.clear(); return }
                     is SlashMenu.Action.Model -> {
@@ -154,8 +154,9 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                         if (m != null) {
                             v.bg { v.backend.configure(threadId, ConfigChange(model = m.id)) }
                             Toast.makeText(ctx, "Model: ${m.name.ifBlank { m.id }}", Toast.LENGTH_SHORT).show()
-                        } else v.push(Route.Settings(threadId))
-                        composer.clear(); return
+                            composer.clear()
+                        } else { composer.text = ""; composer.sheet = ComposerSheet.MODEL }
+                        return
                     }
                     is SlashMenu.Action.Side -> if (slashCtx.side) {
                         slashCtx.sideBlocked?.let { Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show(); return }
@@ -164,7 +165,9 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                     }
                     null -> Unit
                 }
-                v.bg { v.backend.send(threadId, text, atts, steer, fresh = freshArmed) }
+                val prompt = composer.prompt() // NativeCode skills ride ahead of the text as context blocks
+                val fresh = freshArmed
+                v.bg { v.backend.send(threadId, prompt, atts, steer, fresh = fresh) }
                 freshArmed = false
             }
         }
@@ -229,8 +232,6 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                     queued = queued.size,
                     forceStop = live?.forceStopAvailable == true || (stopAt > 0 && tick - stopAt >= 10_000),
                     stopping = stopAt > 0,
-                    onStop = { stopAt = System.currentTimeMillis(); v.bg { v.backend.interrupt(threadId) } },
-                    onForceStop = { v.bg { v.backend.forceStop(threadId) } },
                 )
             }
             androidx.compose.animation.AnimatedVisibility(!follow,Modifier.align(Alignment.BottomEnd).padding(S.m), enter = fadeIn(), exit = fadeOut()) {
@@ -296,14 +297,16 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
             running = running && pending == null,
             canSteer = live?.caps?.steer == true,
             context = ContextInfo(usage?.contextUsed, ctxSize, compacting),
-            freeModel = live?.models?.firstOrNull { it.id == (t.model ?: live.defaultModel) }?.free == true,
+            stopping = stopAt > 0,
+            forceStop = live?.forceStopAvailable == true || (stopAt > 0 && tick - stopAt >= 10_000),
             onSend = ::send,
             onStop = { stopAt = System.currentTimeMillis(); v.bg { v.backend.interrupt(threadId) } },
+            onForceStop = { v.bg { v.backend.forceStop(threadId) } },
             onSlash = { c ->
                 val rest = composer.text.substringBeforeLast('\n', "") // the trigger line goes
                 when {
                     c.kind != SlashCommand.Kind.BUILTIN -> composer.text = SlashMenu.insert(composer.text, c)
-                    c.name == "model" -> { composer.text = rest; v.push(Route.Settings(threadId)) }
+                    c.name == "model" -> { composer.text = rest; composer.sheet = ComposerSheet.MODEL }
                     c.name == "side" || c.name == "btw" ->
                         slashCtx.sideBlocked?.let { Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show() } ?: run { composer.text = "/${c.name} " }
                     c.name == "clear" -> { composer.text = rest; freshArmed = true }
@@ -327,7 +330,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                     Text(msg?.text ?: "", Modifier.padding(vertical = S.s), color = C.on, style = T.body, maxLines = 3, overflow = TextOverflow.Ellipsis)
                     Row(horizontalArrangement = Arrangement.spacedBy(S.s)) {
                         NcButton("Send now", primary = true, icon = Ic.ArrowUp) { queueSheet = false; v.bg { v.backend.queueSendNow(threadId, r.id) } }
-                        NcButton("Edit", icon = Ic.Pencil) { queueSheet = false; composer.text = msg?.text.orEmpty(); v.bg { v.backend.queueRemove(threadId, r.id) } }
+                        NcButton("Edit", icon = Ic.Pencil) { queueSheet = false; composer.load(msg?.text.orEmpty()); v.bg { v.backend.queueRemove(threadId, r.id) } }
                         NcButton("Remove", danger = true, icon = Ic.Trash) { v.bg { v.backend.queueRemove(threadId, r.id) } }
                     }
                 }
@@ -458,28 +461,19 @@ internal fun LoadingRows() {
 }
 
 @Composable
-private fun WorkingPill(elapsed: Long, activity: String?, queued: Int, forceStop: Boolean, stopping: Boolean, onStop: () -> Unit, onForceStop: () -> Unit) {
+/** Status only; the one Stop is the composer send button (t3code). */
+private fun WorkingPill(elapsed: Long, activity: String?, queued: Int, forceStop: Boolean, stopping: Boolean) {
     val accent = if (forceStop) C.error else C.primary
     Row(
-        Modifier.brutal(3.dp, if (forceStop) C.errorCon else C.shadowGreen).card(C.low, accent).heightIn(min = 48.dp).padding(start = S.m),
+        Modifier.brutal(3.dp, if (forceStop) C.errorCon else C.shadowGreen).card(C.low, accent).heightIn(min = 48.dp).padding(horizontal = S.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StatusDot(accent, size = 8.dp, pulse = !forceStop)
-        Column(Modifier.padding(horizontal = S.s).widthIn(max = 220.dp).semantics(mergeDescendants = true) {}) {
-            Text(if (forceStop) "Agent not responding" else "Working ${ChatLogic.timer(elapsed)}" + if (queued > 0) " · $queued queued" else "",
+        Column(Modifier.padding(start = S.s).widthIn(max = 260.dp).semantics(mergeDescendants = true) {}) {
+            Text(when { forceStop -> "Agent not responding · tap Force stop"; stopping -> "Stopping…"; else -> "Working ${ChatLogic.timer(elapsed)}" } +
+                if (queued > 0) " · $queued queued" else "",
                 color = if (forceStop) C.error else C.on, style = T.label, maxLines = 1)
             if (!forceStop && activity != null) Text(activity, color = C.onVar, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Box(Modifier.width(1.dp).height(28.dp).background(C.border))
-        Row(
-            Modifier.heightIn(min = 48.dp).clickable(enabled = forceStop || !stopping, onClickLabel = if (forceStop) "Force stop" else "Stop") {
-                if (forceStop) onForceStop() else onStop()
-            }.padding(horizontal = S.m),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (stopping && !forceStop) Spinner(14.dp, C.onVar) else NcIcon(Ic.Stop, null, tint = if (forceStop) C.error else C.on, size = 14.dp)
-            Text(if (forceStop) "FORCE STOP" else if (stopping) "STOPPING" else "STOP", Modifier.padding(start = S.s),
-                color = if (forceStop) C.error else C.on, style = T.overline)
         }
     }
 }

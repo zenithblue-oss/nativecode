@@ -1,0 +1,257 @@
+package com.zenithblue.nativecode.agent.chat.ui
+
+import android.content.ClipboardManager
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import com.zenithblue.nativecode.skills.SkillIcons
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.zenithblue.nativecode.agent.chat.core.ChatThread
+import com.zenithblue.nativecode.agent.chat.core.ConfigChange
+import com.zenithblue.nativecode.agent.chat.core.RuntimeMode
+import com.zenithblue.nativecode.skills.SkillCategory
+import com.zenithblue.nativecode.skills.SkillsCatalog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+
+/** Composer bottom sheets (t3code mobile composer pickers). */
+internal enum class ComposerSheet { MODEL, PLUS, SKILLS, FILES }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ComposerSheets(v: AgentChatView, t: ChatThread, s: ComposerState, onSlash: () -> Unit) {
+    val sheet = s.sheet?.takeIf { it != ComposerSheet.MODEL } ?: return // MODEL = inline menu on the chip
+    val close = { s.sheet = null }
+    ModalBottomSheet(close, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = S.l).padding(bottom = S.l).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(S.s)) {
+            when (sheet) {
+                ComposerSheet.MODEL -> Unit
+                ComposerSheet.PLUS -> PlusSheet(v, t, s, onSlash)
+                ComposerSheet.SKILLS -> SkillSheet(s, close)
+                ComposerSheet.FILES -> FileSheet(v, t, s, close)
+            }
+        }
+    }
+}
+
+/**
+ * Model picker body for the menu anchored to the model chip (t3code ModelPicker popover). A pick applies at once.
+ * ponytail: plain Column (DropdownMenu measures intrinsics, a LazyColumn would crash), so rows are capped at 60; search narrows.
+ */
+@Composable
+internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
+    val live = v.live.value
+    val models = live?.models.orEmpty()
+    val current = t.model ?: live?.defaultModel
+    var q by remember { mutableStateOf("") }
+    Column(Modifier.width(300.dp).padding(horizontal = S.m, vertical = S.xs), verticalArrangement = Arrangement.spacedBy(S.xs)) {
+        Overline("Model · ${t.tool}", color = C.outline)
+        if (models.isEmpty()) {
+            Text(current ?: "Default model", color = C.on, style = T.codeSm)
+            if (live?.alive == true) Text("Loading models…", color = C.outline, style = T.meta)
+            else {
+                Text("Start the session to load the model list (uses an AI session slot).", color = C.outline, style = T.meta)
+                NcButton("Load models", icon = Ic.Retry) { v.bg { v.backend.resume(t.id) } }
+            }
+            return@Column
+        }
+        if (models.size > 8) SearchField(q, { q = it }, "Search ${models.size} models")
+        val hits = models.filter { q.isBlank() || it.name.contains(q, true) || it.id.contains(q, true) }
+        hits.take(60).forEach { m ->
+            val on = m.id == current
+            Row(
+                Modifier.fillMaxWidth().selectable(on, role = Role.RadioButton) { if (!on) v.bg { v.backend.configure(t.id, ConfigChange(model = m.id)) }; close() }
+                    .background(if (on) C.primary.copy(alpha = 0.08f) else C.low).heightIn(min = 48.dp).padding(horizontal = S.s, vertical = S.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Ring(if (on) C.primary else C.outline, size = 14.dp, filled = on)
+                Column(Modifier.weight(1f).padding(horizontal = S.s)) {
+                    Text(m.name.ifBlank { m.id }, color = C.on, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(m.id, m.contextLimit?.let { "${ChatLogic.tokens(it)} ctx" }).joinToString(" · "),
+                        color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (m.free) FreeBadge()
+            }
+        }
+        if (hits.size > 60) Text("${hits.size - 60} more · search to narrow", color = C.outline, style = T.meta)
+        if (hits.isEmpty()) Text("No model matches.", color = C.outline, style = T.bodySm)
+    }
+}
+
+@Composable
+internal fun FreeBadge() = Box(Modifier.background(C.primary.copy(alpha = 0.14f)).padding(horizontal = S.s, vertical = S.xs)) {
+    Label("FREE", color = C.primary, size = 10, bold = true)
+}
+
+/** "+": labeled actions; rows the CLI cannot use are hidden. */
+@Composable
+private fun PlusSheet(v: AgentChatView, t: ChatThread, s: ComposerState, onSlash: () -> Unit) {
+    val ctx = LocalContext.current
+    val caps = v.live.value?.caps
+    val cm = remember { ctx.getSystemService(ClipboardManager::class.java) }
+    val clipImage = remember { runCatching { cm?.primaryClipDescription?.hasMimeType("image/*") == true }.getOrDefault(false) }
+    Text("Add to message", color = C.on, style = T.title)
+    if (caps?.images != false) SheetRow(Ic.Image, "Photo", "Attach an image from the gallery") { s.sheet = null; v.host.pickImage { s.add(v, t, it, true) } }
+    if (clipImage && caps?.images != false) SheetRow(Ic.ClipboardList, "Clipboard image", "Attach the image you copied") {
+        s.sheet = null
+        runCatching { cm?.primaryClip?.getItemAt(0)?.uri }.getOrNull()?.let { s.add(v, t, it, true) }
+    }
+    SheetRow(Ic.FileText, "File or document", "Copy a file into the project and attach it") { s.sheet = null; v.host.pickFile { s.add(v, t, it, false) } }
+    SheetRow(Ic.AtSign, "Mention project file", "Search the workspace, insert @path") { s.sheet = ComposerSheet.FILES }
+    SheetRow(Ic.SquareSlash, "Slash command", "Browse ${t.tool} commands") { s.sheet = null; onSlash() }
+    SheetRow(Ic.BookOpen, "NativeCode skills", "Attach a skill guide to this message") { s.sheet = ComposerSheet.SKILLS }
+}
+
+@Composable
+private fun SkillSheet(s: ComposerState, close: () -> Unit) {
+    val byCat = remember { SkillCategory.entries.associateWith { SkillsCatalog.skills(it) } }
+    var cat by remember { mutableStateOf<SkillCategory?>(null) }
+    var q by remember { mutableStateOf("") }
+    Text("NativeCode skills", color = C.on, style = T.title)
+    SearchField(q, { q = it }, "Search skills")
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.s)) {
+        Chip("All", on = cat == null) { cat = null }
+        SkillCategory.entries.forEach { c -> Chip(c.title, on = cat == c, icon = skillIcon(c)) { cat = c } }
+    }
+    val pool = cat?.let { byCat.getValue(it).map { sk -> it to sk } } ?: byCat.flatMap { (c, l) -> l.map { c to it } }
+    val hits = SkillsCatalog.matching(q, pool.map { it.second }).toSet()
+    val shown = pool.filter { it.second in hits }
+    if (shown.isEmpty()) Text("No skill matches.", color = C.outline, style = T.bodySm)
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp)) {
+        items(shown, key = { it.second.id }) { (c, sk) ->
+            val ctx = LocalContext.current
+            val logo by produceState<ImageBitmap?>(null, sk.id) {
+                value = withContext(Dispatchers.IO) { SkillIcons.decode(ctx, SkillIcons.file(sk.id))?.asImageBitmap() }
+            }
+            SheetRow(skillIcon(c), sk.title, sk.summary, on = s.skills.any { it.name == sk.title }, logo = logo) { s.addSkill(sk.title, sk.body); close() }
+        }
+    }
+}
+
+internal fun skillIcon(c: SkillCategory): ImageVector = when (c) {
+    SkillCategory.INBUILT -> Ic.Sparkles
+    SkillCategory.PROJECT -> Ic.Wrench
+    SkillCategory.INSTALL -> Ic.Download
+}
+
+private val SKIP_DIRS = setOf("node_modules", "build", "dist", "target", "__pycache__", "venv")
+
+/** Workspace files relative to the thread cwd (host side of the guest rootfs); hidden and build dirs skipped. */
+private fun workspaceFiles(root: File): List<String> = runCatching {
+    root.walkTopDown().maxDepth(12)
+        .onEnter { it == root || (!it.name.startsWith(".") && it.name !in SKIP_DIRS) }
+        .filter { it.isFile }.take(20_000).map { it.relativeTo(root).path }.toList()
+}.getOrDefault(emptyList())
+
+@Composable
+private fun FileSheet(v: AgentChatView, t: ChatThread, s: ComposerState, close: () -> Unit) {
+    val root = remember(t.cwd) { File(v.host.guestHome().path.removeSuffix(AgentChatView.HOME) + t.cwd) }
+    val files by produceState<List<String>?>(null, root) { value = withContext(Dispatchers.IO) { workspaceFiles(root) } }
+    var q by remember { mutableStateOf("") }
+    Text("Mention project file", color = C.on, style = T.title)
+    SearchField(q, { q = it }, "Search files in ${ChatLogic.baseName(t.cwd).ifEmpty { "~" }}")
+    val all = files
+    if (all == null) { Spinner(18.dp); return }
+    val hits = all.filter { q.isBlank() || it.contains(q.trim(), true) }
+        .sortedWith(compareBy({ !it.substringAfterLast('/').startsWith(q.trim(), true) }, { it.length })).take(100)
+    if (hits.isEmpty()) Text(if (all.isEmpty()) "No files in this folder." else "No file matches.", color = C.outline, style = T.bodySm)
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp)) {
+        items(hits, key = { it }) { p ->
+            SheetRow(Ic.FileText, p.substringAfterLast('/'), p.substringBeforeLast('/', "./")) {
+                val sep = if (s.text.isEmpty() || s.text.last().isWhitespace()) "" else " "
+                s.text = s.text + sep + "@" + p + " "
+                close()
+            }
+        }
+    }
+}
+
+/** Sheet row: icon tile, title, one-line subtitle; [on] = selected. */
+@Composable
+private fun SheetRow(icon: ImageVector, title: String, subtitle: String, on: Boolean = false, logo: ImageBitmap? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = title, onClick = onClick).heightIn(min = 56.dp).padding(vertical = S.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(40.dp).card(C.low, if (on) C.primary else C.border), contentAlignment = Alignment.Center) {
+            if (logo != null) Image(logo, null, Modifier.size(24.dp)) else NcIcon(icon, null, tint = if (on) C.primary else C.onVar, size = 18.dp)
+        }
+        Column(Modifier.weight(1f).padding(start = S.m)) {
+            Text(title, color = C.on, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (on) NcIcon(Ic.Check, "Added", tint = C.primary, size = 16.dp)
+    }
+}
+
+@Composable
+private fun SearchField(q: String, onQ: (String) -> Unit, hint: String) {
+    Row(Modifier.fillMaxWidth().card(C.lowest).heightIn(min = 44.dp).padding(horizontal = S.m), verticalAlignment = Alignment.CenterVertically) {
+        NcIcon(Ic.Search, null, tint = C.outline, size = 16.dp)
+        BasicTextField(q, onQ, Modifier.weight(1f).padding(start = S.s), singleLine = true, textStyle = T.body.copy(color = C.on),
+            cursorBrush = SolidColor(C.primary),
+            decorationBox = { inner -> Box { if (q.isEmpty()) Text(hint, color = C.outline, style = T.body); inner() } })
+        if (q.isNotEmpty()) IconBtn(Ic.Close, "Clear search", tint = C.onVar, size = 14.dp, box = 36.dp) { onQ("") }
+    }
+}
+
+/** Approval modes: icon + one-line description (composer menu and thread settings). */
+internal fun modeIcon(m: RuntimeMode): ImageVector = when (m) {
+    RuntimeMode.APPROVAL_REQUIRED -> Ic.ShieldCheck
+    RuntimeMode.AUTO_ACCEPT_EDITS -> Ic.Pencil
+    RuntimeMode.AUTO -> Ic.Zap
+    RuntimeMode.FULL_ACCESS -> Ic.ShieldAlert
+}
+
+internal fun modeHint(m: RuntimeMode) = when (m) {
+    RuntimeMode.APPROVAL_REQUIRED -> "Asks before edits and commands"
+    RuntimeMode.AUTO_ACCEPT_EDITS -> "Edits freely, asks before commands"
+    RuntimeMode.AUTO -> "Asks only for risky actions"
+    RuntimeMode.FULL_ACCESS -> "Never asks: runs every command and edit"
+}
+
+@Composable
+internal fun FullAccessDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) = AlertDialog(
+    onDismissRequest = onDismiss, containerColor = C.low, shape = Square,
+    icon = { NcIcon(Ic.ShieldAlert, null, tint = C.tertiary, size = 24.dp) },
+    title = { Text("Full access?", style = T.title, color = C.on) },
+    text = { Text("The agent runs every command and edit without asking. Use only in a project you can restore.", style = T.bodySm, color = C.onVar) },
+    confirmButton = { NcButton("Allow full access", danger = true) { onConfirm(); onDismiss() } },
+    dismissButton = { NcButton("Cancel", onClick = onDismiss) },
+)

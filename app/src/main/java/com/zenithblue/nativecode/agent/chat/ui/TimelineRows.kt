@@ -142,7 +142,9 @@ internal fun UserBubble(p: ItemPayload.UserMessage, at: Long, modifier: Modifier
     val ctx = LocalContext.current
     var expanded by rememberSaveable { mutableStateOf(false) }
     var stamp by remember { mutableStateOf(false) }
-    val (folded, isFolded) = remember(p.text) { ChatLogic.fold(p.text) }
+    val (skills, own) = remember(p.text) { com.zenithblue.nativecode.agent.chat.core.SkillBlocks.split(p.text) }
+    var skillOpen by rememberSaveable { mutableStateOf<String?>(null) }
+    val (folded, isFolded) = remember(own) { ChatLogic.fold(own) }
     val maxW = (LocalConfiguration.current.screenWidthDp * 0.85f).dp
     Column(modifier, horizontalAlignment = Alignment.End) {
         Column(
@@ -158,7 +160,25 @@ internal fun UserBubble(p: ItemPayload.UserMessage, at: Long, modifier: Modifier
             if (p.attachments.isNotEmpty()) Row(Modifier.padding(bottom = S.s).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
                 p.attachments.forEach { AttachmentThumb(it) }
             }
-            Text(if (expanded || !isFolded) p.text else folded, color = C.on, style = T.body)
+            if (skills.isNotEmpty()) Row(Modifier.padding(bottom = S.s).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
+                skills.forEach { k ->
+                    val on = skillOpen == k.name
+                    Row(
+                        Modifier.heightIn(min = 32.dp).card(C.container, if (on) C.primary else C.tertiary)
+                            .clickable(onClickLabel = if (on) "Hide skill ${k.name}" else "Show skill ${k.name}") { skillOpen = if (on) null else k.name }
+                            .padding(horizontal = S.s),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        NcIcon(Ic.BookOpen, null, tint = C.tertiary, size = 14.dp)
+                        Text(k.name, Modifier.padding(horizontal = S.gap).widthIn(max = 180.dp), color = C.on, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Chevron(on, size = 12.dp)
+                    }
+                }
+            }
+            skills.firstOrNull { it.name == skillOpen }?.let { k ->
+                Markdown(k.body, streaming = false, modifier = Modifier.padding(bottom = S.s).heightIn(max = 360.dp).verticalScroll(rememberScrollState()))
+            }
+            if (own.isNotBlank()) Text(if (expanded || !isFolded) own else folded, color = C.on, style = T.body)
             if (isFolded) Text(if (expanded) "Show less" else "Show more", Modifier.clickable { expanded = !expanded }.padding(top = S.xs),
                 color = C.primary, style = T.label)
         }

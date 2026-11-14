@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenuItem
@@ -183,6 +184,7 @@ internal fun Chip(
     val fg = if (on) C.primary else color
     Row(
         modifier
+            .widthIn(max = 280.dp) // bounded: the weighted label collapses to 0 inside a horizontalScroll row
             .heightIn(min = 32.dp)
             .background(if (on) C.primary.copy(alpha = 0.14f) else C.low)
             .border(1.dp, if (on) C.primary else C.border)

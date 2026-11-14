@@ -20,7 +20,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -143,7 +142,7 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
                             .card(if (on) C.primary.copy(alpha = 0.08f) else C.bg, if (on) C.primary else C.border).heightIn(min = 52.dp).padding(horizontal = S.m, vertical = S.s),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        NcIcon(if (full) Ic.ShieldAlert else Ic.ShieldCheck, null, tint = if (full) C.tertiary else if (on) C.primary else C.outline, size = 18.dp)
+                        NcIcon(modeIcon(m), null, tint = if (full) C.tertiary else if (on) C.primary else C.outline, size = 18.dp)
                         Column(Modifier.weight(1f).padding(horizontal = S.m)) {
                             Text(m.label, color = C.on, style = T.body)
                             Text(modeHint(m), color = C.outline, style = T.meta)
@@ -221,21 +220,7 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
             }
         }
     }
-    if (confirmFull) AlertDialog(
-        onDismissRequest = { confirmFull = false }, containerColor = C.low, shape = Square,
-        icon = { NcIcon(Ic.ShieldAlert, null, tint = C.tertiary, size = 24.dp) },
-        title = { Text("Full access?", style = T.title, color = C.on) },
-        text = { Text("The agent runs every command and edit without asking. Use only in a project you can restore.", style = T.bodySm, color = C.onVar) },
-        confirmButton = { NcButton("Allow full access", danger = true) { cfg(ConfigChange(runtimeMode = RuntimeMode.FULL_ACCESS)); confirmFull = false } },
-        dismissButton = { NcButton("Cancel") { confirmFull = false } },
-    )
-}
-
-private fun modeHint(m: RuntimeMode) = when (m) {
-    RuntimeMode.APPROVAL_REQUIRED -> "Asks before commands and edits"
-    RuntimeMode.AUTO_ACCEPT_EDITS -> "Edits freely, asks before commands"
-    RuntimeMode.AUTO -> "Asks only for risky actions"
-    RuntimeMode.FULL_ACCESS -> "Never asks"
+    if (confirmFull) FullAccessDialog({ confirmFull = false }) { cfg(ConfigChange(runtimeMode = RuntimeMode.FULL_ACCESS)) }
 }
 
 @Composable

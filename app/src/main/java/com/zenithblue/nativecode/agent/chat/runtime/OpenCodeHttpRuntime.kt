@@ -317,10 +317,11 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
             }
         }
         // `$skill` mentions → prompt `skills` (t3 `skillsMentioned`: re-list once when one is unknown).
-        val mentions = OpenCodeSlash.skillMentions(text)
+        val own = com.zenithblue.nativecode.agent.chat.core.SkillBlocks.split(text).second // not `$VAR`s inside attached skill md
+        val mentions = OpenCodeSlash.skillMentions(own)
         if (mentions.any { m -> commands.none { it.kind == SlashCommand.Kind.SKILL && it.name == m } }) refreshCommands()
         val body = OpenCodeWire.promptBody(id, turn, steer)
-        OpenCodeSlash.skillAttachments(text, commands)?.let { body.put("skills", it) }
+        OpenCodeSlash.skillAttachments(own, commands)?.let { body.put("skills", it) }
         api.call("POST", "$s/prompt", body)
     }
 

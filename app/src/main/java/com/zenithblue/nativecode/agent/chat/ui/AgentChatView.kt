@@ -203,7 +203,7 @@ class AgentChatView(
                     val last = runs.lastOrNull { it.status != com.zenithblue.nativecode.agent.chat.core.RunStatus.QUEUED }
                     val stat = last?.diffStat.orEmpty()
                     val preview = backend.items(t.id, 8).lastOrNull { it.payload is ItemPayload.AssistantMessage || it.payload is ItemPayload.UserMessage }?.payload?.let { p ->
-                        ((p as? ItemPayload.AssistantMessage)?.text ?: (p as ItemPayload.UserMessage).text).lineSequence().firstOrNull { it.isNotBlank() }
+                        ((p as? ItemPayload.AssistantMessage)?.text ?: com.zenithblue.nativecode.agent.chat.core.SkillBlocks.plain((p as ItemPayload.UserMessage).text)).lineSequence().firstOrNull { it.isNotBlank() }
                             ?.trim()?.trimStart('#', '>', '-', '*', ' ')?.take(200)?.let { Md.inline(it).text }
                     }?.takeUnless { it.startsWith(t.title.take(40)) } // the first prompt is already the title
                     ThreadRow(t, ChatLogic.status(t, last, backend.openRequests(t.id)), last, stat.sumOf { it.add }, stat.sumOf { it.del }, preview)

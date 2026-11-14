@@ -510,6 +510,6 @@ class ChatReducer(
         const val OUTPUT_TAIL = 64 * 1024
         private val OPEN_ITEM = setOf(ItemStatus.PENDING, ItemStatus.RUNNING, ItemStatus.WAITING)
 
-        fun titleOf(prompt: String): String = prompt.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }?.take(60) ?: DEFAULT_TITLE
+        fun titleOf(prompt: String): String = com.zenithblue.nativecode.agent.chat.core.SkillBlocks.plain(prompt).lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }?.take(60) ?: DEFAULT_TITLE
     }
 }

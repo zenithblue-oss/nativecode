@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,7 +54,10 @@ import androidx.compose.ui.unit.dp
 import com.zenithblue.nativecode.agent.chat.core.ChatAttachment
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.RuntimeMode
+import com.zenithblue.nativecode.agent.chat.core.ConfigChange
+import com.zenithblue.nativecode.agent.chat.core.SkillBlocks
 import com.zenithblue.nativecode.agent.chat.core.SlashCommand
+import com.zenithblue.nativecode.skills.SkillsCatalog
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -64,6 +68,9 @@ internal data class Pending(val key: Long, val name: String, val uri: Uri?, val 
 internal class ComposerState(draftJson: String?) {
     var text by mutableStateOf("")
     val chips = mutableStateListOf<Pending>()
+    /** NativeCode skills attached to the next message (chip = name; the md goes with the prompt). */
+    val skills = mutableStateListOf<SkillBlocks.Block>()
+    var sheet by mutableStateOf<ComposerSheet?>(null)
 
     init {
         runCatching {
@@ -74,20 +81,35 @@ internal class ComposerState(draftJson: String?) {
                 val att = ChatAttachment(j.getString("name"), j.optString("mime"), j.optLong("size"), j.optString("guestPath").ifEmpty { null }, j.optString("hostPath").ifEmpty { null })
                 chips += Pending(System.nanoTime(), att.name, null, att.isImage, att)
             }
+            val sk = o.optJSONArray("skills") ?: JSONArray()
+            for (i in 0 until sk.length()) sk.getJSONObject(i).let { skills += SkillBlocks.Block(it.getString("name"), it.getString("body")) }
         }
     }
 
     val ready: List<ChatAttachment> get() = chips.mapNotNull { it.att }
     val busy: Boolean get() = chips.any { it.att == null && it.error == null }
 
-    fun draftJson(): String? {
-        if (text.isEmpty() && ready.isEmpty()) return null
-        val a = JSONArray()
-        ready.forEach { a.put(JSONObject().put("name", it.name).put("mime", it.mime).put("size", it.sizeBytes).put("guestPath", it.guestPath ?: "").put("hostPath", it.hostPath ?: "")) }
-        return JSONObject().put("text", text).put("attachments", a).toString()
+    fun addSkill(name: String, body: String) { if (skills.none { it.name == name }) skills += SkillBlocks.Block(name, body) }
+
+    /** Prompt as sent: skill blocks first, then the typed text. */
+    fun prompt(): String = SkillBlocks.wrap(skills, text.trim())
+
+    /** Load a stored message back (queue Edit): skill blocks become chips again. */
+    fun load(message: String) {
+        val (b, rest) = SkillBlocks.split(message)
+        skills.clear(); skills += b; text = rest
     }
 
-    fun clear() { text = ""; chips.clear() }
+    fun draftJson(): String? {
+        if (text.isEmpty() && ready.isEmpty() && skills.isEmpty()) return null
+        val a = JSONArray()
+        ready.forEach { a.put(JSONObject().put("name", it.name).put("mime", it.mime).put("size", it.sizeBytes).put("guestPath", it.guestPath ?: "").put("hostPath", it.hostPath ?: "")) }
+        val sk = JSONArray()
+        skills.forEach { sk.put(JSONObject().put("name", it.name).put("body", it.body)) }
+        return JSONObject().put("text", text).put("attachments", a).put("skills", sk).toString()
+    }
+
+    fun clear() { text = ""; chips.clear(); skills.clear() }
 }
 
 /** Copy a pick into the thread cwd and track its chip. */
@@ -103,7 +125,10 @@ internal fun ComposerState.add(v: AgentChatView, t: ChatThread, uri: Uri, image:
 /** Context window: tokens used / max; [compacting] = compaction running now. */
 internal data class ContextInfo(val used: Long?, val size: Long?, val compacting: Boolean)
 
-/** Multiline composer card: IME Enter = newline. Slash popup, attach, model + mode chips, context ring, send / stop. */
+/**
+ * Multiline composer card: IME Enter = newline. Slash popup, "+" action sheet, model / effort / mode chips (inline
+ * pickers, applied at once), context ring, send button that turns into the one Stop while a turn runs (t3code).
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun Composer(
@@ -116,35 +141,59 @@ internal fun Composer(
     running: Boolean,
     canSteer: Boolean,
     context: ContextInfo,
-    freeModel: Boolean,
+    stopping: Boolean,
+    forceStop: Boolean,
     onSend: (steer: Boolean) -> Unit,
     onStop: () -> Unit,
+    onForceStop: () -> Unit,
     onSlash: (SlashCommand) -> Unit,
 ) {
-    var plus by remember { mutableStateOf(false) }
     var sendMenu by remember { mutableStateOf(false) }
+    var effortMenu by remember { mutableStateOf(false) }
+    var modeMenu by remember { mutableStateOf(false) }
+    var confirmFull by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val focus = remember { MutableInteractionSource() }
     val focused by focus.collectIsFocusedAsState()
+    val catalog = remember { SkillsCatalog.all() }
+    val live = v.live.value
+    val currentModel = t.model ?: live?.defaultModel
+    val model = live?.models?.firstOrNull { it.id == currentModel }
+    val efforts = if (live?.caps?.effort == true) model?.variants.orEmpty() else emptyList()
+    fun cfg(c: ConfigChange) = v.bg { v.backend.configure(t.id, c) }
     Column(Modifier.fillMaxWidth().background(C.lowest)) {
         Hairline()
         val trigger = SlashMenu.trigger(s.text)
         if (trigger != null) {
             val hits = SlashMenu.items(commands, slashCtx, trigger, bare = s.chips.isEmpty())
             val (cmds, skills) = hits.partition { it.kind != SlashCommand.Kind.SKILL }
-            if (hits.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().padding(start = S.m, end = S.m, top = S.s).heightIn(max = 260.dp).brutal(3.dp).card(C.low)) {
+            val nc = SkillsCatalog.matching(trigger.query.removePrefix("skill:"), catalog)
+            if (hits.isNotEmpty() || nc.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().padding(start = S.m, end = S.m, top = S.s).heightIn(max = 260.dp).brutal(3.dp).card(C.low)) {
                 items(cmds, key = { "c:" + it.name }) { c -> SlashRow(c, "/" + c.name) { onSlash(c) } }
                 if (skills.isNotEmpty()) item("skills") {
                     Overline("Skills", Modifier.padding(start = S.m, end = S.m, top = S.s, bottom = S.xs), color = C.outline)
                 }
                 items(skills, key = { "s:" + it.name }) { c -> SlashRow(c, "/skill:" + c.name) { onSlash(c) } }
+                if (nc.isNotEmpty()) item("nc") {
+                    Overline("NativeCode skills", Modifier.padding(start = S.m, end = S.m, top = S.s, bottom = S.xs), color = C.outline)
+                }
+                items(nc, key = { "n:" + it.id }) { sk ->
+                    Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Attach skill ${sk.title}") {
+                        s.text = s.text.substringBeforeLast('\n', ""); s.addSkill(sk.title, sk.body)
+                    }.heightIn(min = 44.dp).padding(horizontal = S.m, vertical = S.gap), verticalAlignment = Alignment.CenterVertically) {
+                        NcIcon(Ic.BookOpen, null, tint = C.tertiary, size = 14.dp)
+                        Text(sk.title, Modifier.padding(start = S.s), color = C.primary, style = T.codeSm, maxLines = 1)
+                        Text(sk.summary, Modifier.weight(1f).padding(start = S.m), color = C.onVar, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
             }
         }
         Column(
             Modifier.fillMaxWidth().padding(horizontal = S.m, vertical = S.s).card(C.low, if (focused) C.primary else C.border).animateContentSize(),
         ) {
-            if (s.chips.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = S.s, end = S.s, top = S.s),
+            if (s.chips.isNotEmpty() || s.skills.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = S.s, end = S.s, top = S.s),
                 horizontalArrangement = Arrangement.spacedBy(S.gap)) {
+                s.skills.forEach { k -> SkillChip(s, k) }
                 s.chips.forEach { c -> AttachChip(v, t, s, c) }
             }
             BasicTextField(
@@ -167,42 +216,77 @@ internal fun Composer(
                 },
             )
             Row(Modifier.fillMaxWidth().padding(start = S.xs, end = S.xs, bottom = S.xs), verticalAlignment = Alignment.CenterVertically) {
-                Box {
-                    IconBtn(Ic.Plus, "Attach a photo or file", tint = C.onVar, box = 40.dp) { plus = true }
-                    DropdownMenu(plus, { plus = false }, containerColor = C.low) {
-                        MItem("Photo", Ic.Image) { plus = false; v.host.pickImage { s.add(v, t, it, true) } }
-                        MItem("File", Ic.FileText) { plus = false; v.host.pickFile { s.add(v, t, it, false) } }
+                IconBtn(Ic.Plus, "Add photo, file, @file, command or skill", tint = C.onVar, box = 40.dp) { s.sheet = ComposerSheet.PLUS }
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
+                    val modelName = model?.name?.ifBlank { null } ?: currentModel?.substringAfterLast('/') ?: "Default model"
+                    Box {
+                        Chip(
+                            modelName + if (model?.free == true) " · free" else "",
+                            Modifier.widthIn(max = 200.dp).semantics { contentDescription = "Model $modelName${if (model?.free == true) ", free" else ""}. Change model" },
+                            icon = Ic.Bot, trailing = Ic.ChevronDown,
+                        ) { s.sheet = ComposerSheet.MODEL }
+                        DropdownMenu(s.sheet == ComposerSheet.MODEL, { s.sheet = null }, containerColor = C.low) {
+                            ModelMenu(v, t) { s.sheet = null }
+                        }
+                    }
+                    if (efforts.isNotEmpty()) Box {
+                        val e = t.effort ?: "Effort"
+                        Chip(e, Modifier.semantics { contentDescription = "Reasoning effort $e. Change effort" }, icon = Ic.Lightbulb, trailing = Ic.ChevronDown) { effortMenu = true }
+                        DropdownMenu(effortMenu, { effortMenu = false }, containerColor = C.low) {
+                            Overline("Reasoning effort", Modifier.padding(horizontal = S.l, vertical = S.xs), color = C.outline)
+                            efforts.forEach { x ->
+                                DropdownMenuItem(
+                                    text = { Text(x, style = T.bodySm, color = C.on) },
+                                    onClick = { effortMenu = false; cfg(ConfigChange(effort = x)) },
+                                    trailingIcon = if (x == t.effort) ({ NcIcon(Ic.Check, "Selected", tint = C.primary, size = 16.dp) }) else null,
+                                )
+                            }
+                        }
+                    }
+                    Box {
+                        val full = t.runtimeMode == RuntimeMode.FULL_ACCESS
+                        Chip(
+                            t.runtimeMode.label, Modifier.semantics { contentDescription = "Access mode ${t.runtimeMode.label}. Change mode" },
+                            color = if (full) C.tertiary else C.onVar, icon = modeIcon(t.runtimeMode), trailing = Ic.ChevronDown,
+                        ) { modeMenu = true }
+                        DropdownMenu(modeMenu, { modeMenu = false }, containerColor = C.low) {
+                            (live?.caps?.modes ?: RuntimeMode.entries).forEach { m ->
+                                val on = m == t.runtimeMode
+                                DropdownMenuItem(
+                                    text = {
+                                        Column(Modifier.padding(vertical = S.xs)) {
+                                            Text(m.label, style = T.body, color = C.on)
+                                            Text(modeHint(m), style = T.meta, color = C.outline)
+                                        }
+                                    },
+                                    onClick = { modeMenu = false; if (m == RuntimeMode.FULL_ACCESS && !on) confirmFull = true else cfg(ConfigChange(runtimeMode = m)) },
+                                    leadingIcon = { NcIcon(modeIcon(m), null, tint = if (m == RuntimeMode.FULL_ACCESS) C.tertiary else if (on) C.primary else C.onVar, size = 18.dp) },
+                                    trailingIcon = if (on) ({ NcIcon(Ic.Check, "Selected", tint = C.primary, size = 16.dp) }) else null,
+                                )
+                            }
+                        }
                     }
                 }
-                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
-                    Chip(
-                        listOfNotNull(t.model?.substringAfterLast('/') ?: "Default model", t.effort, "free".takeIf { freeModel }).joinToString(" · "),
-                        Modifier.widthIn(max = 200.dp).semantics { contentDescription = "Model ${t.model ?: "default"}, change" },
-                        icon = Ic.Bot, trailing = Ic.ChevronDown,
-                    ) { v.push(Route.Settings(t.id)) }
-                    Chip(
-                        t.runtimeMode.label, Modifier.semantics { contentDescription = "Approval mode ${t.runtimeMode.label}, change" },
-                        color = if (t.runtimeMode == RuntimeMode.FULL_ACCESS) C.tertiary else C.onVar,
-                        icon = if (t.runtimeMode == RuntimeMode.FULL_ACCESS) Ic.ShieldAlert else Ic.ShieldCheck,
-                    ) { v.push(Route.Settings(t.id)) }
-                }
                 ContextRing(context)
-                val canSend = (s.text.isNotBlank() || s.ready.isNotEmpty()) && !s.busy
+                val canSend = (s.text.isNotBlank() || s.ready.isNotEmpty() || s.skills.isNotEmpty()) && !s.busy
                 val stop = !canSend && running
+                val label = when { stop && forceStop -> "Force stop"; stop -> "Stop"; running && canSteer -> "Steer now"; running -> "Queue message"; else -> "Send" }
                 Box(Modifier.padding(start = S.xs)) {
                     Box(
                         Modifier.size(40.dp).background(if (canSend) C.primary else if (stop) C.errorCon else C.high)
                             .combinedClickable(
                                 role = Role.Button,
-                                onClickLabel = when { stop -> "Stop"; running && canSteer -> "Steer"; running -> "Queue"; else -> "Send" },
+                                enabled = !(stop && stopping && !forceStop),
+                                onClickLabel = label,
                                 onLongClick = { if (running && canSend && canSteer) { haptics.performHapticFeedback(HapticFeedbackType.LongPress); sendMenu = true } },
-                                onClick = { if (canSend) onSend(running && canSteer) else if (running) onStop() },
+                                onClick = { if (canSend) onSend(running && canSteer) else if (running) { if (forceStop) onForceStop() else onStop() } },
                             )
-                            .semantics { contentDescription = when { stop -> "Stop"; running && canSteer -> "Steer now"; running -> "Queue message"; else -> "Send" } },
+                            .semantics { contentDescription = label },
                         contentAlignment = Alignment.Center,
                     ) {
                         when {
-                            stop -> NcIcon(Ic.Stop, null, tint = C.on, size = 16.dp)
+                            stop && stopping && !forceStop -> Spinner(16.dp, C.on)
+                            stop -> NcIcon(Ic.Stop, null, tint = if (forceStop) C.error else C.on, size = 16.dp)
                             running && canSend && !canSteer -> NcIcon(Ic.Clock, null, tint = C.onPrimary, size = 18.dp)
                             else -> NcIcon(Ic.ArrowUp, null, tint = if (canSend) C.onPrimary else C.outline, size = 20.dp)
                         }
@@ -214,6 +298,21 @@ internal fun Composer(
                 }
             }
         }
+    }
+    ComposerSheets(v, t, s) {
+        val sep = if (s.text.isEmpty() || s.text.endsWith("\n")) "" else "\n"
+        s.text = s.text + sep + "/"
+    }
+    if (confirmFull) FullAccessDialog({ confirmFull = false }) { cfg(ConfigChange(runtimeMode = RuntimeMode.FULL_ACCESS)) }
+}
+
+/** Attached NativeCode skill: name only; the md stays out of the text field. */
+@Composable
+private fun SkillChip(s: ComposerState, k: SkillBlocks.Block) {
+    Row(Modifier.heightIn(min = 32.dp).card(C.container, C.tertiary).padding(start = S.s), verticalAlignment = Alignment.CenterVertically) {
+        NcIcon(Ic.BookOpen, null, tint = C.tertiary, size = 14.dp)
+        Text(k.name, Modifier.padding(start = S.gap).widthIn(max = 180.dp), color = C.on, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        IconBtn(Ic.Close, "Remove skill ${k.name}", tint = C.onVar, size = 14.dp, box = 36.dp) { s.skills.remove(k) }
     }
 }
 
