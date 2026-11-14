@@ -103,7 +103,10 @@ class ChatStore(ctx: Context) {
         val now = System.currentTimeMillis()
         val t = ChatThread(UUID.randomUUID().toString(), projectPath, cwd, tool, title, null, model, effort, runtimeMode, interactionMode,
             createdAt = now, updatedAt = now)
-        apply(ChatWrite.PutThread(t))
+        // Committed before returning: callers read it back at once (AgentChats.controller). Never call from the writer thread.
+        val done = java.util.concurrent.CountDownLatch(1)
+        apply(listOf(ChatWrite.PutThread(t))) { done.countDown() }
+        done.await(5, java.util.concurrent.TimeUnit.SECONDS)
         return t
     }
 

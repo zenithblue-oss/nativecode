@@ -69,7 +69,7 @@ class ChatThreadController internal constructor(
             .mapNotNull { r -> store.itemsOfRun(threadId, r.id).firstOrNull { it.payload is ItemPayload.UserMessage }?.let { QueuedMessage(r, it) } }
         val stale = store.openRequests(threadId).filter { it.kind == RequestKind.USER_INPUT }
         reducer = ChatReducer(initial, maxItem + 1, maxRun + 1, queued, stale)
-        ModelCache.load(ctx, initial.tool)?.let(reducer::seedModels) // picker usable before the first send
+        ModelCache.load(ctx, initial.tool)?.let { c -> reducer.seedModels(c.copy(caps = ChatRuntimes.staticCaps(initial.tool) ?: c.caps)) } // picker usable before the first send
         state = reducer.state
     }
 

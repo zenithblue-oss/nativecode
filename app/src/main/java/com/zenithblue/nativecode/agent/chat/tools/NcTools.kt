@@ -671,12 +671,7 @@ object NcTools : NcMcpServer.Handler {
 
     private fun createThread(project: String?, cwd: String, tool: String, title: String, model: String?, effort: String?,
                              rm: RuntimeMode, im: InteractionMode): ChatThread {
-        val s = store
-        val t = s.createThread(project, cwd, tool, title.take(200), model, effort, rm, im)
-        val done = CountDownLatch(1)
-        s.apply(emptyList()) { done.countDown() } // the writer is serial: the thread row is committed after this
-        done.await(5, TimeUnit.SECONDS)
-        return t
+        return store.createThread(project, cwd, tool, title.take(200), model, effort, rm, im)
     }
 
     /** Send through the thread's controller on main (its preflight = Pro gate + session cap). */

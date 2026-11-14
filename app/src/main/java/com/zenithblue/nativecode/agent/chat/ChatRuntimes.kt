@@ -23,6 +23,14 @@ object ChatRuntimes {
             ?.let { com.zenithblue.nativecode.agent.chat.acp.AcpRuntime(host, it) }
         else -> null // CLAUDE_STREAM (M2), CODEX_APP_SERVER (M3), ACP (M4/M5)
     }
+
+    /** Caps fixed in code (ACP: null, reported per session). Beats a [ModelCache] entry saved by an older app version. */
+    fun staticCaps(tool: String) = when (protocolOf(tool)) {
+        ChatProtocol.OPENCODE_HTTP -> OpenCodeHttpRuntime.CAPS
+        ChatProtocol.CLAUDE_STREAM -> com.zenithblue.nativecode.agent.chat.claude.ClaudeStreamRuntime.CAPS
+        ChatProtocol.CODEX_APP_SERVER -> com.zenithblue.nativecode.agent.chat.codex.CodexAppServerRuntime.CAPS
+        else -> null
+    }
 }
 
 /**
