@@ -72,9 +72,13 @@ internal class ComposerState(draftJson: String?) {
     val skills = mutableStateListOf<SkillBlocks.Block>()
     var sheet by mutableStateOf<ComposerSheet?>(null)
 
-    init {
+    init { restore(draftJson) }
+
+    /** Load a [draftJson] (persisted draft, or a refused send given back). */
+    fun restore(draftJson: String?) {
         runCatching {
             val o = JSONObject(draftJson ?: return@runCatching)
+            clear()
             text = o.optString("text")
             val a = o.optJSONArray("attachments") ?: JSONArray()
             for (i in 0 until a.length()) a.getJSONObject(i).let { j ->

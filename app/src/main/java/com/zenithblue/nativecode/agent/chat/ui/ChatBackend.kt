@@ -69,7 +69,8 @@ interface ChatBackend {
     /** Live snapshot changes of one thread; returns the unsubscribe. */
     fun observeLive(threadId: String, l: () -> Unit): () -> Unit
     /** [fresh] = `/clear` armed: an idle thread starts a new native session for this message. */
-    fun send(threadId: String, text: String, attachments: List<ChatAttachment>, steer: Boolean, fresh: Boolean = false)
+    /** [onRefused] runs on main when the message was not taken (session limit, Pro gate, bad attachment): the caller restores it. */
+    fun send(threadId: String, text: String, attachments: List<ChatAttachment>, steer: Boolean, fresh: Boolean = false, onRefused: () -> Unit = {})
     /** `/side`: new "Side chat" thread forking [parentId]'s session (same tool, cwd, picks), [prompt] sent when not blank. IO thread. */
     fun sideChat(parentId: String, prompt: String): ChatThread?
     fun interrupt(threadId: String)

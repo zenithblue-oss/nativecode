@@ -124,7 +124,16 @@ class ChatThreadController internal constructor(
         if (!state.live && !preflight()) return false
         AgentChats.post {
             val (req, liveSession) = reducer.answer(requestId, answer) ?: return@post
-            if (liveSession) runtime?.respond(req.nativeId, answer)
+            if (liveSession) {
+                runtime?.respond(req.nativeId, answer)
+                // codex / ACP answers carry no reason: "decline with feedback" follows as the user's next words.
+                // A Stop-type answer ends the turn, so the feedback waits in the queue for the next turn instead.
+                val fb = answer.feedback?.trim().orEmpty()
+                if (fb.isNotEmpty() && thread.tool !in FEEDBACK_NATIVE) {
+                    if (req.options.firstOrNull { it.id == answer.optionId }?.kind == "cancel") reducer.enqueue(UUID.randomUUID().toString(), fb, emptyList())
+                    else doSend(fb, emptyList())
+                }
+            }
             else if (!answer.cancel) {
                 val tool = thread.tool
                 if (AgentChats.gate?.canUseTool(tool) == false) AgentChats.onMain { AgentChats.gate?.showUpsell(tool) } // answering = a new send
@@ -418,6 +427,8 @@ class ChatThreadController internal constructor(
 
     companion object {
         const val FORCE_STOP_MS = 10_000L
+        /** Runtimes whose reject answer carries the feedback itself (claude deny message, opencode declined note). */
+        private val FEEDBACK_NATIVE = setOf("claude-code", "opencode")
         const val ROW_FLUSH_MS = 1_000L
         const val IDLE_RELEASE_MS = 30 * 60 * 1000L
     }

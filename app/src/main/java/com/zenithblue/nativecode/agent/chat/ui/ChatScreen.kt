@@ -167,7 +167,9 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                 }
                 val prompt = composer.prompt() // NativeCode skills ride ahead of the text as context blocks
                 val fresh = freshArmed
-                v.bg { v.backend.send(threadId, prompt, atts, steer, fresh = fresh) }
+                val draft = composer.draftJson()
+                // A refused send (6th chat over the session limit, Pro gate) gives the message back instead of losing it.
+                v.bg { v.backend.send(threadId, prompt, atts, steer, fresh = fresh) { if (composer.text.isEmpty() && composer.chips.isEmpty()) composer.restore(draft) } }
                 freshArmed = false
             }
         }

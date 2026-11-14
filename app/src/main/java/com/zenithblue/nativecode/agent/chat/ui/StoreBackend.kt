@@ -76,10 +76,10 @@ class StoreBackend(ctx: Context) : ChatBackend {
         main.post { block(c) }
     }
 
-    override fun send(threadId: String, text: String, attachments: List<ChatAttachment>, steer: Boolean, fresh: Boolean) = cmd(threadId) { c ->
+    override fun send(threadId: String, text: String, attachments: List<ChatAttachment>, steer: Boolean, fresh: Boolean, onRefused: () -> Unit) = cmd(threadId) { c ->
         // ponytail: the controller picks steer vs queue itself (steer when the runtime can); the long-press choice is advisory.
-        ChatAttachments.checkMessage(text, attachments.size)?.let { Toast.makeText(app, it, Toast.LENGTH_LONG).show(); return@cmd }
-        c.send(text, attachments, fresh)
+        ChatAttachments.checkMessage(text, attachments.size)?.let { Toast.makeText(app, it, Toast.LENGTH_LONG).show(); onRefused(); return@cmd }
+        if (!c.send(text, attachments, fresh)) onRefused()
     }
 
     override fun sideChat(parentId: String, prompt: String): ChatThread? {
