@@ -205,7 +205,9 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
             }
             val sig = rows.size to (items.lastOrNull()?.let { it.updatedAt + it.payload.hashCode() } ?: 0)
             LaunchedEffect(sig) {
-                if (follow && rows.isNotEmpty()) { list.scrollToItem(list.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1); list.scrollBy(100_000f) }
+                // Int.MAX_VALUE: the lazy measure clamps it to the last item. layoutInfo is empty on the first
+                // composition (re-entering the chat, back from the terminal), which used to scroll to item 0.
+                if (follow && rows.isNotEmpty()) { list.scrollToItem(Int.MAX_VALUE); list.scrollBy(100_000f) }
                 else unseen = true
             }
             if (items.isEmpty() && live?.phase != AgentEvent.Phase.STARTING) EmptyThread(t, Modifier.align(Alignment.Center))
