@@ -48,7 +48,10 @@ internal object ClaudeWire {
             "--settings", """{"showThinkingSummaries":true}""", "--thinking-display", "summarized")) // t3code ClaudeAdapterV2 requestThinkingSummaries
         model?.takeIf { it.isNotBlank() && it != DEFAULT_MODEL }?.let { add("--model"); add(it) }
         effort?.takeIf { it.isNotBlank() }?.let { add("--effort"); add(it) }
-        if (resume != null) { add("--resume"); add(resume) } else if (sessionId != null) { add("--session-id"); add(sessionId) }
+        if (resume != null) { add("--resume"); add(resume) }
+        // Side chat: `--resume <parent> --fork-session --session-id <new>` copies the parent's history under a new id.
+        if (resume != null && sessionId != null) add("--fork-session")
+        if (sessionId != null) { add("--session-id"); add(sessionId) }
         if (mcp != null) {
             add("--mcp-config"); add(mcpConfig(mcp))
             add("--allowedTools"); add("mcp__${mcp.name}") // the app's own tools never prompt (t3code allowedTools mcp__t3-code__*)

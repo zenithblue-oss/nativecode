@@ -124,7 +124,7 @@ class ClaudeStreamRuntime(private val host: RuntimeHost) : AgentRuntime {
     // ---------------- process ----------------
 
     private fun boot(nativeId: String?) {
-        val (sid, init) = await(launch(nativeId)) ?: return // exited during the handshake: the controller reports it (gate deny included)
+        val (sid, init) = await(launch(nativeId, cfg.forkFrom.takeIf { nativeId == null })) ?: return // exited during the handshake: the controller reports it (gate deny included)
         sessionId = sid
         sink(AgentEvent.NativeId(sid))
         val version = init.optString("claude_code_version")
@@ -143,11 +143,11 @@ class ClaudeStreamRuntime(private val host: RuntimeHost) : AgentRuntime {
      * Spawn + `initialize`. Null = the process exited first. A `--resume` whose transcript is gone is retried
      * as a fresh session synchronously inside the exit callback, so the controller only ever sees the new process.
      */
-    private fun launch(resume: String?): CompletableFuture<Pair<String, JSONObject>?> {
+    private fun launch(resume: String?, forkFrom: String? = null): CompletableFuture<Pair<String, JSONObject>?> {
         val sid = resume ?: UUID.randomUUID().toString()
         val done = CompletableFuture<Pair<String, JSONObject>?>()
         val mcp = ChatMcp.endpoint(cfg.threadId, TOOL) // M7 NC tools server; null = none
-        val argv = ClaudeWire.argv(cfg.model, cfg.effort, ClaudeWire.permissionMode(cfg.runtimeMode, cfg.interactionMode), resume, sid.takeIf { resume == null }, mcp)
+        val argv = ClaudeWire.argv(cfg.model, cfg.effort, ClaudeWire.permissionMode(cfg.runtimeMode, cfg.interactionMode), resume ?: forkFrom, sid.takeIf { resume == null }, mcp)
         val p = host.spawn(argv, ClaudeWire.mcpEnv(mcp), cfg.cwd, ::onLine) { code, tail ->
             if (done.isDone) return@spawn
             if (resume != null && !closed && RESUME_MISSING.containsMatchIn(tail)) {
@@ -267,7 +267,7 @@ class ClaudeStreamRuntime(private val host: RuntimeHost) : AgentRuntime {
     companion object {
         val CAPS = RuntimeCaps(
             steer = true, images = true, pdf = true, userInput = true, planMode = true,
-            modes = RuntimeMode.entries.toList(), effort = true, slashCommands = true, resume = true,
+            modes = RuntimeMode.entries.toList(), effort = true, slashCommands = true, resume = true, fork = true,
         )
         private const val HANDSHAKE_S = 60L
         private const val TOOL = "claude" // CliToolCatalog id
