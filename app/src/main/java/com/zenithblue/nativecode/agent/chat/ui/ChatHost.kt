@@ -34,4 +34,8 @@ interface ChatHost {
     fun projects(): List<Pair<String, String>>
     /** Approval arrived while this surface shows the Terminal: snackbar "Approval needed · Open". */
     fun approvalWhileInTerminal(threadTitle: String, open: () -> Unit)
+    /** Bridge card "Save & open": APK copy to Downloads, then the Downloads UI (tapping it opens the system installer). */
+    fun saveApk(hostPath: String)
+    /** Bridge card "Share": share sheet for a host file (staged copy via FileProvider). */
+    fun shareFile(hostPath: String)
 }

@@ -97,6 +97,25 @@ class ChatReducerTest {
         assertFalse(r.state.reconnecting)
     }
 
+    @Test fun bridgeCardIsStoredInTheRunAndKeepsItsState() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        val run = r.beginRun("c1", "build it", emptyList())
+        rows.apply(r.drain().first)
+        r.step(rows, AgentEvent.TurnStarted("turn1"))
+        r.step(rows, AgentEvent.ItemUpsert("m1", ItemStatus.RUNNING, ItemPayload.AssistantMessage("Building")))
+        val id = r.external(ItemPayload.Bridge("open_link", "Preview", target = "http://localhost:3000"))
+        rows.apply(r.drain().first)
+        val card = rows.items[id]!!
+        assertEquals(run.id, card.runId)
+        assertTrue(card.ordinal > rows.items.values.single { it.nativeRef == "m1" }.ordinal)
+        assertFalse(r.state.liveItems.values.any { it.id == id }) // a live snapshot can never overwrite a button's state
+        rows.apply(listOf(ChatWrite.UpdateItem("t", id) { it.copy(payload = (it.payload as ItemPayload.Bridge).copy(state = ItemPayload.Bridge.DONE)) }))
+        r.step(rows, AgentEvent.ItemUpsert("m1", ItemStatus.COMPLETED, ItemPayload.AssistantMessage("Built")))
+        r.step(rows, AgentEvent.TurnTerminal(RunStatus.COMPLETED))
+        assertEquals(ItemPayload.Bridge.DONE, (rows.items[id]!!.payload as ItemPayload.Bridge).state)
+        assertEquals(ItemStatus.COMPLETED, rows.items[id]!!.status)
+    }
+
     @Test fun fullTurnWithApproval() {
         val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
         val run = r.beginRun("c1", "Fix the login crash\nplease", emptyList())

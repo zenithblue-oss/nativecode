@@ -163,6 +163,9 @@ class ChatThreadController internal constructor(
     /** Close the process (frees the Free/Pro slot); history stays, queue is held, next send resumes. */
     fun stop() = AgentChats.post { close(hold = true) }
 
+    /** Agent bridge card (ChatBridge); [done] gets the new item id on the loop thread. */
+    internal fun appendBridge(p: ItemPayload, done: (String) -> Unit = {}) = AgentChats.post { val id = reducer.external(p); commit(); done(id) }
+
     /** Free the slot of a finished delegated child, unless a newer message (nc_thread_send) already started a turn. */
     fun stopIfIdle() = AgentChats.post { if (reducer.activeRun == null && reducer.state.queued.isEmpty()) close(hold = true) }
 

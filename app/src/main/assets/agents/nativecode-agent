@@ -140,6 +140,13 @@ def main():
     open_apk_p.add_argument("--title", default="Install APK", help="Dialog / notification title")
     open_apk_p.add_argument("--message", default="", help="Message text")
 
+    # share-file / send-file
+    for name in ("share-file", "send-file"):
+        share_p = subparsers.add_parser(name, help="Offer a file to the user (share sheet / save)")
+        share_p.add_argument("--path", required=True, help="Path to the file")
+        share_p.add_argument("--title", default="", help="Card / notification title (default: file name)")
+        share_p.add_argument("--message", default="", help="Message text")
+
     # dismiss-alert / cancel-alert
     subparsers.add_parser("dismiss-alert", help="Dismiss any active on-screen alert card (open-link or install-apk)")
     subparsers.add_parser("cancel-alert", help="Alias for dismiss-alert")
@@ -201,6 +208,12 @@ def main():
                 "title": args.title,
                 "message": args.message
             }
+        elif args.cmd in ("share-file", "send-file"):
+            file_path = os.path.abspath(os.path.expanduser(args.path))
+            if not os.path.isfile(file_path):
+                print(json.dumps({"v": 1, "ok": False, "error": f"File not found: {args.path}"}, indent=2))
+                sys.exit(1)
+            req = {"v": 1, "cmd": "share_file", "path": file_path, "title": args.title, "message": args.message}
         elif args.cmd in ("dismiss-alert", "cancel-alert", "dismiss"):
             req = {"v": 1, "cmd": "dismiss_alert"}
         else:

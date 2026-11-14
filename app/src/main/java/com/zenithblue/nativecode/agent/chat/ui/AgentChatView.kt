@@ -42,6 +42,7 @@ sealed class Route {
     data class Chat(val id: String) : Route()
     data class Diff(val id: String) : Route()
     data class Settings(val id: String) : Route()
+    data class Bridge(val id: String) : Route()
 }
 
 /**
@@ -110,6 +111,7 @@ class AgentChatView(
                                     is Route.Chat -> ChatScreen(this@AgentChatView, r.id)
                                     is Route.Diff -> DiffScreen(this@AgentChatView, r.id)
                                     is Route.Settings -> ThreadSettingsScreen(this@AgentChatView, r.id)
+                                    is Route.Bridge -> BridgeHistoryScreen(this@AgentChatView, r.id)
                                 }
                             }
                             if (sheet.value) NewThreadSheet(this@AgentChatView)

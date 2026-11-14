@@ -69,6 +69,10 @@ class ChatStore(ctx: Context) {
     fun itemsOfRun(threadId: String, runId: String): List<TurnItem> =
         db().query("turn_items", null, "thread_id=? AND run_id=?", arrayOf(threadId, runId), null, null, "ordinal").use { c -> c.list(::rowItem) }
 
+    /** Agent bridge cards of a thread, newest first (bridge history). */
+    fun bridgeItems(threadId: String): List<TurnItem> =
+        db().query("turn_items", null, "thread_id=? AND type=?", arrayOf(threadId, "bridge_event"), null, null, "ordinal DESC").use { c -> c.list(::rowItem) }
+
     fun runs(threadId: String): List<Run> = db().query("runs", null, "thread_id=?", arrayOf(threadId), null, null, "ordinal").use { c -> c.list(::rowRun) }
 
     fun openRequests(threadId: String): List<ChatRequest> =

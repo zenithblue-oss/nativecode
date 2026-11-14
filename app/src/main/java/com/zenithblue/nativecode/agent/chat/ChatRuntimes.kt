@@ -63,7 +63,7 @@ internal class ThreadHost(
             AgentChats.remove(entry)
             runCatching { onExit(code, tail) }
             onProcessExit(proc, code, tail)
-        }, extraEnv - "OPENCODE_SERVER_PASSWORD")
+        }, extraEnv - "OPENCODE_SERVER_PASSWORD" + (ChatBridge.ENV to threadId)) // bridge requests from this CLI → this thread
         entry = AgentChats.Entry(tool, projectPath, proc)
         AgentChats.add(entry)
         onSpawned(entry)

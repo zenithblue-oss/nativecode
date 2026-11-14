@@ -950,6 +950,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 val message = it.getStringExtra("EXTRA_AGENT_MESSAGE")
                 showAgentInstallApkDialog(apkFile, title, message)
             }
+            // Token, not a path: MainActivity is exported, so a path extra would let any app share our private files.
+            it.getStringExtra("EXTRA_AGENT_SHARE_TOKEN")?.let { t -> AgentBridgeServer.takeShare(t) }?.let { f -> shareApkFromProject(f, "Share file") }
             val agentOpenUrl = it.getStringExtra("EXTRA_AGENT_OPEN_LINK_URL")
             if (!agentOpenUrl.isNullOrBlank()) {
                 val title = it.getStringExtra("EXTRA_AGENT_TITLE")
@@ -4305,6 +4307,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             com.google.android.material.snackbar.Snackbar.make(contentFrame, "Approval needed · $threadTitle", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
                 .setAction("OPEN") { open() }.show()
         }
+        override fun saveApk(hostPath: String) = exportApkToDownloads(File(hostPath))
+        override fun shareFile(hostPath: String) = shareApkFromProject(File(hostPath), "Share file")
     }
 
     /** Notification deep link: page 3, or 10 + PROJECT_PATH (already applied by handleIntent), then the thread in Chat. */
@@ -7956,11 +7960,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
-    private fun shareApkFromProject(file: File) {
+    private fun shareApkFromProject(file: File, chooserTitle: String = "Share APK") {
         executor.execute {
             try {
                 val staged = copyOutForShare(file)
-                mainHandler.post { shareApkFile(staged) }
+                mainHandler.post { shareApkFile(staged, chooserTitle) }
             } catch (e: Exception) {
                 Log.e("MainActivity", "shareApkFromProject failed", e)
                 mainHandler.post {
@@ -7970,16 +7974,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
-    private fun shareApkFile(file: File) {
+    private fun shareApkFile(file: File, chooserTitle: String = "Share APK") {
         val uri = getFileUri(file) ?: return
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/octet-stream"
             putExtra(Intent.EXTRA_STREAM, uri)
-            clipData = ClipData.newRawUri("APK", uri)
+            clipData = ClipData.newRawUri(file.name, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         try {
-            startActivity(Intent.createChooser(intent, "Share APK"))
+            startActivity(Intent.createChooser(intent, chooserTitle))
         } catch (e: Exception) {
             Toast.makeText(this, "Unable to share APK: ${e.message}", Toast.LENGTH_SHORT).show()
         }

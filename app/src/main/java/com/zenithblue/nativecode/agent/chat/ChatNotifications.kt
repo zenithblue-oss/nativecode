@@ -26,7 +26,7 @@ object ChatNotifications {
     const val PAGE_TERMINAL = 3
     const val PAGE_WORKSPACE = 10
 
-    enum class Kind(val title: String) { APPROVAL("Approval needed"), INPUT("Input needed"), DONE("Done"), FAILED("Turn failed") }
+    enum class Kind(val title: String) { APPROVAL("Approval needed"), INPUT("Input needed"), DONE("Done"), FAILED("Turn failed"), BRIDGE("From agent") }
 
     fun notify(ctx: Context, thread: ChatThread, kind: Kind, text: String? = null) {
         if (AgentChats.visibleThreadId == thread.id) return

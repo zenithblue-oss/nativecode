@@ -59,6 +59,14 @@ nativecode-agent install-apk \
 - **Behavior:** Resolves guest paths (`/home/flux/...`, relative paths), `/tmp/...` (shared tmp), and external storage (`/sdcard/...`). Validates non-empty file (>100 bytes) and valid package manifest. Stages the APK to Android MediaStore `Downloads`, and presents an in-app card with **SAVE & OPEN** (launches Android Package Installer) and **SHARE** sheet actions. Subject to the **Single Active Alert Rule**.
 - **Alias:** `nativecode-agent open-apk`
 
+### 2.2b Hand a File to the User (`share-file`)
+To give the user a file you produced (report, archive, image, export):
+```bash
+nativecode-agent share-file --path "out/report.pdf" --title "Report" --message "Weekly summary"
+```
+- **Behavior:** Offers the file through the Android share sheet (save to Files, send to an app). Alias: `send-file`.
+- **Chat threads:** when you run inside a NativeCode chat thread, every bridge command (notify, status, toast, open-link, install-apk, share-file) shows as a card in that chat instead of a popup; the single-alert rule does not apply there.
+
 ### 2.3 Dismiss / Cancel On-Screen Alert (`dismiss-alert`)
 When an on-screen alert card is active, agents can dismiss/cancel it programmatically:
 ```bash

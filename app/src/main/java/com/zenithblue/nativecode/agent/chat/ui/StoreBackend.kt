@@ -114,6 +114,9 @@ class StoreBackend(ctx: Context) : ChatBackend {
         }
     }
 
+    override fun bridgeEvents(threadId: String): List<TurnItem> = store.bridgeItems(threadId)
+    override fun bridgeState(threadId: String, itemId: String, state: String) = com.zenithblue.nativecode.agent.chat.ChatBridge.setState(app, threadId, itemId, state)
+
     override fun liveThreadIds(): List<String> = AgentChats.liveThreadIds()
 
     private fun map(s: ChatLiveState) = LiveState(

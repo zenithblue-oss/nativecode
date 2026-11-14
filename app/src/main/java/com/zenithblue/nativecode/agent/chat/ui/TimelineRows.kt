@@ -98,6 +98,7 @@ private fun ItemRow(v: AgentChatView, t: ChatThread, item: TurnItem, live: Boole
             if (item.status == ItemStatus.RUNNING) "Compacting context" else "Context compacted" + (p.tokens?.let { " · ${ChatLogic.tokens(it)} tok" } ?: ""),
             Ic.Fold, shimmer = item.status == ItemStatus.RUNNING,
         )
+        is ItemPayload.Bridge -> BridgeCard(v, t.id, item, p, ROW_PAD)
         is ItemPayload.SystemNotice -> Row(ROW_PAD, verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(4.dp).background(C.outline))
             Text(p.text, Modifier.padding(start = S.s), color = C.outline, style = T.meta)

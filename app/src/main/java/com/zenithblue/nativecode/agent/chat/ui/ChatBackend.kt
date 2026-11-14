@@ -88,6 +88,10 @@ interface ChatBackend {
     fun attach(uri: Uri, cwd: String, imageOnly: Boolean, cb: (ChatAttachment?, String?) -> Unit)
     /** Unified patch for the scope (IO thread); null = not available. */
     fun diff(threadId: String, scope: DiffScope): String?
+    /** Agent bridge cards of the thread, newest first (IO thread). */
+    fun bridgeEvents(threadId: String): List<TurnItem>
+    /** Bridge card button: state done | dismissed. */
+    fun bridgeState(threadId: String, itemId: String, state: String)
     /** Live (or starting) chat processes, for the sessions chip. */
     fun liveThreadIds(): List<String>
 }

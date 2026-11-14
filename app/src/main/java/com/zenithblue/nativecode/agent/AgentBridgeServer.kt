@@ -22,6 +22,8 @@ import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.zenithblue.nativecode.agent.chat.ChatBridge
+import com.zenithblue.nativecode.agent.chat.core.ItemPayload
 import com.zenithblue.nativecode.media.MediaBridgeServer
 import java.io.File
 import java.io.IOException
@@ -45,6 +47,10 @@ class AgentBridgeServer(
         const val SOCKET_NAME_PREFIX = "nativecode.agent.v1."
         const val NOTIFICATION_CHANNEL_ID = "agent_notifications"
         const val NOTIFICATION_CHANNEL_NAME = "Agent Alerts & Progress"
+
+        /** `share-file` notification tokens → file (process memory only; a stale tap after a restart does nothing). */
+        private val shares = java.util.concurrent.ConcurrentHashMap<String, File>()
+        fun takeShare(token: String): File? = shares.remove(token)?.takeIf { it.isFile }
 
         fun resolveApkFile(context: Context, path: String): File? {
             val f = File(path)
@@ -165,6 +171,9 @@ class AgentBridgeServer(
             }
 
             client.soTimeout = 10000 // 10s bounded timeout
+            // Chat thread whose CLI sent this (ChatBridge.ENV in the client's process env); null = terminal → popups.
+            val chatThread: String? = runCatching { ChatBridge.threadOf(creds.pid) }.getOrNull()
+            fun toChat(card: ItemPayload.Bridge): Boolean = chatThread != null && ChatBridge.post(context, chatThread, card)
 
             val input = client.inputStream
             val output = client.outputStream
@@ -201,12 +210,17 @@ class AgentBridgeServer(
                             val ongoing = request.optBoolean("ongoing", false)
                             val priorityStr = request.optString("priority", "default")
 
-                            val result = postNotification(id, tag, title, message, ongoing, priorityStr)
-                            response.put("ok", result.first)
-                            if (!result.first) {
-                                response.put("error", result.second)
+                            if (toChat(ItemPayload.Bridge("notify", title, message, state = ItemPayload.Bridge.DONE))) {
+                                response.put("ok", true)
+                                response.put("chat_card", true)
                             } else {
-                                response.put("posted", true)
+                                val result = postNotification(id, tag, title, message, ongoing, priorityStr)
+                                response.put("ok", result.first)
+                                if (!result.first) {
+                                    response.put("error", result.second)
+                                } else {
+                                    response.put("posted", true)
+                                }
                             }
                         }
                     }
@@ -216,10 +230,16 @@ class AgentBridgeServer(
                         val progress = request.optInt("progress", -1)
                         val id = key.hashCode()
 
-                        val result = postStatusUpdate(id, key, text, progress)
-                        response.put("ok", result.first)
-                        if (!result.first) {
-                            response.put("error", result.second)
+                        if (toChat(ItemPayload.Bridge("status", "Task status", text, detail = progress.toString(),
+                                state = if (progress >= 100) ItemPayload.Bridge.DONE else ItemPayload.Bridge.PENDING, key = key))) {
+                            response.put("ok", true)
+                            response.put("chat_card", true)
+                        } else {
+                            val result = postStatusUpdate(id, key, text, progress)
+                            response.put("ok", result.first)
+                            if (!result.first) {
+                                response.put("error", result.second)
+                            }
                         }
                     }
                     "toast" -> {
@@ -228,8 +248,31 @@ class AgentBridgeServer(
                             response.put("error", "Rate limit exceeded for toasts (max 1 per 2 sec)")
                         } else {
                             val text = request.optString("text", "")
-                            showToast(text)
+                            if (toChat(ItemPayload.Bridge("toast", "Message", text, state = ItemPayload.Bridge.DONE))) response.put("chat_card", true)
+                            else showToast(text)
                             response.put("ok", true)
+                        }
+                    }
+                    "share_file", "send_file" -> {
+                        val path = request.optString("path", "").trim()
+                        val file = path.takeIf { it.isNotEmpty() }?.let { resolveApkFile(context, it) }
+                        if (!dialogLimiter.tryAcquire()) {
+                            response.put("ok", false)
+                            response.put("error", "Rate limit exceeded for file shares (max 1/sec)")
+                        } else if (file == null) {
+                            response.put("ok", false)
+                            response.put("error", if (path.isEmpty()) "Missing or empty 'path' parameter" else "File not found: $path")
+                        } else {
+                            val title = request.optString("title", "").ifBlank { file.name }
+                            val message = request.optString("message", "")
+                            if (toChat(ItemPayload.Bridge("share_file", title, message, target = file.absolutePath, detail = file.length().toString()))) {
+                                response.put("chat_card", true)
+                            } else {
+                                postShareFileNotification(file, title, message)
+                                response.put("notified", true)
+                            }
+                            response.put("ok", true)
+                            response.put("path", file.absolutePath)
                         }
                     }
                     "telemetry" -> {
@@ -237,7 +280,13 @@ class AgentBridgeServer(
                         response.put("telemetry", collectTelemetry())
                     }
                     "open_link", "open_url" -> {
-                        if (uiDelegate?.isAlertActive() == true) {
+                        val chatUrl = request.optString("url", "").trim()
+                        if (chatThread != null && chatUrl.isNotEmpty() && dialogLimiter.tryAcquire() &&
+                            toChat(ItemPayload.Bridge("open_link", request.optString("title", "").ifBlank { "Web link" }, request.optString("message", ""), target = chatUrl))) {
+                            response.put("ok", true)
+                            response.put("chat_card", true)
+                            response.put("url", chatUrl)
+                        } else if (uiDelegate?.isAlertActive() == true) {
                             response.put("ok", false)
                             response.put("error", "alert_already_active")
                             response.put("message", "An alert is already active on screen. Dismiss it first with 'nativecode-agent dismiss-alert' or wait for the user to close it.")
@@ -265,7 +314,7 @@ class AgentBridgeServer(
                         }
                     }
                     "install_apk", "open_apk" -> {
-                        if (uiDelegate?.isAlertActive() == true) {
+                        if (chatThread == null && uiDelegate?.isAlertActive() == true) { // chat cards never collide with a popup
                             response.put("ok", false)
                             response.put("error", "alert_already_active")
                             response.put("message", "An alert is already active on screen. Dismiss it first with 'nativecode-agent dismiss-alert' or wait for the user to close it.")
@@ -302,8 +351,13 @@ class AgentBridgeServer(
                                             try { appInfo.loadLabel(pm).toString() } catch (_: Exception) { apkFile.name }
                                         } ?: apkFile.name
 
-                                        val shown = uiDelegate?.showInstallApkAlert(apkFile, title, message) == true
-                                        if (!shown) {
+                                        val card = ItemPayload.Bridge("install_apk", title, message, target = apkFile.absolutePath,
+                                            detail = "$appLabel · $pkgName $verName · ${apkFile.length()}")
+                                        val chat = toChat(card)
+                                        val shown = !chat && uiDelegate?.showInstallApkAlert(apkFile, title, message) == true
+                                        if (chat) {
+                                            response.put("chat_card", true)
+                                        } else if (!shown) {
                                             postInstallApkNotification(apkFile, appLabel, pkgName, verName, title, message)
                                             response.put("notified", true)
                                         } else {
@@ -320,7 +374,7 @@ class AgentBridgeServer(
                         }
                     }
                     "dismiss_alert", "cancel_alert", "dismiss" -> {
-                        val dismissed = uiDelegate?.dismissActiveAlert() == true
+                        val dismissed = if (chatThread != null) ChatBridge.dismissPending(context, chatThread) else uiDelegate?.dismissActiveAlert() == true
                         response.put("ok", true)
                         response.put("dismissed", dismissed)
                         if (!dismissed) {
@@ -481,6 +535,29 @@ class AgentBridgeServer(
             .build()
         val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         mgr?.notify("agent_install_apk", 1004, notif)
+    }
+
+    /** Terminal `share-file`: tap → MainActivity share sheet. The intent carries a one-shot token ([takeShare]), never the path. */
+    private fun postShareFileNotification(file: File, title: String, message: String) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val token = java.util.UUID.randomUUID().toString()
+        shares[token] = file
+        val launchIntent = Intent().apply {
+            setClassName(context.packageName, "com.zenithblue.nativecode.MainActivity")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            putExtra("EXTRA_AGENT_SHARE_TOKEN", token)
+        }
+        val pi = PendingIntent.getActivity(context, token.hashCode(), launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notif = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("File from agent: $title")
+            .setContentText(message.ifBlank { "${file.name} · tap to share or save" })
+            .setSmallIcon(android.R.drawable.ic_menu_share)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pi)
+            .build()
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)?.notify("agent_share_file", 1005, notif)
     }
 
     private fun showToast(text: String) {

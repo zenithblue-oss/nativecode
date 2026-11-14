@@ -350,6 +350,16 @@ class ChatReducer(
         }
     }
 
+    /**
+     * An item from outside the runtime (agent bridge card) at the next ordinal, in the current run if one streams.
+     * Store only (not in the live items), so later status edits to the row are not overwritten by a live snapshot.
+     */
+    fun external(p: ItemPayload): String {
+        val it = TurnItem(newId(), thread.id, run?.id, itemOrd++, null, null, ItemStatus.COMPLETED, p, now())
+        writes += ChatWrite.PutItem(it)
+        return it.id
+    }
+
     private fun session(e: AgentEvent.SessionState) {
         val s = state
         state = s.copy(

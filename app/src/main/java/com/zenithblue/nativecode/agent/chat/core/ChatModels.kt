@@ -144,6 +144,17 @@ sealed class ItemPayload(val type: String) {
     data class Error(val cls: FailureClass, val message: String, val retryAt: Long? = null, val details: String? = null) : ItemPayload("error")
     data class Compaction(val tokens: Long? = null) : ItemPayload("compaction")
     data class SystemNotice(val text: String) : ItemPayload("system_notice")
+    /**
+     * A `nativecode-agent` bridge request from this thread's CLI, shown as a card instead of a popup.
+     * [action]: notify | status | toast | open_link | install_apk | share_file. [target] = URL or host file path;
+     * [detail] = APK label/package, status progress. [state]: pending | done | dismissed. [key] = status key (updates in place).
+     */
+    data class Bridge(
+        val action: String, val title: String, val body: String = "", val target: String? = null, val detail: String? = null,
+        val state: String = PENDING, val key: String? = null, val at: Long = 0,
+    ) : ItemPayload("bridge_event") {
+        companion object { const val PENDING = "pending"; const val DONE = "done"; const val DISMISSED = "dismissed" }
+    }
 }
 
 data class TurnItem(
