@@ -31,6 +31,8 @@ internal object ClaudeWire {
     const val SIGNED_OUT = "Not signed in to Claude Code"
 
     val ENV = mapOf("CLAUDE_CODE_ENTRYPOINT" to "sdk-ts")
+    /** Task result bookkeeping the CLI appends (`<tools-used-before-summary>`, `agentId: …` usage footer). */
+    private val AGENT_META = Regex("""<tools-used-before-summary>[\s\S]*?</tools-used-before-summary>|<usage>[\s\S]*?</usage>|(?m)^agentId: \S+.*$""")
     private val IMAGE_MIMES = setOf("image/gif", "image/jpeg", "image/png", "image/webp")
 
     /**
@@ -43,7 +45,7 @@ internal object ClaudeWire {
         addAll(listOf("claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--include-partial-messages", "--permission-prompt-tool", "stdio", "--permission-mode", mode,
             "--allow-dangerously-skip-permissions", "--setting-sources", "user,project,local",
-            "--settings", """{"showThinkingSummaries":true}"""))
+            "--settings", """{"showThinkingSummaries":true}""", "--thinking-display", "summarized")) // t3code ClaudeAdapterV2 requestThinkingSummaries
         model?.takeIf { it.isNotBlank() && it != DEFAULT_MODEL }?.let { add("--model"); add(it) }
         effort?.takeIf { it.isNotBlank() }?.let { add("--effort"); add(it) }
         if (resume != null) { add("--resume"); add(resume) } else if (sessionId != null) { add("--session-id"); add(sessionId) }
@@ -231,7 +233,8 @@ internal object ClaudeWire {
             "webfetch" -> ItemPayload.WebSearch(s(input, "url").orEmpty(), listOfNotNull(out.ifBlank { null }?.take(2000)))
             "websearch" -> ItemPayload.WebSearch(s(input, "query").orEmpty(),
                 objects(structured?.optJSONArray("results")).flatMap { r -> objects(r.optJSONArray("content")).mapNotNull { it.optString("title").ifBlank { null } } }.take(50))
-            "task", "agent" -> ItemPayload.Subagent(s(input, "description") ?: s(input, "subagent_type") ?: name, 0, out.ifBlank { null }?.take(4000))
+            "task", "agent" -> ItemPayload.Subagent(s(input, "description") ?: s(input, "subagent_type") ?: name, 0,
+                out.replace(AGENT_META, "").trim().ifBlank { null }?.take(4000))
             "todowrite" -> ItemPayload.TodoList(objects(input.optJSONArray("todos")).map { TodoStep(it.optString("content"), it.optString("status")) })
             "read" -> ItemPayload.DynamicTool("Read " + (pathOf(input)?.substringAfterLast('/') ?: ""), input.toString().take(2000), out.take(OUTPUT_TAIL))
             else -> ItemPayload.DynamicTool(toolLabel(name), input.toString().take(2000), out.take(OUTPUT_TAIL))

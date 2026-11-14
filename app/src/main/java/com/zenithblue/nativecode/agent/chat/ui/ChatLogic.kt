@@ -22,7 +22,8 @@ data class DiffFile(val path: String, val kind: Char, val add: Int, val del: Int
 sealed class Row {
     abstract val key: String
     data class Item(val item: TurnItem) : Row() { override val key get() = item.id }
-    data class Work(val runId: String?, val items: List<TurnItem>) : Row() { override val key get() = "w:" + items.first().id }
+    /** [kids] = subagent activity by parent item id (nested under its card, never top-level rows). */
+    data class Work(val runId: String?, val items: List<TurnItem>, val kids: Map<String, List<TurnItem>> = emptyMap()) : Row() { override val key get() = "w:" + items.first().id }
     data class Meta(val run: Run) : Row() { override val key get() = "m:" + run.id }
 }
 
@@ -206,9 +207,15 @@ object ChatLogic {
         val out = ArrayList<Row>()
         var work = ArrayList<TurnItem>()
         var runId: String? = null
-        fun flushWork() { if (work.isNotEmpty()) { out += Row.Work(work.first().runId, work); work = ArrayList() } }
+        val ids = items.mapTo(HashSet()) { it.id }
+        val kids = items.filter { it.parentId != null && it.parentId in ids }.groupBy { it.parentId!! }
+        fun flushWork() {
+            if (work.isEmpty()) return
+            out += Row.Work(work.first().runId, work, kids); work = ArrayList() // whole map: grandchildren nest too
+        }
         fun endRun() { runs[runId ?: return]?.takeIf { it.status.terminal }?.let { out += Row.Meta(it) } }
         for (it in items) {
+            if (it.parentId != null && it.parentId in ids) continue // nested under its subagent card
             if (it.runId != runId) { flushWork(); endRun(); runId = it.runId }
             when {
                 it.type in WORK -> work += it

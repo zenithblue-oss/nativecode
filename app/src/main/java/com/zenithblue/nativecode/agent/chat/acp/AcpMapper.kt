@@ -43,6 +43,7 @@ class AcpMapper(private val profile: AcpProfile, private val nonce: String, priv
     private val pending = LinkedHashMap<String, Pending>()
     private var lastPlan: String? = null
 
+    val openTools: Int get() = tools.values.count { it.status == "pending" || it.status == "in_progress" }
     fun pending(id: String): Pending? = pending[id]
     fun pendingIds(): List<String> = pending.keys.toList()
 
@@ -181,6 +182,17 @@ class AcpMapper(private val profile: AcpProfile, private val nonce: String, priv
      * otherwise approval options mapped through [AcpProfile.options], plus Cancel. Missing kind/title come from the
      * tracked tool call.
      */
+    /**
+     * A permission request's `toolCall.rawInput` fills a tracked call that came without one: agy `invoke_subagent`
+     * carries its launch (`Subagents[{Role,Prompt}]`) only there (t3code AntigravityChildWork). Also on auto-approve.
+     */
+    fun adoptInput(call: JSONObject) {
+        val t = tools[call.optString("toolCallId")] ?: return
+        if (t.rawInput != null || !call.has("rawInput")) return
+        t.merge(JSONObject().put("rawInput", call.opt("rawInput")))
+        emitTool(t, statusOf(t.status))
+    }
+
     fun permission(rpcId: Any, p: JSONObject): Pending {
         val call = p.optJSONObject("toolCall") ?: JSONObject()
         val callId = call.optString("toolCallId")
@@ -195,6 +207,7 @@ class AcpMapper(private val profile: AcpProfile, private val nonce: String, priv
         }
         val kind = call.optString("kind").ifEmpty { tracked?.kind ?: "other" }
         val tmp = AcpWire.Tool(callId).apply { tracked?.let { o -> this.kind = o.kind; title = o.title; rawInput = o.rawInput; locations = o.locations; content = o.content }; merge(call); this.kind = kind }
+        adoptInput(call)
         val reqKind = when (kind) {
             "execute" -> RequestKind.COMMAND
             "read", "search", "fetch" -> RequestKind.FILE_READ

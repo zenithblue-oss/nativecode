@@ -61,6 +61,8 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
     private var modeIds: List<String> = emptyList()
     @Volatile private var currentMode: String? = null
     private var restartAfterTurn = false
+    private var waking = false // under lock: the open turn is a wake, not a prompt
+    private var wakeTimer: java.util.concurrent.ScheduledFuture<*>? = null
     private var promptSeq = 0
     private val bgTasks = HashMap<String, String>() // grok task id → tool call id
 
@@ -296,7 +298,10 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
         val text = rewriteSkill(turn.text)
         val params = JSONObject().put("sessionId", sid).put("prompt", AcpWire.promptBlocks(turn.copy(text = text), caps.images, profile.embedDocs && caps.pdf))
         if (profile.xai) "nc-xai-prompt-${++promptSeq}".let { params.put("_meta", JSONObject().put("promptId", it).put("requestId", it)) }
-        val myGen = synchronized(lock) { mapper.beginTurn(); gen }
+        val myGen = synchronized(lock) {
+            if (waking) { waking = false; wakeTimer?.cancel(false); mapper.endTurn(RunStatus.COMPLETED) } // the user's prompt takes over
+            mapper.beginTurn(); gen
+        }
         r.request("session/prompt", params).whenComplete { res, err -> synchronized(lock) { if (myGen == gen) finishPrompt(res, err) } }
     }
 
@@ -332,6 +337,13 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
         val sid = sessionId ?: return
         val myGen = synchronized(lock) {
             if (!mapper.active) return
+            if (waking) { // no prompt to answer `cancelled`: settle the wake here
+                waking = false; wakeTimer?.cancel(false)
+                mapper.interrupting = true
+                mapper.endTurn(RunStatus.INTERRUPTED)
+                r.notify("session/cancel", JSONObject().put("sessionId", sid).apply { profile.cancelMeta?.let { put("_meta", it) } })
+                return
+            }
             mapper.interrupting = true
             mapper.pendingIds().forEach { id -> mapper.settle(id, RequestStatus.CANCELLED)?.let { p -> r.reply(p.rpcId, cancelled(p.method)) } }
             gen
@@ -440,6 +452,7 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
             when {
                 m == "session/update" -> {
                     if (loading && params.optJSONObject("update")?.optString("sessionUpdate") !in KEEP_WHILE_LOADING) return
+                    wake(params)
                     if (!mapper.update(params)) sink(AgentEvent.Unknown(params.toString().take(400)))
                 }
                 loading -> Unit // session/load replays history (also grok's turn_completed): already in the store
@@ -462,8 +475,36 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
                 u.optJSONObject("usage")?.let { mapper.addUsage(AcpWire.usageOf(it, mapper.usage)) }
                 xaiComplete(u.optString("prompt_id"), u.optString("stop_reason"), null)
             }
-            else -> if (u.optString("sessionUpdate") in setOf("tool_call", "tool_call_update", "agent_message_chunk", "agent_thought_chunk", "plan")) mapper.update(params)
+            else -> if (u.optString("sessionUpdate") in setOf("tool_call", "tool_call_update", "agent_message_chunk", "agent_thought_chunk", "plan")) { wake(params); mapper.update(params) }
         }
+    }
+
+    /**
+     * Under [lock]. Agent output with no prompt open = a wake: background subagents (agy `invoke_subagent` swarm,
+     * grok `subagent-completed-*`) finished and the agent carries on by itself (t3code acp adapter wakeBuffer →
+     * provider continuation). It becomes its own run, settled after [WAKE_QUIET_MS] of silence with no tool open.
+     */
+    private fun wake(params: JSONObject) {
+        val u = params.optJSONObject("update") ?: return
+        if (u.optJSONObject("_meta")?.optBoolean("isReplay") == true || closed) return
+        if (!mapper.active) {
+            if (u.optString("sessionUpdate") !in WAKE_KINDS) return
+            mapper.beginTurn()
+            waking = true
+        }
+        if (!waking) return
+        val myGen = gen
+        wakeTimer?.cancel(false)
+        wakeTimer = io.schedule({ synchronized(lock) { settleWake(myGen) } }, WAKE_QUIET_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun settleWake(myGen: Int) {
+        if (myGen != gen || !waking || !mapper.active) return
+        if (mapper.openTools > 0 || mapper.pendingIds().isNotEmpty()) {
+            wakeTimer = io.schedule({ synchronized(lock) { settleWake(myGen) } }, WAKE_QUIET_MS, TimeUnit.MILLISECONDS); return
+        }
+        waking = false
+        mapper.endTurn(RunStatus.COMPLETED)
     }
 
     /** First of `prompt_complete` / prompt reply wins; background-task wakes are not the user's turn. */
@@ -504,6 +545,7 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
         val call = p.optJSONObject("toolCall") ?: JSONObject()
         val callId = call.optString("toolCallId")
         val question = profile.interactionQuestions && callId.startsWith("interaction_")
+        mapper.adoptInput(call)
         if (!question) {
             val kind = call.optString("kind").ifEmpty { mapper.toolKind(callId) ?: "other" }
             if (allow(kind, cfg.runtimeMode)) {
@@ -556,6 +598,8 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
         private const val SETUP_S = 90L
         private const val LOAD_S = 90L
         private const val CANCEL_WAIT_S = 15L
+        private const val WAKE_QUIET_MS = 5_000L
+        private val WAKE_KINDS = setOf("agent_message_chunk", "agent_thought_chunk", "tool_call")
         private val KEEP_WHILE_LOADING = setOf("available_commands_update", "current_mode_update", "config_option_update")
         const val NO_PLAN = "# No plan written yet\n\n(The agent exited plan mode without writing a plan.)"
         const val PLAN_CAPTURED = "The client captured your proposed plan. Stop here and wait for the user's feedback or implementation request in a later turn."

@@ -76,7 +76,7 @@ private val ROW_PAD = Modifier.fillMaxWidth().padding(horizontal = S.edge, verti
 @Composable
 internal fun TimelineRow(v: AgentChatView, t: ChatThread, row: Row, liveRun: String?, lastRun: String?, ttft: Long?, metaText: String?) {
     when (row) {
-        is Row.Work -> WorkGroup(v, t, row.items, live = row.runId != null && row.runId == liveRun)
+        is Row.Work -> WorkGroup(v, t, row.items, row.kids, live = row.runId != null && row.runId == liveRun)
         is Row.Meta -> MetaRow(row.run, metaText, ttft.takeIf { row.run.id == lastRun })
         is Row.Item -> ItemRow(v, t, row.item, row.item.runId != null && row.item.runId == liveRun)
     }
@@ -238,7 +238,7 @@ private fun Reasoning(p: ItemPayload.Reasoning, running: Boolean, modifier: Modi
 
 /** Collapsible work log of one run (t3code work group); the live turn stays expanded. */
 @Composable
-private fun WorkGroup(v: AgentChatView, t: ChatThread, items: List<TurnItem>, live: Boolean) {
+private fun WorkGroup(v: AgentChatView, t: ChatThread, items: List<TurnItem>, kids: Map<String, List<TurnItem>>, live: Boolean) {
     var open by remember(live) { mutableStateOf(live) }
     val failed = items.count { it.status == ItemStatus.FAILED }
     val running = items.any { it.status == ItemStatus.RUNNING }
@@ -259,22 +259,73 @@ private fun WorkGroup(v: AgentChatView, t: ChatThread, items: List<TurnItem>, li
         }
         if (open) items.forEach { i ->
             Hairline()
-            WorkItem(v, t, i, Modifier.fillMaxWidth())
+            WorkItem(v, t, i, Modifier.fillMaxWidth(), kids)
         }
     }
 }
 
 @Composable
-private fun WorkItem(v: AgentChatView, t: ChatThread, item: TurnItem, modifier: Modifier) {
+private fun WorkItem(v: AgentChatView, t: ChatThread, item: TurnItem, modifier: Modifier, kids: Map<String, List<TurnItem>> = emptyMap()) {
     val running = item.status == ItemStatus.RUNNING
+    val mine = kids[item.id].orEmpty()
+    if (item.payload is ItemPayload.Subagent || mine.isNotEmpty()) return SubagentCard(v, t, item, mine, kids, modifier)
     when (val p = item.payload) {
         is ItemPayload.CommandExecution -> CommandCard(p, item.status, modifier)
         is ItemPayload.FileChange -> FileChangeRow(v, t, p, modifier)
         is ItemPayload.FileSearch -> ToolLine(Ic.Search, p.pattern, "${p.results.size} results", item.status, modifier)
         is ItemPayload.WebSearch -> ToolLine(Ic.Globe, p.query, "${p.results.size} results", item.status, modifier)
         is ItemPayload.DynamicTool -> ToolLine(Ic.Wrench, p.name, null, item.status, modifier)
-        is ItemPayload.Subagent -> ToolLine(Ic.Bot, p.title, if (p.childCount > 0) "${p.childCount} steps" else if (running) "working" else null, item.status, modifier)
         else -> {}
+    }
+}
+
+/**
+ * Subagent / task card (t3code subagent work entry): title, live activity or step count, status; expands to the
+ * child's own activity (nested) and its result.
+ */
+@Composable
+private fun SubagentCard(v: AgentChatView, t: ChatThread, item: TurnItem, children: List<TurnItem>, kids: Map<String, List<TurnItem>>, modifier: Modifier) {
+    val p = item.payload as? ItemPayload.Subagent
+    val running = item.status == ItemStatus.RUNNING || item.status == ItemStatus.PENDING
+    var open by rememberSaveable(item.id) { mutableStateOf(false) }
+    val steps = children.count { it.type != "assistant_message" && it.type != "reasoning" }
+    val title = p?.title ?: (item.payload as? ItemPayload.DynamicTool)?.name ?: ChatLogic.activity(item.payload) ?: "Subagent"
+    val meta = when {
+        running -> ChatLogic.currentActivity(children, item.runId) ?: "working"
+        steps > 0 -> if (steps == 1) "1 step" else "$steps steps"
+        else -> null
+    }
+    val canOpen = children.isNotEmpty() || !p?.result.isNullOrBlank()
+    Column(modifier.animateContentSize()) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(enabled = canOpen, onClickLabel = if (open) "Hide subagent activity" else "Show subagent activity") { open = !open }
+                .padding(horizontal = S.m, vertical = S.s),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NcIcon(Ic.Bot, null, tint = if (item.status == ItemStatus.FAILED) C.error else C.tertiary, size = 16.dp)
+            Column(Modifier.weight(1f).padding(horizontal = S.s)) {
+                Text(title, color = C.on, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                meta?.let { Text(it, Modifier.shimmer(running), color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+            ItemStatusIcon(item.status)
+            if (canOpen) Chevron(open, Modifier.padding(start = S.s), size = 14.dp)
+        }
+        if (open) Row(Modifier.height(IntrinsicSize.Min).padding(start = S.l, end = S.s, bottom = S.s)) {
+            Box(Modifier.width(2.dp).fillMaxHeight().background(C.tertiary.copy(alpha = 0.4f)))
+            Column(Modifier.weight(1f).padding(start = S.s)) {
+                children.forEach { c ->
+                    when (val cp = c.payload) {
+                        is ItemPayload.AssistantMessage -> Text(cp.text, Modifier.padding(vertical = S.xs), color = C.onVar, style = T.bodySm, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                        is ItemPayload.Reasoning -> Reasoning(cp, c.status == ItemStatus.RUNNING, Modifier.fillMaxWidth())
+                        else -> WorkItem(v, t, c, Modifier.fillMaxWidth(), kids)
+                    }
+                }
+                p?.result?.takeIf { it.isNotBlank() && !running }?.let {
+                    Overline("Result", Modifier.padding(top = S.s), color = C.outline)
+                    Markdown(it, streaming = false, modifier = Modifier.padding(top = S.xs).heightIn(max = 320.dp).verticalScroll(rememberScrollState()))
+                }
+            }
+        }
     }
 }
 

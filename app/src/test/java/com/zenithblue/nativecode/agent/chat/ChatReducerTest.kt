@@ -57,6 +57,18 @@ class ChatReducerTest {
         return fx
     }
 
+    @Test fun reasoningGetsDurationWhenTextStarts() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        r.beginRun("c1", "hi", emptyList())
+        r.step(rows, AgentEvent.TurnStarted("n1"))
+        r.step(rows, AgentEvent.ItemUpsert("th", ItemStatus.RUNNING, ItemPayload.Reasoning("hmm")))
+        clock += 3000
+        r.step(rows, AgentEvent.ItemUpsert("a1", ItemStatus.RUNNING, ItemPayload.AssistantMessage("Hi")))
+        val th = rows.items.values.first { it.payload is ItemPayload.Reasoning }
+        assertEquals(ItemStatus.COMPLETED, th.status)
+        assertTrue((th.payload as ItemPayload.Reasoning).durationMs!! >= 3000)
+    }
+
     @Test fun firstTokenPerRunAndReconnecting() {
         val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
         val run1 = r.beginRun("c1", "hi", emptyList())

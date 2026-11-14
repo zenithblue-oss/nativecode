@@ -20,6 +20,7 @@ object AcpWire {
     const val CANCEL = "__cancel"
     private const val OUTPUT_TAIL = 64 * 1024
     private const val PREVIEW = 8_000
+    private val SUBAGENT_VERB = Regex("""^Run(ning)? (invoke|start|spawn)_subagent\??$""")
     private const val IMAGE_MAX = 10L shl 20
     private const val TEXT_MAX = 1L shl 20
     private val TEXT_MIME = Regex("""^(text/.*|application/(json|xml|yaml|x-yaml|javascript|x-sh|toml))$""")
@@ -257,7 +258,7 @@ object AcpWire {
         val diffs = objects(t.content).filter { it.optString("type") == "diff" }
         if (t.isSubagent) {
             val roles = objects(t.rawInput?.optJSONArray("Subagents")).mapNotNull { it.optString("Role").ifEmpty { null } }
-            val name = roles.joinToString(", ").ifEmpty { str(t.rawInput, "description", "subagent_type") ?: title }
+            val name = roles.joinToString(", ").ifEmpty { str(t.rawInput, "description", "subagent_type") ?: title.replace(SUBAGENT_VERB, "Subagent") }
             return ItemPayload.Subagent(name, roles.size.coerceAtLeast(if (roles.isEmpty()) 0 else 1), out.ifBlank { null }?.take(PREVIEW))
         }
         val xai = t.xaiTool

@@ -131,6 +131,19 @@ class ChatLogicTest {
         assertEquals("Ran 1 command · edited 1 file", ChatLogic.workSummary((rows[1] as Row.Work).items))
     }
 
+    @Test fun subagentActivityNestsUnderItsCard() {
+        fun item(id: String, p: ItemPayload, parent: String? = null) = TurnItem(id, "t", "r1", id.hashCode(), null, parent, ItemStatus.COMPLETED, p, 0)
+        val items = listOf(
+            item("s", ItemPayload.Subagent("explore")),
+            item("k1", ItemPayload.CommandExecution("ls"), "s"),
+            item("k2", ItemPayload.AssistantMessage("found it"), "s"),
+            item("a", ItemPayload.AssistantMessage("done")),
+        )
+        val rows = ChatLogic.rows(items, emptyMap())
+        assertEquals(listOf("w:s", "a"), rows.map { it.key })
+        assertEquals(listOf("k1", "k2"), (rows[0] as Row.Work).kids["s"]!!.map { it.id })
+    }
+
     @Test fun foldLongText() {
         val t = (1..20).joinToString("\n")
         val (f, folded) = ChatLogic.fold(t)

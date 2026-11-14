@@ -99,6 +99,7 @@ class ChatReducer(
     private var runDirty = false
     private val items = LinkedHashMap<String, TurnItem>()          // current run, keyed by native ref (or id)
     private val dirty = LinkedHashSet<String>()
+    private val reasonStart = HashMap<String, Long>()               // reasoning native ref → first seen
     private val live = LinkedHashMap<String, ChatRequest>()        // pending requests of the live session, by native id
     private val stale = LinkedHashMap<String, ChatRequest>()       // pending user-input from an ended session, by id
     private val writes = mutableListOf<ChatWrite>()
@@ -380,7 +381,11 @@ class ChatReducer(
     private fun upsertItem(e: AgentEvent.ItemUpsert) {
         val old = items[e.nativeRef]
         if (old?.payload is ItemPayload.UserMessage) return // the client owns user messages (text + attachments)
-        val payload = (e.payload as? ItemPayload.CommandExecution)?.let { it.copy(outputTail = it.outputTail.takeLast(OUTPUT_TAIL)) } ?: e.payload
+        var payload = (e.payload as? ItemPayload.CommandExecution)?.let { it.copy(outputTail = it.outputTail.takeLast(OUTPUT_TAIL)) } ?: e.payload
+        if (payload is ItemPayload.Reasoning) {
+            val start = reasonStart.getOrPut(e.nativeRef) { now() }
+            if (payload.durationMs == null && e.status !in OPEN_ITEM) payload = payload.copy(durationMs = now() - start)
+        } else closeReasoning(ItemStatus.COMPLETED) // t3code: thinking ends when the next part starts ("Thought for Ns")
         items[e.nativeRef] = old?.copy(status = e.status, payload = payload, updatedAt = now(),
             parentId = e.parentRef?.let { items[it]?.id } ?: old.parentId)
             ?: TurnItem(newId(), thread.id, run?.id, itemOrd++, e.nativeRef, e.parentRef?.let { items[it]?.id }, e.status, payload, now())
@@ -391,6 +396,16 @@ class ChatReducer(
             (payload is ItemPayload.AssistantMessage || payload is ItemPayload.Reasoning)
         ) state = state.copy(firstTokenMs = (now() - started).coerceAtLeast(0), firstTokenRunId = r.id)
         publishItems()
+    }
+
+    /** Open reasoning items of this run → [status], with their duration (runtimes that send no timing). */
+    private fun closeReasoning(status: ItemStatus) {
+        for ((k, it) in items) {
+            val p = it.payload as? ItemPayload.Reasoning ?: continue
+            if (it.status !in OPEN_ITEM) continue
+            items[k] = it.copy(status = status, payload = p.copy(durationMs = p.durationMs ?: reasonStart[k]?.let { s -> now() - s }), updatedAt = now())
+            dirty += k
+        }
     }
 
     private fun request(e: AgentEvent.RequestUpsert) {
@@ -455,6 +470,7 @@ class ChatReducer(
             else -> ItemStatus.INTERRUPTED
         }
         expireLive(expireUserInput)
+        closeReasoning(itemStatus)
         for ((k, it) in items) if (!k.startsWith("req:") && it.status in OPEN_ITEM) { items[k] = it.copy(status = itemStatus, updatedAt = now()); dirty += k }
         if (failure != null) {
             val it = TurnItem(newId(), thread.id, r.id, itemOrd++, null, null, ItemStatus.COMPLETED,

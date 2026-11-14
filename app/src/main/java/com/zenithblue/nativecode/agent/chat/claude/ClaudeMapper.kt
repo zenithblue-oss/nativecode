@@ -172,7 +172,8 @@ internal class ClaudeMapper(
                     "text", "thinking" -> if (parent == null) {
                         val ref = "$msg:$idx"
                         blockRefs[ref] = ref
-                        texts.getOrPut(ref) { Text(ref, b.optString("type") == "thinking", null) }
+                        val t = texts.getOrPut(ref) { Text(ref, b.optString("type") == "thinking", null) }
+                        if (t.thinking) emitText(t, ItemStatus.RUNNING) // "Thinking" row from the first frame (its duration starts here)
                     }
                     "tool_use" -> {
                         val id = b.optString("id")
@@ -211,7 +212,7 @@ internal class ClaudeMapper(
     }
 
     private fun emitText(t: Text, status: ItemStatus) {
-        if (t.sb.isBlank()) return
+        if (t.sb.isBlank() && !t.thinking) return // a thinking block with display omitted still shows "Thought for Ns"
         t.shown = true
         sink(AgentEvent.ItemUpsert(t.ref, status, if (t.thinking) ItemPayload.Reasoning(t.sb.toString()) else ItemPayload.AssistantMessage(t.sb.toString())))
     }
