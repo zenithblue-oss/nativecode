@@ -453,6 +453,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val ID_TOPBAR = 28
     private val ID_BACKUP = 29
     private val ID_SSH = 30
+    private val ID_USAGE = 31
+    private var usagePage: com.zenithblue.nativecode.usage.ui.UsagePage? = null
+    private val usageHost = object : com.zenithblue.nativecode.usage.ui.UsageHostApi {
+        override fun allowed(agent: String) =
+            FeatureGate.canLaunchAiTool(isPro(), com.zenithblue.nativecode.usage.UsageModel.toolId(agent)) is GateResult.Allow
+        override fun upgrade() { gateAllows(FeatureGate.canLaunchAiTool(isPro(), "claude-code")) }
+    }
     /** Settings sub-pages built by [buildExtraPage] (SSH, AI usage): shown/hidden/back-handled generically. */
     private val extraPages = LinkedHashMap<Int, ScrollView>()
     private val extraPageOnShow = HashMap<Int, () -> Unit>()
@@ -1265,6 +1272,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 homeScrollView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
                 populateRecentProjects()
                 refreshHomeSsh()
+                refreshHomeUsage()
                 val valTv = homeLayout.findViewWithTag<TextView>("APP_STORAGE_VAL")
                 val subTv = homeLayout.findViewWithTag<TextView>("APP_STORAGE_SUB")
                 val barFill = homeLayout.findViewWithTag<View>("APP_STORAGE_BAR")
@@ -2040,6 +2048,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         buildTopBarPage()
         buildBackupPage()
         buildSshPage()
+        buildUsagePage()
         buildPrivacyPolicyPage()
         buildHardwarePage()
         buildProotSettingsPage()
@@ -4575,6 +4584,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 title = "SSH",
                 subtitle = "SSH server (Pro) · remote hosts · keys",
                 pageId = ID_SSH
+            )
+        )
+        settingsHubLayout.addView(spacer(16))
+
+        settingsHubLayout.addView(
+            settingsHubNavRow(
+                iconRes = R.drawable.ic_lucide_chart,
+                title = "AI USAGE",
+                subtitle = "Tokens and cost per AI CLI",
+                pageId = ID_USAGE
             )
         )
         settingsHubLayout.addView(spacer(16))
@@ -9735,12 +9754,33 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         return section
     }
 
-    /** Home: SSH entry (server status) and, later, the AI usage summary. */
+    /** Home: AI usage summary and the SSH entry (server status). */
     private fun buildHomeToolsSection(): View {
         val section = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) }
         }
+        section.addView(TextView(this).apply {
+            text = "// AI USAGE"
+            textSize = 13f
+            setTextColor(NC.PRIMARY)
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setPadding(0, 0, 0, dp(12))
+        })
+        section.addView(buildHomePackageModuleCard(
+            accentFill = false,
+            iconRes = R.drawable.ic_lucide_chart,
+            kicker = "USAGE",
+            title = "AI USAGE",
+            subtitle = "Tokens and cost per AI CLI.",
+            footer = "DAY · WEEK · MONTH · PER CLI",
+            pageId = ID_USAGE,
+            onSubtitle = { tv ->
+                homeUsageSubtitle = tv
+                refreshHomeUsage()
+            }
+        ).apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(16) } })
         section.addView(TextView(this).apply {
             text = "// REMOTE ACCESS"
             textSize = 13f
@@ -21748,6 +21788,40 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun buildSshPage() {
         val p = com.zenithblue.nativecode.ssh.ui.SshPage(this, sshHost).also { sshPage = it }
         buildExtraPage(ID_SSH, "SSH", "// SERVER AND REMOTE HOSTS", R.drawable.ic_lucide_server, p.content) { p.refresh() }
+    }
+
+    /** Settings -> AI usage (plan 18): per-CLI tokens and cost from ccusage, drawn natively. */
+    private fun buildUsagePage() {
+        val p = com.zenithblue.nativecode.usage.ui.UsagePage(this, usageHost).also { usagePage = it }
+        buildExtraPage(ID_USAGE, "AI USAGE", "// TOKENS AND COST", R.drawable.ic_lucide_chart, p.content) { p.refresh() }
+    }
+
+    private var homeUsageSubtitle: TextView? = null
+    private val homeUsageRefreshing = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Home AI usage card: today's tokens and cost from the cached report; reloads it in the background when older than 10 minutes. */
+    private fun refreshHomeUsage() {
+        val tv = homeUsageSubtitle ?: return
+        if (!homeUsageRefreshing.compareAndSet(false, true)) return
+        Thread {
+            val line = try {
+                val repo = com.zenithblue.nativecode.usage.UsageRepository
+                val m = com.zenithblue.nativecode.usage.UsageModel
+                if (!repo.isInstalled(this)) "Tokens and cost per AI CLI. Tap to set up."
+                else {
+                    if (repo.cacheAgeMs(this) > 600_000L) repo.load(this)
+                    val rep = repo.cached(this)?.only(usageHost::allowed)
+                    val t = rep?.let { m.today(it, repo.todayString()) }
+                    when {
+                        rep == null -> "No usage data yet. Tap to read it."
+                        t == null -> "Today: no AI usage yet."
+                        else -> "Today: ${m.fmtTokens(t.first)} tokens · ${m.fmtCost(t.second)} est."
+                    }
+                }
+            } catch (_: Exception) { "Tokens and cost per AI CLI." }
+            homeUsageRefreshing.set(false)
+            runOnUiThread { homeUsageSubtitle?.text = line }
+        }.start()
     }
 
     /** `ssh ...` line in a new app terminal tab (Free). Runs through the guest shell, closes the tab when ssh ends cleanly. */
