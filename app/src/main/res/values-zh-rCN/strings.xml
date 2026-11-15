@@ -1455,4 +1455,37 @@
     <string name="main_agent_chat_on_the_terminal">在终端标签页和项目工作区中显示智能体对话，并提供对话/终端切换。关闭 = 仅终端。</string>
     <string name="main_tokens_and_cost_per_ai_3">各 AI CLI 的令牌和费用。点击设置。</string>
     <string name="main_today_tokens_est">今日：%1$s 令牌 · 预估 %2$s。</string>
+    <string name="main_caps_create_new_project">创建新项目</string>
+    <string name="main_caps_got_it">知道了</string>
+    <string name="main_caps_continue">继续</string>
+    <string name="main_caps_system_configuration_preferences">// 系统配置与偏好设置</string>
+    <string name="main_caps_play_delivered_development_components">// Play 提供的开发组件</string>
+    <string name="main_caps_ai_cli_tools">AI CLI 工具</string>
+    <string name="main_caps_re_run_setup_fix_scripts">// 重新运行安装与修复脚本</string>
+    <string name="main_caps_alpine_guest_environment">// Alpine guest 环境</string>
+    <string name="main_caps_preview">预览</string>
+    <string name="main_caps_start_phosh_desktop">启动 Phosh 桌面</string>
+    <string name="main_caps_package_ops">// 软件包操作</string>
+    <string name="main_caps_ai_usage">// AI 用量</string>
+    <string name="main_caps_remote_access">// 远程访问</string>
+    <string name="main_caps_refresh">刷新</string>
+    <string name="main_caps_scanning">扫描中</string>
+    <string name="main_caps_installed">已安装</string>
+    <string name="main_caps_installed_packages">// 已安装软件包</string>
+    <string name="main_caps_curated_components_apps">// 精选组件与应用</string>
+    <string name="main_caps_installed_launchable_apps">// 已安装的可启动应用</string>
+    <string name="main_caps_running">运行中</string>
+    <string name="main_caps_no_repos_loaded">// 未加载仓库</string>
+    <string name="main_caps_gpu_accel_vpu_host_agent_bridge">// GPU 加速 + VPU + 主机代理桥</string>
+    <string name="main_caps_unavailable">不可用</string>
+    <string name="main_caps_view_only">// 仅查看</string>
+    <string name="main_caps_project_config">// 项目配置</string>
+    <string name="main_caps_changed_files">// 已更改文件</string>
+    <string name="main_caps_phone_stats_in_the_top_bar">// 顶部栏显示手机状态</string>
+    <string name="main_caps_back_up_and_restore">// 备份与恢复</string>
+    <string name="main_caps_working_tree_clean">// 工作区干净</string>
+    <string name="main_caps_font_size">字号：%1$d PT（%2$d%%）</string>
+    <string name="main_opened_ago">%1$s打开</string>
+    <string name="main_one_project_caps">1 个项目</string>
+    <string name="main_n_projects_caps">%1$d 个项目</string>
 </resources>

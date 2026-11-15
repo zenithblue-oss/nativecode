@@ -1455,4 +1455,37 @@
     <string name="main_agent_chat_on_the_terminal">TerminalタブとプロジェクトワークスペースでエージェントチャットをChat/Terminalの切り替え付きで表示します。オフ = terminalのみ。</string>
     <string name="main_tokens_and_cost_per_ai_3">AI CLIごとのトークンとコスト。タップして設定。</string>
     <string name="main_today_tokens_est">今日: %1$sトークン · 推定%2$s</string>
+    <string name="main_caps_create_new_project">新規プロジェクトを作成</string>
+    <string name="main_caps_got_it">了解</string>
+    <string name="main_caps_continue">続行</string>
+    <string name="main_caps_system_configuration_preferences">// システム設定と環境設定</string>
+    <string name="main_caps_play_delivered_development_components">// Play提供の開発コンポーネント</string>
+    <string name="main_caps_ai_cli_tools">AI CLIツール</string>
+    <string name="main_caps_re_run_setup_fix_scripts">// セットアップ・修復スクリプトを再実行</string>
+    <string name="main_caps_alpine_guest_environment">// Alpineゲスト環境</string>
+    <string name="main_caps_preview">プレビュー</string>
+    <string name="main_caps_start_phosh_desktop">Phoshデスクトップを起動</string>
+    <string name="main_caps_package_ops">// パッケージ操作</string>
+    <string name="main_caps_ai_usage">// AI使用状況</string>
+    <string name="main_caps_remote_access">// リモートアクセス</string>
+    <string name="main_caps_refresh">更新</string>
+    <string name="main_caps_scanning">スキャン中</string>
+    <string name="main_caps_installed">インストール済み</string>
+    <string name="main_caps_installed_packages">// インストール済みパッケージ</string>
+    <string name="main_caps_curated_components_apps">// 厳選コンポーネントとアプリ</string>
+    <string name="main_caps_installed_launchable_apps">// 起動可能なインストール済みアプリ</string>
+    <string name="main_caps_running">実行中</string>
+    <string name="main_caps_no_repos_loaded">// リポジトリ未読み込み</string>
+    <string name="main_caps_gpu_accel_vpu_host_agent_bridge">// GPUアクセラレーション + VPU + ホストエージェントブリッジ</string>
+    <string name="main_caps_unavailable">利用不可</string>
+    <string name="main_caps_view_only">// 表示専用</string>
+    <string name="main_caps_project_config">// プロジェクト設定</string>
+    <string name="main_caps_changed_files">// 変更されたファイル</string>
+    <string name="main_caps_phone_stats_in_the_top_bar">// 上部バーにスマホの統計を表示</string>
+    <string name="main_caps_back_up_and_restore">// バックアップと復元</string>
+    <string name="main_caps_working_tree_clean">// ワーキングツリーはクリーン</string>
+    <string name="main_caps_font_size">フォントサイズ: %1$d PT (%2$d%%)</string>
+    <string name="main_opened_ago">%1$sに開いた</string>
+    <string name="main_one_project_caps">1件のプロジェクト</string>
+    <string name="main_n_projects_caps">%1$d件のプロジェクト</string>
 </resources>

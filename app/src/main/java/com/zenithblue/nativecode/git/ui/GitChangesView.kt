@@ -249,7 +249,7 @@ internal class GitChangesView(
         amend.isEnabled = s.oid != null
 
         if (s.files.isEmpty()) {
-            msgTv.text = "// WORKING TREE CLEAN"; msgTv.visibility = View.VISIBLE
+            msgTv.text = tr(R.string.main_caps_working_tree_clean); msgTv.visibility = View.VISIBLE
             return
         }
         msgTv.visibility = View.GONE

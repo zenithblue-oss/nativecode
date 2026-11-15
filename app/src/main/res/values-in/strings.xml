@@ -1455,4 +1455,37 @@
     <string name="main_agent_chat_on_the_terminal">Chat agen di tab Terminal dan workspace proyek, dengan pengalih Chat/Terminal. Mati = hanya terminal.</string>
     <string name="main_tokens_and_cost_per_ai_3">Token dan biaya per CLI AI. Ketuk untuk menyiapkan.</string>
     <string name="main_today_tokens_est">Hari ini: %1$s token · est. %2$s</string>
+    <string name="main_caps_create_new_project">BUAT PROYEK BARU</string>
+    <string name="main_caps_got_it">MENGERTI</string>
+    <string name="main_caps_continue">LANJUT</string>
+    <string name="main_caps_system_configuration_preferences">// KONFIGURASI SISTEM &amp; PREFERENSI</string>
+    <string name="main_caps_play_delivered_development_components">// KOMPONEN PENGEMBANGAN DARI PLAY</string>
+    <string name="main_caps_ai_cli_tools">ALAT AI CLI</string>
+    <string name="main_caps_re_run_setup_fix_scripts">// JALANKAN ULANG PENYIAPAN &amp; SKRIP PERBAIKAN</string>
+    <string name="main_caps_alpine_guest_environment">// LINGKUNGAN GUEST ALPINE</string>
+    <string name="main_caps_preview">PRATINJAU</string>
+    <string name="main_caps_start_phosh_desktop">MULAI DESKTOP PHOSH</string>
+    <string name="main_caps_package_ops">// OPERASI PAKET</string>
+    <string name="main_caps_ai_usage">// PENGGUNAAN AI</string>
+    <string name="main_caps_remote_access">// AKSES JARAK JAUH</string>
+    <string name="main_caps_refresh">SEGARKAN</string>
+    <string name="main_caps_scanning">MEMINDAI</string>
+    <string name="main_caps_installed">TERPASANG</string>
+    <string name="main_caps_installed_packages">// PAKET TERPASANG</string>
+    <string name="main_caps_curated_components_apps">// KOMPONEN &amp; APLIKASI PILIHAN</string>
+    <string name="main_caps_installed_launchable_apps">// APLIKASI TERPASANG YANG DAPAT DILUNCURKAN</string>
+    <string name="main_caps_running">BERJALAN</string>
+    <string name="main_caps_no_repos_loaded">// TIDAK ADA REPO DIMUAT</string>
+    <string name="main_caps_gpu_accel_vpu_host_agent_bridge">// AKSELERASI GPU + VPU + JEMBATAN AGEN HOST</string>
+    <string name="main_caps_unavailable">TIDAK TERSEDIA</string>
+    <string name="main_caps_view_only">// HANYA LIHAT</string>
+    <string name="main_caps_project_config">// KONFIGURASI PROYEK</string>
+    <string name="main_caps_changed_files">// FILE YANG DIUBAH</string>
+    <string name="main_caps_phone_stats_in_the_top_bar">// STATISTIK PONSEL DI BILAH ATAS</string>
+    <string name="main_caps_back_up_and_restore">// CADANGKAN DAN PULIHKAN</string>
+    <string name="main_caps_working_tree_clean">// POHON KERJA BERSIH</string>
+    <string name="main_caps_font_size">UKURAN FONT: %1$d PT (%2$d%%)</string>
+    <string name="main_opened_ago">Dibuka %1$s</string>
+    <string name="main_one_project_caps">1 PROYEK</string>
+    <string name="main_n_projects_caps">%1$d PROYEK</string>
 </resources>

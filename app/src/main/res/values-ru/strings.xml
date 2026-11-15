@@ -1455,4 +1455,37 @@
     <string name="main_agent_chat_on_the_terminal">Чат с агентом во вкладке Terminal и в рабочей области проекта с переключателем Чат/Terminal. Выкл. = только terminal.</string>
     <string name="main_tokens_and_cost_per_ai_3">Токены и стоимость по каждому ИИ CLI. Нажмите для настройки.</string>
     <string name="main_today_tokens_est">Сегодня: %1$s токенов · прибл. %2$s</string>
+    <string name="main_caps_create_new_project">СОЗДАТЬ НОВЫЙ ПРОЕКТ</string>
+    <string name="main_caps_got_it">ПОНЯТНО</string>
+    <string name="main_caps_continue">ДАЛЕЕ</string>
+    <string name="main_caps_system_configuration_preferences">// КОНФИГУРАЦИЯ СИСТЕМЫ И НАСТРОЙКИ</string>
+    <string name="main_caps_play_delivered_development_components">// КОМПОНЕНТЫ РАЗРАБОТКИ ИЗ PLAY</string>
+    <string name="main_caps_ai_cli_tools">ИНСТРУМЕНТЫ AI CLI</string>
+    <string name="main_caps_re_run_setup_fix_scripts">// ПОВТОРНЫЙ ЗАПУСК НАСТРОЙКИ И СКРИПТОВ ИСПРАВЛЕНИЯ</string>
+    <string name="main_caps_alpine_guest_environment">// ГОСТЕВАЯ СРЕДА ALPINE</string>
+    <string name="main_caps_preview">ПРЕДПРОСМОТР</string>
+    <string name="main_caps_start_phosh_desktop">ЗАПУСТИТЬ РАБОЧИЙ СТОЛ PHOSH</string>
+    <string name="main_caps_package_ops">// ОПЕРАЦИИ С ПАКЕТАМИ</string>
+    <string name="main_caps_ai_usage">// ИСПОЛЬЗОВАНИЕ ИИ</string>
+    <string name="main_caps_remote_access">// УДАЛЁННЫЙ ДОСТУП</string>
+    <string name="main_caps_refresh">ОБНОВИТЬ</string>
+    <string name="main_caps_scanning">СКАНИРОВАНИЕ</string>
+    <string name="main_caps_installed">УСТАНОВЛЕНО</string>
+    <string name="main_caps_installed_packages">// УСТАНОВЛЕННЫЕ ПАКЕТЫ</string>
+    <string name="main_caps_curated_components_apps">// ПОДОБРАННЫЕ КОМПОНЕНТЫ И ПРИЛОЖЕНИЯ</string>
+    <string name="main_caps_installed_launchable_apps">// УСТАНОВЛЕННЫЕ ЗАПУСКАЕМЫЕ ПРИЛОЖЕНИЯ</string>
+    <string name="main_caps_running">РАБОТАЕТ</string>
+    <string name="main_caps_no_repos_loaded">// РЕПОЗИТОРИИ НЕ ЗАГРУЖЕНЫ</string>
+    <string name="main_caps_gpu_accel_vpu_host_agent_bridge">// УСКОРЕНИЕ GPU + VPU + МОСТ ХОСТ-АГЕНТА</string>
+    <string name="main_caps_unavailable">НЕДОСТУПНО</string>
+    <string name="main_caps_view_only">// ТОЛЬКО ПРОСМОТР</string>
+    <string name="main_caps_project_config">// КОНФИГ ПРОЕКТА</string>
+    <string name="main_caps_changed_files">// ИЗМЕНЁННЫЕ ФАЙЛЫ</string>
+    <string name="main_caps_phone_stats_in_the_top_bar">// СТАТИСТИКА ТЕЛЕФОНА В ВЕРХНЕЙ ПАНЕЛИ</string>
+    <string name="main_caps_back_up_and_restore">// РЕЗЕРВНОЕ КОПИРОВАНИЕ И ВОССТАНОВЛЕНИЕ</string>
+    <string name="main_caps_working_tree_clean">// РАБОЧЕЕ ДЕРЕВО ЧИСТО</string>
+    <string name="main_caps_font_size">РАЗМЕР ШРИФТА: %1$d PT (%2$d%%)</string>
+    <string name="main_opened_ago">Открыто %1$s</string>
+    <string name="main_one_project_caps">1 ПРОЕКТ</string>
+    <string name="main_n_projects_caps">ПРОЕКТОВ: %1$d</string>
 </resources>

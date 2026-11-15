@@ -1981,7 +1981,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             itemIconTintList = navTintList
             itemTextColor = navTintList
             itemActiveIndicatorColor = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
-            menu.add(Menu.NONE, ID_HOME,          Menu.NONE, "HOME").setIcon(R.drawable.ic_home)
+            menu.add(Menu.NONE, ID_HOME,          Menu.NONE, tr(R.string.main_home).uppercase()).setIcon(R.drawable.ic_home)
             menu.add(Menu.NONE, ID_PROJECTS_LIST, Menu.NONE, tr(R.string.main_project)).setIcon(R.drawable.ic_folder)
             menu.add(Menu.NONE, ID_TERMINAL,      Menu.NONE, tr(R.string.main_terminal)).setIcon(R.drawable.ic_terminal)
             menu.add(Menu.NONE, ID_SETTINGS,      Menu.NONE, tr(R.string.main_settings)).setIcon(R.drawable.ic_settings)
@@ -3163,7 +3163,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val tabsData = listOf(
-            Triple(ID_HOME, R.drawable.ic_home, "HOME"),
+            Triple(ID_HOME, R.drawable.ic_home, tr(R.string.main_home).uppercase()),
             Triple(ID_PROJECTS_LIST, R.drawable.ic_folder, tr(R.string.main_project)),
             Triple(ID_TERMINAL, R.drawable.ic_terminal, tr(R.string.main_terminal)),
             Triple(ID_SETTINGS, R.drawable.ic_settings, tr(R.string.main_settings))
@@ -3639,7 +3639,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val createBtn = TextView(this).apply {
-            text = "  CREATE NEW PROJECT"
+            text = "  " + tr(R.string.main_caps_create_new_project)
             textSize = 13f
             setTextColor(Color.WHITE)
             typeface = Typeface.MONOSPACE
@@ -4115,7 +4115,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             })
         }
         btnRow.addView(TextView(this).apply {
-            text = if (onContinue == null) "GOT IT" else "CONTINUE"
+            text = if (onContinue == null) tr(R.string.main_caps_got_it) else tr(R.string.main_caps_continue)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -4543,7 +4543,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         headerTitleRow.addView(headerIcon)
         headerTitleRow.addView(titleTv)
         val subTitleTv = TextView(this).apply {
-            text = "// SYSTEM CONFIGURATION & PREFERENCES"
+            text = tr(R.string.main_caps_system_configuration_preferences)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -4825,7 +4825,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         page.addView(
             buildSubPageHeader(
                 title = tr(R.string.main_components),
-                subtitle = "// PLAY-DELIVERED DEVELOPMENT COMPONENTS",
+                subtitle = tr(R.string.main_caps_play_delivered_development_components),
                 iconRes = R.drawable.ic_download,
                 pageId = ID_COMPONENTS
             ) { badge -> badge.text = tr(R.string.main_play) }
@@ -5254,7 +5254,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
             details.addView(TextView(this@MainActivity).apply {
-                text = "AI CLI TOOLS"
+                text = tr(R.string.main_caps_ai_cli_tools)
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
@@ -6075,7 +6075,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         headerTitleRow.addView(headerIcon)
         headerTitleRow.addView(titleTv)
         val subTitleTv = TextView(this).apply {
-            text = "// RE-RUN SETUP & FIX SCRIPTS"
+            text = tr(R.string.main_caps_re_run_setup_fix_scripts)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -6218,7 +6218,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             "guest" -> {
                 val rootOk = repairsRootOk == true
                 val hint = TextView(this).apply {
-                    text = "// ALPINE GUEST ENVIRONMENT"
+                    text = tr(R.string.main_caps_alpine_guest_environment)
                     textSize = 10f
                     setTextColor(NC.ON_SURF_VAR)
                     typeface = Typeface.MONOSPACE
@@ -8500,7 +8500,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val previewTab = TextView(this).apply {
-            text = "PREVIEW"
+            text = tr(R.string.main_caps_preview)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -9436,7 +9436,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         startGuiBtn = TextView(this).apply {
-            text = "START PHOSH DESKTOP"
+            text = tr(R.string.main_caps_start_phosh_desktop)
             textSize = 14f
             setTextColor(NC.ON_PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -9771,7 +9771,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(12))
         }
         val sectionTitle = TextView(this).apply {
-            text = "// PACKAGE OPS"
+            text = tr(R.string.main_caps_package_ops)
             textSize = 13f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -9804,7 +9804,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) }
         }
         section.addView(TextView(this).apply {
-            text = "// AI USAGE"
+            text = tr(R.string.main_caps_ai_usage)
             textSize = 13f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -9831,7 +9831,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         ).apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(16) } })
         section.addView(TextView(this).apply {
-            text = "// REMOTE ACCESS"
+            text = tr(R.string.main_caps_remote_access)
             textSize = 13f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -10465,7 +10465,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         prootRefreshBtn = TextView(this).apply {
-            text = " REFRESH"
+            text = " " + tr(R.string.main_caps_refresh)
             textSize = 10f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -10496,7 +10496,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             indeterminateTintList = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
         }
         val loadingLabel = TextView(this).apply {
-            text = " SCANNING"
+            text = " " + tr(R.string.main_caps_scanning)
             textSize = 10f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -10900,7 +10900,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         chrootRefreshBtn = TextView(this).apply {
-            text = " REFRESH"
+            text = " " + tr(R.string.main_caps_refresh)
             textSize = 10f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -10932,7 +10932,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             indeterminateTintList = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
         }
         val loadingLabel = TextView(this).apply {
-            text = " SCANNING"
+            text = " " + tr(R.string.main_caps_scanning)
             textSize = 10f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -11495,7 +11495,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (badge == null) return
         when {
             markerOk -> {
-                badge.text = "INSTALLED"
+                badge.text = tr(R.string.main_caps_installed)
                 badge.setTextColor(Color.parseColor("#0A0A0A"))
                 badge.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -11691,7 +11691,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             indeterminateTintList = android.content.res.ColorStateList.valueOf(NC.ERROR)
         }
         val loadingLabel = TextView(this).apply {
-            text = " SCANNING"
+            text = " " + tr(R.string.main_caps_scanning)
             textSize = 10f
             setTextColor(NC.ERROR)
             typeface = Typeface.MONOSPACE
@@ -12306,7 +12306,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         softwareManagerBody.addView(buildSubPageHeader(
             title = tr(R.string.main_software_manager),
-            subtitle = "// INSTALLED PACKAGES",
+            subtitle = tr(R.string.main_caps_installed_packages),
             iconRes = R.drawable.ic_extension,
             pageId = ID_SOFTWARE_MANAGER
         ) { smEnvBadge = it })
@@ -12426,7 +12426,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         marketplaceBody.addView(buildSubPageHeader(
             title = tr(R.string.main_marketplace),
-            subtitle = "// CURATED COMPONENTS & APPS",
+            subtitle = tr(R.string.main_caps_curated_components_apps),
             iconRes = R.drawable.ic_download,
             pageId = ID_MARKETPLACE
         ) { mpEnvBadge = it })
@@ -12518,7 +12518,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         appsBody.addView(buildSubPageHeader(
             title = tr(R.string.main_apps),
-            subtitle = "// INSTALLED LAUNCHABLE APPS",
+            subtitle = tr(R.string.main_caps_installed_launchable_apps),
             iconRes = R.drawable.ic_play_thick,
             pageId = ID_APPS
         ) { appsEnvBadge = it })
@@ -14140,7 +14140,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         heroText.addView(mpInstallerNameTv)
         heroText.addView(mpInstallerMetaTv)
         mpInstallerStatusTv = TextView(this).apply {
-            text = "RUNNING"
+            text = tr(R.string.main_caps_running)
             textSize = 11f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -14765,9 +14765,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     /** Free tier: idle START shows today's remaining desktop minutes; lock at 0. No-op unless idle START. */
     private fun paintGuiBudget() {
-        if (!::startGuiBtn.isInitialized || !startGuiBtn.text.startsWith("START PHOSH DESKTOP")) return
+        if (!::startGuiBtn.isInitialized || !startGuiBtn.text.startsWith(tr(R.string.main_caps_start_phosh_desktop))) return
         if (!proLocked()) {
-            startGuiBtn.text = "START PHOSH DESKTOP"
+            startGuiBtn.text = tr(R.string.main_caps_start_phosh_desktop)
             startGuiBtn.markProLocked(false)
             return
         }
@@ -14782,7 +14782,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         startGuiBtn.visibility = View.VISIBLE
         val installed = isXfceInstalled()
         if (installed) {
-            startGuiBtn.text = "START PHOSH DESKTOP"
+            startGuiBtn.text = tr(R.string.main_caps_start_phosh_desktop)
             startGuiBtn.isEnabled = true
             startGuiBtn.alpha = 1f
             paintGuiBudget()
@@ -16490,7 +16490,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         if (filtered.isEmpty()) {
             list.addView(TextView(this).apply {
-                text = if (ghReposForMethod.isEmpty()) "// NO REPOS LOADED" else "// NO MATCH FOR \"$query\""
+                text = if (ghReposForMethod.isEmpty()) tr(R.string.main_caps_no_repos_loaded) else "// NO MATCH FOR \"$query\""
                 textSize = 12f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -16886,7 +16886,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         val titleTv = TextView(this).apply {
-            text = "AI CLI TOOLS"
+            text = tr(R.string.main_caps_ai_cli_tools)
             textSize = 22f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -17472,7 +17472,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         pageLayout.addView(headerTitleRow)
 
         pageLayout.addView(TextView(this).apply {
-            text = "// GPU ACCEL + VPU + HOST AGENT BRIDGE"
+            text = tr(R.string.main_caps_gpu_accel_vpu_host_agent_bridge)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -17965,7 +17965,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val hevcEnc = MediaCodecSelector.selectHardwareEncoder("video/hevc")?.name ?: "None"
 
         val hasHw = avcDec != "None" || hevcDec != "None"
-        vpuStatusBadge.text = if (hasHw) tr(R.string.main_active) else "UNAVAILABLE"
+        vpuStatusBadge.text = if (hasHw) tr(R.string.main_active) else tr(R.string.main_caps_unavailable)
         vpuStatusBadge.setTextColor(if (hasHw) NC.PRIMARY else NC.ERROR)
 
         vpuDecodersTv.text = "Hardware Decoders:\n• H.264 / AVC: $avcDec\n• HEVC / H.265: $hevcDec\n• AV1: $av1Dec\n• VP9: $vp9Dec"
@@ -18390,7 +18390,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val method = LinuxCommandBuilder.currentMethod
         val sel = cliAuthSelected
         cliAuthMethodBadge?.text = method.uppercase()
-        cliAuthTitle?.text = if (sel == null) "AI CLI TOOLS" else cliAuthName(sel).uppercase()
+        cliAuthTitle?.text = if (sel == null) tr(R.string.main_caps_ai_cli_tools) else cliAuthName(sel).uppercase()
         val ids = if (sel != null) listOf(sel) else CliToolCatalog.forMethod(method).map { it.id } + "gh"
         Thread {
             val home = ProjectPathResolver.guestHomeDir(this, method)
@@ -19537,7 +19537,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
         topRow.addView(TextView(this).apply {
-            text = if (list.size == 1) "1 PROJECT" else "${list.size} PROJECTS"
+            text = if (list.size == 1) tr(R.string.main_one_project_caps) else tr(R.string.main_n_projects_caps, list.size)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -19832,8 +19832,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (running > 0) chips.addView(projectChip("$running RUNNING", null, NC.PRIMARY))
         if (FeatureGate.canUse(isPro(), ProFeature.WORKSPACE) is GateResult.Deny) chips.addView(projectChip("PRO", R.drawable.ic_lock, NC.ERROR))
         val opened = if (p.lastOpened <= 0L) tr(R.string.main_never_opened)
-            else if (System.currentTimeMillis() - p.lastOpened < 60_000L) tr(R.string.main_opened_just_now) else "Opened " +
-            android.text.format.DateUtils.getRelativeTimeSpanString(p.lastOpened, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS)
+            else if (System.currentTimeMillis() - p.lastOpened < 60_000L) tr(R.string.main_opened_just_now) else tr(R.string.main_opened_ago,
+            android.text.format.DateUtils.getRelativeTimeSpanString(p.lastOpened, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString())
         chips.addView(projectChip(opened, R.drawable.ic_lucide_clock, NC.ON_SURF_VAR))
         card.addView(HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
@@ -20648,7 +20648,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
         titleRow.addView(TextView(this).apply {
-            text = "// VIEW ONLY"
+            text = tr(R.string.main_caps_view_only)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -20896,7 +20896,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val settingsHeaderSub = TextView(this).apply {
-            text = "// PROJECT CONFIG"
+            text = tr(R.string.main_caps_project_config)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -21377,7 +21377,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val gitHeaderSub = TextView(this).apply {
-            text = "// CHANGED FILES"
+            text = tr(R.string.main_caps_changed_files)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -21537,7 +21537,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(4))
         }
         val zoomValueTv = TextView(this).apply {
-            text = "FONT SIZE: " + termFontSize + " PT (" + (termFontSize * 100 / 40) + "%)"
+            text = tr(R.string.main_caps_font_size, termFontSize, termFontSize * 100 / 40)
             textSize = 12f
             setTextColor(Color.WHITE)
             typeface = Typeface.MONOSPACE
@@ -21644,7 +21644,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         fun updateZoomUI() {
-            zoomValueTv.text = "FONT SIZE: " + termFontSize + " PT (" + (termFontSize * 100 / 40) + "%)"
+            zoomValueTv.text = tr(R.string.main_caps_font_size, termFontSize, termFontSize * 100 / 40)
             val targetProg = termFontSize - MIN_FONT_SIZE
             if (zoomSeekBar.progress != targetProg) {
                 zoomSeekBar.progress = targetProg
@@ -21664,7 +21664,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 if (fromUser) {
                     val newSize = MIN_FONT_SIZE + progress
                     setGlobalTerminalZoom(newSize)
-                    zoomValueTv.text = "FONT SIZE: " + newSize + " PT (" + (newSize * 100 / 40) + "%)"
+                    zoomValueTv.text = tr(R.string.main_caps_font_size, newSize, newSize * 100 / 40)
                 }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -21805,7 +21805,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         page.addView(
             buildSubPageHeader(
                 title = tr(R.string.main_top_bar),
-                subtitle = "// PHONE STATS IN THE TOP BAR",
+                subtitle = tr(R.string.main_caps_phone_stats_in_the_top_bar),
                 iconRes = R.drawable.ic_tune_thick,
                 pageId = ID_TOPBAR
             ) { badge -> badge.visibility = View.GONE }
@@ -21913,7 +21913,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         page.addView(
             buildSubPageHeader(
                 title = tr(R.string.main_backup),
-                subtitle = "// BACK UP AND RESTORE",
+                subtitle = tr(R.string.main_caps_back_up_and_restore),
                 iconRes = R.drawable.ic_lucide_archive,
                 pageId = ID_BACKUP
             ) { badge -> badge.visibility = View.GONE }

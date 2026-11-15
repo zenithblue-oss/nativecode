@@ -1455,4 +1455,37 @@
     <string name="main_agent_chat_on_the_terminal">دردشة الوكيل في علامة Terminal ومساحة عمل المشروع مع مبدّل Chat/Terminal. متوقف = terminal فقط.</string>
     <string name="main_tokens_and_cost_per_ai_3">الرموز والتكلفة لكل AI CLI. اضغط للإعداد.</string>
     <string name="main_today_tokens_est">اليوم: %1$s رمز · %2$s تقديري.</string>
+    <string name="main_caps_create_new_project">إنشاء مشروع جديد</string>
+    <string name="main_caps_got_it">حسنًا</string>
+    <string name="main_caps_continue">متابعة</string>
+    <string name="main_caps_system_configuration_preferences">// إعدادات النظام والتفضيلات</string>
+    <string name="main_caps_play_delivered_development_components">// مكونات التطوير المقدمة من Play</string>
+    <string name="main_caps_ai_cli_tools">أدوات AI CLI</string>
+    <string name="main_caps_re_run_setup_fix_scripts">// إعادة تشغيل الإعداد ونصوص الإصلاح</string>
+    <string name="main_caps_alpine_guest_environment">// بيئة Alpine الضيفة</string>
+    <string name="main_caps_preview">معاينة</string>
+    <string name="main_caps_start_phosh_desktop">تشغيل سطح مكتب Phosh</string>
+    <string name="main_caps_package_ops">// عمليات الحزم</string>
+    <string name="main_caps_ai_usage">// استخدام الذكاء الاصطناعي</string>
+    <string name="main_caps_remote_access">// وصول عن بُعد</string>
+    <string name="main_caps_refresh">تحديث</string>
+    <string name="main_caps_scanning">جارٍ الفحص</string>
+    <string name="main_caps_installed">مثبّت</string>
+    <string name="main_caps_installed_packages">// الحزم المثبّتة</string>
+    <string name="main_caps_curated_components_apps">// مكونات وتطبيقات مختارة</string>
+    <string name="main_caps_installed_launchable_apps">// التطبيقات المثبّتة القابلة للتشغيل</string>
+    <string name="main_caps_running">قيد التشغيل</string>
+    <string name="main_caps_no_repos_loaded">// لا توجد مستودعات محمّلة</string>
+    <string name="main_caps_gpu_accel_vpu_host_agent_bridge">// تسريع GPU + VPU + جسر وكيل المضيف</string>
+    <string name="main_caps_unavailable">غير متاح</string>
+    <string name="main_caps_view_only">// عرض فقط</string>
+    <string name="main_caps_project_config">// إعدادات المشروع</string>
+    <string name="main_caps_changed_files">// الملفات المتغيرة</string>
+    <string name="main_caps_phone_stats_in_the_top_bar">// إحصاءات الهاتف في الشريط العلوي</string>
+    <string name="main_caps_back_up_and_restore">// نسخ احتياطي واستعادة</string>
+    <string name="main_caps_working_tree_clean">// شجرة العمل نظيفة</string>
+    <string name="main_caps_font_size">حجم الخط: %1$d PT (%2$d%%)</string>
+    <string name="main_opened_ago">فُتح %1$s</string>
+    <string name="main_one_project_caps">مشروع واحد</string>
+    <string name="main_n_projects_caps">%1$d مشاريع</string>
 </resources>

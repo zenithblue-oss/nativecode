@@ -1472,4 +1472,37 @@
     <string name="main_agent_chat_on_the_terminal">Agent chat on the Terminal tab and the project workspace, with a Chat/Terminal switch. Off = terminal only.</string>
     <string name="main_tokens_and_cost_per_ai_3">Tokens and cost per AI CLI. Tap to set up.</string>
     <string name="main_today_tokens_est">Today: %1$s tokens · %2$s est.</string>
+    <string name="main_caps_create_new_project">CREATE NEW PROJECT</string>
+    <string name="main_caps_got_it">GOT IT</string>
+    <string name="main_caps_continue">CONTINUE</string>
+    <string name="main_caps_system_configuration_preferences">// SYSTEM CONFIGURATION &amp; PREFERENCES</string>
+    <string name="main_caps_play_delivered_development_components">// PLAY-DELIVERED DEVELOPMENT COMPONENTS</string>
+    <string name="main_caps_ai_cli_tools">AI CLI TOOLS</string>
+    <string name="main_caps_re_run_setup_fix_scripts">// RE-RUN SETUP &amp; FIX SCRIPTS</string>
+    <string name="main_caps_alpine_guest_environment">// ALPINE GUEST ENVIRONMENT</string>
+    <string name="main_caps_preview">PREVIEW</string>
+    <string name="main_caps_start_phosh_desktop">START PHOSH DESKTOP</string>
+    <string name="main_caps_package_ops">// PACKAGE OPS</string>
+    <string name="main_caps_ai_usage">// AI USAGE</string>
+    <string name="main_caps_remote_access">// REMOTE ACCESS</string>
+    <string name="main_caps_refresh">REFRESH</string>
+    <string name="main_caps_scanning">SCANNING</string>
+    <string name="main_caps_installed">INSTALLED</string>
+    <string name="main_caps_installed_packages">// INSTALLED PACKAGES</string>
+    <string name="main_caps_curated_components_apps">// CURATED COMPONENTS &amp; APPS</string>
+    <string name="main_caps_installed_launchable_apps">// INSTALLED LAUNCHABLE APPS</string>
+    <string name="main_caps_running">RUNNING</string>
+    <string name="main_caps_no_repos_loaded">// NO REPOS LOADED</string>
+    <string name="main_caps_gpu_accel_vpu_host_agent_bridge">// GPU ACCEL + VPU + HOST AGENT BRIDGE</string>
+    <string name="main_caps_unavailable">UNAVAILABLE</string>
+    <string name="main_caps_view_only">// VIEW ONLY</string>
+    <string name="main_caps_project_config">// PROJECT CONFIG</string>
+    <string name="main_caps_changed_files">// CHANGED FILES</string>
+    <string name="main_caps_phone_stats_in_the_top_bar">// PHONE STATS IN THE TOP BAR</string>
+    <string name="main_caps_back_up_and_restore">// BACK UP AND RESTORE</string>
+    <string name="main_caps_working_tree_clean">// WORKING TREE CLEAN</string>
+    <string name="main_caps_font_size">FONT SIZE: %1$d PT (%2$d%%)</string>
+    <string name="main_opened_ago">Opened %1$s</string>
+    <string name="main_one_project_caps">1 PROJECT</string>
+    <string name="main_n_projects_caps">%1$d PROJECTS</string>
 </resources>

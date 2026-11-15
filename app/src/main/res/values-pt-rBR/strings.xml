@@ -1455,4 +1455,37 @@
     <string name="main_agent_chat_on_the_terminal">Chat com o agente na aba Terminal e no workspace do projeto, com um seletor Chat/Terminal. Desativado = somente terminal.</string>
     <string name="main_tokens_and_cost_per_ai_3">Tokens e custo por CLI de IA. Toque para configurar.</string>
     <string name="main_today_tokens_est">Hoje: %1$s tokens · %2$s est.</string>
+    <string name="main_caps_create_new_project">CRIAR NOVO PROJETO</string>
+    <string name="main_caps_got_it">ENTENDI</string>
+    <string name="main_caps_continue">CONTINUAR</string>
+    <string name="main_caps_system_configuration_preferences">// CONFIGURAÇÃO DO SISTEMA E PREFERÊNCIAS</string>
+    <string name="main_caps_play_delivered_development_components">// COMPONENTES DE DESENVOLVIMENTO DO PLAY</string>
+    <string name="main_caps_ai_cli_tools">FERRAMENTAS AI CLI</string>
+    <string name="main_caps_re_run_setup_fix_scripts">// REEXECUTAR CONFIGURAÇÃO E SCRIPTS DE CORREÇÃO</string>
+    <string name="main_caps_alpine_guest_environment">// AMBIENTE GUEST ALPINE</string>
+    <string name="main_caps_preview">PRÉVIA</string>
+    <string name="main_caps_start_phosh_desktop">INICIAR DESKTOP PHOSH</string>
+    <string name="main_caps_package_ops">// OPERAÇÕES DE PACOTES</string>
+    <string name="main_caps_ai_usage">// USO DE IA</string>
+    <string name="main_caps_remote_access">// ACESSO REMOTO</string>
+    <string name="main_caps_refresh">ATUALIZAR</string>
+    <string name="main_caps_scanning">VARRENDO</string>
+    <string name="main_caps_installed">INSTALADO</string>
+    <string name="main_caps_installed_packages">// PACOTES INSTALADOS</string>
+    <string name="main_caps_curated_components_apps">// COMPONENTES E APPS SELECIONADOS</string>
+    <string name="main_caps_installed_launchable_apps">// APPS INSTALADOS EXECUTÁVEIS</string>
+    <string name="main_caps_running">EM EXECUÇÃO</string>
+    <string name="main_caps_no_repos_loaded">// NENHUM REPOSITÓRIO CARREGADO</string>
+    <string name="main_caps_gpu_accel_vpu_host_agent_bridge">// ACELERAÇÃO GPU + VPU + PONTE DO AGENTE HOST</string>
+    <string name="main_caps_unavailable">INDISPONÍVEL</string>
+    <string name="main_caps_view_only">// SOMENTE VISUALIZAÇÃO</string>
+    <string name="main_caps_project_config">// CONFIG. DO PROJETO</string>
+    <string name="main_caps_changed_files">// ARQUIVOS ALTERADOS</string>
+    <string name="main_caps_phone_stats_in_the_top_bar">// ESTATÍSTICAS DO CELULAR NA BARRA SUPERIOR</string>
+    <string name="main_caps_back_up_and_restore">// BACKUP E RESTAURAÇÃO</string>
+    <string name="main_caps_working_tree_clean">// ÁRVORE DE TRABALHO LIMPA</string>
+    <string name="main_caps_font_size">TAMANHO DA FONTE: %1$d PT (%2$d%%)</string>
+    <string name="main_opened_ago">Aberto %1$s</string>
+    <string name="main_one_project_caps">1 PROJETO</string>
+    <string name="main_n_projects_caps">%1$d PROJETOS</string>
 </resources>
