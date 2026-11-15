@@ -1,14 +1,11 @@
 package com.zenithblue.nativecode.onboarding
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
 import com.google.android.play.core.assetpacks.AssetPackManagerFactory
-import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.BufferedInputStream
 import java.io.File
@@ -77,10 +74,7 @@ object RuntimeUpdatePack {
         }
         val archive = resolveArchive(context)
             ?: return ApplyResult(false, "Runtime update pack is not downloaded")
-        return applyTo(root, archive).also {
-            if (it.success) removePack(context)
-            com.zenithblue.nativecode.telemetry.Telemetry.componentUpdate(context, "runtime_pack", it.success)
-        }
+        return applyTo(root, archive).also { if (it.success) removePack(context) }
     }
 
     /** Drop the ~135 MB on-demand pack once applied; the marker in the rootfs keeps [isNeeded] false. */
@@ -251,59 +245,65 @@ object RuntimeUpdatePack {
 
     // ── prompt + download + apply (existing users only) ─────────────────────────────────────────
 
-    /**
-     * Once per process: offer the update when the rootfs predates 1.8.0. "Later", a failed download (e.g. a
-     * sideloaded build, where Play can never deliver the pack) or a failed apply silences it until the next app version.
-     */
-    fun promptIfNeeded(activity: Activity) {
-        val app = activity.applicationContext
-        if (promptedThisProcess || prefs(app).getInt(KEY_SKIP_VERSION, -1) == BuildConfig.VERSION_CODE || !isNeeded(app)) return
+    // What the Components card shows (no dialog: the update lives on Settings > Components).
+    const val TITLE = "Linux runtime update"
+    const val FROM_TO = "1.7 runtime to 1.8.0 runtime"
+    const val SIZE = "About 135 MB download"
+    const val CHANGES = "opencode 2.3.0, GitHub CLI 2.104 and a zsh fix. Replaces ~/.opencode/bin/opencode, /usr/local/bin/gh and zsh (a newer self-updated opencode is replaced too); your other files are not touched."
+
+    /** App start: a pack already on the device is applied silently; otherwise the Components card offers it. */
+    fun applyIfDownloaded(app: Context) {
+        if (promptedThisProcess || !isNeeded(app) || resolveArchive(app) == null) return
         promptedThisProcess = true
-        if (resolveArchive(app) != null) {
-            applyAsync(app)
-            return
-        }
-        if (activity.isFinishing || activity.isDestroyed) return
-        AlertDialog.Builder(activity)
-            .setTitle("Runtime update")
-            .setMessage("opencode 2.3.0, GitHub CLI 2.104 and a shell fix. About 135 MB download. Replaces ~/.opencode/bin/opencode, /usr/local/bin/gh and zsh (a newer self-updated opencode is replaced too); your other files are not touched.")
-            .setPositiveButton("Update") { _, _ -> download(activity) }
-            .setNegativeButton("Later") { _, _ -> skipThisVersion(app) }
-            .setOnCancelListener { skipThisVersion(app) }
-            .show()
+        Thread {
+            val r = apply(app)
+            Log.i(TAG, r.message)
+            com.zenithblue.nativecode.telemetry.Telemetry.componentUpdate(app, "runtime_pack", r.success)
+        }.start()
     }
 
-    private const val KEY_SKIP_VERSION = "runtime_update_skip_version"
-    private fun prefs(context: Context) = context.getSharedPreferences("runtime_update_pack", Context.MODE_PRIVATE)
-    private fun skipThisVersion(context: Context) =
-        prefs(context).edit().putInt(KEY_SKIP_VERSION, BuildConfig.VERSION_CODE).apply()
+    sealed interface Progress {
+        data class Running(val text: String, val percent: Int?) : Progress
+        data class Finished(val ok: Boolean, val message: String) : Progress
+    }
 
-    private fun download(activity: Activity) {
+    /** Download (if needed) then apply. [onState] runs on the main thread. */
+    fun update(activity: Activity, onState: (Progress) -> Unit) {
         val app = activity.applicationContext
+        val main = Handler(Looper.getMainLooper())
+        fun applyNow() {
+            onState(Progress.Running("Applying the runtime update…", null))
+            Thread {
+                val r = apply(app)
+                Log.i(TAG, r.message)
+                main.post { onState(Progress.Finished(r.success, r.message)) }
+            }.start()
+        }
+        if (resolveArchive(app) != null) return applyNow()
+        onState(Progress.Running("Requesting the update from Google Play…", null))
         var listener: com.google.android.play.core.assetpacks.AssetPackStateUpdateListener? = null
         listener = PlayAssetDeliveryManager.requestDownload(activity, PlayAssetDeliveryManager.PACK_UPDATE_CORE) { state ->
             when (state) {
+                is PlayAssetDeliveryManager.DownloadState.Pending -> onState(Progress.Running("Download pending…", null))
+                is PlayAssetDeliveryManager.DownloadState.Downloading ->
+                    onState(Progress.Running("Downloading ${state.percentage}%", state.percentage))
+                is PlayAssetDeliveryManager.DownloadState.Transferring ->
+                    onState(Progress.Running("Unpacking ${state.percentage}%", state.percentage))
+                is PlayAssetDeliveryManager.DownloadState.WaitingForWifi -> onState(Progress.Running("Waiting for Wi-Fi approval…", null))
                 is PlayAssetDeliveryManager.DownloadState.Completed -> {
                     listener?.let { PlayAssetDeliveryManager.unregisterListener(app, it) }
-                    applyAsync(app)
+                    applyNow()
                 }
-                is PlayAssetDeliveryManager.DownloadState.Failed,
+                is PlayAssetDeliveryManager.DownloadState.Failed -> {
+                    listener?.let { PlayAssetDeliveryManager.unregisterListener(app, it) }
+                    onState(Progress.Finished(false, "Download failed (${state.errorCode})"))
+                }
                 is PlayAssetDeliveryManager.DownloadState.Canceled -> {
                     listener?.let { PlayAssetDeliveryManager.unregisterListener(app, it) }
-                    skipThisVersion(app)
-                    Toast.makeText(app, "Runtime update download did not finish", Toast.LENGTH_LONG).show()
+                    onState(Progress.Finished(false, "Download canceled"))
                 }
                 else -> Unit
             }
         }
-    }
-
-    private fun applyAsync(app: Context) {
-        Thread {
-            val result = apply(app)
-            Log.i(TAG, result.message)
-            if (!result.success) skipThisVersion(app)
-            Handler(Looper.getMainLooper()).post { Toast.makeText(app, result.message, Toast.LENGTH_LONG).show() }
-        }.start()
     }
 }

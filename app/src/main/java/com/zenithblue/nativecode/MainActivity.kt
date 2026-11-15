@@ -713,7 +713,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         // 1.7.x rootfs -> 1.8.0 runtime: small Play pack, applied by Kotlin file I/O (no guest scripts).
         // PLAY_STORE_BUILD is hard-coded false since the play flavor was removed, so it cannot gate this.
-        RuntimeUpdatePack.promptIfNeeded(this)
+        // Not downloaded yet: no dialog, the Components card + home banner offer it (refreshComponentUpdates).
+        RuntimeUpdatePack.applyIfDownloaded(applicationContext)
 
         buildRootLayout()
         setContentView(drawerLayout)
@@ -836,9 +837,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Files may have changed in a terminal or another app: refresh the visible CHANGES tab.
         if (::projectGitDiffContainer.isInitialized && projectGitDiffContainer.visibility == View.VISIBLE && projectGitTab == 0) refreshGitDiffTree()
         if (lastProState == null) lastProState = isPro() // state the onCreate-built views reflect
-        if (!panvkChecked && ::componentsScrollView.isInitialized) {
-            panvkChecked = true
-            refreshPanvkCard(promptIfNew = true)
+        if (!componentUpdatesChecked && ::componentsScrollView.isInitialized) {
+            componentUpdatesChecked = true
+            refreshComponentUpdates()
         }
         BillingRepository.onChanged = { onEntitlementChanged() }
         BillingRepository.refresh()
@@ -1355,7 +1356,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 if (::componentsScrollView.isInitialized) {
                     componentsScrollView.visibility = View.VISIBLE
                     refreshAndroidSdkPackCard()
-                    refreshPanvkCard()
+                    refreshComponentUpdates()
                 }
             }
             ID_PRIVACY_POLICY -> {
@@ -3369,6 +3370,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // 1. Dashboard Banner & Quick Actions
         homeLayout.addView(buildHomeHeaderBanner())
         homeLayout.addView(spacer(14))
+        (homeUpdateBannerHolder.parent as? ViewGroup)?.removeView(homeUpdateBannerHolder)
+        homeLayout.addView(homeUpdateBannerHolder) // non-blocking "updates available" link to Components
 
         // 2. System Telemetry Cards (SYS_CPU & SYS_MEM)
         homeLayout.addView(buildSystemTelemetryCards())
@@ -4481,7 +4484,25 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 title = "COMPONENTS",
                 subtitle = "Linux runtime · Android SDK 36",
                 pageId = ID_COMPONENTS
-            )
+            ).also { row ->
+                // Update dot on the icon + subtitle, painted by refreshComponentUpdates().
+                val details = (row as ViewGroup).getChildAt(1) as ViewGroup
+                componentsNavSub = details.getChildAt(1) as TextView
+                val icon = row.getChildAt(0)
+                row.removeViewAt(0)
+                row.addView(FrameLayout(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { rightMargin = dp(12) }
+                    icon.layoutParams = FrameLayout.LayoutParams(dp(24), dp(24))
+                    addView(icon)
+                    componentsNavDot = View(this@MainActivity).apply {
+                        visibility = View.GONE
+                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(NC.TERTIARY_CON) }
+                        layoutParams = FrameLayout.LayoutParams(dp(9), dp(9), Gravity.TOP or Gravity.END)
+                        contentDescription = "Update available"
+                    }
+                    addView(componentsNavDot)
+                }, 0)
+            }
         )
         settingsHubLayout.addView(spacer(16))
 
@@ -4719,82 +4740,198 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         })
         page.addView(spacer(16))
         page.addView(buildAndroidSdkPackCard())
-        panvkHolder = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        page.addView(panvkHolder)
+        (componentUpdatesHolder.parent as? ViewGroup)?.removeView(componentUpdatesHolder)
+        page.addView(componentUpdatesHolder)
     }
 
-    private var panvkHolder: LinearLayout? = null
-    private var panvkBusy = false
-    private var panvkChecked = false
+    // ── Component updates (existing users): cards on Components + a non-blocking home banner ──────────
+    // Testing only: shows both update cards on an up-to-date install. Never commit as true.
+    private val FORCE_COMPONENT_UPDATE_UI = false
 
-    /** Show the PanVK update card only if guest .so exists and differs from the bundled one. */
-    private fun refreshPanvkCard(promptIfNew: Boolean = false) {
+    private val componentUpdatesHolder by lazy { LinearLayout(this).apply { orientation = LinearLayout.VERTICAL } }
+    private val homeUpdateBannerHolder by lazy { LinearLayout(this).apply { orientation = LinearLayout.VERTICAL } }
+    private var componentsNavSub: TextView? = null
+    private var componentsNavDot: View? = null
+    private var componentUpdatesChecked = false
+    private val busyUpdates = mutableSetOf<String>()
+
+    private class ComponentUpdate(val id: String, val iconRes: Int, val title: String, val fromTo: String,
+                                  val size: String, val changes: String)
+
+    /** Which components have an update (background thread: PanVK hashes guest files). */
+    private fun pendingComponentUpdates(): List<ComponentUpdate> = buildList {
+        if (FORCE_COMPONENT_UPDATE_UI || RuntimeUpdatePack.isNeeded(this@MainActivity)) add(ComponentUpdate(
+            "runtime_pack", R.drawable.ic_terminal, RuntimeUpdatePack.TITLE, RuntimeUpdatePack.FROM_TO,
+            RuntimeUpdatePack.SIZE, RuntimeUpdatePack.CHANGES))
+        val panvk = FORCE_COMPONENT_UPDATE_UI || try { PanvkDriverUpdate.needsUpdate(this@MainActivity) } catch (_: Exception) { false }
+        if (panvk) add(ComponentUpdate(
+            "panvk", R.drawable.ic_display, "PanVK GPU driver",
+            "installed ${(PanvkDriverUpdate.installedSha(this@MainActivity) ?: "unknown").take(8)} to rc3-lowmem ${PanvkDriverUpdate.bundledSha(this@MainActivity).take(8)}",
+            "Bundled in the app, no download",
+            "New PanVK Vulkan driver for Mali GPUs (lowmem mode) and the matching GPU env scripts. Stop the desktop first; the old driver is kept as .so.bak."))
+    }
+
+    /** Re-check and repaint the Components cards, the Settings row dot and the home banner. */
+    private fun refreshComponentUpdates(cards: Boolean = true) {
         executor.execute {
-            val need = try { PanvkDriverUpdate.needsUpdate(this) } catch (_: Exception) { false }
+            val list = pendingComponentUpdates()
             runOnUiThread {
-                val holder = panvkHolder ?: return@runOnUiThread
-                holder.removeAllViews()
-                if (!need) return@runOnUiThread
-                holder.addView(spacer(16))
-                val card = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    background = cyberBrutalistBg(NC.SURFACE_LOW, NC.OUTLINE_VAR, NC.SHADOW_DARK, 6, 0)
-                    setPadding(dp(16), dp(16), dp(16), dp(16))
+                componentsNavDot?.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
+                componentsNavSub?.text = if (list.isEmpty()) "Linux runtime · Android SDK 36" else "${list.size} UPDATE${if (list.size > 1) "S" else ""} AVAILABLE"
+                componentsNavSub?.setTextColor(if (list.isEmpty()) NC.ON_SURF_VAR else NC.TERTIARY_CON)
+                homeUpdateBannerHolder.removeAllViews()
+                if (list.isNotEmpty()) homeUpdateBannerHolder.addView(buildHomeUpdateBanner(list.size))
+                if (!cards || busyUpdates.isNotEmpty()) return@runOnUiThread // keep live progress on screen
+                componentUpdatesHolder.removeAllViews()
+                list.forEach { u ->
+                    componentUpdatesHolder.addView(spacer(16))
+                    componentUpdatesHolder.addView(buildComponentUpdateCard(u))
                 }
-                card.addView(TextView(this).apply {
-                    text = "PanVK driver update (rc3-lowmem)"
-                    textSize = 15f
-                    setTextColor(Color.WHITE)
-                    typeface = Typeface.DEFAULT_BOLD
-                })
-                val status = TextView(this).apply {
-                    text = "New PanVK GPU driver for Mali GPUs. Stop the desktop first."
-                    textSize = 11f
-                    setTextColor(NC.ON_SURF_VAR)
-                    typeface = Typeface.MONOSPACE
-                    setPadding(0, dp(6), 0, dp(10))
-                }
-                card.addView(status)
-                val btn = primaryButton("UPDATE") {}
-                btn.setOnClickListener { runPanvkUpdate(status, btn) }
-                card.addView(btn)
-                holder.addView(card)
-                if (promptIfNew) maybePromptPanvk()
             }
         }
     }
 
-    private fun runPanvkUpdate(status: TextView?, btn: View?, done: (() -> Unit)? = null) {
-        if (panvkBusy) return
-        panvkBusy = true
-        btn?.isEnabled = false
-        status?.text = "Updating PanVK driver…"
-        executor.execute {
-            val (ok, msg) = PanvkDriverUpdate.update(this)
-            Telemetry.componentUpdate(this, "panvk", ok)
-            runOnUiThread {
-                panvkBusy = false
-                btn?.isEnabled = true
-                status?.text = (if (ok) "SUCCESS · " else "FAILED · ") + msg
-                android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
-                done?.invoke()
-                if (ok) panvkHolder?.removeAllViews()
-            }
-        }
+    private fun buildHomeUpdateBanner(count: Int): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = cyberBrutalistBg(NC.SURFACE_LOW, NC.TERTIARY_CON, NC.SHADOW_DARK, 4, 0)
+        setPadding(dp(14), dp(12), dp(14), dp(12))
+        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(14) }
+        contentDescription = "Component updates available. Open Components."
+        setOnClickListener { pageStack.push(ID_COMPONENTS); navigateToPage(ID_COMPONENTS) }
+        addView(ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_download)
+            setColorFilter(NC.TERTIARY_CON)
+            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(12) }
+        })
+        addView(TextView(this@MainActivity).apply {
+            text = if (count == 1) "1 component update available" else "$count component updates available"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        })
+        addView(TextView(this@MainActivity).apply {
+            text = "VIEW"
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setTextColor(NC.TERTIARY_CON)
+        })
+        addView(ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            setColorFilter(NC.TERTIARY_CON)
+            layoutParams = LinearLayout.LayoutParams(dp(18), dp(18))
+        })
     }
 
-    /** One-time (per bundled sha) prompt. Later => only the Components row. */
-    private fun maybePromptPanvk() {
-        val prefs = getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
-        val key = "panvk_prompted_" + try { PanvkDriverUpdate.bundledSha(this) } catch (_: Exception) { return }
-        if (prefs.getBoolean(key, false)) return
-        prefs.edit().putBoolean(key, true).apply()
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("PanVK GPU driver")
-            .setMessage("New PanVK GPU driver available for Mali GPUs — update now?")
-            .setPositiveButton("Update") { _, _ -> runPanvkUpdate(null, null) }
-            .setNegativeButton("Later", null)
-            .show()
+    private fun buildComponentUpdateCard(u: ComponentUpdate): View {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(NC.SURFACE_LOW, NC.OUTLINE_VAR, NC.SHADOW_DARK, 6, 0)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        val chip = TextView(this).apply {
+            textSize = 10f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setPadding(dp(8), dp(3), dp(8), dp(3))
+        }
+        fun chipState(label: String, color: Int) {
+            chip.text = label
+            chip.setTextColor(color)
+            chip.background = GradientDrawable().apply { setColor(Color.TRANSPARENT); setStroke(dp(1), color) }
+        }
+        chipState("UPDATE AVAILABLE", NC.TERTIARY_CON)
+        card.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(ImageView(this@MainActivity).apply {
+                setImageResource(u.iconRes)
+                setColorFilter(NC.PRIMARY)
+                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { rightMargin = dp(12) }
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = u.title.uppercase()
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            })
+            addView(chip)
+        })
+        fun mono(t: String, color: Int = NC.ON_SURF_VAR, top: Int = 6) = TextView(this).apply {
+            text = t
+            textSize = 11f
+            setTextColor(color)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, dp(top), 0, 0)
+        }
+        card.addView(mono(u.fromTo.uppercase(), NC.PRIMARY, 10))
+        card.addView(mono(u.size))
+        card.addView(TextView(this).apply {
+            text = u.changes
+            textSize = 13f
+            setTextColor(Color.parseColor("#D0D0D0"))
+            setPadding(0, dp(10), 0, dp(10))
+        })
+        val bar = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            visibility = View.GONE
+            progressTintList = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(MATCH, dp(6)).apply { bottomMargin = dp(6) }
+        }
+        card.addView(bar)
+        val status = mono("", top = 0).apply { visibility = View.GONE; setPadding(0, 0, 0, dp(10)) }
+        card.addView(status)
+        val btn = primaryButton("UPDATE") {}
+        card.addView(btn)
+
+        fun running(text: String, pct: Int?) {
+            chipState("UPDATING", NC.PRIMARY)
+            bar.visibility = View.VISIBLE
+            bar.isIndeterminate = pct == null
+            if (pct != null) bar.progress = pct
+            status.visibility = View.VISIBLE
+            status.setTextColor(NC.ON_SURF_VAR)
+            status.text = text
+            btn.visibility = View.GONE
+        }
+        fun finished(ok: Boolean, msg: String) {
+            busyUpdates.remove(u.id)
+            Telemetry.componentUpdate(this, u.id, ok)
+            bar.visibility = View.GONE
+            status.visibility = View.VISIBLE
+            status.text = msg
+            status.setTextColor(if (ok) NC.PRIMARY else NC.ERROR)
+            if (ok) {
+                chipState("UP TO DATE", NC.PRIMARY)
+                btn.visibility = View.GONE
+            } else {
+                chipState("FAILED", NC.ERROR)
+                btn.text = "RETRY"
+                btn.visibility = View.VISIBLE
+            }
+            refreshComponentUpdates(cards = false) // banner + dot only: this card keeps its done/failed state
+        }
+        btn.setOnClickListener {
+            if (!busyUpdates.add(u.id)) return@setOnClickListener
+            when (u.id) {
+                "runtime_pack" -> RuntimeUpdatePack.update(this) { p ->
+                    when (p) {
+                        is RuntimeUpdatePack.Progress.Running -> running(p.text, p.percent)
+                        is RuntimeUpdatePack.Progress.Finished -> finished(p.ok, p.message)
+                    }
+                }
+                "panvk" -> {
+                    running("Updating the PanVK driver…", null)
+                    executor.execute {
+                        val (ok, msg) = PanvkDriverUpdate.update(this)
+                        runOnUiThread { finished(ok, msg) }
+                    }
+                }
+            }
+        }
+        return card
     }
 
     private fun buildSkillsSectionButton(): View {
