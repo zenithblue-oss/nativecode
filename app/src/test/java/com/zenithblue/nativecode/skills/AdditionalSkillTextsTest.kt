@@ -12,10 +12,10 @@ class AdditionalSkillTextsTest {
     fun importCountsAndUniqueIds() {
         val install = AdditionalSkillTexts.install
         val project = AdditionalSkillTexts.project
-        assertEquals(10, install.size)
+        assertEquals(13, install.size)
         assertEquals(36, project.size)
         val ids = (install + project).map { it.id }
-        assertEquals(46, ids.size)
+        assertEquals(49, ids.size)
         assertEquals(ids.size, ids.toSet().size)
         (install + project).forEach { skill ->
             assertTrue(skill.id, skill.body.isNotEmpty())
@@ -57,7 +57,7 @@ class AdditionalSkillTextsTest {
         val files = assets.walkTopDown()
             .filter { it.isFile && it.name == "SKILL.md" }
             .toList()
-        assertEquals(46, files.size)
+        assertEquals(49, files.size)
         val byBytes = files.associateBy { it.readBytes().contentHash() }
         val seen = HashSet<String>()
         for (skill in AdditionalSkillTexts.install + AdditionalSkillTexts.project) {
@@ -67,7 +67,7 @@ class AdditionalSkillTextsTest {
             assertTrue(bytes.contentEquals(file!!.readBytes()))
             assertTrue(seen.add(file.canonicalPath))
         }
-        assertEquals(46, seen.size)
+        assertEquals(49, seen.size)
     }
 
     private fun skillsAssetsDir(): File {

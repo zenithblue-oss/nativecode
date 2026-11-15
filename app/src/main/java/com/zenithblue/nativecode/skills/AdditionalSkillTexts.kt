@@ -13,6 +13,9 @@ internal object AdditionalSkillTexts {
         installHyperframes(),
         installMoneyprinter(),
         installAndroidTools(),
+        installRea(),
+        installHermes(),
+        installSsh(),
     )
 
     val project: List<Skill> = listOf(
@@ -6232,6 +6235,262 @@ Deliver existing output paths and editable source through the current file UI. T
 The NativeCode paths and bridge/launcher patterns above are adapted from the user-supplied `create-skill.zip` installation records and the supplied NativeCode source. These project instructions are newly authored; the original installation files remain unmodified in the pack. Do not load those other files to perform this task: the necessary setup is included above.
 
 - https://openpyxl.readthedocs.io/en/stable/
+""",
+    )
+
+    private fun installRea() = Skill(
+        id = "install-rea",
+        title = "REA — Reverse Engineer Anything",
+        summary = "Install REA to reverse engineer apps and binaries.",
+        source = "",
+        body = """---
+name: "install-rea"
+description: "Install and check REA (Reverse Engineer Anything), an MCP server and CLI for reverse engineering JavaScript/Electron apps, .NET assemblies and Android APKs, on NativeCode ARM64 PRoot. Use when the user asks to reverse engineer an app or binary and REA is missing."
+compatibility: "NativeCode ARM64 PRoot (Alpaquita glibc); Node.js and npm; opencode 2.x, Claude Code, Codex, Grok, Qwen, Antigravity"
+metadata:
+  title: "REA — Reverse Engineer Anything"
+  category: "INSTALL"
+  group: "Reverse engineering"
+  engine: "rea-agents (npm) 6.8.0, MIT"
+  status: "user-copied recipe; nothing is bundled with NativeCode"
+  dependencies: "install-node-tools"
+  reviewed: "2026-11-15"
+---
+
+# REA — Reverse Engineer Anything
+
+**Category:** INSTALL PROGRAMS  |  **Mechanism:** npm package `rea-agents` pinned to 6.8.0 (MIT, https://github.com/morluto/rea)
+
+REA is one MCP server plus a `rea` CLI plus an investigation skill. Your agent calls it to understand how an app works. The user copied this text into you on purpose; nothing is installed until you run the steps below. Work as the `flux` user in `${'$'}HOME`, never as root, except for the one `apk add` in step 2 if it is needed.
+
+## What works on this phone
+- **JavaScript and Electron apps:** works. Module and import recovery, Electron boundaries. No native engine needed.
+- **.NET assemblies:** static analysis works.
+- **Android APKs:** works after the Android tools skill is done (JADX and Apktool are needed). Run that skill first.
+- **Native ARM64/x86 binaries (deep pseudocode):** needs Hopper, Ghidra, IDA or Kuna. Hopper does not exist for aarch64 Linux. Ghidra is optional and manual; do not install it unless the user asks.
+- REA is **not a sandbox**. It analyses files, it does not isolate them.
+
+## 1. Check what is already there
+```sh
+node -v          # must satisfy ^22.23.4 || ^24.22.1 || >=26.12.1
+npm -v
+command -v rea && rea --version
+command -v ps && ps --version
+```
+If `node` is missing or too old, stop and run the Install Node Tools skill first. If `rea` already works, skip to step 4.
+
+## 2. procps `ps` (Linux requirement)
+REA's process supervisor needs a procps-compatible `ps` for Ghidra, JADX and JavaScript/Electron analysis. If `ps --version` does not print `procps`, ask the user to open a **root** Linux shell tab in NativeCode and run:
+```sh
+apk add procps
+```
+Do not use `sudo` or `su` yourself.
+
+## 3. Install, from `${'$'}HOME`
+```sh
+cd "${'$'}HOME"
+npm install --global rea-agents@6.8.0
+rea --version
+```
+If `npm install --global` fails with `EACCES`, point npm at the user prefix (`~/.local/bin` is already on PATH in NativeCode) and retry:
+```sh
+npm config set prefix "${'$'}HOME/.local"
+```
+Run package installs from `${'$'}HOME`, not from inside the project being analysed.
+
+## 4. Register REA with the agent(s) the user has
+Preview first; this writes nothing:
+```sh
+rea setup --client opencode --dry-run
+```
+Client ids: `opencode`, `claude_code`, `codex`, `grok_build`, `qwen_code`, `antigravity`. Add one `--client` flag per agent. Apply with:
+```sh
+rea setup --client opencode --yes
+rea doctor --client opencode --json
+```
+`rea setup --all-detected --yes` configures every supported agent it finds; use it only if the user wants that. Setup backs up any config file it changes (look for the `.rea.backup` files named in its output). Restart the agent afterwards.
+
+### opencode 2.x
+opencode 2.x keeps MCP servers under `mcp.servers.<name>` in `~/.config/opencode/opencode.jsonc` (not directly under `mcp`, which was the 1.x layout). After setup, confirm REA is listed:
+```sh
+opencode mcp list
+```
+If it is missing, do not guess: run `rea setup --client opencode --dry-run`, take the command it would register and add it in the 2.x shape:
+```jsonc
+{ "mcp": { "servers": { "rea": { "type": "local", "command": ["<command from dry-run>", "<args>"] } } } }
+```
+Skills for opencode live in `~/.config/opencode/skills/<name>/SKILL.md`; setup installs the REA workflow skill there.
+
+### Other agents
+Each agent reads its own config; `rea setup` writes it. After a restart, ask the agent to list its MCP tools and confirm the REA tools appear.
+
+## 5. Check
+```sh
+rea doctor --json
+```
+`ok` for the JavaScript/Electron path is enough for the first use. Whether REA's PTY prebuilt covers linux-arm64 glibc is unverified: if `doctor` reports a missing or failing native module, report the exact error to the user and stop. Do not compile or patch REA to work around it.
+
+First real use, no engine needed (replace the path):
+```sh
+rea --help
+```
+then ask the agent to analyse an unpacked Electron app folder.
+
+## Update, pin and undo
+- REA releases weekly. This skill pins 6.8.0 so a copy behaves the same every time. To move on, change the version in step 3 or run `rea update`, then `rea doctor --json` again.
+- Undo registrations: `rea uninstall` (removes what setup added for every client, keeps unrelated entries), or restore a `.rea.backup` file over its config.
+- Remove the program: `npm remove --global rea-agents`.
+
+## Safety
+Everything you analyse is **untrusted input**. Never run an analysed binary, installer or script, never `chmod +x` it, and never paste its strings back into a shell. Keep analysed files in a project folder, not in `${'$'}HOME` dotfiles. Do not upload the target anywhere. REA analyses locally; your model provider still sees the tool results.
+
+## Report
+State which parts are **already-working**, **installed-and-checked** (with the `rea doctor` result), **blocked** (with the exact error) or **not attempted** (native engines, APK tools). Record version, install path and which agents were registered.
+""",
+    )
+
+
+    private fun installHermes() = Skill(
+        id = "install-hermes",
+        title = "Hermes Agent",
+        summary = "Install the Hermes agent by hand.",
+        source = "",
+        body = """---
+name: "install-hermes"
+description: "Install and check Hermes Agent (Nous Research) in the NativeCode PRoot guest. Use when the user wants Hermes and it is not installed; NativeCode does not bundle it yet."
+compatibility: "NativeCode ARM64 PRoot (Alpaquita glibc); needs several hundred MB of free space"
+metadata:
+  title: "Hermes Agent"
+  category: "INSTALL"
+  group: "AI agents"
+  engine: "hermes-agent 0.23.1 (MIT) official installer"
+  status: "user-copied recipe; not bundled, not in the NativeCode launchers yet"
+  dependencies: "install-dev-utils"
+  reviewed: "2026-11-15"
+---
+
+# Hermes Agent
+
+**Category:** INSTALL PROGRAMS  |  **Mechanism:** official installer from https://hermes-agent.nousresearch.com, source https://github.com/NousResearch/hermes-agent (MIT, 0.23.1)
+
+State of NativeCode today: **Hermes is not installed, not bundled and not in the NativeCode tool launchers or CLI login pages.** This skill is the manual route, run in a normal Linux shell tab as the `flux` user. A built-in Hermes pack is planned; do not claim it exists.
+
+## 1. Check first
+```sh
+command -v hermes && hermes --version
+df -h "${'$'}HOME" | tail -1
+uname -m; getconf GNU_LIBC_VERSION
+```
+If `hermes` already works, skip to step 4. Hermes needs roughly 0.6-1.2 GB installed (estimate: it ships Python 3.14 and about 350 locked packages, some large). If free space is below 2 GB, stop and tell the user.
+
+## 2. Download the installer and read it
+Do not pipe the web into a shell. Download, show the user the size and head of the script, then run it:
+```sh
+cd "${'$'}HOME"
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh -o hermes-install.sh
+wc -c hermes-install.sh; head -40 hermes-install.sh
+```
+The installer refuses to run when `TERMUX_VERSION` is set or `PREFIX` points into `com.termux`. NativeCode's guest does neither; if it complains anyway, report the exact message and stop.
+
+## 3. Install without the interactive wizard and the browser tools
+```sh
+bash hermes-install.sh --skip-setup --skip-browser
+exec "${'$'}SHELL" -l
+hermes --version
+```
+`--dir` and `--hermes-home` relocate the install and the config; keep the defaults unless the user asks (config lives in `~/.hermes`). Time the install and note how long the first `hermes` start takes under PRoot; both are unmeasured.
+
+## 4. Configure and check
+Credentials are the user's job: never ask the user to paste a key into the chat and never print one.
+```sh
+hermes model        # choose provider and model (device-code login for OAuth providers)
+hermes doctor       # diagnose problems
+hermes              # interactive CLI
+```
+Other useful commands: `hermes setup` (full wizard), `hermes tools`, `hermes config get|set`, `hermes update`.
+
+## 5. Notes for this phone
+- Use the **Linux shell** tab; the Hermes launcher card does not exist yet.
+- Free NativeCode plan: Hermes runs as an ordinary program in the guest, but the NativeCode agent tools (chat, login pages) do not manage it.
+- Keep `~/.hermes/auth.json` and `~/.hermes/.env` out of backups, project folders and git.
+- A Hermes auto-update can pull large downloads; ask before running `hermes update`.
+
+## Undo
+Remove the install directory the installer printed (default under `~/.hermes` and its program directory), the `hermes` link it created and any PATH line it added to `~/.profile`, `~/.zshrc` or `~/.bashrc`. List what you will delete and get the user's OK first. `rm -rf ~/.hermes` also deletes their sessions and keys.
+
+## Report
+Say **already-working**, **installed-and-checked** (version and `hermes doctor` result), **blocked** (exact error) or **planned-only**. Record version, install size (`du -sh`), install time and path.
+""",
+    )
+
+
+    private fun installSsh() = Skill(
+        id = "install-ssh",
+        title = "SSH Server and Client",
+        summary = "Use the SSH client and the key-only SSH server.",
+        source = "",
+        body = """---
+name: "install-ssh"
+description: "Use SSH on NativeCode: the built-in SSH client and saved hosts, and the optional key-only SSH server (port 8022, user flux). Use when the user wants to log in to the phone from another computer or to a remote machine from the phone."
+compatibility: "NativeCode 1.8 ARM64 PRoot (Alpaquita glibc); OpenSSH from the Alpaquita repository"
+metadata:
+  title: "SSH Server and Client"
+  category: "INSTALL"
+  group: "Remote access"
+  engine: "OpenSSH (apk add openssh), managed by the NativeCode SSH page"
+  status: "NativeCode manages the server; the agent only checks and helps with keys"
+  dependencies: ""
+  reviewed: "2026-11-15"
+---
+
+# SSH Server and Client
+
+**Category:** INSTALL PROGRAMS  |  **Mechanism:** OpenSSH inside the guest, controlled from NativeCode **Settings → SSH**
+
+## What NativeCode already does
+- **Client (Free):** the `ssh` command in the guest, plus saved remote hosts on the SSH page; a saved host opens an `ssh` terminal tab. Keys live in `~/.ssh` of the guest.
+- **Server (Pro):** off by default. The user switches it on in Settings → SSH; NativeCode starts `sshd` as `flux`, **key login only**, port **8022**, bound to the Wi-Fi (or hotspot) address, with a notification that has a Stop action. It stops when Wi-Fi is lost or Pro ends.
+- OpenSSH is installed from the SSH page (`apk add openssh`); you do not need to install it yourself.
+
+Do **not** start `sshd` yourself, edit `~/.config/nativecode/sshd_config` (it is rewritten on every start) or open a different port. Passwords, root login and agent/X11 forwarding are off by design and must stay off.
+
+## Check
+```sh
+command -v ssh ssh-keygen sshd
+ls -l ~/.ssh 2>/dev/null
+ssh -V
+```
+If a command is missing, tell the user to open Settings → SSH and tap install; then re-check.
+
+## Let another computer in (server)
+1. On the other computer, create a key if it has none: `ssh-keygen -t ed25519`. Copy the **public** key (`~/.ssh/id_ed25519.pub`, one line).
+2. In NativeCode, Settings → SSH, paste the public key (or import a file). The page shows its fingerprint; it must match `ssh-keygen -lf id_ed25519.pub` on the computer. Lines starting with options such as `command=` or `from=` are rejected.
+3. Start the server there; the page shows the address. From the computer:
+```sh
+ssh -p 8022 flux@<phone-wifi-ip>
+scp -P 8022 file flux@<phone-wifi-ip>:/home/flux/
+```
+Only the same Wi-Fi network can reach it. The first connection shows the phone's host-key fingerprint, which the SSH page also shows: compare them before answering yes.
+
+## Log in to a remote machine (client)
+```sh
+ssh-keygen -t ed25519 -C "phone"         # once; keep the passphrase
+cat ~/.ssh/id_ed25519.pub                # give this to the remote's authorized_keys
+ssh user@host
+```
+Better: ask the user to add the host on the SSH page so it opens as a tab with the right command. Never print or copy `~/.ssh/id_*` private keys; only `.pub` files may leave the phone.
+
+## Agents and background work
+- Long jobs over SSH survive a dropped connection only inside `tmux` or `screen` (install them with `apk add tmux` as root if missing).
+- The phone sleeps: the NativeCode notification keeps the server alive, but battery saver can still cut Wi-Fi.
+
+## Troubleshooting
+- `Permission denied (publickey)`: the key on the page is not the one the computer offers. Compare fingerprints.
+- `Connection refused`: server is off, wrong port (8022, not 22) or different network.
+- `chown /dev/pts failed`: fixed by NativeCode when it starts the server; do not work around it.
+
+## Report
+State whether the client works, whether the server is on, the address and port the page shows, and the key fingerprints you compared. Never include private keys.
 """,
     )
 
