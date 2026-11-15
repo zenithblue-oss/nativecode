@@ -452,6 +452,21 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val ID_SKILLS = 27
     private val ID_TOPBAR = 28
     private val ID_BACKUP = 29
+    private val ID_SSH = 30
+    /** Settings sub-pages built by [buildExtraPage] (SSH, AI usage): shown/hidden/back-handled generically. */
+    private val extraPages = LinkedHashMap<Int, ScrollView>()
+    private val extraPageOnShow = HashMap<Int, () -> Unit>()
+    private var sshPage: com.zenithblue.nativecode.ssh.ui.SshPage? = null
+    /** One-shot `ssh ...` command and tab title for the next app terminal tab of type "ssh". */
+    private var sshTabCommand: String? = null
+    private var sshTabTitle: String? = null
+    private val sshHost = object : com.zenithblue.nativecode.ssh.ui.SshHostApi {
+        override fun serverAllowed() = gateAllows(FeatureGate.canUseSshServer(isPro()))
+        override fun isPro() = this@MainActivity.isPro()
+        override fun connect(title: String, command: String) = openSshTab(title, command)
+        override fun openDocument(onResult: (Uri?) -> Unit) { docResult = onResult; openDocLauncher.launch(arrayOf("*/*")) }
+        override fun requestNotifications() = NativeCodeFgs.ensurePostNotificationsPermission(this@MainActivity)
+    }
     private lateinit var topBarScrollView: ScrollView
     private lateinit var backupScrollView: ScrollView
     private var backupPage: com.zenithblue.nativecode.backup.ui.BackupPage? = null
@@ -1162,6 +1177,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (::backupScrollView.isInitialized) {
             backupScrollView.visibility = View.GONE
         }
+        extraPages.values.forEach { it.visibility = View.GONE }
         if (::hardwareScrollView.isInitialized) {
             hardwareScrollView.visibility = View.GONE
         }
@@ -1248,6 +1264,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         homeScrollView.visibility = View.VISIBLE
                 homeScrollView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
                 populateRecentProjects()
+                refreshHomeSsh()
                 val valTv = homeLayout.findViewWithTag<TextView>("APP_STORAGE_VAL")
                 val subTv = homeLayout.findViewWithTag<TextView>("APP_STORAGE_SUB")
                 val barFill = homeLayout.findViewWithTag<View>("APP_STORAGE_BAR")
@@ -1369,6 +1386,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     backupScrollView.scrollTo(0, 0)
                 }
                 backupPage?.refresh()
+            }
+            in extraPages.keys -> {
+                extraPages[id]?.let { it.visibility = View.VISIBLE; it.scrollTo(0, 0) }
+                extraPageOnShow[id]?.invoke()
             }
             ID_COMPONENTS -> {
                 if (::componentsScrollView.isInitialized) {
@@ -1537,6 +1558,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             navigateBackFromSubpage(ID_BACKUP, fallback = ID_SETTINGS)
             return
         }
+        extraPages.entries.firstOrNull { it.value.visibility == View.VISIBLE }?.let {
+            navigateBackFromSubpage(it.key, fallback = ID_SETTINGS)
+            return
+        }
         if (::aiSafetyScrollView.isInitialized && aiSafetyScrollView.visibility == View.VISIBLE) {
             navigateBackFromSubpage(ID_AI_SAFETY, fallback = ID_SETTINGS)
             return
@@ -1676,7 +1701,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             id == ID_CHROOT_SETTINGS || id == ID_PROOT_SETTINGS ||
             id == ID_SOFTWARE_MANAGER || id == ID_MARKETPLACE || id == ID_APPS || id == ID_MP_INSTALLER ||
             id == ID_CLI_AUTH || id == ID_AI_SAFETY || id == ID_PRIVACY_POLICY || id == ID_COMPONENTS ||
-            id == ID_HARDWARE || id == ID_X11_SETTINGS || id == ID_SKILLS || id == ID_TOPBAR || id == ID_BACKUP
+            id == ID_HARDWARE || id == ID_X11_SETTINGS || id == ID_SKILLS || id == ID_TOPBAR || id == ID_BACKUP ||
+            extraPages.containsKey(id)
         ) {
             showGlobalNav = false
             showProjectNav = false
@@ -2013,6 +2039,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         buildComponentsPage()
         buildTopBarPage()
         buildBackupPage()
+        buildSshPage()
         buildPrivacyPolicyPage()
         buildHardwarePage()
         buildProotSettingsPage()
@@ -2046,6 +2073,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         contentFrame.addView(componentsScrollView)
         contentFrame.addView(topBarScrollView)
         contentFrame.addView(backupScrollView)
+        extraPages.values.forEach { contentFrame.addView(it) }
         contentFrame.addView(privacyPolicyScrollView)
         contentFrame.addView(hardwareScrollView)
         contentFrame.addView(x11SettingsScrollView)
@@ -2224,7 +2252,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
             return
         }
-        if (!aiLaunchAllowed(type)) return
+        if (type != "ssh" && !aiLaunchAllowed(type)) return // the ssh client tab is Free (plan 17)
         if (ToolLauncherCatalog.isAiToolType(type) &&
             !AiCliProvisionState.shouldShowAiToolLaunchers(this)
         ) {
@@ -2268,6 +2296,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         maybeToastHeavyToolLaunch(type)
         val ticket = captureTerminalLaunch(app = true, type)
         val workDir = chatTermCwd.also { chatTermCwd = null } // chat "Open terminal here" / "Open in terminal": thread cwd
+        val sshCmd = if (type == "ssh") sshTabCommand else null
+        val sshTitle = if (type == "ssh") sshTabTitle else null
+        sshTabCommand = null; sshTabTitle = null
         val user = LinuxCommandBuilder.sessionUserForType(type)
         // Warm RootShell su cache so ChrootCommandBuilder.shellRootCommand uses discovered path
         if (!BuildConfig.PLAY_STORE_BUILD && ticket.method == "chroot") {
@@ -2277,7 +2308,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val prepared = try {
                 ensureBootstrapExtracted()
                 if (!bootstrapReady) error("Failed to extract bootstrap")
-                terminalLaunchSpec(type, user, workDir = workDir, ticket.method)
+                terminalLaunchSpec(type, user, workDir = workDir, ticket.method, sshCmd)
             } catch (e: Exception) {
                 mainHandler.post {
                     if (!releaseTerminalLaunch(ticket)) return@post
@@ -2293,7 +2324,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 if (!releaseTerminalLaunch(ticket)) return@post
                 if (!terminalLaunchStillCurrent(ticket)) return@post
                 val (args, envMap) = prepared
-                attachTerminalSession(type, args, envMap, ticket.method)
+                attachTerminalSession(type, args, envMap, ticket.method, sshTitle)
             }
         }
     }
@@ -2365,9 +2396,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         type: String,
         user: String,
         workDir: String?,
-        method: String
+        method: String,
+        shellCmd: String? = null
     ): Pair<Array<String>, HashMap<String, String>> =
-        if (type == "shell" || type == "shell-root") {
+        if (type == "ssh" && shellCmd != null) {
+            LinuxCommandBuilder.build(this, shellCmd, user = user, method = method)
+        } else if (type == "shell" || type == "shell-root") {
             LinuxCommandBuilder.buildInteractive(this, user = user, workDir = workDir, method = method)
         } else if (method != "chroot") {
             LinuxCommandBuilder.buildToolDirect(
@@ -2382,7 +2416,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         type: String,
         args: Array<String>,
         envMap: HashMap<String, String>,
-        method: String
+        method: String,
+        title: String? = null
     ) {
         val cwd = File(filesDir, "home").absolutePath
         val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
@@ -2394,6 +2429,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val session = TerminalSession(sessionExec, cwd, sessionArgs, env, 10000, sessionClient)
         sessionsList.add(session)
         terminalSessionTypes.add(type)
+        if (title != null) termTabTitles[session] = title
         switchTerminalSession(sessionsList.size - 1)
         updateAppTerminalService()
     }
@@ -3432,7 +3468,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         homeLayout.addView(buildHomePackageOpsSection())
         homeLayout.addView(spacer(8))
 
-        // 4. Recent workspaces
+        // 4. Remote access + AI usage
+        homeLayout.addView(buildHomeToolsSection())
+        homeLayout.addView(spacer(8))
+
+        // 5. Recent workspaces
         homeLayout.addView(buildRecentProjectsSection())
     }
 
@@ -4525,6 +4565,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 title = "BACKUP",
                 subtitle = "Back up and restore your guest home",
                 pageId = ID_BACKUP
+            )
+        )
+        settingsHubLayout.addView(spacer(16))
+
+        settingsHubLayout.addView(
+            settingsHubNavRow(
+                iconRes = R.drawable.ic_lucide_server,
+                title = "SSH",
+                subtitle = "SSH server (Pro) · remote hosts · keys",
+                pageId = ID_SSH
             )
         )
         settingsHubLayout.addView(spacer(16))
@@ -5655,6 +5705,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         refreshProCard()
         paintGuiBudget() // also re-reads minutes on every resume
         val pro = isPro()
+        if (!pro && BuildConfig.MONETISATION_ENFORCE &&
+            com.zenithblue.nativecode.ssh.SshServerController.status.state != com.zenithblue.nativecode.ssh.SshState.STOPPED
+        ) com.zenithblue.nativecode.ssh.SshServerController.stop(this) // Pro ended: the server goes with it
         if (lastProState != null && lastProState != pro) {
             proLockTexts.forEach { it.markProLocked(proLocked()) }
             navigateToPage(currentPageId, false)
@@ -9682,6 +9735,48 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         return section
     }
 
+    /** Home: SSH entry (server status) and, later, the AI usage summary. */
+    private fun buildHomeToolsSection(): View {
+        val section = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) }
+        }
+        section.addView(TextView(this).apply {
+            text = "// REMOTE ACCESS"
+            textSize = 13f
+            setTextColor(NC.PRIMARY)
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setPadding(0, 0, 0, dp(12))
+        })
+        section.addView(buildHomePackageModuleCard(
+            accentFill = false,
+            iconRes = R.drawable.ic_lucide_server,
+            kicker = "SSH",
+            title = "SSH SERVER AND REMOTE HOSTS",
+            subtitle = "Log in to this phone from your PC, or connect to other machines.",
+            footer = "SERVER (PRO) · CLIENT · KEYS",
+            pageId = ID_SSH,
+            onSubtitle = { tv ->
+                homeSshSubtitle = tv
+                refreshHomeSsh()
+            }
+        ).apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP) })
+        return section
+    }
+
+    private var homeSshSubtitle: TextView? = null
+
+    private fun refreshHomeSsh() {
+        val tv = homeSshSubtitle ?: return
+        val st = com.zenithblue.nativecode.ssh.SshServerController.status
+        tv.text = when (st.state) {
+            com.zenithblue.nativecode.ssh.SshState.RUNNING -> "Server running: " + com.zenithblue.nativecode.ssh.SshModel.connectCommand(st.address ?: "?")
+            com.zenithblue.nativecode.ssh.SshState.STARTING -> "Server starting..."
+            else -> "Log in to this phone from your PC, or connect to other machines."
+        }
+    }
+
     private fun buildHomePackageModuleCard(
         accentFill: Boolean,
         iconRes: Int,
@@ -9689,7 +9784,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         title: String,
         subtitle: String,
         footer: String,
-        pageId: Int
+        pageId: Int,
+        onSubtitle: ((TextView) -> Unit)? = null
     ): View {
         val fill = if (accentFill) Color.parseColor("#0F1A14") else NC.SURFACE_LOW
         val stroke = if (accentFill) NC.PRIMARY_CON else Color.parseColor("#3c4a3f")
@@ -9778,6 +9874,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
             }
             content.addView(subTv)
+            onSubtitle?.invoke(subTv)
 
             val footerRow = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -21628,6 +21725,39 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun openTopBarPage() = navigateToPage(ID_TOPBAR)
+
+    /** Registers a Settings sub-page (header + [body]); [onShow] runs every time it is shown. */
+    private fun buildExtraPage(id: Int, title: String, subtitle: String, iconRes: Int, body: View, onShow: () -> Unit) {
+        val sv = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            visibility = View.GONE
+            setBackgroundColor(NC.BG)
+        }
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        sv.addView(page)
+        page.addView(buildSubPageHeader(title = title, subtitle = subtitle, iconRes = iconRes, pageId = id) { badge -> badge.visibility = View.GONE })
+        page.addView(body)
+        extraPages[id] = sv
+        extraPageOnShow[id] = onShow
+    }
+
+    /** Settings -> SSH (plan 17): OpenSSH install, SSH server (Pro), authorized keys, remote hosts, client keys. */
+    private fun buildSshPage() {
+        val p = com.zenithblue.nativecode.ssh.ui.SshPage(this, sshHost).also { sshPage = it }
+        buildExtraPage(ID_SSH, "SSH", "// SERVER AND REMOTE HOSTS", R.drawable.ic_lucide_server, p.content) { p.refresh() }
+    }
+
+    /** `ssh ...` line in a new app terminal tab (Free). Runs through the guest shell, closes the tab when ssh ends cleanly. */
+    private fun openSshTab(title: String, command: String) {
+        sshTabCommand = command
+        sshTabTitle = title
+        if (pageStack.isEmpty() || pageStack.peek() != ID_TERMINAL) pageStack.push(ID_TERMINAL)
+        navigateToPage(ID_TERMINAL)
+        createNewTerminalSession("ssh")
+    }
 
     /** Settings -> Backup (plan 15): backup/restore of the guest home. */
     private fun buildBackupPage() {

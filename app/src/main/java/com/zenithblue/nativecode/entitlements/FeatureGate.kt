@@ -3,7 +3,7 @@ package com.zenithblue.nativecode.entitlements
 import com.zenithblue.nativecode.BuildConfig
 
 /** Gated features; also selects Upgrade sheet copy. Last four are Pro-only (free = 0 projects). */
-enum class ProFeature { AI_TOOL, AI_SESSIONS, XFCE, PROJECTS, PROJECT_IMPORT, WORKSPACE, GITHUB_LOGIN, SHELL }
+enum class ProFeature { AI_TOOL, AI_SESSIONS, XFCE, PROJECTS, PROJECT_IMPORT, WORKSPACE, GITHUB_LOGIN, SHELL, SSH_SERVER }
 
 sealed class GateResult {
     data object Allow : GateResult()
@@ -45,6 +45,14 @@ object FeatureGate {
     ): GateResult =
         if (!enforce || isPro) GateResult.Allow
         else GateResult.Deny("Shell access requires NativeCode Pro", ProFeature.SHELL)
+
+    /** SSH server (plan 17): Pro. The SSH client and saved hosts stay Free. */
+    fun canUseSshServer(
+        isPro: Boolean,
+        enforce: Boolean = BuildConfig.MONETISATION_ENFORCE
+    ): GateResult =
+        if (!enforce || isPro) GateResult.Allow
+        else GateResult.Deny("The SSH server requires NativeCode Pro", ProFeature.SSH_SERVER)
 
     fun canOpenAiSession(
         isPro: Boolean,

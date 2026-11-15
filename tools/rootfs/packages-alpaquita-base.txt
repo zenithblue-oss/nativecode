@@ -75,3 +75,6 @@ git
 python3
 nodejs
 npm
+
+# SSH client, server and ssh-keygen (plan 17); existing users get it from the SSH page (apk add openssh)
+openssh

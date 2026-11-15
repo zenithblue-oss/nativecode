@@ -33,3 +33,7 @@ Each FGS declares `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE` with a short su
 - Local-first: guest data stays in the app-private PRoot environment on device.
 - FGS starts only after the user opens a terminal session, starts XFCE, or starts onboarding installation.
 - `POST_NOTIFICATIONS` requested on Android 13+ so the ongoing notification is visible.
+
+## SSH server (BackgroundService-independent `SshService`)
+
+User-started only (Settings > SSH, Pro): runs `sshd` as the guest user on port 8022 with key authentication, bound to the Wi-Fi address. Off by default, never started at boot. The foreground notification shows the connect command and has a Stop action; the service stops when the server stops, when Wi-Fi is lost (unless "Keep running" is on) or when Pro ends.

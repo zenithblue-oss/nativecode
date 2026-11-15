@@ -95,6 +95,16 @@
                 android:value="Keeps user-started app and project Linux terminal / AI CLI sessions and agent chat sessions alive with a visible notification." />
         </service>
 
+        <service
+            android:name=".ssh.SshService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the user-started SSH server (key authentication only, off by default) alive with a visible notification that has a Stop action." />
+        </service>
+
     </application>
 
 </manifest>
