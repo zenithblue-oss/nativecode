@@ -1,6 +1,8 @@
 package com.zenithblue.nativecode.cliauth
 
 import android.content.Context
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * C10 — clear AI credentials / suite provision flag for current isolation.
@@ -27,7 +29,7 @@ object CredentialClearService {
             if (index >= tools.size) {
                 val ok = failures.isEmpty()
                 val msg = if (ok) {
-                    "Cleared AI credentials for ${tools.size} tool(s) ($method)"
+                    tr(R.string.cli_cleared_ai_credentials_for_tool, tools.size, method)
                 } else {
                     "Partial clear ($method). Failed: ${failures.joinToString()}"
                 }

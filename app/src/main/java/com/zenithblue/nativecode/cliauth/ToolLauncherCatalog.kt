@@ -1,5 +1,8 @@
 package com.zenithblue.nativecode.cliauth
 
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
+
 /**
  * SSOT for Terminal + Workspace tool launcher cards (C6).
  * Prevents Free/Paid/Shell drift between surfaces.
@@ -13,21 +16,21 @@ data class LauncherToolDef(
 object ToolLauncherCatalog {
 
     val SHELL: List<LauncherToolDef> = listOf(
-        LauncherToolDef("shell", "Linux Shell", "User: flux"),
-        LauncherToolDef("shell-root", "Rooted Linux Shell", "User: root")
+        LauncherToolDef("shell", tr(R.string.cli_linux_shell), tr(R.string.cli_user_flux)),
+        LauncherToolDef("shell-root", tr(R.string.cli_rooted_linux_shell), tr(R.string.cli_user_root))
     )
 
     val FREE: List<LauncherToolDef> = listOf(
-        LauncherToolDef("opencode", "opencode", "Open Source")
+        LauncherToolDef("opencode", "opencode", tr(R.string.cli_open_source))
     )
 
     val PAID: List<LauncherToolDef> = listOf(
-        LauncherToolDef("codex", "codex", "OpenAI Codex"),
+        LauncherToolDef("codex", "codex", tr(R.string.cli_openai_codex)),
         LauncherToolDef("agy", "agy", "Antigravity"),
-        LauncherToolDef("claude-code", "claude-code", "Claude Code"),
-        LauncherToolDef("qwen-code", "qwen-code", "Qwen Code"),
-        LauncherToolDef("grok", "grok", "Grok CLI"),
-        LauncherToolDef("kiro", "kiro", "Kiro CLI")
+        LauncherToolDef("claude-code", "claude-code", tr(R.string.cli_claude_code)),
+        LauncherToolDef("qwen-code", "qwen-code", tr(R.string.cli_qwen_code)),
+        LauncherToolDef("grok", "grok", tr(R.string.cli_grok_cli)),
+        LauncherToolDef("kiro", "kiro", tr(R.string.cli_kiro_cli))
     )
 
     fun freeTools(): List<LauncherToolDef> = FREE
@@ -43,8 +46,8 @@ object ToolLauncherCatalog {
     /** Dropdown / open-with pairs. */
     fun openWithPairs(method: String, showAi: Boolean): List<Pair<String, String>> {
         val shells = listOf(
-            "Linux Shell" to "shell",
-            "Rooted Linux Shell" to "shell-root"
+            tr(R.string.cli_linux_shell) to "shell",
+            tr(R.string.cli_rooted_linux_shell) to "shell-root"
         )
         if (!showAi) return shells
         val ai = listOf(

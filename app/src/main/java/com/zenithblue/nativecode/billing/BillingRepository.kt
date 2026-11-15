@@ -21,6 +21,8 @@ import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 import com.zenithblue.nativecode.entitlements.EntitlementStore
 import java.util.concurrent.ConcurrentHashMap
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * Play Billing (PBL 9). Two subscription products (monthly, yearly) + one non-consumable INAPP (lifetime).
@@ -194,12 +196,12 @@ object BillingRepository : PurchasesUpdatedListener {
 
     /** Returns an error message, or null if the Play purchase sheet launched. */
     fun launch(activity: Activity, sku: String): String? {
-        val c = client ?: return "Billing not ready"
-        val pd = products[sku] ?: return "Product unavailable — try again later"
+        val c = client ?: return tr(R.string.cli_billing_not_ready)
+        val pd = products[sku] ?: return tr(R.string.cli_product_unavailable_try_again_later)
         val token = if (sku == SKU_LIFETIME) {
             pd.oneTimePurchaseOfferDetailsList?.firstOrNull()?.offerToken
         } else {
-            val offer = subOffer(pd) ?: return "No subscription offer available"
+            val offer = subOffer(pd) ?: return tr(R.string.cli_no_subscription_offer_available)
             pendingTrialSku = sku.takeIf { offer.isTrial }
             offer.token
         }

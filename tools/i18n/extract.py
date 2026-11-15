@@ -32,7 +32,7 @@ EXCL_PRE = re.compile(
     r'(?:\bLog\.\w\(|appendLog\(|Exception\(|\berror\(|\brequire\w*\(|\bcheck\w*\(|println\(|\.put\w*\(|\bput\(|startsWith\(|endsWith\(|'
     r'contains\(|equals\(|[=!]=\s*|\bgetString\(|\bgetBoolean\(|getStringExtra\(|putExtra\(|File\(|Intent\(|Uri\.parse\(|Regex\(|'
     r'\.replace\(|\.split\(|removePrefix\(|removeSuffix\(|\.trim\w*\(|\bsh\b|bash|\bcmd\b|command|script|Pattern|getenv|getProperty|'
-    r'\.add\(\s*$|\bTAG\b|\bKEY_?\w*\s*=|const\s+val|\bAction\b|setAction\(|addCategory\(|\bsource\s*=|\bid\s*=|\bname\s*=|\bkey\s*=|\btype\s*=|\bgit\(|\bcmd\w*\()'
+    r'@\w+(?:\.\w+)?\(|requestMethod|setRequestProperty|addHeader|setHeader|setType\(|MIME|charset|encoding|\.add\(\s*$|\bTAG\b|\bKEY_?\w*\s*=|const\s+val|\bAction\b|setAction\(|addCategory\(|\bsource\s*=|\bid\s*=|\bname\s*=|\bkey\s*=|\btype\s*=|\bgit\(|\bcmd\w*\()'
 )
 EXCL_POST = re.compile(r'^\s*(?:->|to\s+\w+\s*[,)]|\.toRegex|\.toInt|\.format\(|\+)')
 
@@ -113,8 +113,16 @@ def convert(raw):
     return ''.join(text), args
 
 
+# Technical terms, brands, key caps and tokens that stay English (tools/i18n/GLOSSARY.md).
+TECH = set(w.upper() for w in """0GB ABCD-1234 BOOTCLASSPATH DEX2OATBOOTCLASSPATH TMPDIR PREFIX LANG TERM PATH GET POST PUT UTF-8 USD UTC MIT
+PULSEAUDIO PANFROST PANVK TURNIP VENUS VIRGL GEMFILE FLUTTER RUBY RUST PHP PYTHON NODE MAVEN GRADLE JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC
+ALT CTRL ESC TAB DEL BKSP PGUP PGDN END ENTER SHFT INS CODEX GROK ANTIGRAVITY GOOGLE NATIVECODE PRO SSH APK CPU RAM URL HEAD GIT PROOT ROOT CHROOT
+HOST OPENCODE CLAUDE QWEN KIRO HERMES GITHUB LINUX ANDROID SDK NDK JDK ARM64 AUP NATIVE CANON BRAND""".split())
+
+
 def worth(t):
     s = t.replace('\x00', '')
+    if s.strip().upper() in TECH: return False
     if not re.search(r'[A-Za-z\u00c0-\u024f]{2}', s): return False
     if s != s.strip() or '\t' in s: return False
     if '://' in s or s.startswith(('-', '.', '/', '~', '#', '@')) or re.search(r'\b(sh -c|apk |npm |curl |git )', s): return False

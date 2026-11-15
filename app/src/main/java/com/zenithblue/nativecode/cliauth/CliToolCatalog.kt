@@ -1,5 +1,8 @@
 package com.zenithblue.nativecode.cliauth
 
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
+
 /**
  * AI CLI tools from setup_cli_tools.sh + login strategy per vendor docs.
  */
@@ -44,35 +47,35 @@ object CliToolCatalog {
     val ALL: List<CliToolDef> = listOf(
         CliToolDef(
             id = "claude",
-            displayName = "Claude Code",
+            displayName = tr(R.string.cli_claude_code),
             bin = "claude",
             strategy = CliLoginStrategy.STREAM_URL,
             terminalType = "claude-code",
             consoleUrl = "https://claude.ai/login",
             envKey = "CLAUDE_CODE_OAUTH_TOKEN",
-            subtitle = "claude auth login · browser OAuth",
+            subtitle = tr(R.string.cli_claude_auth_login_browser_oauth),
             chat = ChatProtocol.CLAUDE_STREAM
         ),
         CliToolDef(
             id = "codex",
-            displayName = "OpenAI Codex",
+            displayName = tr(R.string.cli_openai_codex),
             bin = "codex",
             strategy = CliLoginStrategy.DEVICE_CODE,
             terminalType = "codex",
             hideOnChroot = true,
             consoleUrl = "https://auth.openai.com/codex/device",
-            subtitle = "codex login --device-auth",
+            subtitle = tr(R.string.cli_codex_login_device_auth),
             chat = ChatProtocol.CODEX_APP_SERVER
         ),
         CliToolDef(
             id = "qwen",
-            displayName = "Qwen Code",
+            displayName = tr(R.string.cli_qwen_code),
             bin = "qwen",
             strategy = CliLoginStrategy.API_KEY_FORM,
             terminalType = "qwen-code",
             consoleUrl = "https://modelstudio.console.alibabacloud.com/?tab=coding-plan#/efm/coding-plan-index",
             envKey = "BAILIAN_CODING_PLAN_API_KEY",
-            subtitle = "API key · OAuth free tier discontinued"
+            subtitle = tr(R.string.cli_api_key_oauth_free_tier)
         ),
         CliToolDef(
             id = "opencode",
@@ -81,7 +84,7 @@ object CliToolCatalog {
             strategy = CliLoginStrategy.TERMINAL_GUIDED,
             terminalType = "opencode",
             consoleUrl = "https://opencode.ai/auth",
-            subtitle = "opencode auth login · providers",
+            subtitle = tr(R.string.cli_opencode_auth_login_providers),
             loginOptional = true,
             chat = ChatProtocol.OPENCODE_HTTP
         ),
@@ -92,32 +95,32 @@ object CliToolCatalog {
             strategy = CliLoginStrategy.STREAM_URL,
             terminalType = "agy",
             consoleUrl = "https://accounts.google.com",
-            subtitle = "agy acp --login · Google OAuth, paste code",
+            subtitle = tr(R.string.cli_agy_acp_login_google_oauth),
             chat = ChatProtocol.ACP,
             acpProfile = "agy"
         ),
         CliToolDef(
             id = "grok",
-            displayName = "Grok Build",
+            displayName = tr(R.string.cli_grok_build),
             bin = "grok",
             strategy = CliLoginStrategy.DEVICE_CODE,
             terminalType = "grok",
             consoleUrl = "https://console.x.ai",
             envKey = "XAI_API_KEY",
-            subtitle = "grok login · or XAI_API_KEY",
+            subtitle = tr(R.string.cli_grok_login_or_xai_api),
             chat = ChatProtocol.ACP,
             acpProfile = "grok"
         ),
         CliToolDef(
             id = "kiro",
-            displayName = "Kiro CLI",
+            displayName = tr(R.string.cli_kiro_cli),
             bin = "kiro-cli",
             altBins = listOf("kiro"),
             strategy = CliLoginStrategy.DEVICE_CODE,
             terminalType = "kiro",
             consoleUrl = "https://app.kiro.dev",
             envKey = "KIRO_API_KEY",
-            subtitle = "kiro-cli login · device / browser"
+            subtitle = tr(R.string.cli_kiro_cli_login_device_browser)
         )
     )
 

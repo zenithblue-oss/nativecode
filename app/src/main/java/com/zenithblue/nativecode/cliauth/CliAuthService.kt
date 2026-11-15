@@ -18,6 +18,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * SSOT for AI CLI browser / device-code / API-key auth in guest (flux).
@@ -59,7 +61,7 @@ object CliAuthService {
             return null
         }
         if (!activeSession.compareAndSet(false, true)) {
-            mainHandler.post { listener.onFailed("Auth already in progress") }
+            mainHandler.post { listener.onFailed(tr(R.string.cli_auth_already_in_progress)) }
             return null
         }
         val session = CliAuthSession()
@@ -70,7 +72,7 @@ object CliAuthService {
             } catch (e: Exception) {
                 if (!session.cancelled) {
                     mainHandler.post {
-                        listener.onFailed(e.message ?: "Login error")
+                        listener.onFailed(e.message ?: tr(R.string.cli_login_error))
                     }
                 }
             } finally {
@@ -90,12 +92,12 @@ object CliAuthService {
         executor.execute {
             val def = CliToolCatalog.byId(toolId)
             if (def == null) {
-                mainHandler.post { onResult(false, "Unknown tool", null) }
+                mainHandler.post { onResult(false, tr(R.string.cli_unknown_tool), null) }
                 return@execute
             }
             val key = apiKey.trim()
             if (key.isBlank()) {
-                mainHandler.post { onResult(false, "Empty key", null) }
+                mainHandler.post { onResult(false, tr(R.string.cli_empty_key), null) }
                 return@execute
             }
             val envKey = def.envKey ?: when (toolId) {
@@ -106,7 +108,7 @@ object CliAuthService {
                 else -> null
             }
             if (envKey == null) {
-                mainHandler.post { onResult(false, "No env key for tool", null) }
+                mainHandler.post { onResult(false, tr(R.string.cli_no_env_key_for_tool), null) }
                 return@execute
             }
             val ok = writeAuthEnvKey(ctx, method, envKey, key)
@@ -115,7 +117,7 @@ object CliAuthService {
             }
             val st = probeOneSync(ctx, method, def)
             mainHandler.post {
-                onResult(ok, if (ok) "Saved $envKey" else "Write failed", st)
+                onResult(ok, if (ok) "Saved $envKey" else tr(R.string.cli_write_failed), st)
             }
         }
     }
@@ -129,7 +131,7 @@ object CliAuthService {
         executor.execute {
             val def = CliToolCatalog.byId(toolId)
             if (def == null) {
-                mainHandler.post { onResult(false, "Unknown tool") }
+                mainHandler.post { onResult(false, tr(R.string.cli_unknown_tool)) }
                 return@execute
             }
             // The CLI's own non-interactive logout where it has one; the rest remove only
@@ -203,11 +205,11 @@ object CliAuthService {
             mainHandler.post { listener.onFailed(msg) }
         }
 
-        phase(CliAuthPhase.CHECK_BIN, "Checking ${def.bin}…")
+        phase(CliAuthPhase.CHECK_BIN, tr(R.string.cli_checking, def.bin))
         // Tools mandatory via setup_cli_tools — soft probe only; do not hard-block login
         val installed = isInstalledSync(ctx, method, def)
         if (!installed) {
-            log("WARN: ${def.bin} not found on PATH (continuing login attempt)")
+            log(tr(R.string.cli_warn_not_found_on_path, def.bin))
         }
         if (session.cancelled) {
             mainHandler.post { listener.onCancelled() }
@@ -216,7 +218,7 @@ object CliAuthService {
 
         when (def.strategy) {
             CliLoginStrategy.DEVICE_CODE -> {
-                phase(CliAuthPhase.LOGIN, "Starting device login…")
+                phase(CliAuthPhase.LOGIN, tr(R.string.cli_starting_device_login))
                 val loginCmd = when (def.id) {
                     "codex" -> CliGuestCommands.loginCodexDevice()
                     "kiro" -> CliGuestCommands.loginKiro()
@@ -235,20 +237,20 @@ object CliAuthService {
                 if (!ok) {
                     // kiro may need terminal; codex fail is hard
                     if (def.id == "kiro") {
-                        phase(CliAuthPhase.LOGIN, "Opening guided terminal…")
+                        phase(CliAuthPhase.LOGIN, tr(R.string.cli_opening_guided_terminal))
                         mainHandler.post {
                             listener.onTerminalGuided(def.id, "kiro-cli login")
                         }
                         // Still fail session so overlay closes path can open term
-                        fail("Complete login in terminal (device code)")
+                        fail(tr(R.string.cli_complete_login_in_terminal_device))
                         return
                     }
-                    fail("Device login failed or timed out")
+                    fail(tr(R.string.cli_device_login_failed_or_timed))
                     return
                 }
             }
             CliLoginStrategy.STREAM_URL -> {
-                phase(CliAuthPhase.LOGIN, "Starting browser login…")
+                phase(CliAuthPhase.LOGIN, tr(R.string.cli_starting_browser_login))
                 val loginCmd = when (def.id) {
                     "claude" -> CliGuestCommands.loginClaude()
                     "agy" -> CliGuestCommands.loginAgy()
@@ -272,7 +274,7 @@ object CliAuthService {
             }
             // MainActivity routes these to the key dialog / the tool's own terminal before here.
             CliLoginStrategy.TERMINAL_GUIDED, CliLoginStrategy.API_KEY_FORM -> {
-                fail("Sign in from the ${def.displayName} terminal or key form")
+                fail(tr(R.string.cli_sign_in_from_the_terminal, def.displayName))
                 return
             }
         }
@@ -281,7 +283,7 @@ object CliAuthService {
             mainHandler.post { listener.onCancelled() }
             return
         }
-        phase(CliAuthPhase.VERIFY, "Verifying…")
+        phase(CliAuthPhase.VERIFY, tr(R.string.cli_verifying))
         // Poll status a few times (credentials may settle)
         var status = probeOneSync(ctx, method, def)
         var attempts = 0
@@ -289,18 +291,18 @@ object CliAuthService {
             Thread.sleep(1500)
             status = probeOneSync(ctx, method, def)
             attempts++
-            log("Probe ${attempts}: installed=${status.installed} in=${status.loggedIn}")
+            log(tr(R.string.cli_probe_installed_in, attempts, status.installed, status.loggedIn))
         }
         if (session.cancelled) {
             mainHandler.post { listener.onCancelled() }
             return
         }
         if (status.loggedIn) {
-            phase(CliAuthPhase.SUCCESS, "Signed in")
+            phase(CliAuthPhase.SUCCESS, tr(R.string.cli_signed_in))
             mainHandler.post { listener.onDone(status) }
         } else {
             // Device flow may have completed in CLI but probe weak — soft fail with tip
-            fail("Auth ran but status still signed-out (refresh or re-check)")
+            fail(tr(R.string.cli_auth_ran_but_status_still))
         }
     }
 
@@ -334,7 +336,7 @@ object CliAuthService {
                     if (lastUrl.get() != url) {
                         lastUrl.set(url)
                         mainHandler.post {
-                            listener.onPhase(CliAuthPhase.WAIT_BROWSER, "Open browser…")
+                            listener.onPhase(CliAuthPhase.WAIT_BROWSER, tr(R.string.cli_open_browser))
                             listener.onUrl(url)
                         }
                         openBrowser(ctx, url)
@@ -399,7 +401,7 @@ object CliAuthService {
 
     private fun probeOneSync(ctx: Context, method: String, def: CliToolDef): CliToolStatus {
         if (!isInstalledSync(ctx, method, def)) {
-            return CliToolStatus(def.id, method, false, false, detail = "not installed")
+            return CliToolStatus(def.id, method, false, false, detail = tr(R.string.cli_not_installed))
         }
         return hostStatus(ctx, method, def.id).copy(installed = true)
     }

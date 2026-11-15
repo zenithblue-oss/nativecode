@@ -7,7 +7,7 @@ set -eu
 cd /tmp/zb
 apk add --no-cache ncurses-dev libcap-dev pcre-dev >/dev/null
 rm -rf zsh-5.9 dest
-tar -xf zsh-5.9.tar.xz
+tar -o -xf zsh-5.9.tar.xz   # -o: do not chown (single-uid user namespace)
 patch -p1 --batch -d zsh-5.9 < zsh-5.9-modern-ncurses.patch
 cd zsh-5.9
 export zsh_cv_sys_killesrch=yes zsh_cv_sys_sigsuspend=yes

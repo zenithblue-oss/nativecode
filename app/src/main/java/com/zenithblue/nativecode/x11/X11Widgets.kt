@@ -23,6 +23,7 @@ import android.widget.TextView
 import com.zenithblue.nativecode.NC
 import com.zenithblue.nativecode.R
 import com.zenithblue.nativecode.ui.BrutalistToggle
+import com.zenithblue.nativecode.tr
 
 /** Local UI kit for the X11 settings page — mirrors MainActivity brutalist styling. */
 internal fun Context.dp(v: Int): Int =
@@ -223,7 +224,7 @@ private fun Context.showNcSingleChoice(
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.END
     }
-    btnRow.addView(ncPressable("CANCEL", NC.SURFACE_CONTAINER, NC.OUTLINE_VAR, Color.WHITE) { dialog.dismiss() })
+    btnRow.addView(ncPressable(tr(R.string.x11_cancel), NC.SURFACE_CONTAINER, NC.OUTLINE_VAR, Color.WHITE) { dialog.dismiss() })
     card.addView(btnRow)
     dialog.show()
 }
@@ -270,10 +271,10 @@ private fun Context.showNcTextInput(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(0, dp(16), 0, 0)
     }
-    btnRow.addView(ncPressable("CANCEL", NC.SURFACE_CONTAINER, NC.OUTLINE_VAR, Color.WHITE) { dialog.dismiss() }.apply {
+    btnRow.addView(ncPressable(tr(R.string.x11_cancel), NC.SURFACE_CONTAINER, NC.OUTLINE_VAR, Color.WHITE) { dialog.dismiss() }.apply {
         layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(10) }
     })
-    btnRow.addView(ncPressable("SAVE", NC.PRIMARY, NC.PRIMARY, Color.parseColor("#0A0A0A")) {
+    btnRow.addView(ncPressable(tr(R.string.x11_save), NC.PRIMARY, NC.PRIMARY, Color.parseColor("#0A0A0A")) {
         val v = input.text.toString().trim()
         if (validate(v)) {
             dialog.dismiss()

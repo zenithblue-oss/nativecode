@@ -3,6 +3,8 @@ package com.zenithblue.nativecode.cliauth
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Opens optional third-party vendor safety email links. */
 object ReportMailHelper {
@@ -33,7 +35,7 @@ object ReportMailHelper {
                 data = uri
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            ctx.startActivity(Intent.createChooser(intent, "Send report email"))
+            ctx.startActivity(Intent.createChooser(intent, tr(R.string.cli_send_report_email)))
             true
         } catch (_: Exception) {
             false

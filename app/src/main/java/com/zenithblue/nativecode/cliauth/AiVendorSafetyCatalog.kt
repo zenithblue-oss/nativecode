@@ -1,5 +1,8 @@
 package com.zenithblue.nativecode.cliauth
 
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
+
 /**
  * SSOT for AI safety / report / ToS links (C5 / B16).
  * UI must not hardcode vendor URLs — change here only.
@@ -28,28 +31,28 @@ object AiVendorSafetyCatalog {
             toolId = NATIVECODE_TOOL_ID,
             displayName = "NativeCode",
             reportMailto = NATIVECODE_REPORT_EMAIL,
-            notes = "App bugs · safety awareness · not model host"
+            notes = tr(R.string.cli_app_bugs_safety_awareness_not)
         ),
         VendorSafetyLinks(
             toolId = "claude",
-            displayName = "Claude Code",
+            displayName = tr(R.string.cli_claude_code),
             reportUrl = "https://claude.com/form/anthropic-content-reporting",
             reportMailto = "usersafety@anthropic.com",
             tosUrl = "https://www.anthropic.com/legal/consumer-terms",
             aupUrl = "https://www.anthropic.com/legal/aup",
-            notes = "Anthropic content form · AUP"
+            notes = tr(R.string.cli_anthropic_content_form_aup)
         ),
         VendorSafetyLinks(
             toolId = "codex",
-            displayName = "OpenAI Codex",
+            displayName = tr(R.string.cli_openai_codex),
             reportUrl = "https://openai.com/form/report-content/",
             tosUrl = "https://openai.com/policies/terms-of-use",
             aupUrl = "https://openai.com/policies/usage-policies",
-            notes = "OpenAI report form · usage policies"
+            notes = tr(R.string.cli_openai_report_form_usage_policies)
         ),
         VendorSafetyLinks(
             toolId = "grok",
-            displayName = "Grok Build",
+            displayName = tr(R.string.cli_grok_build),
             reportMailto = "support@x.ai",
             tosUrl = "https://x.ai/legal/terms-of-service",
             aupUrl = "https://x.ai/legal/acceptable-use-policy",
@@ -60,25 +63,25 @@ object AiVendorSafetyCatalog {
             displayName = "Antigravity",
             reportUrl = "https://reportcontent.google.com",
             tosUrl = "https://policies.google.com/terms/generative-ai",
-            notes = "Google report content · gen-AI terms"
+            notes = tr(R.string.cli_google_report_content_gen_ai)
         ),
         VendorSafetyLinks(
             toolId = "qwen",
-            displayName = "Qwen Code",
+            displayName = tr(R.string.cli_qwen_code),
             reportUrl = "https://modelstudio.console.alibabacloud.com/?tab=coding-plan#/efm/coding-plan-index",
-            notes = "Vendor console / account support · no public AI form"
+            notes = tr(R.string.cli_vendor_console_account_support_no)
         ),
         VendorSafetyLinks(
             toolId = "opencode",
             displayName = "OpenCode",
             reportUrl = "https://opencode.ai",
-            notes = "Site / project issues · use NativeCode mailto too"
+            notes = tr(R.string.cli_site_project_issues_use_nativecode)
         ),
         VendorSafetyLinks(
             toolId = "kiro",
-            displayName = "Kiro CLI",
+            displayName = tr(R.string.cli_kiro_cli),
             reportUrl = "https://app.kiro.dev",
-            notes = "AWS / Kiro app support · no public gen-AI form"
+            notes = tr(R.string.cli_aws_kiro_app_support_no)
         )
     )
 

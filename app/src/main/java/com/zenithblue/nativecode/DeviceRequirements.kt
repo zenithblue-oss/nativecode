@@ -89,15 +89,15 @@ object DeviceRequirements {
         val checks = listOf(
             CheckResult(
                 id = "storage",
-                title = "Storage",
+                title = tr(R.string.cli_storage),
                 measured = formatBytes(storage.freeBytes) + " free",
-                requirement = "> 10 GB free",
+                requirement = tr(R.string.cli_10_gb_free),
                 status = storageStatus,
                 severity = Severity.HARD,
                 detail = if (storageStatus == Status.PASS) {
-                    "Enough free space for rootfs + packages."
+                    tr(R.string.cli_enough_free_space_for_rootfs)
                 } else {
-                    "Need more than 10 GB free internal storage to continue."
+                    tr(R.string.cli_need_more_than_10_gb)
                 }
             ),
             CheckResult(
@@ -108,36 +108,36 @@ object DeviceRequirements {
                 status = ramStatus,
                 severity = Severity.SOFT,
                 detail = when (ramStatus) {
-                    Status.PASS -> "Memory headroom looks healthy."
-                    Status.WARN -> "Below ~8 GB — heavy AI/IDE workloads may thrash."
-                    else -> "Could not read total RAM."
+                    Status.PASS -> tr(R.string.cli_memory_headroom_looks_healthy)
+                    Status.WARN -> tr(R.string.cli_below_8_gb_heavy_ai)
+                    else -> tr(R.string.cli_could_not_read_total_ram)
                 }
             ),
             CheckResult(
                 id = "swap",
-                title = "Swap / zRAM",
-                measured = if (mem.swapTotalMb > 0) "${mem.swapTotalMb} MB total" else "0 MB / none",
+                title = tr(R.string.cli_swap_zram),
+                measured = if (mem.swapTotalMb > 0) "${mem.swapTotalMb} MB total" else tr(R.string.cli_0_mb_none),
                 requirement = "> 7000 MB (~8 GB)",
                 status = swapStatus,
                 severity = Severity.SOFT,
                 detail = when (swapStatus) {
-                    Status.PASS -> "Swap/zRAM capacity is adequate."
+                    Status.PASS -> tr(R.string.cli_swap_zram_capacity_is_adequate)
                     Status.WARN -> "Low swap — enable large zRAM if the ROM allows; experience may stutter."
-                    else -> "Could not read SwapTotal."
+                    else -> tr(R.string.cli_could_not_read_swaptotal)
                 }
             ),
             CheckResult(
                 id = "cpu",
-                title = "CPU / SoC",
+                title = tr(R.string.cli_cpu_soc),
                 measured = soc.displayName,
-                requirement = "SD 8 Gen2 / D9200 / Tensor G3 / Exynos 2200+",
+                requirement = tr(R.string.cli_sd_8_gen2_d9200_tensor),
                 status = cpuStatus,
                 severity = Severity.SOFT,
                 detail = when (cpuStatus) {
-                    Status.PASS -> "Meets recommended chipset floor."
-                    Status.WARN -> "Below recommended SoC — expect slower builds/AI."
-                    Status.UNKNOWN -> "SoC not identified (Android often hides marketing names). Proceed at your own risk."
-                    Status.FAIL -> "SoC not identified."
+                    Status.PASS -> tr(R.string.cli_meets_recommended_chipset_floor)
+                    Status.WARN -> tr(R.string.cli_below_recommended_soc_expect_slower)
+                    Status.UNKNOWN -> tr(R.string.cli_soc_not_identified_android_often)
+                    Status.FAIL -> tr(R.string.cli_soc_not_identified)
                 }
             )
         )
@@ -244,13 +244,13 @@ object DeviceRequirements {
             if (v.isNotEmpty()) parts += "$label=$v"
         }
 
-        add("HARDWARE", Build.HARDWARE)
-        add("BOARD", Build.BOARD)
-        add("DEVICE", Build.DEVICE)
-        add("PRODUCT", Build.PRODUCT)
-        add("MANUFACTURER", Build.MANUFACTURER)
+        add(tr(R.string.cli_hardware), Build.HARDWARE)
+        add(tr(R.string.cli_board), Build.BOARD)
+        add(tr(R.string.cli_device), Build.DEVICE)
+        add(tr(R.string.cli_product), Build.PRODUCT)
+        add(tr(R.string.cli_manufacturer), Build.MANUFACTURER)
         add("BRAND", Build.BRAND)
-        add("MODEL", Build.MODEL)
+        add(tr(R.string.cli_model), Build.MODEL)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add("SOC_MANUFACTURER", Build.SOC_MANUFACTURER)
             add("SOC_MODEL", Build.SOC_MODEL)
@@ -302,7 +302,7 @@ object DeviceRequirements {
         }
 
         Log.i(TAG, "SoC → UNKNOWN raw=$raw")
-        return SocId(displayName = "Unknown", meetsMinimum = null, rawSignals = raw)
+        return SocId(displayName = tr(R.string.cli_unknown), meetsMinimum = null, rawSignals = raw)
     }
 
     private fun matchKnownSoc(socModel: String, platform: String, blob: String): SocId? {
@@ -313,17 +313,17 @@ object DeviceRequirements {
         // ── Google Tensor ────────────────────────────────────────────────────
         when {
             m.contains("tensor g5") || b.contains("tensor g5") || p.contains("lise") ->
-                return SocId("Google Tensor G5", true, "")
+                return SocId(tr(R.string.cli_google_tensor_g5), true, "")
             m.contains("tensor g4") || b.contains("tensor g4") || p.contains("zumapro") || p.contains("gs401") ->
-                return SocId("Google Tensor G4", true, "")
+                return SocId(tr(R.string.cli_google_tensor_g4), true, "")
             m.contains("tensor g3") || b.contains("tensor g3") || p.contains("zuma") || p.contains("gs301") ->
-                return SocId("Google Tensor G3", true, "")
+                return SocId(tr(R.string.cli_google_tensor_g3), true, "")
             m.contains("tensor g2") || b.contains("tensor g2") || p.contains("cloudripper") || p.contains("gs201") ->
-                return SocId("Google Tensor G2", false, "")
+                return SocId(tr(R.string.cli_google_tensor_g2), false, "")
             m.contains("tensor") && (m.contains("g1") || p.contains("slider") || p.contains("gs101")) ->
-                return SocId("Google Tensor G1", false, "")
+                return SocId(tr(R.string.cli_google_tensor_g1), false, "")
             m.contains("tensor") ->
-                return SocId(socModel.ifBlank { "Google Tensor" }, null, "")
+                return SocId(socModel.ifBlank { tr(R.string.cli_google_tensor) }, null, "")
         }
 
         // ── Qualcomm Snapdragon (marketing name first) ───────────────────────
@@ -346,13 +346,13 @@ object DeviceRequirements {
 
         // Generic Snapdragon string without gen
         if (m.contains("snapdragon") || b.contains("snapdragon")) {
-            return SocId(socModel.ifBlank { "Snapdragon (unparsed)" }, null, "")
+            return SocId(socModel.ifBlank { tr(R.string.cli_snapdragon_unparsed) }, null, "")
         }
         if (m.contains("dimensity") || b.contains("dimensity")) {
-            return SocId(socModel.ifBlank { "Dimensity (unparsed)" }, null, "")
+            return SocId(socModel.ifBlank { tr(R.string.cli_dimensity_unparsed) }, null, "")
         }
         if (m.contains("exynos") || b.contains("exynos")) {
-            return SocId(socModel.ifBlank { "Exynos (unparsed)" }, null, "")
+            return SocId(socModel.ifBlank { tr(R.string.cli_exynos_unparsed) }, null, "")
         }
 
         return null
@@ -390,16 +390,16 @@ object DeviceRequirements {
     private fun smPartToSoc(sm: Int): SocId? {
         // Rough SM ladder: 8550 = 8 Gen 2, 8450 = 8 Gen 1, 8650 = 8 Gen 3, 8750 = 8 Elite
         return when {
-            sm >= 8750 -> SocId("Snapdragon 8 Elite (SM$sm)", true, "")
-            sm >= 8650 -> SocId("Snapdragon 8 Gen 3 (SM$sm)", true, "")
-            sm >= 8635 -> SocId("Snapdragon 8s Gen 3 (SM$sm)", true, "")
-            sm >= 8550 -> SocId("Snapdragon 8 Gen 2 (SM$sm)", true, "")
-            sm >= 8475 -> SocId("Snapdragon 8+ Gen 1 (SM$sm)", false, "")
-            sm >= 8450 -> SocId("Snapdragon 8 Gen 1 (SM$sm)", false, "")
-            sm >= 8350 -> SocId("Snapdragon 888-class (SM$sm)", false, "")
-            sm >= 8250 -> SocId("Snapdragon 865-class (SM$sm)", false, "")
-            sm in 7000..7999 -> SocId("Snapdragon 7-series (SM$sm)", false, "")
-            sm in 6000..6999 -> SocId("Snapdragon 6-series (SM$sm)", false, "")
+            sm >= 8750 -> SocId(tr(R.string.cli_snapdragon_8_elite_sm, sm), true, "")
+            sm >= 8650 -> SocId(tr(R.string.cli_snapdragon_8_gen_3_sm, sm), true, "")
+            sm >= 8635 -> SocId(tr(R.string.cli_snapdragon_8s_gen_3_sm, sm), true, "")
+            sm >= 8550 -> SocId(tr(R.string.cli_snapdragon_8_gen_2_sm, sm), true, "")
+            sm >= 8475 -> SocId(tr(R.string.cli_snapdragon_8_gen_1_sm, sm), false, "")
+            sm >= 8450 -> SocId(tr(R.string.cli_snapdragon_8_gen_1_sm_2, sm), false, "")
+            sm >= 8350 -> SocId(tr(R.string.cli_snapdragon_888_class_sm, sm), false, "")
+            sm >= 8250 -> SocId(tr(R.string.cli_snapdragon_865_class_sm, sm), false, "")
+            sm in 7000..7999 -> SocId(tr(R.string.cli_snapdragon_7_series_sm, sm), false, "")
+            sm in 6000..6999 -> SocId(tr(R.string.cli_snapdragon_6_series_sm, sm), false, "")
             else -> null
         }
     }
@@ -464,7 +464,7 @@ object DeviceRequirements {
             // Heuristic: MT698x high-end; 6985+ meets
             val meets = mt >= 6985
             val known = mt >= 6800
-            if (known) return SocId("MediaTek MT$mt", meets, "")
+            if (known) return SocId(tr(R.string.cli_mediatek_mt, mt), meets, "")
         }
         return null
     }
@@ -479,17 +479,17 @@ object DeviceRequirements {
         // Internal s5e codes
         when {
             t.contains("s5e9955") || t.contains("s5e9945") ->
-                return SocId("Exynos 2400-class", true, "")
+                return SocId(tr(R.string.cli_exynos_2400_class), true, "")
             t.contains("s5e9925") ->
-                return SocId("Exynos 2200", true, "")
+                return SocId(tr(R.string.cli_exynos_2200), true, "")
             t.contains("s5e9840") || t.contains("exynos2100") || t.contains("s5e9830") ->
-                return SocId("Exynos 2100 or older", false, "")
+                return SocId(tr(R.string.cli_exynos_2100_or_older), false, "")
             t.contains("xclipse") && (t.contains("940") || t.contains("920")) ->
-                return SocId("Exynos (Xclipse 9xx)", true, "")
+                return SocId(tr(R.string.cli_exynos_xclipse_9xx), true, "")
             t.contains("xclipse") ->
-                return SocId("Exynos (Xclipse)", null, "")
+                return SocId(tr(R.string.cli_exynos_xclipse), null, "")
             t.contains("exynos") ->
-                return SocId(socModel.ifBlank { "Exynos (unparsed)" }, null, "")
+                return SocId(socModel.ifBlank { tr(R.string.cli_exynos_unparsed) }, null, "")
         }
         return null
     }

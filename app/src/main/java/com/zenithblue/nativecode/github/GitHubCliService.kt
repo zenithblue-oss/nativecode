@@ -28,6 +28,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * SSOT for guest `gh`: probe, install, device-code auth, repo list, logout.
@@ -140,12 +142,12 @@ object GitHubCliService {
                 mainHandler.post {
                     onResult(
                         ok,
-                        if (ok) "Logged out$label" else "Logout failed"
+                        if (ok) tr(R.string.cli_logged_out, label) else tr(R.string.cli_logout_failed)
                     )
                 }
             } catch (e: Exception) {
                 invalidateAuth(method)
-                mainHandler.post { onResult(false, e.message ?: "Logout failed") }
+                mainHandler.post { onResult(false, e.message ?: tr(R.string.cli_logout_failed)) }
             }
         }
     }
@@ -197,7 +199,7 @@ object GitHubCliService {
         listener: GhAuthListener
     ): GhAuthSession? {
         if (!activeSession.compareAndSet(false, true)) {
-            mainHandler.post { listener.onFailed("Auth already in progress") }
+            mainHandler.post { listener.onFailed(tr(R.string.cli_auth_already_in_progress)) }
             return null
         }
         val session = GhAuthSession()
@@ -209,7 +211,7 @@ object GitHubCliService {
             } catch (e: Exception) {
                 if (!session.cancelled) {
                     mainHandler.post {
-                        listener.onFailed(e.message ?: "Connect failed")
+                        listener.onFailed(e.message ?: tr(R.string.cli_connect_failed))
                     }
                 }
             } finally {
@@ -237,7 +239,7 @@ object GitHubCliService {
     fun copyCode(ctx: Context, code: String) {
         try {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("GitHub one-time code", code))
+            cm.setPrimaryClip(ClipData.newPlainText(tr(R.string.cli_github_one_time_code), code))
         } catch (_: Exception) {
         }
     }
@@ -419,7 +421,7 @@ object GitHubCliService {
         }
 
         // CHECK_GH
-        phase(GhAuthPhase.CHECK_GH, "Checking gh…")
+        phase(GhAuthPhase.CHECK_GH, tr(R.string.cli_checking_gh))
         var status = probeStatusSync(ctx, method)
         if (session.cancelled) {
             mainHandler.post { listener.onCancelled() }
@@ -428,7 +430,7 @@ object GitHubCliService {
 
         // INSTALL if needed (prebuilt rootfs bakes github-cli; fallback is distro-aware)
         if (!status.ghInstalled) {
-            phase(GhAuthPhase.INSTALL_GH, "Installing gh…")
+            phase(GhAuthPhase.INSTALL_GH, tr(R.string.cli_installing_gh))
             log("\$ apk add github-cli  # or: apt-get install -y gh")
             val installOk = runInstall(ctx, method, session, listener)
             if (session.cancelled) {
@@ -436,7 +438,7 @@ object GitHubCliService {
                 return
             }
             if (!installOk) {
-                fail("Failed to install gh")
+                fail(tr(R.string.cli_failed_to_install_gh))
                 return
             }
             status = probeStatusSync(ctx, method)
@@ -448,9 +450,9 @@ object GitHubCliService {
         }
 
         // CHECK_AUTH
-        phase(GhAuthPhase.CHECK_AUTH, "Checking auth…")
+        phase(GhAuthPhase.CHECK_AUTH, tr(R.string.cli_checking_auth))
         if (status.loggedIn && !status.username.isNullOrBlank()) {
-            phase(GhAuthPhase.SUCCESS, "Already signed in")
+            phase(GhAuthPhase.SUCCESS, tr(R.string.cli_already_signed_in))
             mainHandler.post { listener.onDone(status) }
             // best-effort git helper after UI done (do not block)
             executor.execute { runSetupGit(ctx, method) }
@@ -458,27 +460,27 @@ object GitHubCliService {
         }
 
         // LOGIN — Android device flow (not guest gh --web poll; proot often drops HTTPS)
-        phase(GhAuthPhase.LOGIN, "Starting device login…")
-        log("OAuth device flow via Android network…")
+        phase(GhAuthPhase.LOGIN, tr(R.string.cli_starting_device_login))
+        log(tr(R.string.cli_oauth_device_flow_via_android))
         val loginOk = runLoginAndroidDeviceFlow(ctx, method, session, listener)
         if (session.cancelled) {
             mainHandler.post { listener.onCancelled() }
             return
         }
         if (!loginOk) {
-            fail("Login failed or timed out")
+            fail(tr(R.string.cli_login_failed_or_timed_out))
             return
         }
 
         // VERIFY — hosts.yml / cache first (fast); never stall UI on setup-git
-        phase(GhAuthPhase.VERIFY, "Verifying…")
+        phase(GhAuthPhase.VERIFY, tr(R.string.cli_verifying))
         status = probeStatusSync(ctx, method)
         if (status.loggedIn) {
-            phase(GhAuthPhase.SUCCESS, "Signed in as @${status.username}")
+            phase(GhAuthPhase.SUCCESS, tr(R.string.cli_signed_in_as, status.username))
             mainHandler.post { listener.onDone(status) }
             executor.execute { runSetupGit(ctx, method) }
         } else {
-            fail("Auth completed but not logged in")
+            fail(tr(R.string.cli_auth_completed_but_not_logged))
         }
     }
 
@@ -497,7 +499,7 @@ object GitHubCliService {
             if (st.ghInstalled) return true
         }
         mainHandler.post {
-            listener.onLog("Primary apt failed or package missing — trying GitHub CLI repo…")
+            listener.onLog(tr(R.string.cli_primary_apt_failed_or_package))
         }
         streamRoot(ctx, method, GhGuestCommands.installFallback(), session, listener)
         if (session.cancelled) return false
@@ -553,12 +555,12 @@ object GitHubCliService {
         val token = pollAccessToken(device, session, logLine)
         if (session.cancelled) return false
         if (token.isNullOrBlank()) {
-            logLine("No access token (denied, expired, or timeout)")
+            logLine(tr(R.string.cli_no_access_token_denied_expired))
             return false
         }
 
-        logLine("Token received — resolving username…")
-        mainHandler.post { listener.onPhase(GhAuthPhase.VERIFY, "Saving credentials…") }
+        logLine(tr(R.string.cli_token_received_resolving_username))
+        mainHandler.post { listener.onPhase(GhAuthPhase.VERIFY, tr(R.string.cli_saving_credentials)) }
         val username = try {
             fetchGithubLogin(token)
         } catch (e: Exception) {
@@ -566,16 +568,16 @@ object GitHubCliService {
             null
         }
         if (username.isNullOrBlank()) {
-            logLine("Could not resolve GitHub username from token")
+            logLine(tr(R.string.cli_could_not_resolve_github_username))
         } else {
-            logLine("GitHub user: @$username")
+            logLine(tr(R.string.cli_github_user, username))
         }
 
         // Primary: write hosts.yml into guest rootfs from Android (no guest network)
         val finalUser = username ?: "user"
         val wrote = writeHostsYml(ctx, method, token, finalUser)
         if (wrote) {
-            logLine("Wrote ~/.config/gh/hosts.yml for flux ($method)")
+            logLine(tr(R.string.cli_wrote_config_gh_hosts_yml, method))
             // Seed cache now — VERIFY must not re-hang on guest shell
             if (!username.isNullOrBlank()) {
                 rememberAuth(ctx, method, GhAuthStatus(
@@ -583,9 +585,9 @@ object GitHubCliService {
                 ))
             }
         } else {
-            logLine("Direct hosts.yml write failed — trying gh --with-token…")
+            logLine(tr(R.string.cli_direct_hosts_yml_write_failed))
             if (!injectTokenViaGh(ctx, method, token, logLine)) {
-                logLine("Token inject failed")
+                logLine(tr(R.string.cli_token_inject_failed))
                 return false
             }
             if (!username.isNullOrBlank()) {
@@ -863,20 +865,20 @@ object GitHubCliService {
                 json.optString("error") == "authorization_pending" -> {
                     val now = System.currentTimeMillis()
                     if (now - lastStatusLog > 20_000) {
-                        log("Waiting for browser approval…")
+                        log(tr(R.string.cli_waiting_for_browser_approval))
                         lastStatusLog = now
                     }
                 }
                 json.optString("error") == "slow_down" -> {
                     intervalMs += 5000
-                    log("Slowing poll…")
+                    log(tr(R.string.cli_slowing_poll))
                 }
                 json.optString("error") == "expired_token" -> {
-                    log("Device code expired")
+                    log(tr(R.string.cli_device_code_expired))
                     return null
                 }
                 json.optString("error") == "access_denied" -> {
-                    log("Access denied in browser")
+                    log(tr(R.string.cli_access_denied_in_browser))
                     return null
                 }
                 json.has("error") -> {
@@ -885,7 +887,7 @@ object GitHubCliService {
                 }
             }
         }
-        log("Auth timed out")
+        log(tr(R.string.cli_auth_timed_out))
         return null
     }
 
