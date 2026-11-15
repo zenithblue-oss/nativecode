@@ -234,7 +234,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(headerIcon)
 
         val title = TextView(this).apply {
-            text = "PRIVACY"
+            text = tr(R.string.onb_privacy)
             textSize = 28f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -293,32 +293,32 @@ class OnboardingActivity : AppCompatActivity() {
 
         card.addView(
             bullet(
-                "01 · NO NATIVECODE CLOUD",
-                "No ads and no NativeCode servers. Crash reports and anonymous usage statistics (Google Firebase) are off unless you turn them on in the next step or in Settings."
+                tr(R.string.onb_01_no_nativecode_cloud),
+                tr(R.string.onb_no_ads_and_no_nativecode)
             )
         )
         card.addView(
             bullet(
-                "02 · YOUR DATA STAYS LOCAL",
-                "Files, projects, packages, and credentials are stored on this device inside the isolated Alpaquita Linux PRoot environment."
+                tr(R.string.onb_02_your_data_stays_local),
+                tr(R.string.onb_files_projects_packages_and_credenti)
             )
         )
         card.addView(
             bullet(
-                "03 · OPTIONAL NETWORK",
-                "When you use GitHub, AI CLIs, or package managers, prompts, selected code, account identifiers, diagnostics, and downloads may be sent directly to those providers under their policies."
+                tr(R.string.onb_03_optional_network),
+                tr(R.string.onb_when_you_use_github_ai)
             )
         )
         card.addView(
             bullet(
-                "04 · YOU CONTROL DELETION",
-                "Clear app storage, uninstall, or delete guest files to remove local data. Manage third-party accounts with each vendor."
+                tr(R.string.onb_04_you_control_deletion),
+                tr(R.string.onb_clear_app_storage_uninstall_or)
             )
         )
         root.addView(card)
 
         val policyLink = TextView(this).apply {
-            text = "Full privacy policy ↗"
+            text = tr(R.string.onb_full_privacy_policy)
             textSize = 13f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -328,7 +328,7 @@ class OnboardingActivity : AppCompatActivity() {
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
                 } catch (_: Exception) {
-                    Toast.makeText(this@OnboardingActivity, "No browser available", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@OnboardingActivity, tr(R.string.onb_no_browser_available), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -340,7 +340,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(spacer)
 
         root.addView(
-            primaryButton("I Understand — Continue", R.drawable.ic_arrow_right) {
+            primaryButton(tr(R.string.onb_i_understand_continue), R.drawable.ic_arrow_right) {
                 getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
                     .edit()
                     .putBoolean("privacy_accepted", true)
@@ -404,7 +404,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(nameTv)
 
         val taglineTv = TextView(this).apply {
-            text = "Portable Linux & AI Developer Environment"
+            text = tr(R.string.onb_portable_linux_ai_developer_environm)
             textSize = 14f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -419,11 +419,11 @@ class OnboardingActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, dp(48))
         }
-        tagRow.addView(featureBadge(R.drawable.ic_terminal, "Linux Glibc"))
+        tagRow.addView(featureBadge(R.drawable.ic_terminal, tr(R.string.onb_linux_glibc)))
         tagRow.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(8), 1) })
-        tagRow.addView(featureBadge(R.drawable.ic_smart_toy, "AI & LLMs"))
+        tagRow.addView(featureBadge(R.drawable.ic_smart_toy, tr(R.string.onb_ai_llms)))
         tagRow.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(8), 1) })
-        tagRow.addView(featureBadge(R.drawable.ic_laptop, "Dev Suite"))
+        tagRow.addView(featureBadge(R.drawable.ic_laptop, tr(R.string.onb_dev_suite)))
         root.addView(tagRow)
 
         val botSpacer = View(this).apply {
@@ -431,7 +431,7 @@ class OnboardingActivity : AppCompatActivity() {
         }
         root.addView(botSpacer)
 
-        val btn = primaryButton("Get Started", R.drawable.ic_arrow_right) {
+        val btn = primaryButton(tr(R.string.onb_get_started), R.drawable.ic_arrow_right) {
             showPage(2) // slideshow
         }
         root.addView(btn)
@@ -452,7 +452,7 @@ class OnboardingActivity : AppCompatActivity() {
         // Slim mono label replaces the 20sp smallHeader() used on other pages — that header
         // alone cost ~36dp (20sp text + 16dp bottom pad) of hero space for little benefit here.
         root.addView(TextView(this).apply {
-            text = "CORE CAPABILITIES"
+            text = tr(R.string.onb_core_capabilities)
             textSize = 12f
             letterSpacing = 0.06f
             setTextColor(NC.ON_SURF_VAR)
@@ -473,45 +473,45 @@ class OnboardingActivity : AppCompatActivity() {
 
         val slides = listOf(
             SlideData(
-                category = "WORKSPACE",
-                title = "Project Management",
+                category = tr(R.string.onb_workspace),
+                title = tr(R.string.onb_project_management),
                 iconResId = R.drawable.ic_folder,
-                desc = "Multi-repo project tree manager with quick creation, workspace switching, and file organization.",
+                desc = tr(R.string.onb_multi_repo_project_tree_manager),
                 type = PreviewType.PROJECT_TREE
             ),
             SlideData(
-                category = "AI ENGINE",
-                title = "AI Tools & LLM Harness",
+                category = tr(R.string.onb_ai_engine),
+                title = tr(R.string.onb_ai_tools_llm_harness),
                 iconResId = R.drawable.ic_smart_toy,
-                desc = "Run OpenCode, Codex, Qwen Code, Claude Code, Antigravity, Grok and Kiro directly inside the prebuilt Linux environment.",
+                desc = tr(R.string.onb_run_opencode_codex_qwen_code),
                 type = PreviewType.AI_CLI
             ),
             SlideData(
-                category = "RUNTIMES",
-                title = "Development Environment",
+                category = tr(R.string.onb_runtimes),
+                title = tr(R.string.onb_development_environment),
                 iconResId = R.drawable.ic_laptop,
-                desc = "Preconfigured Node.js 26 LTS, Python 3.12, GCC, and package managers ready for instant execution.",
+                desc = tr(R.string.onb_preconfigured_node_js_26_lts),
                 type = PreviewType.DEV_SUITE
             ),
             SlideData(
-                category = "DESKTOP",
-                title = "XFCE4 Graphic Server",
+                category = tr(R.string.onb_desktop),
+                title = tr(R.string.onb_xfce4_graphic_server),
                 iconResId = R.drawable.ic_display,
-                desc = "Integrated Termux-X11 display server support to launch full Linux XFCE desktop GUIs on Android.",
+                desc = tr(R.string.onb_integrated_termux_x11_display_server),
                 type = PreviewType.XFCE_GUI
             ),
             SlideData(
-                category = "LINUX",
-                title = "Alpaquita Linux",
+                category = tr(R.string.onb_linux),
+                title = tr(R.string.onb_alpaquita_linux),
                 iconResId = R.drawable.ic_terminal,
                 desc = "Native glibc Alpaquita Linux PRoot environment with apk package manager and full Linux userland.",
                 type = PreviewType.DEBIAN_ENV
             ),
             SlideData(
-                category = "CONTROL",
-                title = "Git Diff & Version Control",
+                category = tr(R.string.onb_control),
+                title = tr(R.string.onb_git_diff_version_control),
                 iconResId = R.drawable.ic_git,
-                desc = "Native Git integration with real-time status tracking, visual diff inspection, and branch switching.",
+                desc = tr(R.string.onb_native_git_integration_with_real),
                 type = PreviewType.GIT_DIFF
             )
         )
@@ -733,7 +733,7 @@ class OnboardingActivity : AppCompatActivity() {
             // Reserve shadow extrusion under buttons
             setPadding(0, 0, 0, dp(shadowOff))
         }
-        val prevBtn = secondaryButton("Back") {
+        val prevBtn = secondaryButton(tr(R.string.onb_back)) {
             if (activeSlide > 0) {
                 switchSlide(activeSlide - 1)
             } else {
@@ -742,7 +742,7 @@ class OnboardingActivity : AppCompatActivity() {
         }
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
 
-        val nextBtn = primaryButton("Continue", R.drawable.ic_arrow_right) {
+        val nextBtn = primaryButton(tr(R.string.onb_continue), R.drawable.ic_arrow_right) {
             if (activeSlide < slides.size - 1) {
                 switchSlide(activeSlide + 1)
             } else {
@@ -810,14 +810,14 @@ class OnboardingActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         headerLeft.addView(TextView(this).apply {
-            text = "DEVICE PROBE"
+            text = tr(R.string.onb_device_probe)
             textSize = 11f
             letterSpacing = 0.12f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
         })
         headerLeft.addView(TextView(this).apply {
-            text = "Hardware gate before install"
+            text = tr(R.string.onb_hardware_gate_before_install)
             textSize = 18f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
@@ -854,7 +854,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(headerRow)
 
         root.addView(TextView(this).apply {
-            text = "Storage is a hard gate. RAM / swap / SoC are soft signals."
+            text = tr(R.string.onb_storage_is_a_hard_gate)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -945,10 +945,10 @@ class OnboardingActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(10), 0, dp(shadowOff))
         }
-        val prevBtn = secondaryButton("Back") { showPage(2) }
+        val prevBtn = secondaryButton(tr(R.string.onb_back)) { showPage(2) }
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
 
-        val nextLabel = if (snap.hardBlocked) "Storage required" else "Continue"
+        val nextLabel = if (snap.hardBlocked) tr(R.string.onb_storage_required) else tr(R.string.onb_continue)
         val nextBtn = primaryButton(nextLabel, if (snap.hardBlocked) null else R.drawable.ic_arrow_right) {
             if (!snap.hardBlocked) {
                 selectedIsolationMethod = "proot"
@@ -977,9 +977,9 @@ class OnboardingActivity : AppCompatActivity() {
 
     private fun reqStatusBadge(status: DeviceRequirements.Status): TextView {
         val (bg, fg, label) = when (status) {
-            DeviceRequirements.Status.PASS -> Triple(NC.PRIMARY_CON, NC.ON_PRIMARY_CON, "PASS")
-            DeviceRequirements.Status.FAIL -> Triple(NC.ERROR_CON, NC.ON_ERROR_CON, "FAIL")
-            DeviceRequirements.Status.WARN -> Triple(NC.SURFACE_HIGHEST, NC.TERTIARY, "WARN")
+            DeviceRequirements.Status.PASS -> Triple(NC.PRIMARY_CON, NC.ON_PRIMARY_CON, tr(R.string.onb_pass))
+            DeviceRequirements.Status.FAIL -> Triple(NC.ERROR_CON, NC.ON_ERROR_CON, tr(R.string.onb_fail))
+            DeviceRequirements.Status.WARN -> Triple(NC.SURFACE_HIGHEST, NC.TERTIARY, tr(R.string.onb_warn))
             DeviceRequirements.Status.UNKNOWN -> Triple(NC.SURFACE_HIGHEST, NC.SECONDARY, "????")
         }
         return textBadge(label, bg, fg)
@@ -1037,14 +1037,14 @@ class OnboardingActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         top.addView(TextView(this).apply {
-            text = "01  STORAGE"
+            text = tr(R.string.onb_01_storage)
             textSize = 11f
             letterSpacing = 0.08f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
-        top.addView(textBadge("HARD GATE", NC.SURFACE_HIGHEST, NC.ON_SURF_VAR).apply {
+        top.addView(textBadge(tr(R.string.onb_hard_gate), NC.SURFACE_HIGHEST, NC.ON_SURF_VAR).apply {
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(6) }
         })
         top.addView(reqStatusBadge(check.status))
@@ -1140,7 +1140,7 @@ class OnboardingActivity : AppCompatActivity() {
         })
 
         card.addView(TextView(this).apply {
-            text = "soft · need >${minMb / 1000} GB"
+            text = tr(R.string.onb_soft_need_gb, minMb / 1000)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -1207,14 +1207,14 @@ class OnboardingActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         top.addView(TextView(this).apply {
-            text = "04  SILICON"
+            text = tr(R.string.onb_04_silicon)
             textSize = 11f
             letterSpacing = 0.08f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
-        top.addView(textBadge("SOFT", NC.SURFACE_HIGHEST, NC.ON_SURF_VAR).apply {
+        top.addView(textBadge(tr(R.string.onb_soft), NC.SURFACE_HIGHEST, NC.ON_SURF_VAR).apply {
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(6) }
         })
         top.addView(reqStatusBadge(check.status))
@@ -1290,7 +1290,7 @@ class OnboardingActivity : AppCompatActivity() {
             logoRes == R.drawable.logo_soc_mediatek -> "MEDIATEK  ·  DIMENSITY"
             logoRes == R.drawable.logo_soc_exynos -> "SAMSUNG  ·  EXYNOS"
             logoRes == R.drawable.logo_soc_tensor -> "GOOGLE  ·  TENSOR"
-            else -> "VENDOR  ·  UNIDENTIFIED"
+            else -> tr(R.string.onb_vendor_unidentified)
         }
         card.addView(TextView(this).apply {
             text = vendor
@@ -1307,24 +1307,24 @@ class OnboardingActivity : AppCompatActivity() {
         data class Verdict(val label: String, val detail: String, val stroke: Int, val fg: Int, val tagBg: Int, val tagFg: Int)
         val v = when {
             snap.hardBlocked -> Verdict(
-                "BLOCKED",
-                "Free more than 10 GB storage to continue setup.",
+                tr(R.string.onb_blocked),
+                tr(R.string.onb_free_more_than_10_gb),
                 NC.ERROR,
                 NC.ERROR,
                 NC.ERROR_CON,
                 NC.ON_ERROR_CON
             )
             snap.hasSoftWarnings -> Verdict(
-                "SOFT WARN",
-                "You can continue — performance may stutter below recommended RAM / swap / SoC.",
+                tr(R.string.onb_soft_warn),
+                tr(R.string.onb_you_can_continue_performance_may),
                 NC.TERTIARY_CON,
                 NC.TERTIARY,
                 NC.TERTIARY_CON,
                 NC.ON_TERTIARY
             )
             else -> Verdict(
-                "ALL CLEAR",
-                "Checks look good. Ready for method selection.",
+                tr(R.string.onb_all_clear),
+                tr(R.string.onb_checks_look_good_ready_for),
                 NC.PRIMARY,
                 NC.PRIMARY,
                 NC.PRIMARY_CON,
@@ -1369,7 +1369,7 @@ class OnboardingActivity : AppCompatActivity() {
             setBackgroundColor(NC.BG)
         }
 
-        root.addView(smallHeader("Notifications", R.drawable.ic_stat_terminal))
+        root.addView(smallHeader(tr(R.string.onb_notifications), R.drawable.ic_stat_terminal))
 
         val spacer1 = View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f) }
         root.addView(spacer1)
@@ -1399,7 +1399,7 @@ class OnboardingActivity : AppCompatActivity() {
         card.addView(icon)
 
         val title = TextView(this).apply {
-            text = "FOREGROUND SERVICE STATUS"
+            text = tr(R.string.onb_foreground_service_status)
             textSize = 16f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -1409,7 +1409,7 @@ class OnboardingActivity : AppCompatActivity() {
         card.addView(title)
 
         val desc = TextView(this).apply {
-            text = "NativeCode runs long tasks (package installation, rootfs decompression, desktop sessions) in an Android Foreground Service. Notification permission allows you to monitor real-time setup progress and terminal background tasks without Android killing the process."
+            text = tr(R.string.onb_nativecode_runs_long_tasks_package)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -1420,7 +1420,7 @@ class OnboardingActivity : AppCompatActivity() {
 
         val grantBtn = TextView(this).apply {
             val granted = Build.VERSION.SDK_INT < 33 || checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            text = if (granted) "PERMISSION GRANTED" else "GRANT PERMISSION"
+            text = if (granted) tr(R.string.onb_permission_granted) else tr(R.string.onb_grant_permission)
             textSize = 13f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -1439,7 +1439,7 @@ class OnboardingActivity : AppCompatActivity() {
                 if (Build.VERSION.SDK_INT >= 33) {
                     NativeCodeFgs.ensurePostNotificationsPermission(this@OnboardingActivity)
                 } else {
-                    Toast.makeText(this@OnboardingActivity, "Notification permission already granted", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@OnboardingActivity, tr(R.string.onb_notification_permission_already_gran), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -1450,9 +1450,9 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(spacer2)
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val prevBtn = secondaryButton("Back") { showPage(3) }
+        val prevBtn = secondaryButton(tr(R.string.onb_back)) { showPage(3) }
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
-        val nextBtn = primaryButton("Continue", R.drawable.ic_arrow_right) {
+        val nextBtn = primaryButton(tr(R.string.onb_continue), R.drawable.ic_arrow_right) {
             showPage(5)
         }
         nextBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
@@ -1474,7 +1474,7 @@ class OnboardingActivity : AppCompatActivity() {
             setPadding(dp(16), dp(20), dp(16), dp(20))
         }
 
-        root.addView(smallHeader("Linux Runtime", R.drawable.ic_storage))
+        root.addView(smallHeader(tr(R.string.onb_linux_runtime), R.drawable.ic_storage))
         root.addView(TextView(this).apply {
             text = "// PREBUILT ALPAQUITA GLIBC (AARCH64) · PLAY ASSET DELIVERY"
             textSize = 11f
@@ -1503,21 +1503,21 @@ class OnboardingActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(8))
         }
         specHead.addView(TextView(this).apply {
-            text = "PRE-BUILT LINUX USERLAND"
+            text = tr(R.string.onb_pre_built_linux_userland)
             textSize = 14f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
-        specHead.addView(textBadge("ALL-IN-ONE", NC.PRIMARY_CON, NC.ON_PRIMARY_CON))
+        specHead.addView(textBadge(tr(R.string.onb_all_in_one), NC.PRIMARY_CON, NC.ON_PRIMARY_CON))
         specCard.addView(specHead)
 
         val specLines = listOf(
-            "• Shell + developer toolchain",
-            "• Git + GitHub CLI",
-            "• XFCE desktop + NativeCode theme",
-            "• Python / Node / JVM / Rust / Go",
-            "• OpenCode / Codex / Qwen / Claude / Antigravity / Grok / Kiro"
+            tr(R.string.onb_shell_developer_toolchain),
+            tr(R.string.onb_git_github_cli),
+            tr(R.string.onb_xfce_desktop_nativecode_theme),
+            tr(R.string.onb_python_node_jvm_rust_go),
+            tr(R.string.onb_opencode_codex_qwen_claude_antigravi)
         )
         specLines.forEach { line ->
             specCard.addView(TextView(this).apply {
@@ -1564,14 +1564,14 @@ class OnboardingActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(8))
         }
         padHead.addView(TextView(this).apply {
-            text = "RUNTIME DELIVERY"
+            text = tr(R.string.onb_runtime_delivery)
             textSize = 14f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
         val statusBadgeTv = textBadge(
-            if (deliveryReady()) "READY" else "DOWNLOAD REQUIRED",
+            if (deliveryReady()) tr(R.string.onb_ready) else tr(R.string.onb_download_required),
             if (deliveryReady()) NC.PRIMARY_CON else NC.SEC_CON,
             if (deliveryReady()) NC.ON_PRIMARY_CON else NC.ON_SEC_CON
         )
@@ -1583,9 +1583,9 @@ class OnboardingActivity : AppCompatActivity() {
                 val sizeStr = currentSource?.archiveFile?.length()?.let { " (${OnboardingIo.formatBytes(it)})" } ?: ""
                 "Runtime + Android SDK 36 packs ready: ${currentSource?.archiveFile?.name ?: "Bundled"}$sizeStr\nSHA256: ${currentSource?.expectedSha256?.take(16)}… [VERIFIED]"
             } else if (currentSource != null) {
-                "Runtime pack ready. Android SDK 36 + ARM64 aapt2 pack (~76 MB) is required."
+                tr(R.string.onb_runtime_pack_ready_android_sdk)
             } else {
-                "Play Asset Packs: Alpaquita runtime (~1.5 GB) + Android SDK 36 (~76 MB)."
+                tr(R.string.onb_play_asset_packs_alpaquita_runtime)
             }
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
@@ -1615,22 +1615,22 @@ class OnboardingActivity : AppCompatActivity() {
 
         fun requestAndroidDevPack() {
             padProgressBar.visibility = View.VISIBLE
-            detailTv.text = "Requesting nativecode_android_dev from Google Play…"
+            detailTv.text = tr(R.string.onb_requesting_nativecode_android_dev_fr)
             PlayAssetDeliveryManager.requestDownload(this, PlayAssetDeliveryManager.PACK_ANDROID_DEV) { state ->
                 when (state) {
                     is PlayAssetDeliveryManager.DownloadState.Pending -> {
-                        detailTv.text = "Android SDK download pending…"
+                        detailTv.text = tr(R.string.onb_android_sdk_download_pending)
                         padProgressBar.isIndeterminate = true
                     }
                     is PlayAssetDeliveryManager.DownloadState.Downloading -> {
                         padProgressBar.isIndeterminate = false
                         padProgressBar.progress = state.percentage
-                        detailTv.text = "Android SDK: ${OnboardingIo.formatBytes(state.bytesDownloaded)} / ${OnboardingIo.formatBytes(state.totalBytes)} (${state.percentage}%)"
+                        detailTv.text = tr(R.string.onb_android_sdk, OnboardingIo.formatBytes(state.bytesDownloaded), OnboardingIo.formatBytes(state.totalBytes), state.percentage)
                     }
                     is PlayAssetDeliveryManager.DownloadState.Transferring -> {
                         padProgressBar.isIndeterminate = false
                         padProgressBar.progress = state.percentage
-                        detailTv.text = "Transferring Android SDK (${state.percentage}%)…"
+                        detailTv.text = tr(R.string.onb_transferring_android_sdk, state.percentage)
                     }
                     is PlayAssetDeliveryManager.DownloadState.Completed -> {
                         devPackReady = state.archiveFile.isFile &&
@@ -1639,12 +1639,12 @@ class OnboardingActivity : AppCompatActivity() {
                         padProgressBar.progress = if (devPackReady) 100 else 0
                         padProgressBar.visibility = if (devPackReady) View.GONE else View.VISIBLE
                         detailTv.text = if (devPackReady) {
-                            "Runtime + Android SDK 36 packs downloaded and SHA-256 verified."
+                            tr(R.string.onb_runtime_android_sdk_36_packs)
                         } else {
-                            "Android SDK pack checksum verification failed."
+                            tr(R.string.onb_android_sdk_pack_checksum_verificati)
                         }
                         if (devPackReady) {
-                            statusBadgeTv.text = "READY"
+                            statusBadgeTv.text = tr(R.string.onb_ready)
                             statusBadgeTv.setBackgroundColor(NC.PRIMARY_CON)
                             statusBadgeTv.setTextColor(NC.ON_PRIMARY_CON)
                             downloadBtnRef?.visibility = View.GONE
@@ -1652,48 +1652,48 @@ class OnboardingActivity : AppCompatActivity() {
                         updateStartBtnState()
                     }
                     is PlayAssetDeliveryManager.DownloadState.WaitingForWifi ->
-                        detailTv.text = "Waiting for Wi-Fi for Android SDK pack."
+                        detailTv.text = tr(R.string.onb_waiting_for_wi_fi_for)
                     is PlayAssetDeliveryManager.DownloadState.Failed -> {
                         padProgressBar.visibility = View.GONE
                         detailTv.text = "Android SDK download failed (${state.errorCode}): ${state.message}"
                     }
                     is PlayAssetDeliveryManager.DownloadState.Canceled ->
-                        detailTv.text = "Android SDK download canceled"
+                        detailTv.text = tr(R.string.onb_android_sdk_download_canceled)
                     else -> Unit
                 }
             }
         }
 
-        val downloadBtn = primaryButton("Download via Google Play", R.drawable.ic_download) {
+        val downloadBtn = primaryButton(tr(R.string.onb_download_via_google_play), R.drawable.ic_download) {
             if (currentSource != null && BuildConfig.PLAY_STORE_BUILD && !devPackReady) {
                 requestAndroidDevPack()
                 return@primaryButton
             }
             padProgressBar.visibility = View.VISIBLE
-            detailTv.text = "Requesting nativecode_runtime from Google Play…"
+            detailTv.text = tr(R.string.onb_requesting_nativecode_runtime_from_g)
             PlayAssetDeliveryManager.requestDownload(this, PlayAssetDeliveryManager.PACK_RUNTIME) { state ->
                 when (state) {
                     is PlayAssetDeliveryManager.DownloadState.Pending -> {
-                        detailTv.text = "Download pending in Google Play queue…"
+                        detailTv.text = tr(R.string.onb_download_pending_in_google_play)
                         padProgressBar.isIndeterminate = true
                     }
                     is PlayAssetDeliveryManager.DownloadState.Downloading -> {
                         padProgressBar.isIndeterminate = false
                         padProgressBar.progress = state.percentage
-                        detailTv.text = "Downloading: ${OnboardingIo.formatBytes(state.bytesDownloaded)} / ${OnboardingIo.formatBytes(state.totalBytes)} (${state.percentage}%)"
+                        detailTv.text = tr(R.string.onb_downloading, OnboardingIo.formatBytes(state.bytesDownloaded), OnboardingIo.formatBytes(state.totalBytes), state.percentage)
                     }
                     is PlayAssetDeliveryManager.DownloadState.Transferring -> {
                         padProgressBar.isIndeterminate = false
                         padProgressBar.progress = state.percentage
-                        detailTv.text = "Transferring asset pack (${state.percentage}%)…"
+                        detailTv.text = tr(R.string.onb_transferring_asset_pack, state.percentage)
                     }
                     is PlayAssetDeliveryManager.DownloadState.Completed -> {
                         padProgressBar.isIndeterminate = false
                         padProgressBar.progress = 100
                         padProgressBar.visibility = View.GONE
                         currentSource = RootfsSourceResolver.resolve(this, File(filesDir, "home"))
-                        detailTv.text = "Runtime pack downloaded and verified: ${state.archiveFile.name} (${OnboardingIo.formatBytes(state.archiveFile.length())})"
-                        statusBadgeTv.text = "READY"
+                        detailTv.text = tr(R.string.onb_runtime_pack_downloaded_and_verified, state.archiveFile.name, OnboardingIo.formatBytes(state.archiveFile.length()))
+                        statusBadgeTv.text = tr(R.string.onb_ready)
                         statusBadgeTv.setBackgroundColor(NC.PRIMARY_CON)
                         statusBadgeTv.setTextColor(NC.ON_PRIMARY_CON)
                         if (BuildConfig.PLAY_STORE_BUILD && !devPackReady) {
@@ -1704,14 +1704,14 @@ class OnboardingActivity : AppCompatActivity() {
                         }
                     }
                     is PlayAssetDeliveryManager.DownloadState.WaitingForWifi -> {
-                        detailTv.text = "Waiting for Wi-Fi (large download). Cellular prompt shown."
+                        detailTv.text = tr(R.string.onb_waiting_for_wi_fi_large)
                     }
                     is PlayAssetDeliveryManager.DownloadState.Failed -> {
                         padProgressBar.visibility = View.GONE
                         detailTv.text = "Download failed (code ${state.errorCode}): ${state.message}"
                     }
                     is PlayAssetDeliveryManager.DownloadState.Canceled -> {
-                        detailTv.text = "Download canceled"
+                        detailTv.text = tr(R.string.onb_download_canceled)
                     }
                     else -> {}
                 }
@@ -1743,7 +1743,7 @@ class OnboardingActivity : AppCompatActivity() {
             buttonTintList = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
         }
         val consentTv = TextView(this).apply {
-            text = "I reviewed this plan. NativeCode will install this prebuilt Linux environment on this device."
+            text = tr(R.string.onb_i_reviewed_this_plan_nativecode)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -1754,11 +1754,11 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(consentRow)
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val prevBtn = secondaryButton("Back") { showPage(4) }
+        val prevBtn = secondaryButton(tr(R.string.onb_back)) { showPage(4) }
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
-        val startBtn = primaryButton("Install Linux Environment", R.drawable.ic_arrow_right) {
+        val startBtn = primaryButton(tr(R.string.onb_install_linux_environment), R.drawable.ic_arrow_right) {
             if (!planAccepted) {
-                Toast.makeText(this, "Check the consent box to continue", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr(R.string.onb_check_the_consent_box_to), Toast.LENGTH_SHORT).show()
                 return@primaryButton
             }
             AiCliProvisionState.setPlanAccepted(this, true)
@@ -1799,7 +1799,7 @@ class OnboardingActivity : AppCompatActivity() {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
         }
 
-        root.addView(smallHeader("Environment Setup", R.drawable.ic_storage))
+        root.addView(smallHeader(tr(R.string.onb_environment_setup), R.drawable.ic_storage))
 
         // Center cluster: progress + log controls vertically in remaining space
         val center = LinearLayout(this).apply {
@@ -1889,13 +1889,13 @@ class OnboardingActivity : AppCompatActivity() {
 
         setupStepTitleText = TextView(this).apply {
             text = if (setupFinished) {
-                "Prebuilt Linux runtime ready"
+                tr(R.string.onb_prebuilt_linux_runtime_ready)
             } else if (setupFailed) {
-                "Setup failed"
+                tr(R.string.onb_setup_failed)
             } else if (isDebianBaseSetupStarted) {
-                currentSetupPhase()?.label ?: "Installing environment…"
+                currentSetupPhase()?.label ?: tr(R.string.onb_installing_environment)
             } else {
-                "Preparing prebuilt Linux runtime…"
+                tr(R.string.onb_preparing_prebuilt_linux_runtime)
             }
             textSize = 14f
             setTextColor(if (setupFailed) NC.ERROR else NC.ON_SURFACE)
@@ -1907,7 +1907,7 @@ class OnboardingActivity : AppCompatActivity() {
         progressCard.addView(setupStepTitleText)
 
         setupDetailText = TextView(this).apply {
-            text = if (setupFinished) "Ready to continue" else "Step progress updates as install runs"
+            text = if (setupFinished) tr(R.string.onb_ready_to_continue) else tr(R.string.onb_step_progress_updates_as_install)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -1920,7 +1920,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(center)
 
         // Next pinned to bottom
-        baseNextBtn = primaryButton("Next: Complete Setup", R.drawable.ic_arrow_right) {
+        baseNextBtn = primaryButton(tr(R.string.onb_next_complete_setup), R.drawable.ic_arrow_right) {
             showPage(7) // complete
         }
         if (setupFinished) {
@@ -1940,19 +1940,19 @@ class OnboardingActivity : AppCompatActivity() {
 
     private fun prootSetupPhases(): List<SetupPhase> {
         return listOf(
-            SetupPhase("A", "Preparing NativeCode host…", 10),
-            SetupPhase("B", "Installing prebuilt Linux runtime…", 75),
-            SetupPhase("C", "Deploying AI agent guidelines & hardware bridge…", 10),
-            SetupPhase("D", "Verifying environment…", 5)
+            SetupPhase("A", tr(R.string.onb_preparing_nativecode_host), 10),
+            SetupPhase("B", tr(R.string.onb_installing_prebuilt_linux_runtime), 75),
+            SetupPhase("C", tr(R.string.onb_deploying_ai_agent_guidelines_hardwa), 10),
+            SetupPhase("D", tr(R.string.onb_verifying_environment), 5)
         )
     }
 
     private fun chrootSetupPhases(): List<SetupPhase> {
         return listOf(
-            SetupPhase("R0", "Checking root access…", 10),
-            SetupPhase("R1", "Installing prebuilt Linux runtime (chroot)…", 75),
-            SetupPhase("R2", "Deploying AI agent guidelines & hardware bridge…", 10),
-            SetupPhase("R3", "Verifying environment…", 5)
+            SetupPhase("R0", tr(R.string.onb_checking_root_access), 10),
+            SetupPhase("R1", tr(R.string.onb_installing_prebuilt_linux_runtime_ch), 75),
+            SetupPhase("R2", tr(R.string.onb_deploying_ai_agent_guidelines_hardwa), 10),
+            SetupPhase("R3", tr(R.string.onb_verifying_environment), 5)
         )
     }
 
@@ -1960,7 +1960,7 @@ class OnboardingActivity : AppCompatActivity() {
         setupPhases.getOrNull(setupPhaseIndex)
 
     private fun setupPhaseMetaLabel(): String {
-        if (setupPhases.isEmpty()) return "SETUP"
+        if (setupPhases.isEmpty()) return tr(R.string.onb_setup)
         val step = (setupPhaseIndex + 1).coerceAtMost(setupPhases.size)
         return "STEP $step / ${setupPhases.size}"
     }
@@ -2027,10 +2027,10 @@ class OnboardingActivity : AppCompatActivity() {
     private fun formatSetupElapsedLabel(): String {
         val t = formatSetupElapsed(currentSetupElapsedMs())
         return when {
-            setupFinished -> "ELAPSED  $t  ·  DONE"
-            setupFailed -> "ELAPSED  $t  ·  STOPPED"
+            setupFinished -> tr(R.string.onb_elapsed_done, t)
+            setupFailed -> tr(R.string.onb_elapsed_stopped, t)
             setupElapsedRunning || setupElapsedStartMs > 0L -> "ELAPSED  $t"
-            else -> "ELAPSED  00:00"
+            else -> tr(R.string.onb_elapsed_00_00)
         }
     }
 
@@ -2106,11 +2106,11 @@ class OnboardingActivity : AppCompatActivity() {
             if (gen != setupProgressGeneration) return@post
             stopProgressPulse()
             if (::setupStepTitleText.isInitialized) {
-                setupStepTitleText.text = "Prebuilt Linux runtime ready"
+                setupStepTitleText.text = tr(R.string.onb_prebuilt_linux_runtime_ready)
                 setupStepTitleText.setTextColor(NC.PRIMARY)
             }
             if (::setupDetailText.isInitialized) {
-                setupDetailText.text = "Ready to continue"
+                setupDetailText.text = tr(R.string.onb_ready_to_continue)
             }
             applySetupProgressUi(animate = true, onBarSettled = { punchPercentSuccess() })
             if (::baseNextBtn.isInitialized) {
@@ -2134,7 +2134,7 @@ class OnboardingActivity : AppCompatActivity() {
                 setupStepTitleText.setTextColor(NC.ERROR)
             }
             if (::setupDetailText.isInitialized) {
-                setupDetailText.text = "Setup failed"
+                setupDetailText.text = tr(R.string.onb_setup_failed)
             }
             applySetupProgressUi(animate = true)
         }
@@ -2364,18 +2364,18 @@ class OnboardingActivity : AppCompatActivity() {
     private fun runDebianBaseSetup() {
         if (setupStartedAt == 0L) setupStartedAt = android.os.SystemClock.elapsedRealtime()
         startSetupFgs(
-            "Installing Alpaquita Linux — setup scripts running"
+            tr(R.string.onb_installing_alpaquita_linux_setup_scr)
         )
         // ── CHROOT path (full debug build only) ─────────────────────────────
         if (!BuildConfig.PLAY_STORE_BUILD && selectedIsolationMethod == "chroot") {
             beginSetupPhases("chroot")
-            enterSetupPhase("R0", "Verifying root access…")
-            updateBaseStatus("[CHROOT] Checking root access...")
+            enterSetupPhase("R0", tr(R.string.onb_verifying_root_access))
+            updateBaseStatus(tr(R.string.onb_chroot_checking_root_access))
             executor.execute {
                 val rootOk = RootShell.isRootAvailable()
                 if (!rootOk) {
-                    updateBaseStatus("[CHROOT] ERROR: Root not available. Grant access in your root manager, then retry.")
-                    failSetupProgress("Root not available — grant superuser, then retry")
+                    updateBaseStatus(tr(R.string.onb_chroot_error_root_not_available))
+                    failSetupProgress(tr(R.string.onb_root_not_available_grant_superuser))
                     return@execute
                 }
                 enterSetupPhase("R1", "Running setup_alpaquita_chroot.sh…")
@@ -2421,7 +2421,7 @@ class OnboardingActivity : AppCompatActivity() {
                     onDone = { code ->
                         val installed = ProjectPathResolver.isChrootInstalled()
                         if (code == 0 || installed) {
-                            setSetupPhaseFraction(1f, "Base chroot installed")
+                            setSetupPhaseFraction(1f, tr(R.string.onb_base_chroot_installed))
                             val gpuDetect = GpuAccelDetector.detect()
                             getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
                                 .putString("linux_method", "chroot")
@@ -2429,16 +2429,16 @@ class OnboardingActivity : AppCompatActivity() {
                                 .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                                 .apply()
                             AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "chroot", true)
-                            enterSetupPhase("R2", "Deploying AI agent guidelines & hardware bridge…")
-                            updateBaseStatus("[CHROOT] Deploying AI agent guidelines & hardware bridge…")
+                            enterSetupPhase("R2", tr(R.string.onb_deploying_ai_agent_guidelines_hardwa))
+                            updateBaseStatus(tr(R.string.onb_chroot_deploying_ai_agent_guidelines))
                             appendSetupLog(">>> Copying agent guidelines and tool configs into chroot…\n")
                             AgentConfigInstaller.install(this@OnboardingActivity)
-                            setSetupPhaseFraction(1f, "Agent guidelines deployed")
-                            enterSetupPhase("R3", "Verifying environment…")
+                            setSetupPhaseFraction(1f, tr(R.string.onb_agent_guidelines_deployed))
+                            enterSetupPhase("R3", tr(R.string.onb_verifying_environment))
                             finishChrootBaseSetup()
                         } else {
-                            updateBaseStatus("[CHROOT] Distro extraction failed (exit $code).")
-                            failSetupProgress("Distro extraction failed (exit $code)")
+                            updateBaseStatus(tr(R.string.onb_chroot_distro_extraction_failed_exit, code))
+                            failSetupProgress(tr(R.string.onb_distro_extraction_failed_exit, code))
                         }
                     }
                 )
@@ -2450,8 +2450,8 @@ class OnboardingActivity : AppCompatActivity() {
         beginSetupPhases("proot")
         executor.execute {
             try {
-                enterSetupPhase("A", "Creating prefix directories…")
-                updateBaseStatus("A. Preparing Directories...")
+                enterSetupPhase("A", tr(R.string.onb_creating_prefix_directories))
+                updateBaseStatus(tr(R.string.onb_a_preparing_directories))
                 val usrDir = File(filesDir, "usr")
                 val tmpDir = File(usrDir, "tmp")
                 val etcDir = File(usrDir, "etc")
@@ -2461,8 +2461,8 @@ class OnboardingActivity : AppCompatActivity() {
                 File(varDir, "log/apt").mkdirs()
                 File(varDir, "lib/dpkg").mkdirs()
 
-                enterSetupPhase("B", "Unpacking bootstrap.tar…")
-                updateBaseStatus("B. Extracting Bootstrap Assets...")
+                enterSetupPhase("B", tr(R.string.onb_unpacking_bootstrap_tar))
+                updateBaseStatus(tr(R.string.onb_b_extracting_bootstrap_assets))
                 val tarFile = File(filesDir, "bootstrap.tar")
                 if (!tarFile.exists()) {
                     copyAssetWithProgress("bootstrap.tar", tarFile) { frac, detail ->
@@ -2494,7 +2494,7 @@ class OnboardingActivity : AppCompatActivity() {
                         extractTarStream(input, filesDir)
                     }
                 }
-                setSetupPhaseFraction(1f, "Bootstrap extracted")
+                setSetupPhaseFraction(1f, tr(R.string.onb_bootstrap_extracted))
                 if (tarFile.exists()) tarFile.delete()
 
                 val nested = File(filesDir, "data/data/com.zenithblue.nativecode/files")
@@ -2507,12 +2507,12 @@ class OnboardingActivity : AppCompatActivity() {
                 if (loginInitPy.exists()) {
                     var content = loginInitPy.readText()
                     content = content.replace(
-                        "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\"",
-                        "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\", \"PROOT_TMP_DIR\""
+                        tr(R.string.onb_proot_no_seccomp_proot_verbose),
+                        tr(R.string.onb_proot_no_seccomp_proot_verbose_2)
                     )
                     content = content.replace(
-                        "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\"",
-                        "\"PROOT_NO_SECCOMP\", \"PROOT_VERBOSE\", \"PROOT_LOADER\", \"PROOT_TMP_DIR\""
+                        tr(R.string.onb_proot_no_seccomp_proot_verbose_3),
+                        tr(R.string.onb_proot_no_seccomp_proot_verbose_2)
                     )
                     loginInitPy.writeText(content)
                 }
@@ -2524,14 +2524,14 @@ class OnboardingActivity : AppCompatActivity() {
 
                 File(varDir, "log/apt").mkdirs(); File(varDir, "lib/dpkg").mkdirs(); tmpDir.mkdirs()
 
-                enterSetupPhase("A", "Preparing NativeCode host…")
-                updateBaseStatus("A. Preparing Host Environment...")
+                enterSetupPhase("A", tr(R.string.onb_preparing_nativecode_host))
+                updateBaseStatus(tr(R.string.onb_a_preparing_host_environment))
                 deployScripts()
                 File(etcDir, "resolv.conf").writeText("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
-                setSetupPhaseFraction(1f, "Host environment ready")
+                setSetupPhaseFraction(1f, tr(R.string.onb_host_environment_ready))
 
-                enterSetupPhase("B", "Installing prebuilt Linux runtime…")
-                updateBaseStatus("B. Inspecting Linux runtime...")
+                enterSetupPhase("B", tr(R.string.onb_installing_prebuilt_linux_runtime))
+                updateBaseStatus(tr(R.string.onb_b_inspecting_linux_runtime))
 
                 val existing = inspectExistingAlpaquita()
                 if (existing.installed) {
@@ -2544,21 +2544,21 @@ class OnboardingActivity : AppCompatActivity() {
                             .putString("flux_gpu_vendor", gpuDetect.vendorHint)
                             .apply()
                         GuestGpuConfig.applyToRootfs(this@OnboardingActivity)
-                        enterSetupPhase("C", "Deploying AI agent guidelines & hardware bridge…")
+                        enterSetupPhase("C", tr(R.string.onb_deploying_ai_agent_guidelines_hardwa))
                         AgentConfigInstaller.install(this@OnboardingActivity)
-                        setSetupPhaseFraction(1f, "Agent guidelines and hardware bridge configured")
-                        enterSetupPhase("D", "Verifying environment…")
+                        setSetupPhaseFraction(1f, tr(R.string.onb_agent_guidelines_and_hardware_bridge))
+                        enterSetupPhase("D", tr(R.string.onb_verifying_environment))
                         applyAndroidDevPackForPlay()
                         verifyRuntimeSentinel()
                         LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
                         AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
-                        updateBaseStatus("Existing Alpaquita environment detected — setup already complete.")
-                        setSetupPhaseFraction(1f, "Setup already complete")
+                        updateBaseStatus(tr(R.string.onb_existing_alpaquita_environment_detec))
+                        setSetupPhaseFraction(1f, tr(R.string.onb_setup_already_complete))
                         finishSetupProgressSuccess()
                         return@execute
                     } else {
                         appendSetupLog(">>> Existing Linux environment incomplete: ${existing.reason}\n")
-                        val msg = "Existing Linux environment is incomplete.\nUse Linux Runtime settings to reset/reinstall it."
+                        val msg = tr(R.string.onb_existing_linux_environment_is_incomp)
                         updateBaseStatus(msg)
                         failSetupProgress(msg)
                         return@execute
@@ -2593,7 +2593,7 @@ class OnboardingActivity : AppCompatActivity() {
                 check(archiveFile.isFile && archiveFile.length() > 2L * 1024L * 1024L) {
                     "Rootfs archive missing or too small: $archivePath"
                 }
-                updateBaseStatus("B. Verifying runtime SHA-256...")
+                updateBaseStatus(tr(R.string.onb_b_verifying_runtime_sha_256))
                 appendSetupLog(">>> Verifying rootfs SHA-256 (${rootfsSource::class.simpleName}): $archivePath\n")
                 check(RootfsSourceResolver.verifyArchiveAgainstPin(archiveFile)) {
                     "Rootfs SHA-256 mismatch — expected pinned ${RootfsSourceResolver.PINNED_ALPAQUITA_SHA256}"
@@ -2611,10 +2611,10 @@ class OnboardingActivity : AppCompatActivity() {
                     "PD_PROOT_BIN" to prootBin,
                     "PROOT_LOADER" to prootLoader,
                     "LD_LIBRARY_PATH" to TermuxHostPaths.LIB,
-                    "PATH" to "${TermuxHostPaths.BIN}:/system/bin",
-                    "HOME" to TermuxHostPaths.HOME,
-                    "PREFIX" to TermuxHostPaths.PREFIX,
-                    "TMPDIR" to TermuxHostPaths.TMPDIR
+                    tr(R.string.onb_path) to "${TermuxHostPaths.BIN}:/system/bin",
+                    tr(R.string.onb_home) to TermuxHostPaths.HOME,
+                    tr(R.string.onb_prefix) to TermuxHostPaths.PREFIX,
+                    tr(R.string.onb_tmpdir) to TermuxHostPaths.TMPDIR
                 )
                 if (termuxExec.exists()) {
                     env["LD_PRELOAD"] = termuxExec.absolutePath
@@ -2630,7 +2630,7 @@ class OnboardingActivity : AppCompatActivity() {
                 )
                 check(installCode == 0) { "proot-distro install failed with code $installCode" }
 
-                setSetupPhaseFraction(1f, "Alpaquita container installed")
+                setSetupPhaseFraction(1f, tr(R.string.onb_alpaquita_container_installed))
 
                 val gpuDetect = GpuAccelDetector.detect()
                 getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
@@ -2640,23 +2640,23 @@ class OnboardingActivity : AppCompatActivity() {
                     .apply()
                 GuestGpuConfig.applyToRootfs(this@OnboardingActivity)
 
-                enterSetupPhase("C", "Deploying AI agent guidelines & hardware bridge…")
-                updateBaseStatus("C. Deploying AI agent guidelines & hardware bridge…")
+                enterSetupPhase("C", tr(R.string.onb_deploying_ai_agent_guidelines_hardwa))
+                updateBaseStatus(tr(R.string.onb_c_deploying_ai_agent_guidelines))
                 appendSetupLog(">>> Copying agent guidelines (AGENTS.md, CLAUDE.md) and tool configs…\n")
                 AgentConfigInstaller.install(this@OnboardingActivity)
                 appendSetupLog(">>> Agent configs deployed to /home/flux, /root, and CLI tools (opencode, codex, agy, claude, grok, qwen, kiro).\n")
-                setSetupPhaseFraction(1f, "Agent guidelines and hardware bridge configured")
+                setSetupPhaseFraction(1f, tr(R.string.onb_agent_guidelines_and_hardware_bridge))
 
-                enterSetupPhase("D", "Verifying environment…")
-                updateBaseStatus("D. Verifying environment…")
+                enterSetupPhase("D", tr(R.string.onb_verifying_environment))
+                updateBaseStatus(tr(R.string.onb_d_verifying_environment))
                 applyAndroidDevPackForPlay()
                 verifyRuntimeSentinel()
 
                 LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
 
                 AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
-                updateBaseStatus("Prebuilt Linux Runtime Setup Successful!")
-                setSetupPhaseFraction(1f, "Environment verified")
+                updateBaseStatus(tr(R.string.onb_prebuilt_linux_runtime_setup_success))
+                setSetupPhaseFraction(1f, tr(R.string.onb_environment_verified))
                 finishSetupProgressSuccess()
             } catch (e: Exception) {
                 Log.e("Onboarding", "Debian Base Setup failed", e)
@@ -2674,7 +2674,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     private fun applyAndroidDevPackForPlay() {
         if (!BuildConfig.PLAY_STORE_BUILD) return
-        updateBaseStatus("C. Applying Android SDK 36…")
+        updateBaseStatus(tr(R.string.onb_c_applying_android_sdk_36))
         appendSetupLog(">>> Verifying and applying Play-delivered Android SDK 36 overlay…\n")
         val result = AndroidDevPackManager.applyAvailablePack(this)
         check(result.success) { result.message }
@@ -2741,26 +2741,26 @@ class OnboardingActivity : AppCompatActivity() {
         check(
             File(rootfsDir, "usr/local/bin/nativecode-desktop").exists() ||
             File(rootfsDir, "usr/bin/startxfce4").exists()
-        ) { "Sentinel check failed: desktop launcher not found" }
+        ) { tr(R.string.onb_sentinel_check_failed_desktop_launch) }
         check(
             File(rootfsDir, "usr/local/bin/phoc").exists() ||
             File(rootfsDir, "usr/bin/xfce4-panel").exists()
-        ) { "Sentinel check failed: desktop compositor not found" }
+        ) { tr(R.string.onb_sentinel_check_failed_desktop_compos) }
         check(
             File(rootfsDir, "usr/bin/xfce4-terminal").exists() ||
             File(rootfsDir, "usr/local/bin/wvkbd-mobintl").exists()
-        ) { "Sentinel check failed: terminal/keyboard not found" }
+        ) { tr(R.string.onb_sentinel_check_failed_terminal_keybo) }
         check(
             File(rootfsDir, "home/flux/.local/bin/opencode").exists() ||
             File(rootfsDir, "usr/local/bin/opencode").exists() ||
             File(rootfsDir, "usr/bin/opencode").exists()
-        ) { "Sentinel check failed: opencode not found" }
+        ) { tr(R.string.onb_sentinel_check_failed_opencode_not) }
         if (BuildConfig.PLAY_STORE_BUILD) {
             check(File(rootfsDir, "opt/android-sdk/platforms/android-36/android.jar").isFile) {
-                "Sentinel check failed: Android Platform 36 not found"
+                tr(R.string.onb_sentinel_check_failed_android_platfo)
             }
             check(File(rootfsDir, "opt/android-sdk/build-tools/36.1.0/aapt2").canExecute()) {
-                "Sentinel check failed: ARM64 aapt2 36.1.0 not executable"
+                tr(R.string.onb_sentinel_check_failed_arm64_aapt2)
             }
         }
     }
@@ -2837,7 +2837,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(logoCard)
 
         val title = TextView(this).apply {
-            text = "ENVIRONMENT READY"
+            text = tr(R.string.onb_environment_ready)
             textSize = 24f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -2848,7 +2848,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(title)
 
         val subtitle = TextView(this).apply {
-            text = "Prebuilt Alpaquita Linux runtime verified and ready"
+            text = tr(R.string.onb_prebuilt_alpaquita_linux_runtime_ver)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -2872,7 +2872,7 @@ class OnboardingActivity : AppCompatActivity() {
         }
 
         val summaryHeader = TextView(this).apply {
-            text = "[ INCLUDED IN THE RUNTIME ]"
+            text = tr(R.string.onb_included_in_the_runtime)
             textSize = 11f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -2881,20 +2881,20 @@ class OnboardingActivity : AppCompatActivity() {
         }
         summaryCard.addView(summaryHeader)
 
-        summaryCard.addView(summaryRow(R.drawable.ic_terminal, "Runtime", "Alpaquita Linux (glibc AArch64)", "READY"))
+        summaryCard.addView(summaryRow(R.drawable.ic_terminal, tr(R.string.onb_runtime), tr(R.string.onb_alpaquita_linux_glibc_aarch64), tr(R.string.onb_ready)))
         summaryCard.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, dp(10)) })
 
-        summaryCard.addView(summaryRow(R.drawable.ic_display, "Desktop", "XFCE Desktop + NativeCode Theme", "READY"))
+        summaryCard.addView(summaryRow(R.drawable.ic_display, tr(R.string.quick_widget_desktop), tr(R.string.onb_xfce_desktop_nativecode_theme_2), tr(R.string.onb_ready)))
         summaryCard.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, dp(10)) })
 
-        summaryCard.addView(summaryRow(R.drawable.ic_laptop, "Toolchain", "Git + GitHub CLI + Dev Toolchain", "READY"))
+        summaryCard.addView(summaryRow(R.drawable.ic_laptop, tr(R.string.onb_toolchain), tr(R.string.onb_git_github_cli_dev_toolchain), tr(R.string.onb_ready)))
         summaryCard.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, dp(10)) })
 
-        summaryCard.addView(summaryRow(R.drawable.ic_smart_toy, "AI Suite", "7 AI CLI Tools Included", "READY"))
+        summaryCard.addView(summaryRow(R.drawable.ic_smart_toy, tr(R.string.onb_ai_suite), tr(R.string.onb_7_ai_cli_tools_included), tr(R.string.onb_ready)))
         root.addView(summaryCard)
 
         val instructions = TextView(this).apply {
-            text = "Launch tools from Terminal, Workspace, or AI CLI Tools."
+            text = tr(R.string.onb_launch_tools_from_terminal_workspace)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -2919,7 +2919,7 @@ class OnboardingActivity : AppCompatActivity() {
         )
         HostServerController.ensureServers(this)
 
-        val btn = primaryButton("Launch Environment", R.drawable.ic_arrow_right) {
+        val btn = primaryButton(tr(R.string.onb_launch_environment), R.drawable.ic_arrow_right) {
             HostServerController.ensureServers(this)
             val intent = Intent(this, MainActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -3004,7 +3004,7 @@ class OnboardingActivity : AppCompatActivity() {
             val copyCmd = "mkdir -p $chrootTmpPath && cp ${staged.absolutePath} $chrootTmpPath/$scriptName && chmod +x $chrootTmpPath/$scriptName"
             val copyCode = RootShell.executeSync(copyCmd)
             if (copyCode != 0) {
-                updateBaseStatus("[CHROOT] Error copying $scriptName into chroot (exit $copyCode).")
+                updateBaseStatus(tr(R.string.onb_chroot_error_copying_into_chroot, scriptName, copyCode))
                 mainHandler.post { onDone(-1) }
                 return@execute
             }

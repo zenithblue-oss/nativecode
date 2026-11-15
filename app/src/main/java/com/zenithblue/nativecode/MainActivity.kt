@@ -860,8 +860,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         handleIntent(intent)
     }
 
+    /** Per-app language (plan 20). Views are built once, so a change applies after a restart; terminals are not recreated. */
+    private var uiLocaleTag: String? = null
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val tag = newConfig.locales.toLanguageTags()
+        val old = uiLocaleTag
+        uiLocaleTag = tag
+        if (old != null && old != tag) Toast.makeText(this, tr(R.string.language_restart), Toast.LENGTH_LONG).show()
+    }
+
     override fun onResume() {
         super.onResume()
+        if (uiLocaleTag == null) uiLocaleTag = resources.configuration.locales.toLanguageTags()
         chatResumed = true
         updateChatShown()
         NativeCodeBridge.agentUiDelegate = this

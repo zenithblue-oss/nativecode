@@ -8,6 +8,8 @@ import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import com.zenithblue.nativecode.terminal.TermuxHostPaths
 import java.io.File
 import java.security.MessageDigest
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Installs the Play-delivered Android SDK 36 overlay into the Linux PRoot. */
 object AndroidDevPackManager {
@@ -94,15 +96,15 @@ object AndroidDevPackManager {
     }
 
     fun applyAvailablePack(context: Context, force: Boolean = false): ApplyResult {
-        if (!force && isApplied(context)) return ApplyResult(true, "Android SDK 36 ready")
+        if (!force && isApplied(context)) return ApplyResult(true, tr(R.string.onb_android_sdk_36_ready))
         val archive = resolveArchive(context)
-            ?: return ApplyResult(false, "Android SDK asset pack is not downloaded")
+            ?: return ApplyResult(false, tr(R.string.onb_android_sdk_asset_pack_is))
         if (!verifyArchive(archive)) {
-            return ApplyResult(false, "Android SDK asset checksum mismatch")
+            return ApplyResult(false, tr(R.string.onb_android_sdk_asset_checksum_mismatch))
         }
 
         val root = ProjectPathResolver.prootRootfsDir(context)
-        if (!root.isDirectory) return ApplyResult(false, "Install the Linux runtime first")
+        if (!root.isDirectory) return ApplyResult(false, tr(R.string.onb_install_the_linux_runtime_first))
 
         val tar = "${TermuxHostPaths.BIN}/tar"
         val xz = "${TermuxHostPaths.BIN}/xz"
@@ -121,7 +123,7 @@ object AndroidDevPackManager {
         val code = process.waitFor()
         if (code != 0) {
             Log.e(TAG, "Overlay extraction failed ($code): $output")
-            return ApplyResult(false, "Android SDK extraction failed ($code)")
+            return ApplyResult(false, tr(R.string.onb_android_sdk_extraction_failed, code))
         }
 
         val platform = File(root, PLATFORM_REL)
@@ -130,7 +132,7 @@ object AndroidDevPackManager {
         if (!platform.isFile || platform.length() <= 1_000_000L ||
             !aapt2.isFile || aapt2.length() <= 1_000_000L
         ) {
-            return ApplyResult(false, "Android SDK verification failed after extraction")
+            return ApplyResult(false, tr(R.string.onb_android_sdk_verification_failed_afte))
         }
 
         applyGradleAapt2Override(root)
@@ -145,7 +147,7 @@ object AndroidDevPackManager {
             .putLong("applied_timestamp", System.currentTimeMillis())
             .apply()
 
-        return ApplyResult(true, "Android SDK 36 + ARM64 aapt2 ready")
+        return ApplyResult(true, tr(R.string.onb_android_sdk_36_arm64_aapt2))
     }
 
     fun verifyArchive(archive: File): Boolean = try {

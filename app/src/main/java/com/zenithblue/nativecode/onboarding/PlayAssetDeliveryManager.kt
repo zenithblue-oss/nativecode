@@ -9,6 +9,8 @@ import com.google.android.play.core.assetpacks.AssetPackState
 import com.google.android.play.core.assetpacks.AssetPackStateUpdateListener
 import com.google.android.play.core.assetpacks.model.AssetPackStatus
 import java.io.File
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 object PlayAssetDeliveryManager {
     private const val TAG = "PlayAssetDelivery"
@@ -107,7 +109,7 @@ object PlayAssetDeliveryManager {
                             }
                         } else {
                             activity.runOnUiThread {
-                                onStateChange(DownloadState.Failed(-1, "Pack location missing after completion"))
+                                onStateChange(DownloadState.Failed(-1, tr(R.string.onb_pack_location_missing_after_completi)))
                             }
                         }
                     }
@@ -124,7 +126,7 @@ object PlayAssetDeliveryManager {
                         val code = state.errorCode()
                         Log.e(TAG, "$packName: FAILED (errorCode=$code)")
                         activity.runOnUiThread {
-                            onStateChange(DownloadState.Failed(code, "Asset pack download failed (error $code)"))
+                            onStateChange(DownloadState.Failed(code, tr(R.string.onb_asset_pack_download_failed_error, code)))
                         }
                     }
                     AssetPackStatus.CANCELED -> {
@@ -140,7 +142,7 @@ object PlayAssetDeliveryManager {
         manager.fetch(listOf(packName)).addOnFailureListener { e ->
             Log.e(TAG, "fetch failed for $packName: ${e.message}", e)
             activity.runOnUiThread {
-                onStateChange(DownloadState.Failed(-1, e.message ?: "Failed to start download"))
+                onStateChange(DownloadState.Failed(-1, e.message ?: tr(R.string.onb_failed_to_start_download)))
             }
         }
 

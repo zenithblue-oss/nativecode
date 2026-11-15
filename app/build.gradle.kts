@@ -126,9 +126,18 @@ android {
 
     assetPacks += listOf(":nativecode_runtime", ":nativecode_android_dev", ":nativecode_update_core")
 
+    // Per-app language: every language ships in the base APK (a Play language split would hide it from the picker).
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     lint {
         abortOnError = false
         checkReleaseBuilds = false
+        // Translations must stay complete and format-safe (plan 20).
+        error += listOf("MissingTranslation", "ExtraTranslation", "StringFormatMatches", "StringFormatInvalid", "StringFormatCount")
     }
 }
 
