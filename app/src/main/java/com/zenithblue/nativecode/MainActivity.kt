@@ -1155,7 +1155,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Project open gate (free = 0 projects). Deny → Upgrade sheet. */
     private fun projectGateAllows(): Boolean {
         if (FeatureGate.canUse(isPro(), ProFeature.WORKSPACE) is GateResult.Allow) return true
-        showUpgradeSheet("Unlock your projects with NativeCode Pro")
+        showUpgradeSheet(tr(R.string.main_unlock_your_projects_with_nativecode))
         return false
     }
 
@@ -1850,12 +1850,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun showExitConfirmDialog() {
         androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Exit NativeCode?")
-            .setMessage("Terminal sessions will keep running in the background.")
-            .setPositiveButton("Exit") { _, _ ->
+            .setTitle(tr(R.string.main_exit_nativecode))
+            .setMessage(tr(R.string.main_terminal_sessions_will_keep_running))
+            .setPositiveButton(tr(R.string.main_exit)) { _, _ ->
                 super.onBackPressed()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(tr(R.string.git_cancel), null)
             .show()
     }
 
@@ -1982,9 +1982,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             itemTextColor = navTintList
             itemActiveIndicatorColor = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
             menu.add(Menu.NONE, ID_HOME,          Menu.NONE, "HOME").setIcon(R.drawable.ic_home)
-            menu.add(Menu.NONE, ID_PROJECTS_LIST, Menu.NONE, "PROJECT").setIcon(R.drawable.ic_folder)
-            menu.add(Menu.NONE, ID_TERMINAL,      Menu.NONE, "TERMINAL").setIcon(R.drawable.ic_terminal)
-            menu.add(Menu.NONE, ID_SETTINGS,      Menu.NONE, "SETTINGS").setIcon(R.drawable.ic_settings)
+            menu.add(Menu.NONE, ID_PROJECTS_LIST, Menu.NONE, tr(R.string.main_project)).setIcon(R.drawable.ic_folder)
+            menu.add(Menu.NONE, ID_TERMINAL,      Menu.NONE, tr(R.string.main_terminal)).setIcon(R.drawable.ic_terminal)
+            menu.add(Menu.NONE, ID_SETTINGS,      Menu.NONE, tr(R.string.main_settings)).setIcon(R.drawable.ic_settings)
         }
 
         projectBottomNavigation = BottomNavigationView(this).apply {
@@ -1993,10 +1993,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             itemIconTintList = navTintList
             itemTextColor = navTintList
             itemActiveIndicatorColor = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
-            menu.add(Menu.NONE, ID_PROJECT_WORKSPACE, Menu.NONE, "WORKSPACE").setIcon(R.drawable.ic_home)
-            menu.add(Menu.NONE, ID_PROJECT_DIR_TREE, Menu.NONE, "DIRECTORY").setIcon(R.drawable.ic_folder)
-            menu.add(Menu.NONE, ID_PROJECT_GIT_DIFF, Menu.NONE, "DIFF").setIcon(R.drawable.ic_git)
-            menu.add(Menu.NONE, ID_PROJECT_SETTINGS, Menu.NONE, "CONFIG").setIcon(R.drawable.ic_project_config)
+            menu.add(Menu.NONE, ID_PROJECT_WORKSPACE, Menu.NONE, tr(R.string.onb_workspace)).setIcon(R.drawable.ic_home)
+            menu.add(Menu.NONE, ID_PROJECT_DIR_TREE, Menu.NONE, tr(R.string.main_directory)).setIcon(R.drawable.ic_folder)
+            menu.add(Menu.NONE, ID_PROJECT_GIT_DIFF, Menu.NONE, tr(R.string.main_diff)).setIcon(R.drawable.ic_git)
+            menu.add(Menu.NONE, ID_PROJECT_SETTINGS, Menu.NONE, tr(R.string.main_config)).setIcon(R.drawable.ic_project_config)
         }
 
         mainContentLayout.addView(contentFrame)
@@ -2021,10 +2021,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             itemTextColor = navTintList
             labelVisibilityMode = com.google.android.material.navigationrail.NavigationRailView.LABEL_VISIBILITY_LABELED
             menuGravity = 1 // MENU_GRAVITY_CENTER - vertically center items per ui_design.md
-            menu.add(android.view.Menu.NONE, ID_HOME,          android.view.Menu.NONE, "Home").setIcon(R.drawable.ic_home)
-            menu.add(android.view.Menu.NONE, ID_PROJECTS_LIST, android.view.Menu.NONE, "Projects").setIcon(R.drawable.ic_folder)
+            menu.add(android.view.Menu.NONE, ID_HOME,          android.view.Menu.NONE, tr(R.string.main_home)).setIcon(R.drawable.ic_home)
+            menu.add(android.view.Menu.NONE, ID_PROJECTS_LIST, android.view.Menu.NONE, tr(R.string.main_projects)).setIcon(R.drawable.ic_folder)
             menu.add(android.view.Menu.NONE, ID_TERMINAL,      android.view.Menu.NONE, "Terminal").setIcon(R.drawable.ic_terminal)
-            menu.add(android.view.Menu.NONE, ID_SETTINGS,      android.view.Menu.NONE, "Settings").setIcon(R.drawable.ic_settings)
+            menu.add(android.view.Menu.NONE, ID_SETTINGS,      android.view.Menu.NONE, tr(R.string.main_settings_2)).setIcon(R.drawable.ic_settings)
             
             setOnItemSelectedListener { item ->
                 val pageId = item.itemId
@@ -2048,10 +2048,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             itemTextColor = navTintList
             labelVisibilityMode = com.google.android.material.navigationrail.NavigationRailView.LABEL_VISIBILITY_LABELED
             menuGravity = 1 // MENU_GRAVITY_CENTER
-            menu.add(android.view.Menu.NONE, ID_PROJECT_WORKSPACE, android.view.Menu.NONE, "Workspace").setIcon(R.drawable.ic_home)
-            menu.add(android.view.Menu.NONE, ID_PROJECT_DIR_TREE, android.view.Menu.NONE, "Directory").setIcon(R.drawable.ic_folder)
-            menu.add(android.view.Menu.NONE, ID_PROJECT_GIT_DIFF, android.view.Menu.NONE, "Diff").setIcon(R.drawable.ic_git)
-            menu.add(android.view.Menu.NONE, ID_PROJECT_SETTINGS, android.view.Menu.NONE, "Config").setIcon(R.drawable.ic_project_config)
+            menu.add(android.view.Menu.NONE, ID_PROJECT_WORKSPACE, android.view.Menu.NONE, tr(R.string.chat_workspace)).setIcon(R.drawable.ic_home)
+            menu.add(android.view.Menu.NONE, ID_PROJECT_DIR_TREE, android.view.Menu.NONE, tr(R.string.main_directory_2)).setIcon(R.drawable.ic_folder)
+            menu.add(android.view.Menu.NONE, ID_PROJECT_GIT_DIFF, android.view.Menu.NONE, tr(R.string.main_diff_2)).setIcon(R.drawable.ic_git)
+            menu.add(android.view.Menu.NONE, ID_PROJECT_SETTINGS, android.view.Menu.NONE, tr(R.string.main_config_2)).setIcon(R.drawable.ic_project_config)
 
             setOnItemSelectedListener { item ->
                 val pageId = item.itemId
@@ -2300,7 +2300,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun createNewTerminalSession(type: String = "shell") {
         if (sessionsList.size + pendingAppTerminalSlots >= 10) {
-            Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_maximum_10_tabs_allowed), Toast.LENGTH_SHORT).show()
             return
         }
         if (type != "ssh" && !aiLaunchAllowed(type)) return // the ssh client tab is Free (plan 17)
@@ -2309,13 +2309,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         ) {
             Toast.makeText(
                 this,
-                "Install AI CLI tools in Settings → AI CLI tools",
+                tr(R.string.main_install_ai_cli_tools_in),
                 Toast.LENGTH_LONG
             ).show()
             return
         }
         if (!BuildConfig.PLAY_STORE_BUILD && type == "codex" && LinuxCommandBuilder.currentMethod == "chroot") {
-            Toast.makeText(this, "Codex unavailable in chroot", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_codex_unavailable_in_chroot), Toast.LENGTH_SHORT).show()
             return
         }
         if (!BuildConfig.PLAY_STORE_BUILD && type == "shell-root" && LinuxCommandBuilder.currentMethod == "chroot") {
@@ -2325,7 +2325,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     if (!rootOk) {
                         Toast.makeText(
                             this,
-                            "Root required for rooted chroot shell",
+                            tr(R.string.main_root_required_for_rooted_chroot),
                             Toast.LENGTH_SHORT
                         ).show()
                     } else {
@@ -2340,7 +2340,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun startNewTerminalSession(type: String) {
         if (!reserveTerminalSlot(app = true)) {
-            Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_maximum_10_tabs_allowed), Toast.LENGTH_SHORT).show()
             return
         }
         setTerminalMode(ws = false, chat = false) // every new tab (card, +, intent, login, Open in terminal) shows the Terminal
@@ -2365,7 +2365,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     if (!releaseTerminalLaunch(ticket)) return@post
                     Toast.makeText(
                         this,
-                        e.message?.takeIf { it.isNotBlank() } ?: "Failed to prepare terminal",
+                        e.message?.takeIf { it.isNotBlank() } ?: tr(R.string.main_failed_to_prepare_terminal),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -2642,7 +2642,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Called from onCreate before the first terminal session creates sessionClient.
         val out = (if (::sessionClient.isInitialized) sessionClient as? NativeCodeTerminalSessionClient else null)?.lastOutputAt
         val now = android.os.SystemClock.uptimeMillis()
-        val chat = if (chatBetaOn()) listOf(TermTabStrip.Tab("", "CHAT", null, live = false, selected = false, home = true)) else emptyList()
+        val chat = if (chatBetaOn()) listOf(TermTabStrip.Tab("", tr(R.string.main_chat), null, live = false, selected = false, home = true)) else emptyList()
         strip.submit(chat + sessionsList.mapIndexed { i, s ->
             val type = terminalSessionTypes.getOrNull(i) ?: "shell"
             val name = termTabTitles[s] ?: termTabLabel(type)
@@ -2748,13 +2748,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
             banner.addView(TextView(this).apply {
-                text = "AI CLI tools not installed"
+                text = tr(R.string.main_ai_cli_tools_not_installed)
                 textSize = 13f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
             })
             banner.addView(TextView(this).apply {
-                text = "Tap → Settings · AI CLI tools · Install  (shells always available)"
+                text = tr(R.string.main_tap_settings_ai_cli_tools)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -2885,10 +2885,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         // C6: AI Free/Paid only when suite provisioned for current method
         if (showAi) {
-            addSection("FREE CLI TOOLS", "// OPEN SOURCE / FREE", freeTools)
-            addSection("PAID CLI TOOLS", "// PRO / SUBSCRIPTION", paidTools)
+            addSection(tr(R.string.main_free_cli_tools), "// OPEN SOURCE / FREE", freeTools)
+            addSection(tr(R.string.main_paid_cli_tools), "// PRO / SUBSCRIPTION", paidTools)
         }
-        addSection("LINUX SHELL", "// SYSTEM SHELL", shellTools)
+        addSection(tr(R.string.main_linux_shell), "// SYSTEM SHELL", shellTools)
 
         scrollView.addView(container)
         scrollView.post {
@@ -2972,7 +2972,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 typeface = Typeface.DEFAULT_BOLD
             })
             banner.addView(TextView(this).apply {
-                text = "Tap → Install suite in $method guest (independent of other isolation)"
+                text = tr(R.string.main_tap_install_suite_in_guest, method)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -3129,10 +3129,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         if (showAi) {
-            addSection("FREE CLI TOOLS", "// OPEN SOURCE / FREE", freeTools)
-            addSection("PAID CLI TOOLS", "// PRO / SUBSCRIPTION", paidTools)
+            addSection(tr(R.string.main_free_cli_tools), "// OPEN SOURCE / FREE", freeTools)
+            addSection(tr(R.string.main_paid_cli_tools), "// PRO / SUBSCRIPTION", paidTools)
         }
-        addSection("LINUX SHELL", "// SYSTEM SHELL", shellTools)
+        addSection(tr(R.string.main_linux_shell), "// SYSTEM SHELL", shellTools)
     }
 
     private fun refreshToolCardsForMethod() {
@@ -3164,9 +3164,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         val tabsData = listOf(
             Triple(ID_HOME, R.drawable.ic_home, "HOME"),
-            Triple(ID_PROJECTS_LIST, R.drawable.ic_folder, "PROJECT"),
-            Triple(ID_TERMINAL, R.drawable.ic_terminal, "TERMINAL"),
-            Triple(ID_SETTINGS, R.drawable.ic_settings, "SETTINGS")
+            Triple(ID_PROJECTS_LIST, R.drawable.ic_folder, tr(R.string.main_project)),
+            Triple(ID_TERMINAL, R.drawable.ic_terminal, tr(R.string.main_terminal)),
+            Triple(ID_SETTINGS, R.drawable.ic_settings, tr(R.string.main_settings))
         )
 
         navTabViews.clear()
@@ -3289,10 +3289,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val tabsData = listOf(
-            Triple(ID_PROJECT_WORKSPACE, R.drawable.ic_home, "WORKSPACE"),
-            Triple(ID_PROJECT_DIR_TREE, R.drawable.ic_folder, "DIRECTORY"),
-            Triple(ID_PROJECT_GIT_DIFF, R.drawable.ic_git, "DIFF"),
-            Triple(ID_PROJECT_SETTINGS, R.drawable.ic_project_config, "CONFIG")
+            Triple(ID_PROJECT_WORKSPACE, R.drawable.ic_home, tr(R.string.onb_workspace)),
+            Triple(ID_PROJECT_DIR_TREE, R.drawable.ic_folder, tr(R.string.main_directory)),
+            Triple(ID_PROJECT_GIT_DIFF, R.drawable.ic_git, tr(R.string.main_diff)),
+            Triple(ID_PROJECT_SETTINGS, R.drawable.ic_project_config, tr(R.string.main_config))
         )
 
         projectNavTabViews.clear()
@@ -3340,10 +3340,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setBackgroundColor(NC.SURFACE_LOWEST)
         }
         val tabsData = listOf(
-            Triple(ID_HOME, R.drawable.ic_home, "Home"),
-            Triple(ID_PROJECTS_LIST, R.drawable.ic_folder, "Projects"),
+            Triple(ID_HOME, R.drawable.ic_home, tr(R.string.main_home)),
+            Triple(ID_PROJECTS_LIST, R.drawable.ic_folder, tr(R.string.main_projects)),
             Triple(ID_TERMINAL, R.drawable.ic_terminal, "Terminal"),
-            Triple(ID_SETTINGS, R.drawable.ic_settings, "Settings")
+            Triple(ID_SETTINGS, R.drawable.ic_settings, tr(R.string.main_settings_2))
         )
         sideNavTabViews.clear()
         for ((pageId, iconRes, label) in tabsData) {
@@ -3391,10 +3391,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             visibility = View.GONE
         }
         val tabsData = listOf(
-            Triple(ID_PROJECT_WORKSPACE, R.drawable.ic_home, "Workspace"),
-            Triple(ID_PROJECT_DIR_TREE, R.drawable.ic_folder, "Directory"),
-            Triple(ID_PROJECT_GIT_DIFF, R.drawable.ic_git, "Diff"),
-            Triple(ID_PROJECT_SETTINGS, R.drawable.ic_project_config, "Config")
+            Triple(ID_PROJECT_WORKSPACE, R.drawable.ic_home, tr(R.string.chat_workspace)),
+            Triple(ID_PROJECT_DIR_TREE, R.drawable.ic_folder, tr(R.string.main_directory_2)),
+            Triple(ID_PROJECT_GIT_DIFF, R.drawable.ic_git, tr(R.string.main_diff_2)),
+            Triple(ID_PROJECT_SETTINGS, R.drawable.ic_project_config, tr(R.string.main_config_2))
         )
         sideProjectNavTabViews.clear()
         for ((pageId, iconRes, label) in tabsData) {
@@ -3622,7 +3622,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val titleTv = TextView(this).apply {
-            text = "Welcome to\nNativeCode"
+            text = tr(R.string.main_welcome_to_nativecode)
             textSize = 24f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -3630,7 +3630,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val subtextTv = TextView(this).apply {
-            text = "Full Linux development environment on Android. Run AI coding assistants, code in Node.js, Python, or C++, and build projects on your device."
+            text = tr(R.string.main_full_linux_development_environment_o)
             textSize = 11f
             setTextColor(Color.parseColor("#D0D0D0"))
             typeface = Typeface.MONOSPACE
@@ -3712,7 +3712,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(16) }
         }
         val searchEt = EditText(this).apply {
-            hint = "Search files..."; setHintTextColor(NC.OUTLINE); textSize = 13f; setTextColor(NC.ON_SURFACE)
+            hint = tr(R.string.main_search_files); setHintTextColor(NC.OUTLINE); textSize = 13f; setTextColor(NC.ON_SURFACE)
             setBackgroundColor(NC.SURFACE)
             setPadding(dp(12), dp(10), dp(12), dp(10))
             background = roundedBg(NC.SURFACE, NC.BORDER, dp(6))
@@ -3732,11 +3732,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         val title = TextView(this).apply {
             fileExplorerTitleTv = this
-            text = "Project Root"; textSize = 15f; setTextColor(NC.ON_SURFACE); typeface = Typeface.DEFAULT_BOLD
+            text = tr(R.string.main_project_root); textSize = 15f; setTextColor(NC.ON_SURFACE); typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
-        val newFolder = TextView(this).apply { text = "+ Folder"; textSize = 16f; setTextColor(NC.ON_SURF_VAR); setPadding(dp(8), 0, dp(4), 0) }
-        val newFile = TextView(this).apply { text = "+ File"; textSize = 16f; setTextColor(NC.ON_SURF_VAR) }
+        val newFolder = TextView(this).apply { text = tr(R.string.main_folder); textSize = 16f; setTextColor(NC.ON_SURF_VAR); setPadding(dp(8), 0, dp(4), 0) }
+        val newFile = TextView(this).apply { text = tr(R.string.main_file); textSize = 16f; setTextColor(NC.ON_SURF_VAR) }
         header.addView(title); header.addView(newFolder); header.addView(newFile)
         rootPanel.addView(header)
 
@@ -3771,10 +3771,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setBackgroundColor(NC.SURFACE_VAR); setPadding(dp(14), dp(10), dp(14), dp(10))
         }
         val gitTitle = TextView(this).apply {
-            text = "Git Changes (2)"; textSize = 15f; setTextColor(NC.ON_SURFACE); typeface = Typeface.DEFAULT_BOLD
+            text = tr(R.string.main_git_changes_2); textSize = 15f; setTextColor(NC.ON_SURFACE); typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
-        val commitBtn = TextView(this).apply { text = "Commit"; textSize = 13f; setTextColor(NC.PRIMARY); typeface = Typeface.DEFAULT_BOLD }
+        val commitBtn = TextView(this).apply { text = tr(R.string.main_commit); textSize = 13f; setTextColor(NC.PRIMARY); typeface = Typeface.DEFAULT_BOLD }
         gitHeader.addView(gitTitle); gitHeader.addView(commitBtn)
         gitPanel.addView(gitHeader)
 
@@ -3800,9 +3800,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         "BKSP"  to KeyEvent.KEYCODE_DEL,
         "DEL"   to KeyEvent.KEYCODE_FORWARD_DEL,
         "UP"    to KeyEvent.KEYCODE_DPAD_UP,
-        "DOWN"  to KeyEvent.KEYCODE_DPAD_DOWN,
-        "LEFT"  to KeyEvent.KEYCODE_DPAD_LEFT,
-        "RIGHT" to KeyEvent.KEYCODE_DPAD_RIGHT,
+        tr(R.string.term_down)  to KeyEvent.KEYCODE_DPAD_DOWN,
+        tr(R.string.term_left)  to KeyEvent.KEYCODE_DPAD_LEFT,
+        tr(R.string.term_right) to KeyEvent.KEYCODE_DPAD_RIGHT,
         "HOME"  to KeyEvent.KEYCODE_MOVE_HOME,
         "END"   to KeyEvent.KEYCODE_MOVE_END,
         "PGUP"  to KeyEvent.KEYCODE_PAGE_UP,
@@ -3899,7 +3899,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val method = resolveAttachMethod(isWorkspace)
         val mime = contentResolver.getType(uri)
         if (imageOnly && mime != null && !mime.startsWith("image/")) {
-            Toast.makeText(this, "Not an image", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_not_an_image), Toast.LENGTH_SHORT).show()
             return
         }
         val fname = safeAttachmentName(uri, mime, imageOnly)
@@ -3909,7 +3909,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             "/home/flux/$fname"
         }
 
-        Toast.makeText(this, "Copying into Linux…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, tr(R.string.main_copying_into_linux), Toast.LENGTH_SHORT).show()
 
         executor.execute {
             var stageFile: File? = null
@@ -3920,13 +3920,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     FileOutputStream(stageFile).use { out -> inp.copyTo(out) }
                 } ?: run {
                     mainHandler.post {
-                        Toast.makeText(this@MainActivity, "Failed to read selection", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, tr(R.string.main_failed_to_read_selection), Toast.LENGTH_SHORT).show()
                     }
                     return@execute
                 }
                 if (!stageFile.isFile || (imageOnly && stageFile.length() <= 0L)) {
                     mainHandler.post {
-                        Toast.makeText(this@MainActivity, "Selected file could not be copied", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, tr(R.string.main_selected_file_could_not_be), Toast.LENGTH_SHORT).show()
                     }
                     return@execute
                 }
@@ -3964,7 +3964,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         mainHandler.post {
                             Toast.makeText(
                                 this@MainActivity,
-                                "Chroot copy failed (exit ${result.exitCode})",
+                                tr(R.string.main_chroot_copy_failed_exit, result.exitCode),
                                 Toast.LENGTH_LONG
                             ).show()
                         }
@@ -3978,7 +3978,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     stageFile.copyTo(hostTarget, overwrite = true)
                     if (!hostTarget.isFile || hostTarget.length() != stagedSize) {
                         mainHandler.post {
-                            Toast.makeText(this@MainActivity, "Proot write failed", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, tr(R.string.main_proot_write_failed), Toast.LENGTH_SHORT).show()
                         }
                         return@execute
                     }
@@ -4045,7 +4045,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             isClickable = true
         }
         card.addView(TextView(this).apply {
-            text = "ATTACH TO LINUX"
+            text = tr(R.string.main_attach_to_linux)
             textSize = 15f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -4086,10 +4086,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 })
             }
         }
-        card.addView(step(R.drawable.ic_attach_image, "IMAGE", "Pick a picture. Copied into the project."))
-        card.addView(step(R.drawable.ic_attach_file, "FILE", "Pick any document. Same copy path."))
+        card.addView(step(R.drawable.ic_attach_image, tr(R.string.main_image), tr(R.string.main_pick_a_picture_copied_into)))
+        card.addView(step(R.drawable.ic_attach_file, tr(R.string.main_file_2), tr(R.string.main_pick_any_document_same_copy)))
         card.addView(TextView(this).apply {
-            text = "NativeCode writes the file into the active project (or /home/flux) and copies the Linux path to the clipboard. Paste it in the terminal or agent. Hold either icon to reopen this."
+            text = tr(R.string.main_nativecode_writes_the_file_into)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -4102,7 +4102,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         if (onContinue != null) {
             btnRow.addView(TextView(this).apply {
-                text = "CANCEL"
+                text = tr(R.string.x11_cancel)
                 textSize = 12f
                 typeface = Typeface.MONOSPACE
                 paint.isFakeBoldText = true
@@ -4390,7 +4390,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun showPreviewChip(url: String) {
         if (isFinishing) return
         val port = com.zenithblue.nativecode.preview.PortProbe.portOf(url) ?: return
-        com.google.android.material.snackbar.Snackbar.make(contentFrame, "Dev server on :$port", 8000)
+        com.google.android.material.snackbar.Snackbar.make(contentFrame, tr(R.string.main_dev_server_on, port), 8000)
             .setAction("PREVIEW") { com.zenithblue.nativecode.preview.PreviewActivity.open(this, url) }
             .setActionTextColor(NC.PRIMARY)
             .show()
@@ -4420,14 +4420,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val termOnly = { terminalTools && !isChatMode(workspace) }
         rail.add(
             icon = { R.drawable.ic_keyboard },
-            desc = { if (showExtraKeys) "Extra keys: on" else "Extra keys: off" },
+            desc = { if (showExtraKeys) tr(R.string.main_extra_keys_on) else tr(R.string.main_extra_keys_off) },
             active = { showExtraKeys },
             visible = termOnly,
         ) { setExtraKeysEnabled(!showExtraKeys) }
         // Attach lives here now (was two keys in the extra-keys row). Hold = how it works.
         rail.add(
             icon = { R.drawable.ic_lucide_image },
-            desc = { "Attach image to Linux" },
+            desc = { tr(R.string.main_attach_image_to_linux) },
             onLongClick = { showAttachmentTutorial() },
             visible = termOnly,
         ) {
@@ -4437,7 +4437,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         rail.add(
             icon = { R.drawable.ic_lucide_file_text },
-            desc = { "Attach file to Linux" },
+            desc = { tr(R.string.main_attach_file_to_linux) },
             onLongClick = { showAttachmentTutorial() },
             visible = termOnly,
         ) {
@@ -4447,12 +4447,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         rail.add(
             icon = { R.drawable.ic_lucide_bot },
-            desc = { "Copy skill" },
+            desc = { tr(R.string.main_copy_skill) },
             visible = termOnly,
         ) { showSkillsPicker() }
         rail.add(
             icon = { if (keepAwake) R.drawable.ic_lucide_eye else R.drawable.ic_lucide_eye_off },
-            desc = { if (keepAwake) "Keep awake: on" else "Keep awake: off" },
+            desc = { if (keepAwake) tr(R.string.main_keep_awake_on) else tr(R.string.main_keep_awake_off) },
             active = { keepAwake },
         ) { toggleKeepAwake() }
         rail.addControl(DesktopPill(this, desktop))
@@ -4535,7 +4535,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(26), dp(26)).apply { rightMargin = dp(10) }
         }
         val titleTv = TextView(this).apply {
-            text = "SETTINGS HUB"
+            text = tr(R.string.main_settings_hub)
             textSize = 24f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -4570,8 +4570,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(
             settingsHubNavRow(
                 iconRes = R.drawable.ic_download,
-                title = "COMPONENTS",
-                subtitle = "Linux runtime · Android SDK 36",
+                title = tr(R.string.main_components),
+                subtitle = tr(R.string.main_linux_runtime_android_sdk_36),
                 pageId = ID_COMPONENTS
             ).also { row ->
                 // Update dot on the icon + subtitle, painted by refreshComponentUpdates().
@@ -4603,8 +4603,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(
             settingsHubNavRow(
                 iconRes = R.drawable.ic_tune_thick,
-                title = "TOP BAR",
-                subtitle = "Phone stats · order",
+                title = tr(R.string.main_top_bar),
+                subtitle = tr(R.string.main_phone_stats_order),
                 pageId = ID_TOPBAR
             )
         )
@@ -4613,8 +4613,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(
             settingsHubNavRow(
                 iconRes = R.drawable.ic_lucide_archive,
-                title = "BACKUP",
-                subtitle = "Back up and restore your guest home",
+                title = tr(R.string.main_backup),
+                subtitle = tr(R.string.main_back_up_and_restore_your),
                 pageId = ID_BACKUP
             )
         )
@@ -4624,7 +4624,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             settingsHubNavRow(
                 iconRes = R.drawable.ic_lucide_server,
                 title = "SSH",
-                subtitle = "SSH server (Pro) · remote hosts · keys",
+                subtitle = tr(R.string.main_ssh_server_pro_remote_hosts),
                 pageId = ID_SSH
             )
         )
@@ -4633,8 +4633,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(
             settingsHubNavRow(
                 iconRes = R.drawable.ic_lucide_chart,
-                title = "AI USAGE",
-                subtitle = "Tokens and cost per AI CLI",
+                title = tr(R.string.main_ai_usage),
+                subtitle = tr(R.string.main_tokens_and_cost_per_ai),
                 pageId = ID_USAGE
             )
         )
@@ -4680,7 +4680,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(buildPrivacyPolicyCard())
         settingsHubLayout.addView(spacer(16))
         // Opt-in crash reports / usage statistics (telemetry/ConsentSheet)
-        settingsHubLayout.addView(secondaryButton("CRASH REPORTS & USAGE STATS") { ConsentSheet.show(this) })
+        settingsHubLayout.addView(secondaryButton(tr(R.string.main_crash_reports_usage_stats)) { ConsentSheet.show(this) })
         settingsHubLayout.addView(spacer(20))
 
         // App version code + commit from gradle BuildConfig
@@ -4694,14 +4694,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val applied = AndroidDevPackManager.isApplied(this)
         val archive = AndroidDevPackManager.resolveArchive(this)
         sdkStatusTv?.text = when {
-            applied -> "READY · Platform 36 · ARM64 aapt2 36.1.0"
+            applied -> tr(R.string.main_ready_platform_36_arm64_aapt2)
             archive != null -> "PACK READY · apply to Alpaquita"
-            else -> "OPTIONAL PLAY ASSET PACK · ~76 MB download"
+            else -> tr(R.string.main_optional_play_asset_pack_76)
         }
         sdkActionBtn?.text = when {
-            applied -> "REAPPLY SDK"
+            applied -> tr(R.string.main_reapply_sdk)
             archive != null -> "APPLY SDK"
-            else -> "DOWNLOAD SDK"
+            else -> tr(R.string.main_download_sdk)
         }
         sdkActionBtn?.isEnabled = true
         sdkActionBtn?.alpha = 1f
@@ -4720,7 +4720,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(dp(16), dp(16), dp(16), dp(16))
         }
         card.addView(TextView(this).apply {
-            text = "ANDROID SDK 36"
+            text = tr(R.string.main_android_sdk_36)
             textSize = 15f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -4729,9 +4729,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val archive = AndroidDevPackManager.resolveArchive(this)
         val status = TextView(this).apply {
             text = when {
-                applied -> "READY · Platform 36 · ARM64 aapt2 36.1.0"
+                applied -> tr(R.string.main_ready_platform_36_arm64_aapt2)
                 archive != null -> "PACK READY · apply to Alpaquita"
-                else -> "OPTIONAL PLAY ASSET PACK · ~76 MB download"
+                else -> tr(R.string.main_optional_play_asset_pack_76)
             }
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
@@ -4743,9 +4743,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         val action = primaryButton(
             when {
-                applied -> "REAPPLY SDK"
+                applied -> tr(R.string.main_reapply_sdk)
                 archive != null -> "APPLY SDK"
-                else -> "DOWNLOAD SDK"
+                else -> tr(R.string.main_download_sdk)
             }
         ) {}
         sdkActionBtn = action
@@ -4754,7 +4754,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             action.alpha = 0.5f
 
             fun applyPack(force: Boolean) {
-                status.text = if (force) "Re-verifying and applying SDK overlay…" else "Verifying and applying SDK overlay…"
+                status.text = if (force) tr(R.string.main_re_verifying_and_applying_sdk) else tr(R.string.main_verifying_and_applying_sdk_overlay)
                 executor.execute {
                     val result = AndroidDevPackManager.applyAvailablePack(this@MainActivity, force = force)
                     runOnUiThread {
@@ -4762,7 +4762,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         action.isEnabled = true
                         action.alpha = 1f
                         if (result.success) {
-                            action.text = "REAPPLY SDK"
+                            action.text = tr(R.string.main_reapply_sdk)
                         }
                     }
                 }
@@ -4771,7 +4771,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             if (AndroidDevPackManager.resolveArchive(this) != null) {
                 applyPack(force = AndroidDevPackManager.isApplied(this))
             } else {
-                status.text = "Requesting nativecode_android_dev from Google Play…"
+                status.text = tr(R.string.onb_requesting_nativecode_android_dev_fr)
                 var listener: AssetPackStateUpdateListener? = null
                 listener = PlayAssetDeliveryManager.requestDownload(
                     this,
@@ -4779,26 +4779,26 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 ) { state ->
                     when (state) {
                         is PlayAssetDeliveryManager.DownloadState.Pending ->
-                            status.text = "SDK download pending…"
+                            status.text = tr(R.string.main_sdk_download_pending)
                         is PlayAssetDeliveryManager.DownloadState.Downloading ->
-                            status.text = "SDK downloading ${state.percentage}%"
+                            status.text = tr(R.string.main_sdk_downloading, state.percentage)
                         is PlayAssetDeliveryManager.DownloadState.Transferring ->
-                            status.text = "SDK transferring ${state.percentage}%"
+                            status.text = tr(R.string.main_sdk_transferring, state.percentage)
                         is PlayAssetDeliveryManager.DownloadState.Completed -> {
                             listener?.let { PlayAssetDeliveryManager.unregisterListener(this, it) }
                             applyPack(force = true)
                         }
                         is PlayAssetDeliveryManager.DownloadState.WaitingForWifi ->
-                            status.text = "Waiting for Wi-Fi approval…"
+                            status.text = tr(R.string.main_waiting_for_wi_fi_approval)
                         is PlayAssetDeliveryManager.DownloadState.Failed -> {
                             listener?.let { PlayAssetDeliveryManager.unregisterListener(this, it) }
-                            status.text = "SDK download failed (${state.errorCode})"
+                            status.text = tr(R.string.main_sdk_download_failed, state.errorCode)
                             action.isEnabled = true
                             action.alpha = 1f
                         }
                         is PlayAssetDeliveryManager.DownloadState.Canceled -> {
                             listener?.let { PlayAssetDeliveryManager.unregisterListener(this, it) }
-                            status.text = "SDK download canceled"
+                            status.text = tr(R.string.main_sdk_download_canceled)
                             action.isEnabled = true
                             action.alpha = 1f
                         }
@@ -4824,11 +4824,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         componentsScrollView.addView(page)
         page.addView(
             buildSubPageHeader(
-                title = "COMPONENTS",
+                title = tr(R.string.main_components),
                 subtitle = "// PLAY-DELIVERED DEVELOPMENT COMPONENTS",
                 iconRes = R.drawable.ic_download,
                 pageId = ID_COMPONENTS
-            ) { badge -> badge.text = "PLAY" }
+            ) { badge -> badge.text = tr(R.string.main_play) }
         )
 
         val rootfs = ProjectPathResolver.prootRootfsDir(this)
@@ -4843,14 +4843,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             )
             setPadding(dp(16), dp(16), dp(16), dp(16))
             addView(TextView(this@MainActivity).apply {
-                text = "ALPAQUITA RUNTIME"
+                text = tr(R.string.main_alpaquita_runtime)
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
             })
             addView(TextView(this@MainActivity).apply {
                 val phosh = File(rootfs, "usr/local/bin/phoc").exists() || File(rootfs, "usr/local/bin/nativecode-desktop").exists() || File(rootfs, "usr/bin/startxfce4").exists()
-                text = if (phosh) "READY · PRoot · Phosh Desktop" else "NOT INSTALLED · complete onboarding"
+                text = if (phosh) tr(R.string.main_ready_proot_phosh_desktop) else tr(R.string.main_not_installed_complete_onboarding)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -4884,9 +4884,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             RuntimeUpdatePack.SIZE, RuntimeUpdatePack.CHANGES))
         val panvk = FORCE_COMPONENT_UPDATE_UI || try { PanvkDriverUpdate.needsUpdate(this@MainActivity) } catch (_: Exception) { false }
         if (panvk) add(ComponentUpdate(
-            "panvk", R.drawable.ic_display, "PanVK GPU driver",
+            "panvk", R.drawable.ic_display, tr(R.string.main_panvk_gpu_driver),
             "installed ${(PanvkDriverUpdate.installedSha(this@MainActivity) ?: "unknown").take(8)} to rc3-lowmem ${PanvkDriverUpdate.bundledSha(this@MainActivity).take(8)}",
-            "Bundled in the app, no download",
+            tr(R.string.main_bundled_in_the_app_no),
             "New PanVK Vulkan driver for Mali GPUs (lowmem mode) and the matching GPU env scripts. Stop the desktop first; the old driver is kept as .so.bak."))
     }
 
@@ -4896,7 +4896,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val list = pendingComponentUpdates()
             runOnUiThread {
                 componentsNavDot?.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
-                componentsNavSub?.text = if (list.isEmpty()) "Linux runtime · Android SDK 36" else "${list.size} UPDATE${if (list.size > 1) "S" else ""} AVAILABLE"
+                componentsNavSub?.text = if (list.isEmpty()) tr(R.string.main_linux_runtime_android_sdk_36) else "${list.size} UPDATE${if (list.size > 1) "S" else ""} AVAILABLE"
                 componentsNavSub?.setTextColor(if (list.isEmpty()) NC.ON_SURF_VAR else NC.TERTIARY_CON)
                 homeUpdateBannerHolder.removeAllViews()
                 if (list.isNotEmpty()) homeUpdateBannerHolder.addView(buildHomeUpdateBanner(list.size))
@@ -4930,7 +4930,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
         addView(TextView(this@MainActivity).apply {
-            text = "VIEW"
+            text = tr(R.string.skills_view)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -4960,7 +4960,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             chip.setTextColor(color)
             chip.background = GradientDrawable().apply { setColor(Color.TRANSPARENT); setStroke(dp(1), color) }
         }
-        chipState("UPDATE AVAILABLE", NC.TERTIARY_CON)
+        chipState(tr(R.string.main_update_available), NC.TERTIARY_CON)
         card.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -5002,11 +5002,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(bar)
         val status = mono("", top = 0).apply { visibility = View.GONE; setPadding(0, 0, 0, dp(10)) }
         card.addView(status)
-        val btn = primaryButton("UPDATE") {}
+        val btn = primaryButton(tr(R.string.main_update)) {}
         card.addView(btn)
 
         fun running(text: String, pct: Int?) {
-            chipState("UPDATING", NC.PRIMARY)
+            chipState(tr(R.string.main_updating), NC.PRIMARY)
             bar.visibility = View.VISIBLE
             bar.isIndeterminate = pct == null
             if (pct != null) bar.progress = pct
@@ -5023,11 +5023,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             status.text = msg
             status.setTextColor(if (ok) NC.PRIMARY else NC.ERROR)
             if (ok) {
-                chipState("UP TO DATE", NC.PRIMARY)
+                chipState(tr(R.string.main_up_to_date), NC.PRIMARY)
                 btn.visibility = View.GONE
             } else {
-                chipState("FAILED", NC.ERROR)
-                btn.text = "RETRY"
+                chipState(tr(R.string.ssh_failed), NC.ERROR)
+                btn.text = tr(R.string.preview_retry)
                 btn.visibility = View.VISIBLE
             }
             refreshComponentUpdates(cards = false) // banner + dot only: this card keeps its done/failed state
@@ -5042,7 +5042,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     }
                 }
                 "panvk" -> {
-                    running("Updating the PanVK driver…", null)
+                    running(tr(R.string.main_updating_the_panvk_driver), null)
                     executor.execute {
                         val (ok, msg) = PanvkDriverUpdate.update(this)
                         runOnUiThread { finished(ok, msg) }
@@ -5056,8 +5056,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun buildSkillsSectionButton(): View {
         return settingsHubNavRow(
             iconRes = R.drawable.ic_smart_toy,
-            title = "SKILLS",
-            subtitle = "Agent prompts · hardware, project, install",
+            title = tr(R.string.skills_skills),
+            subtitle = tr(R.string.main_agent_prompts_hardware_project_insta),
             pageId = ID_SKILLS
         )
     }
@@ -5072,8 +5072,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun buildX11SettingsSectionButton(): View {
         return settingsHubNavRow(
             iconRes = R.drawable.ic_display,
-            title = "X11 SETTINGS",
-            subtitle = "Display, pointer, keyboard, gestures",
+            title = tr(R.string.x11_x11_settings),
+            subtitle = tr(R.string.main_display_pointer_keyboard_gestures),
             pageId = ID_X11_SETTINGS
         )
     }
@@ -5101,8 +5101,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun buildSoftwareManagerSectionButton(): View {
         return settingsHubNavRow(
             iconRes = R.drawable.ic_extension,
-            title = "SOFTWARE MANAGER",
-            subtitle = "Installed packages by category",
+            title = tr(R.string.main_software_manager),
+            subtitle = tr(R.string.main_installed_packages_by_category),
             pageId = ID_SOFTWARE_MANAGER
         )
     }
@@ -5110,8 +5110,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun buildMarketplaceSectionButton(): View {
         return settingsHubNavRow(
             iconRes = R.drawable.ic_download,
-            title = "MARKETPLACE",
-            subtitle = "Curated components & X11 apps",
+            title = tr(R.string.main_marketplace),
+            subtitle = tr(R.string.main_curated_components_x11_apps),
             pageId = ID_MARKETPLACE
         )
     }
@@ -5260,7 +5260,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 typeface = Typeface.DEFAULT_BOLD
             })
             details.addView(TextView(this@MainActivity).apply {
-                text = "Install suite · browser / device-code sign-in"
+                text = tr(R.string.main_install_suite_browser_device_code)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -5279,8 +5279,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun buildAiSafetySectionButton(): View {
         return settingsHubNavRow(
             iconRes = R.drawable.ic_shield_thick,
-            title = "AI SAFETY & REPORT",
-            subtitle = "Flag output · vendor ToS · contact",
+            title = tr(R.string.main_ai_safety_report),
+            subtitle = tr(R.string.main_flag_output_vendor_tos_contact),
             pageId = ID_AI_SAFETY
         )
     }
@@ -5342,13 +5342,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
             val name = TextView(this@MainActivity).apply {
-                text = "REPAIRS"
+                text = tr(R.string.main_repairs)
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
             }
             val sub = TextView(this@MainActivity).apply {
-                text = "Re-run host and guest fix scripts"
+                text = tr(R.string.main_re_run_host_and_guest)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -5428,13 +5428,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
             val name = TextView(this@MainActivity).apply {
-                text = "STORAGE SETTINGS"
+                text = tr(R.string.main_storage_settings)
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
             }
             val sub = TextView(this@MainActivity).apply {
-                text = "Alpaquita rootfs size (app storage)"
+                text = tr(R.string.main_alpaquita_rootfs_size_app_storage)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -5487,7 +5487,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             gravity = Gravity.CENTER_VERTICAL
         }
         val name = TextView(this).apply {
-            text = "CHROOT SETTINGS"
+            text = tr(R.string.main_chroot_settings)
             textSize = 15f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -5499,7 +5499,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         titleRow.addView(name)
         titleRow.addView(badge)
         val sub = TextView(this).apply {
-            text = "Rootfs size, path, and uninstall (outside app storage)"
+            text = tr(R.string.main_rootfs_size_path_and_uninstall)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -5563,7 +5563,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 card.alpha = 0.75f
                 card.isEnabled = false
                 card.isClickable = false
-                sub?.text = "Checking root access…"
+                sub?.text = tr(R.string.onb_checking_root_access)
                 sub?.setTextColor(NC.ON_SURF_VAR)
                 badge?.visibility = View.VISIBLE
                 badge?.text = "…"
@@ -5575,7 +5575,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 card.alpha = 1f
                 card.isEnabled = true
                 card.isClickable = true
-                sub?.text = "Rootfs size, path, and uninstall (outside app storage)"
+                sub?.text = tr(R.string.main_rootfs_size_path_and_uninstall)
                 sub?.setTextColor(NC.ON_SURF_VAR)
                 badge?.visibility = View.GONE
                 arrow?.alpha = 1f
@@ -5618,10 +5618,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 card.alpha = 0.45f
                 card.isEnabled = false
                 card.isClickable = false
-                sub?.text = "No root access"
+                sub?.text = tr(R.string.main_no_root_access)
                 sub?.setTextColor(NC.ERROR)
                 badge?.visibility = View.VISIBLE
-                badge?.text = "NO ROOT"
+                badge?.text = tr(R.string.main_no_root)
                 badge?.setTextColor(Color.parseColor("#0A0A0A"))
                 badge?.background = roundedBg(NC.ERROR, NC.ON_ERROR, dp(4))
                 arrow?.alpha = 0.25f
@@ -5629,7 +5629,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 card.setOnClickListener {
                     Toast.makeText(
                         this,
-                        "Chroot needs root access. Grant it in your root manager.",
+                        tr(R.string.main_chroot_needs_root_access_grant),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -5697,13 +5697,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
             val name = TextView(this@MainActivity).apply {
-                text = "RE-RUN ONBOARDING"
+                text = tr(R.string.main_re_run_onboarding)
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
             }
             val sub = TextView(this@MainActivity).apply {
-                text = "Relaunch initial setup and onboarding walkthrough"
+                text = tr(R.string.main_relaunch_initial_setup_and_onboardin)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -5804,7 +5804,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private var proCardStatusTv: TextView? = null
 
     private fun refreshProCard() {
-        proCardStatusTv?.text = if (isPro()) "Pro active" else
+        proCardStatusTv?.text = if (isPro()) tr(R.string.main_pro_active) else
             "Free plan · Upgrade · from ${BillingRepository.price(BillingRepository.SKU_MONTHLY) ?: "$3.99"}/mo"
     }
 
@@ -5830,7 +5830,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             addView(TextView(this@MainActivity).apply {
-                text = "NATIVECODE PRO"
+                text = tr(R.string.main_nativecode_pro)
                 textSize = 15f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
@@ -5866,9 +5866,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setBackgroundColor(NC.BG)
             setPadding(dp(20), dp(20), dp(20), dp(24))
         }
-        col.addView(line("NATIVECODE PRO", 20f, NC.PRIMARY, bold = true))
+        col.addView(line(tr(R.string.main_nativecode_pro), 20f, NC.PRIMARY, bold = true))
         reason?.let { col.addView(line("// $it", 12f, NC.ERROR)) }
-        if (isPro()) col.addView(line("Pro is active on this account.", 13f, NC.ON_SURFACE))
+        if (isPro()) col.addView(line(tr(R.string.main_pro_is_active_on_this), 13f, NC.ON_SURFACE))
         col.addView(
             line(
                 "• All AI CLIs (opencode stays free)\n• Up to 5 parallel AI sessions\n" +
@@ -5883,9 +5883,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             sheet.dismiss()
         }.apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) } }
         if (!isPro()) {
-            col.addView(buy("MONTHLY", BillingRepository.SKU_MONTHLY, "/mo", "$3.99/mo"))
-            col.addView(buy("YEARLY", BillingRepository.SKU_YEARLY, "/yr", "$29.99/yr"))
-            col.addView(buy("LIFETIME", BillingRepository.SKU_LIFETIME, "", "$19.99"))
+            col.addView(buy(tr(R.string.main_monthly), BillingRepository.SKU_MONTHLY, "/mo", "$3.99/mo"))
+            col.addView(buy(tr(R.string.main_yearly), BillingRepository.SKU_YEARLY, "/yr", "$29.99/yr"))
+            col.addView(buy(tr(R.string.main_lifetime), BillingRepository.SKU_LIFETIME, "", "$19.99"))
             // Play subscription policy: trial terms visible before purchase.
             if (BillingRepository.hasTrial()) col.addView(
                 line(
@@ -5895,22 +5895,22 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 ).apply { setPadding(0, dp(10), 0, 0) }
             )
         }
-        col.addView(secondaryButton("RESTORE PURCHASES") {
+        col.addView(secondaryButton(tr(R.string.main_restore_purchases)) {
             BillingRepository.refresh { ok ->
                 refreshProCard()
                 Toast.makeText(
                     this,
-                    if (!ok) "Google Play unavailable" else if (isPro()) "Pro restored" else "No purchases found",
+                    if (!ok) tr(R.string.main_google_play_unavailable) else if (isPro()) tr(R.string.main_pro_restored) else tr(R.string.main_no_purchases_found),
                     Toast.LENGTH_SHORT
                 ).show()
             }
             sheet.dismiss()
         }.apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(16) } })
-        col.addView(secondaryButton("MANAGE SUBSCRIPTION") {
+        col.addView(secondaryButton(tr(R.string.main_manage_subscription)) {
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BillingRepository.manageUrl(this))))
             } catch (_: Exception) {
-                Toast.makeText(this, "Google Play not available", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr(R.string.main_google_play_not_available), Toast.LENGTH_SHORT).show()
             }
         }.apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) } })
         sheet.setContentView(ScrollView(this).apply { addView(col) })
@@ -5973,13 +5973,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
             val name = TextView(this@MainActivity).apply {
-                text = "PRIVACY & LICENSES"
+                text = tr(R.string.main_privacy_licenses)
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
             }
             val sub = TextView(this@MainActivity).apply {
-                text = "Data policy · open source licenses"
+                text = tr(R.string.main_data_policy_open_source_licenses)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -6004,7 +6004,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, dp(8), 0, 0)
 
             val versionTv = TextView(this@MainActivity).apply {
-                text = "VERSION ${BuildConfig.VERSION_NAME} (BUILD ${BuildConfig.VERSION_CODE})"
+                text = tr(R.string.main_version_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
                 textSize = 12f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -6065,7 +6065,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(26), dp(26)).apply { rightMargin = dp(10) }
         }
         val titleTv = TextView(this).apply {
-            text = "REPAIRS"
+            text = tr(R.string.main_repairs)
             textSize = 22f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -6092,7 +6092,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         // Root probe badge
         repairsRootBadge = TextView(this).apply {
-            text = "ROOT …"
+            text = tr(R.string.main_root)
             textSize = 10f
             typeface = Typeface.MONOSPACE
             setTextColor(NC.ON_SURF_VAR)
@@ -6116,7 +6116,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             applyRepairsTabStyles()
             populateRepairsList()
         }
-        repairsTabGuestBtn = makeRepairsTabBtn("GUEST") {
+        repairsTabGuestBtn = makeRepairsTabBtn(tr(R.string.main_guest)) {
             repairsSelectedTab = "guest"
             applyRepairsTabStyles()
             populateRepairsList()
@@ -6174,7 +6174,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun refreshRepairsPage() {
-        repairsRootBadge?.text = "ROOT …"
+        repairsRootBadge?.text = tr(R.string.main_root)
         repairsRootBadge?.setTextColor(NC.ON_SURF_VAR)
         executor.execute {
             val ok = try {
@@ -6184,7 +6184,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             mainHandler.post {
                 repairsRootOk = ok
-                repairsRootBadge?.text = if (ok) "ROOT OK" else "ROOT UNAVAILABLE"
+                repairsRootBadge?.text = if (ok) tr(R.string.main_root_ok) else tr(R.string.main_root_unavailable)
                 repairsRootBadge?.setTextColor(if (ok) NC.PRIMARY else NC.SECONDARY)
                 applyRepairsTabStyles()
                 populateRepairsList()
@@ -6209,7 +6209,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                             name = name,
                             desc = desc,
                             badge = "HOST",
-                            runLabel = "RUN",
+                            runLabel = tr(R.string.main_run),
                             onRun = { runScriptInTerminal(name, "host") }
                         )
                     )
@@ -6236,8 +6236,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         buildScriptCard(
                             name = name,
                             desc = desc,
-                            badge = "GUEST",
-                            runLabel = "RUN",
+                            badge = tr(R.string.main_guest),
+                            runLabel = tr(R.string.main_run),
                             onRun = { runGuestRepairScript(name) }
                         )
                     )
@@ -6246,7 +6246,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             "chroot" -> {
                 if (repairsRootOk != true) {
                     val msg = TextView(this).apply {
-                        text = "Root required for chroot install script."
+                        text = tr(R.string.main_root_required_for_chroot_install)
                         textSize = 12f
                         setTextColor(NC.SECONDARY)
                         typeface = Typeface.MONOSPACE
@@ -6258,9 +6258,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 list.addView(
                     buildScriptCard(
                         name = "setup_alpine_chroot.sh",
-                        desc = "Install Alpine Linux 3.24 Chroot environment (Requires Root).",
+                        desc = tr(R.string.main_install_alpine_linux_3_24),
                         badge = "ROOT",
-                        runLabel = "RUN",
+                        runLabel = tr(R.string.main_run),
                         onRun = { runScriptInTerminal("setup_alpine_chroot.sh", "chroot_host") }
                     )
                 )
@@ -6283,12 +6283,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun confirmAiCliScriptRun(onConfirm: () -> Unit) {
         showBrutalistConfirmDialog(
-            title = "INSTALL AI CLI TOOLS?",
+            title = tr(R.string.main_install_ai_cli_tools),
             message =
                 "setup_cli_tools.sh installs Node/NVM and third-party AI CLIs " +
                     "inside the Alpaquita guest (network). Guest-only — not a host APK update.",
-            confirmLabel = "RUN",
-            cancelLabel = "CANCEL",
+            confirmLabel = tr(R.string.main_run),
+            cancelLabel = tr(R.string.x11_cancel),
             destructive = false,
             onConfirm = onConfirm
         )
@@ -6325,7 +6325,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         card.addView(TextView(this).apply {
-            text = "RUN WHERE?"
+            text = tr(R.string.main_run_where)
             textSize = 16f
             setTextColor(Color.WHITE)
             typeface = Typeface.MONOSPACE
@@ -6344,7 +6344,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(6))
         })
         card.addView(TextView(this).apply {
-            text = "Alpaquita guest scripts work on proot and chroot."
+            text = tr(R.string.main_alpaquita_guest_scripts_work_on)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -6406,7 +6406,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(row)
 
         card.addView(TextView(this).apply {
-            text = "CANCEL"
+            text = tr(R.string.x11_cancel)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -6557,14 +6557,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         scriptInstallTitleTv = TextView(this).apply {
-            text = "Script Runner"
+            text = tr(R.string.main_script_runner)
             textSize = 16f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         scriptInstallCopyBtn = TextView(this).apply {
-            text = "COPY"
+            text = tr(R.string.skills_copy)
             textSize = 13f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -6612,11 +6612,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 scriptName.startsWith("start_") -> "Script Start"
                 scriptName.startsWith("stop_") -> "Script Stop"
                 else -> when (runMode) {
-                    "chroot_host", "chroot" -> "Chroot Script"
-                    "chroot_guest" -> "Chroot Guest Script"
-                    "proot" -> "PRoot Script"
-                    "host" -> "Host Script"
-                    else -> "Script Runner"
+                    "chroot_host", "chroot" -> tr(R.string.main_chroot_script)
+                    "chroot_guest" -> tr(R.string.main_chroot_guest_script)
+                    "proot" -> tr(R.string.main_proot_script)
+                    "host" -> tr(R.string.main_host_script)
+                    else -> tr(R.string.main_script_runner)
                 }
             }
         }
@@ -6626,7 +6626,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (scriptName == "setup_hw_accel_debian.sh") {
             Toast.makeText(
                 this,
-                "GPU is baked into the rootfs (Turnip on Adreno, Venus on Mali). No setup script.",
+                tr(R.string.main_gpu_is_baked_into_the),
                 Toast.LENGTH_LONG
             ).show()
             return
@@ -6791,7 +6791,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                              }
                              Toast.makeText(
                                  this@MainActivity,
-                                 "AI CLI tools provisioned ($provisionMethod)",
+                                 tr(R.string.main_ai_cli_tools_provisioned, provisionMethod),
                                  Toast.LENGTH_LONG
                              ).show()
                          }
@@ -6805,7 +6805,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                              refreshChrootSettingsCard()
                              Toast.makeText(
                                  this@MainActivity,
-                                 "Uninstall may have failed — check log / root access",
+                                 tr(R.string.main_uninstall_may_have_failed_check),
                                  Toast.LENGTH_LONG
                              ).show()
                          }
@@ -6926,7 +6926,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         titleRow.addView(inPageBack)
         titleRow.addView(TextView(this).apply {
-            text = "FILE VIEWER"
+            text = tr(R.string.main_file_viewer)
             textSize = 16f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -6953,7 +6953,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         fileViewerPathTv = pathTv
         val copyPathHeaderBtn = TextView(this).apply {
-            text = "COPY PATH"
+            text = tr(R.string.main_copy_path)
             textSize = 10f
             setTextColor(Color.parseColor("#0A0A0A"))
             typeface = Typeface.MONOSPACE
@@ -7135,7 +7135,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Sticky chrome (fixed at top)
         fileViewerPathTv?.text = "// $relativePathStr"
         (fileViewerStickyHeader.findViewWithTag<TextView>("copy_path_btn"))?.setOnClickListener {
-            copyToClipboard("File Path", relativePathStr)
+            copyToClipboard(tr(R.string.ws_file_path), relativePathStr)
         }
 
         if (!::fileViewerContentHost.isInitialized) return
@@ -7257,7 +7257,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply { rightMargin = dp(6) }
             })
             addView(TextView(this@MainActivity).apply {
-                text = "EDIT"
+                text = tr(R.string.ssh_edit)
                 textSize = 12f
                 typeface = Typeface.MONOSPACE
                 paint.isFakeBoldText = true
@@ -7287,7 +7287,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(dp(12), dp(12), dp(12), dp(12))
         }
 
-        var dimensionsStr = "Unknown resolution"
+        var dimensionsStr = tr(R.string.main_unknown_resolution)
         val bitmap = try {
             BitmapFactory.decodeFile(file.absolutePath)
         } catch (e: Exception) {
@@ -7387,7 +7387,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         infoRow.addView(infoTv)
 
         val openExtBtn = TextView(this).apply {
-            text = "EXTERNAL PLAYER"
+            text = tr(R.string.main_external_player)
             textSize = 10f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -7447,7 +7447,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         infoCol.addView(titleTv)
         infoCol.addView(subTv)
 
-        val openBrowserBtn = primaryButton("OPEN IN BROWSER") {
+        val openBrowserBtn = primaryButton(tr(R.string.main_open_in_browser)) {
             openHtmlFile(file)
         }
 
@@ -7484,7 +7484,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val pm = packageManager
         val pkgInfo = try { pm.getPackageArchiveInfo(file.absolutePath, 0) } catch (e: Exception) { null }
         var appLabel = file.name
-        var pkgName = "Package Archive"
+        var pkgName = tr(R.string.main_package_archive)
         var verStr = "v1.0"
         var iconDrawable: Drawable? = null
 
@@ -7543,7 +7543,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val hintTv = TextView(this).apply {
-            text = "NativeCode cannot install APKs. Save to Downloads, then tap the file to install."
+            text = tr(R.string.main_nativecode_cannot_install_apks_save)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -7551,12 +7551,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         apkCard.addView(hintTv)
 
-        val installBtn = primaryButton("SAVE TO DOWNLOADS & OPEN") {
+        val installBtn = primaryButton(tr(R.string.main_save_to_downloads_open)) {
             confirmAndExportApk(file, pkgInfo)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1.4f)
         }
-        val shareBtn = secondaryButton("SHARE") {
+        val shareBtn = secondaryButton(tr(R.string.main_share)) {
             shareApkFromProject(file)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = dp(8) }
@@ -7626,7 +7626,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
         header.addView(TextView(this).apply {
-            text = "COPY"
+            text = tr(R.string.skills_copy)
             textSize = 10f
             setTextColor(Color.parseColor("#0A0A0A"))
             typeface = Typeface.MONOSPACE
@@ -7639,9 +7639,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(8) }
             setOnClickListener {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("File content", fileContentStr)
+                val clip = ClipData.newPlainText(tr(R.string.main_file_content), fileContentStr)
                 clipboard.setPrimaryClip(clip)
-                Toast.makeText(this@MainActivity, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, tr(R.string.main_copied_to_clipboard), Toast.LENGTH_SHORT).show()
             }
         })
         card.addView(header)
@@ -7750,14 +7750,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val descTv = TextView(this).apply {
-            text = "Binary File · ${formatFileSize(file.length())}\nDirect preview not available for this file type."
+            text = tr(R.string.main_binary_file_direct_preview_not, formatFileSize(file.length()))
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
             setPadding(0, dp(6), 0, dp(16))
         }
 
-        val openExtBtn = primaryButton("OPEN WITH EXTERNAL APP") {
+        val openExtBtn = primaryButton(tr(R.string.main_open_with_external_app)) {
             openExternalFile(file)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
@@ -7803,9 +7803,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         try {
-            startActivity(Intent.createChooser(intent, "Open HTML in Browser"))
+            startActivity(Intent.createChooser(intent, tr(R.string.main_open_html_in_browser)))
         } catch (e: Exception) {
-            Toast.makeText(this, "No browser found to open HTML", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_no_browser_found_to_open), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -7888,7 +7888,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(12))
         }
         titleRow.addView(TextView(this).apply {
-            text = "LINK"
+            text = tr(R.string.main_link)
             textSize = 10f
             setTextColor(Color.parseColor("#0A0A0A"))
             typeface = Typeface.DEFAULT_BOLD
@@ -7901,7 +7901,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(8) }
         })
         titleRow.addView(TextView(this).apply {
-            text = title?.takeIf { it.isNotBlank() } ?: "AGENT: OPEN LINK"
+            text = title?.takeIf { it.isNotBlank() } ?: tr(R.string.main_agent_open_link)
             textSize = 15f
             setTextColor(Color.WHITE)
             typeface = Typeface.MONOSPACE
@@ -7948,7 +7948,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val dismissBtn = TextView(this).apply {
-            text = "DISMISS"
+            text = tr(R.string.main_dismiss)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -7961,7 +7961,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val copyBtn = TextView(this).apply {
-            text = "COPY"
+            text = tr(R.string.skills_copy)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -7973,12 +7973,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setOnClickListener {
                 val clip = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                 clip?.setPrimaryClip(ClipData.newPlainText("URL", url))
-                Toast.makeText(this@MainActivity, "URL copied to clipboard", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, tr(R.string.main_url_copied_to_clipboard), Toast.LENGTH_SHORT).show()
             }
         }
 
         val openBtn = TextView(this).apply {
-            text = "OPEN BROWSER"
+            text = tr(R.string.main_open_browser)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -7993,7 +7993,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 try {
-                    startActivity(Intent.createChooser(intent, "Open with"))
+                    startActivity(Intent.createChooser(intent, tr(R.string.main_open_with)))
                 } catch (e: Exception) {
                     Toast.makeText(this@MainActivity, "No browser found: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
@@ -8018,7 +8018,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val pm = packageManager
         val pkgInfo = try { pm.getPackageArchiveInfo(file.absolutePath, 0) } catch (_: Exception) { null }
         var appLabel = file.name
-        var pkgName = "Package Archive"
+        var pkgName = tr(R.string.main_package_archive)
         var verStr = "v1.0"
         var iconDrawable: Drawable? = null
 
@@ -8091,7 +8091,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(8) }
         })
         titleRow.addView(TextView(this).apply {
-            text = title?.takeIf { it.isNotBlank() } ?: "AGENT: INSTALL APK"
+            text = title?.takeIf { it.isNotBlank() } ?: tr(R.string.main_agent_install_apk)
             textSize = 15f
             setTextColor(Color.WHITE)
             typeface = Typeface.MONOSPACE
@@ -8151,7 +8151,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         card.addView(TextView(this).apply {
-            text = "NativeCode cannot install APKs directly. Saves a copy to Downloads, then tap the file to install.$oldSdkWarn"
+            text = tr(R.string.main_nativecode_cannot_install_apks_direc, oldSdkWarn)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -8164,7 +8164,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val dismissBtn = TextView(this).apply {
-            text = "DISMISS"
+            text = tr(R.string.main_dismiss)
             textSize = 11f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -8177,7 +8177,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val shareBtn = TextView(this).apply {
-            text = "SHARE"
+            text = tr(R.string.main_share)
             textSize = 11f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -8193,7 +8193,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val saveOpenBtn = TextView(this).apply {
-            text = "SAVE & OPEN"
+            text = tr(R.string.main_save_open)
             textSize = 11f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -8236,17 +8236,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val pkgLine = pkgInfo?.packageName?.takeIf { it.isNotBlank() }?.let { "\nPackage: $it" } ?: ""
         val verLine = pkgInfo?.versionName?.let { "\nVersion: $it" } ?: ""
         showBrutalistConfirmDialog(
-            title = "EXPORT APK?",
+            title = tr(R.string.main_export_apk),
             message = "${file.name}\n${formatFileSize(file.length())}$pkgLine$verLine\n\n" +
                 "Saves a copy to Downloads. Open that file to install." +
                 oldSdkWarn,
-            confirmLabel = "SAVE & OPEN",
+            confirmLabel = tr(R.string.main_save_open),
             onConfirm = { exportApkToDownloads(file) }
         )
     }
 
     private fun exportApkToDownloads(file: File) {
-        Toast.makeText(this, "Preparing APK…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, tr(R.string.main_preparing_apk), Toast.LENGTH_SHORT).show()
         executor.execute {
             try {
                 val staged = copyOutForShare(file)
@@ -8274,7 +8274,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     mainHandler.post {
                         Toast.makeText(
                             this,
-                            "Saved to Downloads as $displayName. Tap it to install.",
+                            tr(R.string.main_saved_to_downloads_as_tap, displayName),
                             Toast.LENGTH_LONG
                         ).show()
                         openDownloadsUi()
@@ -8283,7 +8283,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     mainHandler.post {
                         Toast.makeText(
                             this,
-                            "Use SHARE and save to Files, then tap the APK to install.",
+                            tr(R.string.main_use_share_and_save_to),
                             Toast.LENGTH_LONG
                         ).show()
                         shareApkFile(staged)
@@ -8340,7 +8340,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             try {
                 startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (e: Exception) {
-                Toast.makeText(this, "Open Files → Downloads and tap the APK to install.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, tr(R.string.main_open_files_downloads_and_tap), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -8375,9 +8375,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         try {
-            startActivity(Intent.createChooser(intent, "Open with"))
+            startActivity(Intent.createChooser(intent, tr(R.string.main_open_with)))
         } catch (e: Exception) {
-            Toast.makeText(this, "No application available to open this file", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_no_application_available_to_open), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -8430,7 +8430,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun getFileUri(file: File): Uri? {
         return try {
             if (!file.isFile) {
-                Toast.makeText(this, "File not found", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr(R.string.main_file_not_found), Toast.LENGTH_SHORT).show()
                 return null
             }
             val staged = if (isUnderShareDir(file)) file else stageForShare(file)
@@ -8468,12 +8468,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun copyScriptInstallTranscript() {
         val t = transcriptOf(scriptInstallSession)
         if (t.isEmpty()) {
-            Toast.makeText(this, "Nothing to copy yet", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.term_nothing_to_copy_yet), Toast.LENGTH_SHORT).show()
             return
         }
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Script log", t))
-        Toast.makeText(this, "Log copied (${t.length} chars)", Toast.LENGTH_SHORT).show()
+        clipboard.setPrimaryClip(ClipData.newPlainText(tr(R.string.main_script_log), t))
+        Toast.makeText(this, tr(R.string.main_log_copied_chars, t.length), Toast.LENGTH_SHORT).show()
     }
 
     private fun buildMarkdownViewerCard(file: File): View {
@@ -8510,7 +8510,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val sourceTab = TextView(this).apply {
-            text = "SOURCE"
+            text = tr(R.string.main_source)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -8925,7 +8925,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         diffViewerScrollView.scrollTo(0, 0)
         diffViewerContainer.removeAllViews()
         val loadingTv = TextView(this).apply {
-            text = "Loading diff for $name..."
+            text = tr(R.string.main_loading_diff_for, name)
             setTextColor(NC.ON_SURF_VAR)
             textSize = 14f
             setPadding(dp(16), dp(16), dp(16), dp(16))
@@ -9003,7 +9003,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val isBinary = lines.any { it.startsWith("Binary files") || it.contains("differ") }
         if (isBinary) {
             val binaryTv = TextView(this).apply {
-                text = "Binary file changes. No preview available."
+                text = tr(R.string.main_binary_file_changes_no_preview)
                 setTextColor(NC.ON_SURF_VAR)
                 setPadding(dp(16), dp(16), dp(16), dp(16))
             }
@@ -9179,11 +9179,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setPadding(0, dp(12), 0, dp(16))
         }
-        val discardBtn = outlineBtn("Discard")
+        val discardBtn = outlineBtn(tr(R.string.main_discard))
         discardBtn.setOnClickListener {
             discardChanges(fileName)
         }
-        val commitBtn = primaryBtn("Commit Changes")
+        val commitBtn = primaryBtn(tr(R.string.main_commit_changes))
         commitBtn.setOnClickListener {
             showCommitDialog(fileName)
         }
@@ -9195,9 +9195,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun discardChanges(fileName: String) {
         androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Discard Changes")
-            .setMessage("Are you sure you want to discard changes in $fileName?")
-            .setPositiveButton("Discard") { _, _ ->
+            .setTitle(tr(R.string.main_discard_changes))
+            .setMessage(tr(R.string.main_are_you_sure_you_want, fileName))
+            .setPositiveButton(tr(R.string.main_discard)) { _, _ ->
                 val project = activeProjectPath
                 val method = projectGitMethod()
                 val name = fileName
@@ -9261,13 +9261,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     }
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(tr(R.string.git_cancel), null)
             .show()
     }
 
     private fun showCommitDialog(fileName: String) {
         val input = EditText(this).apply {
-            hint = "Commit message"
+            hint = tr(R.string.main_commit_message)
             setPadding(dp(16), dp(16), dp(16), dp(16))
         }
         val container = FrameLayout(this).apply {
@@ -9279,12 +9279,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             })
         }
         androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Commit changes")
+            .setTitle(tr(R.string.main_commit_changes_2))
             .setView(container)
-            .setPositiveButton("Commit") { _, _ ->
+            .setPositiveButton(tr(R.string.main_commit)) { _, _ ->
                 val msg = input.text.toString().trim()
                 if (msg.isEmpty()) {
-                    Toast.makeText(this, "Commit message cannot be empty", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, tr(R.string.main_commit_message_cannot_be_empty), Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
                 val project = activeProjectPath
@@ -9314,7 +9314,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         val (exit, out) = git("commit -m $quotedMsg")
                         mainHandler.post {
                             if (exit == 0) {
-                                Toast.makeText(this@MainActivity, "Committed successfully", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this@MainActivity, tr(R.string.main_committed_successfully), Toast.LENGTH_SHORT).show()
                                 onBackPressed()
                                 refreshGitDiffTree()
                             } else {
@@ -9332,7 +9332,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     }
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(tr(R.string.git_cancel), null)
             .show()
     }
 
@@ -9356,7 +9356,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(12))
         }
         val cardTitle = TextView(this).apply {
-            text = "Environment Status"; textSize = 18f; setTextColor(NC.PRIMARY); typeface = Typeface.DEFAULT_BOLD
+            text = tr(R.string.main_environment_status); textSize = 18f; setTextColor(NC.PRIMARY); typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         titleRow.addView(cardTitle); card.addView(titleRow)
@@ -9371,7 +9371,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(10), dp(10)).apply { rightMargin = dp(8) }
             background = circleDrawable(NC.SECONDARY)
         }
-        homeStatusLabel = TextView(this).apply { text = "Ready"; textSize = 13f; setTextColor(NC.ON_SURFACE); typeface = Typeface.MONOSPACE }
+        homeStatusLabel = TextView(this).apply { text = tr(R.string.main_ready); textSize = 13f; setTextColor(NC.ON_SURFACE); typeface = Typeface.MONOSPACE }
         pill.addView(homeStatusDot); pill.addView(homeStatusLabel); card.addView(pill)
 
         val infoRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -9407,7 +9407,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) }
         }
         val sectionTitle = TextView(this).apply {
-            text = "GRAPHICAL DESKTOP"
+            text = tr(R.string.main_graphical_desktop)
             textSize = 16f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -9418,9 +9418,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val xfceReady = isXfceInstalled()
         val sectionSub = TextView(this).apply {
             text = when {
-                !xfceReady -> "Desktop runtime unavailable — reinstall the Linux Runtime."
+                !xfceReady -> tr(R.string.main_desktop_runtime_unavailable_reinstal)
                 methodNow == "chroot" -> "Termux X11 + Phosh Mobile Shell inside Alpaquita (root)."
-                else -> "Termux X11 + Phosh Mobile Shell graphical environment."
+                else -> tr(R.string.main_termux_x11_phosh_mobile_shell)
             }
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
@@ -9490,7 +9490,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         startGuiBtn.alpha = 0.5f
         startGuiBtn.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
 
-        stopGuiBtn = dangerButton("STOP PHOSH DESKTOP") { desktop.stop() }.apply {
+        stopGuiBtn = dangerButton(tr(R.string.main_stop_phosh_desktop)) { desktop.stop() }.apply {
             setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_stop_thick, 0, 0, 0)
             compoundDrawablePadding = dp(8)
             setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(Color.WHITE))
@@ -9536,7 +9536,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val storageTitle = TextView(this).apply {
-            text = "APP STORAGE USED"
+            text = tr(R.string.main_app_storage_used)
             textSize = 12f
             setTextColor(Color.parseColor("#99E5E2E1"))
             typeface = Typeface.MONOSPACE
@@ -9638,7 +9638,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) }
         }
         val label0 = TextView(this).apply {
-            text = "0% LOAD"
+            text = tr(R.string.main_0_load)
             textSize = 10f
             setTextColor(Color.parseColor("#66FFFFFF"))
             typeface = Typeface.MONOSPACE
@@ -9653,7 +9653,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val label100 = TextView(this).apply {
-            text = "100% MAX"
+            text = tr(R.string.main_100_max)
             textSize = 10f
             setTextColor(Color.parseColor("#66FFFFFF"))
             typeface = Typeface.MONOSPACE
@@ -9741,7 +9741,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         val (cpuCard, cpuTv) = buildStatCard("CPU", "12%", 12, NC.PRIMARY, false)
         val (ramCard, ramTv) = buildStatCard("RAM", "4.1G", 45, Color.parseColor("#80FFFFFF"), false)
-        val (diskCard, diskTv) = buildStatCard("DISK", "94%", 94, NC.ERROR, true)
+        val (diskCard, diskTv) = buildStatCard(tr(R.string.main_disk), "94%", 94, NC.ERROR, true)
 
         statRow.addView(cpuCard)
         statRow.addView(ramCard)
@@ -9784,10 +9784,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val softwareCard = buildHomePackageModuleCard(
             accentFill = false,
             iconRes = R.drawable.ic_extension,
-            kicker = "PACKAGE SCAN",
-            title = "SOFTWARE MANAGER",
-            subtitle = "Installed pkgs by category & size",
-            footer = "BROWSE · REMOVE",
+            kicker = tr(R.string.main_package_scan),
+            title = tr(R.string.main_software_manager),
+            subtitle = tr(R.string.main_installed_pkgs_by_category_size),
+            footer = tr(R.string.main_browse_remove),
             pageId = ID_SOFTWARE_MANAGER
         ).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
@@ -9814,10 +9814,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         section.addView(buildHomePackageModuleCard(
             accentFill = false,
             iconRes = R.drawable.ic_lucide_chart,
-            kicker = "USAGE",
-            title = "AI USAGE",
-            subtitle = "Tokens and cost per AI CLI.",
-            footer = "DAY · WEEK · MONTH · PER CLI",
+            kicker = tr(R.string.usage_usage),
+            title = tr(R.string.main_ai_usage),
+            subtitle = tr(R.string.main_tokens_and_cost_per_ai_2),
+            footer = tr(R.string.main_day_week_month_per_cli),
             pageId = ID_USAGE,
             onSubtitle = { tv ->
                 homeUsageSubtitle = tv
@@ -9842,9 +9842,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             accentFill = false,
             iconRes = R.drawable.ic_lucide_server,
             kicker = "SSH",
-            title = "SSH SERVER AND REMOTE HOSTS",
-            subtitle = "Log in to this phone from your PC, or connect to other machines.",
-            footer = "SERVER (PRO) · CLIENT · KEYS",
+            title = tr(R.string.main_ssh_server_and_remote_hosts),
+            subtitle = tr(R.string.main_log_in_to_this_phone),
+            footer = tr(R.string.main_server_pro_client_keys),
             pageId = ID_SSH,
             onSubtitle = { tv ->
                 homeSshSubtitle = tv
@@ -9861,8 +9861,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val st = com.zenithblue.nativecode.ssh.SshServerController.status
         tv.text = when (st.state) {
             com.zenithblue.nativecode.ssh.SshState.RUNNING -> "Server running: " + com.zenithblue.nativecode.ssh.SshModel.connectCommand(st.address ?: "?")
-            com.zenithblue.nativecode.ssh.SshState.STARTING -> "Server starting..."
-            else -> "Log in to this phone from your PC, or connect to other machines."
+            com.zenithblue.nativecode.ssh.SshState.STARTING -> tr(R.string.main_server_starting)
+            else -> tr(R.string.main_log_in_to_this_phone)
         }
     }
 
@@ -10046,14 +10046,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(12))
         }
         val sectionTitle = TextView(this).apply {
-            text = ">> RECENT WORKSPACES"
+            text = tr(R.string.main_recent_workspaces)
             textSize = 13f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val viewAll = TextView(this).apply {
-            text = "View All"
+            text = tr(R.string.main_view_all)
             textSize = 12f
             setTextColor(Color.parseColor("#80FFFFFF"))
             typeface = Typeface.MONOSPACE
@@ -10084,7 +10084,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val projects = getProjects().sortedByDescending { it.lastOpened }
         if (projects.isEmpty()) {
             val emptyTv = TextView(this).apply {
-                text = "No recent projects found"
+                text = tr(R.string.main_no_recent_projects_found)
                 textSize = 13f
                 setTextColor(NC.ON_SURF_VAR)
                 setPadding(dp(4), dp(8), dp(4), dp(8))
@@ -10119,10 +10119,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, 0, 0, dp(8)) }
         val icon = ImageView(this).apply { setImageResource(R.drawable.ic_laptop_thick); setColorFilter(NC.PRIMARY); layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) } }
-        val title = TextView(this).apply { text = "Terminal Authentication"; textSize = 16f; setTextColor(NC.ON_SURFACE); typeface = Typeface.DEFAULT_BOLD }
+        val title = TextView(this).apply { text = tr(R.string.main_terminal_authentication); textSize = 16f; setTextColor(NC.ON_SURFACE); typeface = Typeface.DEFAULT_BOLD }
         header.addView(icon); header.addView(title); card.addView(header)
 
-        val sub = TextView(this).apply { text = "Authenticate using the GitHub CLI interactive flow."; textSize = 13f; setTextColor(NC.ON_SURF_VAR); setPadding(0, 0, 0, dp(12)) }
+        val sub = TextView(this).apply { text = tr(R.string.main_authenticate_using_the_github_cli); textSize = 13f; setTextColor(NC.ON_SURF_VAR); setPadding(0, 0, 0, dp(12)) }
         card.addView(sub)
 
         val termBlock = LinearLayout(this).apply {
@@ -10136,9 +10136,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         termBlock.addView(dotsRow)
         for ((prompt, line) in listOf(
             "\$ " to "gh auth login",
-            "? " to "What account do you want to log into? GitHub.com",
-            "? " to "Preferred protocol for Git operations? HTTPS",
-            "! " to "First copy your one-time code: ABCD-1234"
+            "? " to tr(R.string.main_what_account_do_you_want),
+            "? " to tr(R.string.main_preferred_protocol_for_git_operation),
+            "! " to tr(R.string.main_first_copy_your_one_time)
         )) {
             val tv = TextView(this).apply { text = "$prompt$line"; textSize = 12f; typeface = Typeface.MONOSPACE; setTextColor(if (prompt == "! ") NC.PRIMARY else NC.ON_SURF_VAR) }
             termBlock.addView(tv)
@@ -10150,7 +10150,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val codeLbl = TextView(this).apply { text = "Code: "; textSize = 13f; setTextColor(NC.ON_SURF_VAR); typeface = Typeface.MONOSPACE }
         val codeVal = textBadge("ABCD-1234", NC.SURFACE_HIGH, NC.ON_SURFACE)
         val spacer2 = View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) }
-        val openBtn = primaryButton("Open Browser") {}
+        val openBtn = primaryButton(tr(R.string.main_open_browser_2)) {}
         openBtn.layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
         codeRow.addView(codeLbl); codeRow.addView(codeVal); codeRow.addView(spacer2); codeRow.addView(openBtn)
         card.addView(codeRow)
@@ -10161,7 +10161,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = roundedBg(NC.SURFACE, NC.BORDER, dp(12)); setPadding(dp(16)) }
         val headerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, 0, 0, dp(12)) }
         val icon = ImageView(this).apply { setImageResource(R.drawable.ic_git_thick); setColorFilter(NC.PRIMARY); layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) } }
-        val title = TextView(this).apply { text = "Active Branches"; textSize = 16f; setTextColor(NC.ON_SURFACE); typeface = Typeface.DEFAULT_BOLD; layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f) }
+        val title = TextView(this).apply { text = tr(R.string.main_active_branches); textSize = 16f; setTextColor(NC.ON_SURFACE); typeface = Typeface.DEFAULT_BOLD; layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f) }
         val fetchBtn = TextView(this).apply {
             text = " git fetch"
             textSize = 11f
@@ -10192,19 +10192,19 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun buildGitAuthInputCard(): LinearLayout {
         val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = roundedBg(NC.SURFACE, NC.BORDER, dp(12)); setPadding(dp(16)) }
-        card.addView(inputField("GitHub Username / Token", "ghp_xxxxxxxxxxxxxxxxxxxx"))
+        card.addView(inputField(tr(R.string.main_github_username_token), "ghp_xxxxxxxxxxxxxxxxxxxx"))
         card.addView(spacer(12))
-        card.addView(inputField("Repository URL or Name", "owner/repo"))
+        card.addView(inputField(tr(R.string.main_repository_url_or_name), "owner/repo"))
         return card
     }
 
     private fun buildEnvironmentCard(): LinearLayout {
         if (BuildConfig.PLAY_STORE_BUILD) return buildPlayEnvironmentCard()
         val card = glassCard()
-        card.addView(sectionHeader(R.drawable.ic_laptop_thick, "Linux Isolation Mode", NC.PRIMARY))
+        card.addView(sectionHeader(R.drawable.ic_laptop_thick, tr(R.string.main_linux_isolation_mode), NC.PRIMARY))
 
         val descTv = TextView(this).apply {
-            text = "Select execution engine for Linux sessions and CLI tools:"
+            text = tr(R.string.main_select_execution_engine_for_linux)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             setPadding(0, 0, 0, dp(12))
@@ -10260,13 +10260,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val prootTitle = TextView(this).apply {
-            text = "PROOT (Rootless)"
+            text = tr(R.string.main_proot_rootless)
             textSize = 14f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
         }
         val prootSub = TextView(this).apply {
-            text = "User-space isolation. No root required."
+            text = tr(R.string.main_user_space_isolation_no_root)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
         }
@@ -10280,13 +10280,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val chrootTitle = TextView(this).apply {
-            text = "CHROOT (Root required)"
+            text = tr(R.string.main_chroot_root_required)
             textSize = 14f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
         }
         val chrootSub = TextView(this).apply {
-            text = if (ProjectPathResolver.isChrootInstalled()) "Installed & Ready. Kernel-level speed." else "Requires Root & Linux Chroot Setup"
+            text = if (ProjectPathResolver.isChrootInstalled()) tr(R.string.main_installed_ready_kernel_level_speed) else tr(R.string.main_requires_root_linux_chroot_setup)
             textSize = 11f
             setTextColor(if (ProjectPathResolver.isChrootInstalled()) NC.PRIMARY else NC.SECONDARY)
         }
@@ -10304,7 +10304,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             if (::homeContainerLabel.isInitialized) homeContainerLabel.text = ProjectPathResolver.methodLabel()
             refreshToolCardsForMethod()
             refreshSettingsGithubCard()
-            Toast.makeText(this, "Switched to PRoot Mode", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_switched_to_proot_mode), Toast.LENGTH_SHORT).show()
         }
 
         chrootCard.setOnClickListener {
@@ -10312,9 +10312,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 val rootAvailable = RootShell.isRootAvailable()
                 mainHandler.post {
                     if (!rootAvailable) {
-                        Toast.makeText(this, "Root access was not granted", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, tr(R.string.main_root_access_was_not_granted), Toast.LENGTH_LONG).show()
                     } else if (!ProjectPathResolver.isChrootInstalled()) {
-                        Toast.makeText(this, "Root detected! Please run Chroot setup in Onboarding to finish installation.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, tr(R.string.main_root_detected_please_run_chroot), Toast.LENGTH_LONG).show()
                         LinuxCommandBuilder.currentMethod = "chroot"
                         getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
                             .edit().putString("linux_method", "chroot").apply()
@@ -10330,7 +10330,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         if (::homeContainerLabel.isInitialized) homeContainerLabel.text = ProjectPathResolver.methodLabel()
                         refreshToolCardsForMethod()
                         refreshSettingsGithubCard()
-                        Toast.makeText(this, "Switched to Chroot Mode", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, tr(R.string.main_switched_to_chroot_mode), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -10341,20 +10341,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(modeContainer)
 
         card.addView(spacer(12))
-        card.addView(infoRow("OS Version", "Alpaquita Linux (glibc AArch64)"))
+        card.addView(infoRow(tr(R.string.main_os_version), tr(R.string.onb_alpaquita_linux_glibc_aarch64)))
         return card
     }
 
     private fun buildPlayEnvironmentCard(): LinearLayout = glassCard().apply {
-        addView(sectionHeader(R.drawable.ic_laptop_thick, "Linux Environment", NC.PRIMARY))
+        addView(sectionHeader(R.drawable.ic_laptop_thick, tr(R.string.main_linux_environment), NC.PRIMARY))
         addView(TextView(this@MainActivity).apply {
-            text = "Alpaquita Linux runs in isolated, rootless PRoot mode. NativeCode does not request superuser access."
+            text = tr(R.string.main_alpaquita_linux_runs_in_isolated)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             setPadding(0, 0, 0, dp(12))
         })
-        addView(infoRow("Execution mode", "PRoot (rootless)"))
-        addView(infoRow("OS Version", "Alpaquita Linux (glibc AArch64)"))
+        addView(infoRow(tr(R.string.main_execution_mode), tr(R.string.main_proot_rootless_2)))
+        addView(infoRow(tr(R.string.main_os_version), tr(R.string.onb_alpaquita_linux_glibc_aarch64)))
     }
 
     /**
@@ -10402,7 +10402,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply { rightMargin = dp(10) }
         }
         val titleTv = TextView(this).apply {
-            text = "STORAGE SETTINGS"
+            text = tr(R.string.main_storage_settings)
             textSize = 22f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -10432,7 +10432,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Proot detail card — rootfs size + host path only (no install/root). */
     private fun buildProotSettingsContentCard(): LinearLayout {
         val card = glassCard()
-        card.addView(sectionHeader(R.drawable.ic_storage, "Storage", NC.PRIMARY))
+        card.addView(sectionHeader(R.drawable.ic_storage, tr(R.string.cli_storage), NC.PRIMARY))
 
         val subTv = TextView(this).apply {
             text = "// ALPAQUITA ROOTFS — MEASURED IN-APP"
@@ -10458,7 +10458,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             gravity = Gravity.CENTER_VERTICAL
         }
         val sizeTitle = TextView(this).apply {
-            text = "LINUX STORAGE"
+            text = tr(R.string.main_linux_storage)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -10551,7 +10551,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(4) }
         }
         pathRow.addView(TextView(this).apply {
-            text = "HOST PATH"
+            text = tr(R.string.main_host_path)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -10567,7 +10567,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         pathRow.addView(prootPathTv)
         card.addView(pathRow)
 
-        val browseFilesBtn = primaryButton("BROWSE HOME FILES") {
+        val browseFilesBtn = primaryButton(tr(R.string.main_browse_home_files)) {
             if (pageStack.isEmpty() || pageStack.peek() != ID_PROOT_FILES) {
                 pageStack.push(ID_PROOT_FILES)
             }
@@ -10602,7 +10602,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         } else if (!dirOk) {
             prootSizeValueTv?.text = "—"
             prootSizeUnitTv?.text = ""
-            prootSizeHintTv?.text = "Proot rootfs not found"
+            prootSizeHintTv?.text = tr(R.string.main_proot_rootfs_not_found)
             prootSizeHintTv?.setTextColor(NC.SECONDARY)
         }
     }
@@ -10634,7 +10634,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         prootRefreshBtn?.isEnabled = !loading
         prootRefreshBtn?.alpha = if (loading) 0.45f else 1f
         if (loading) {
-            prootSizeHintTv?.text = "Measuring Alpaquita PRoot rootfs…"
+            prootSizeHintTv?.text = tr(R.string.main_measuring_alpaquita_proot_rootfs)
             prootSizeHintTv?.setTextColor(NC.PRIMARY)
             prootSizeValueTv?.alpha = 0.45f
         } else {
@@ -10660,13 +10660,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             var measureNote: String
 
             if (!dirPresent) {
-                measureNote = "Proot rootfs not found"
+                measureNote = tr(R.string.main_proot_rootfs_not_found)
             } else {
                 bytes = measureProotRootfsBytes(rootfs)
                 measureNote = if (bytes != null) {
                     "Alpaquita PRoot rootfs · measured in-app"
                 } else {
-                    "Size probe failed"
+                    tr(R.string.main_size_probe_failed)
                 }
             }
 
@@ -10766,7 +10766,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply { rightMargin = dp(10) }
         }
         val titleTv = TextView(this).apply {
-            text = "CHROOT SETTINGS"
+            text = tr(R.string.main_chroot_settings)
             textSize = 22f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -10801,7 +10801,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
      */
     private fun buildChrootSettingsContentCard(): LinearLayout {
         val card = glassCard()
-        card.addView(sectionHeader(R.drawable.ic_storage, "Storage & Manage", NC.PRIMARY))
+        card.addView(sectionHeader(R.drawable.ic_storage, tr(R.string.main_storage_manage), NC.PRIMARY))
 
         val subTv = TextView(this).apply {
             text = "// ROOT-LEVEL ALPAQUITA — OUTSIDE APP STORAGE"
@@ -10837,7 +10837,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(10) }
         }
         val warnText = TextView(this).apply {
-            text = "Rootfs is not removed when you uninstall the app. Free space here."
+            text = tr(R.string.main_rootfs_is_not_removed_when)
             textSize = 11f
             setTextColor(NC.TERTIARY)
             typeface = Typeface.MONOSPACE
@@ -10848,7 +10848,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(warnStrip)
 
         // STATUS row — updated instantly from marker/cache (before size)
-        card.addView(buildChrootMetaRow("STATUS") { row ->
+        card.addView(buildChrootMetaRow(tr(R.string.main_status)) { row ->
             chrootStatusBadge = TextView(this).apply {
                 text = "…"
                 textSize = 10f
@@ -10859,9 +10859,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         })
 
         // ROOT row — only visible when root is granted (hidden if no root → card = NOT INSTALLED only)
-        chrootRootRowView = buildChrootMetaRow("ROOT ACCESS") { row ->
+        chrootRootRowView = buildChrootMetaRow(tr(R.string.main_root_access)) { row ->
             chrootRootBadge = TextView(this).apply {
-                text = "CHECKING"
+                text = tr(R.string.main_checking)
                 textSize = 10f
                 typeface = Typeface.MONOSPACE
                 setPadding(dp(8), dp(3), dp(8), dp(3))
@@ -10893,7 +10893,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             gravity = Gravity.CENTER_VERTICAL
         }
         val sizeTitle = TextView(this).apply {
-            text = "LINUX STORAGE"
+            text = tr(R.string.main_linux_storage)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -10988,7 +10988,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(14) }
         }
         pathRow.addView(TextView(this).apply {
-            text = "HOST PATH"
+            text = tr(R.string.main_host_path)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -11005,7 +11005,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(pathRow)
 
         chrootUninstallBtn = TextView(this).apply {
-            text = "UNINSTALL CHROOT"
+            text = tr(R.string.main_uninstall_chroot)
             textSize = 13f
             setTextColor(NC.ERROR)
             typeface = Typeface.MONOSPACE
@@ -11054,7 +11054,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(chrootUninstallBtn)
 
         chrootInstallBtn = TextView(this).apply {
-            text = "INSTALL CHROOT"
+            text = tr(R.string.main_install_chroot)
             textSize = 13f
             setTextColor(Color.parseColor("#0A0A0A"))
             typeface = Typeface.MONOSPACE
@@ -11270,7 +11270,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         chrootRefreshBtn?.alpha = if (loading) 0.45f else 1f
         if (loading) {
             chrootRootBadge?.let {
-                it.text = "CHECKING"
+                it.text = tr(R.string.main_checking)
                 it.setTextColor(NC.ON_SURF_VAR)
                 it.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -11278,7 +11278,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     setStroke(dp(1), NC.OUTLINE_VAR)
                 }
             }
-            chrootSizeHintTv?.text = "Checking root · measuring rootfs…"
+            chrootSizeHintTv?.text = tr(R.string.main_checking_root_measuring_rootfs)
             chrootSizeHintTv?.setTextColor(NC.PRIMARY)
             chrootSizeValueTv?.alpha = 0.45f
         } else {
@@ -11411,12 +11411,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             liveBytes != null -> {
                 displayBytes = liveBytes
                 dimmedCache = false
-                measureNote = "Alpaquita rootfs · binds excluded (sdcard/mnt/dev)"
+                measureNote = tr(R.string.main_alpaquita_rootfs_binds_excluded_sdca)
             }
             !dirExists -> {
                 displayBytes = null
                 dimmedCache = false
-                measureNote = "No chroot rootfs on host"
+                measureNote = tr(R.string.main_no_chroot_rootfs_on_host)
             }
             priorBytes != null -> {
                 // F2 fix: keep last good size on probe fail
@@ -11434,7 +11434,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             else -> {
                 displayBytes = null
                 dimmedCache = false
-                measureNote = "Root OK · size probe failed"
+                measureNote = tr(R.string.main_root_ok_size_probe_failed)
                 Log.w("ChrootSize", "probe fail no cache err=${measure.error} raw=${measure.raw.take(400)}")
             }
         }
@@ -11482,7 +11482,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         chrootSizeValueTv?.text = "—"
         chrootSizeUnitTv?.text = ""
         chrootSizeValueTv?.alpha = 1f
-        chrootSizeHintTv?.text = "Root required · install via onboarding after granting su"
+        chrootSizeHintTv?.text = tr(R.string.main_root_required_install_via_onboarding)
         chrootSizeHintTv?.setTextColor(NC.SECONDARY)
     }
 
@@ -11503,7 +11503,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
             dirExists || installed -> {
-                badge.text = "PARTIAL"
+                badge.text = tr(R.string.main_partial)
                 badge.setTextColor(Color.parseColor("#0A0A0A"))
                 badge.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -11511,7 +11511,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
             else -> {
-                badge.text = "NOT INSTALLED"
+                badge.text = tr(R.string.main_not_installed)
                 badge.setTextColor(NC.ON_SURF_VAR)
                 badge.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -11526,7 +11526,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (badge == null) return
         when {
             checking -> {
-                badge.text = "CHECKING"
+                badge.text = tr(R.string.main_checking)
                 badge.setTextColor(NC.ON_SURF_VAR)
                 badge.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -11535,7 +11535,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
             rootOk -> {
-                badge.text = "GRANTED"
+                badge.text = tr(R.string.main_granted)
                 badge.setTextColor(Color.parseColor("#0A0A0A"))
                 badge.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -11543,7 +11543,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
             else -> {
-                badge.text = "DENIED"
+                badge.text = tr(R.string.main_denied)
                 badge.setTextColor(Color.parseColor("#0A0A0A"))
                 badge.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -11602,18 +11602,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun confirmAndUninstallChroot() {
         if (chrootUninstallBtn?.isEnabled != true) {
-            Toast.makeText(this, "No chroot rootfs to uninstall", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_no_chroot_rootfs_to_uninstall), Toast.LENGTH_SHORT).show()
             return
         }
         showBrutalistConfirmDialog(
-            title = "UNINSTALL CHROOT?",
+            title = tr(R.string.main_uninstall_chroot_2),
             message =
                 "Permanently deletes ${ChrootCommandBuilder.CHROOT_PATH}, unmounts binds, " +
                     "and removes host launcher scripts.\n\n" +
                     "The app package stays installed. PRoot data is not touched.\n\n" +
                     "This cannot be undone.",
-            confirmLabel = "UNINSTALL",
-            cancelLabel = "CANCEL",
+            confirmLabel = tr(R.string.main_uninstall),
+            cancelLabel = tr(R.string.x11_cancel),
             destructive = true,
             onConfirm = {
                 pendingChrootUninstall = true
@@ -11626,7 +11626,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun buildChrootProcessesCard(): LinearLayout {
         val card = glassCard()
-        card.addView(sectionHeader(R.drawable.ic_stop_thick, "Processes", NC.ERROR))
+        card.addView(sectionHeader(R.drawable.ic_stop_thick, tr(R.string.main_processes), NC.ERROR))
 
         val subTv = TextView(this).apply {
             text = "// orphans survive app close (unlike proot). Kill before uninstall if stuck."
@@ -11653,7 +11653,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             gravity = Gravity.CENTER_VERTICAL
         }
         val title = TextView(this).apply {
-            text = "CHROOT PROCESSES"
+            text = tr(R.string.main_chroot_processes)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -11752,7 +11752,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(panel)
 
         chrootProcKillBtn = TextView(this).apply {
-            text = "KILL ALL CHROOT PROCESSES"
+            text = tr(R.string.main_kill_all_chroot_processes)
             textSize = 13f
             setTextColor(NC.ERROR)
             typeface = Typeface.MONOSPACE
@@ -11860,7 +11860,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         chrootProcScanBtn?.alpha = if (loading || killing) 0.45f else 1f
         if (loading || killing) {
             chrootProcCountTv?.alpha = 0.45f
-            chrootProcHintTv?.text = if (killing) "Sending SIGKILL…" else "Scanning /proc for chroot root…"
+            chrootProcHintTv?.text = if (killing) tr(R.string.main_sending_sigkill) else tr(R.string.main_scanning_proc_for_chroot_root)
             chrootProcHintTv?.setTextColor(if (killing) NC.ERROR else NC.PRIMARY)
             setChrootProcKillEnabled(false)
         } else {
@@ -11894,7 +11894,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (!result.rootOk || result.error == "root_required") {
             chrootProcCountTv?.text = "—"
             chrootProcUnitTv?.text = ""
-            chrootProcHintTv?.text = "Root required"
+            chrootProcHintTv?.text = tr(R.string.main_root_required)
             chrootProcHintTv?.setTextColor(NC.SECONDARY)
             chrootProcSampleBox?.removeAllViews()
             chrootProcSampleBox?.visibility = View.GONE
@@ -11904,7 +11904,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         if (result.error == "stage_failed") {
             chrootProcCountTv?.text = "—"
-            chrootProcHintTv?.text = "Failed to stage helper script"
+            chrootProcHintTv?.text = tr(R.string.main_failed_to_stage_helper_script)
             chrootProcHintTv?.setTextColor(NC.ERROR)
             setChrootProcKillEnabled(false)
             return
@@ -11937,7 +11937,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         box.visibility = View.VISIBLE
         box.addView(TextView(this).apply {
-            text = "SAMPLE"
+            text = tr(R.string.main_sample)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -11956,7 +11956,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val more = procs.size - show.size
         if (more > 0) {
             box.addView(TextView(this).apply {
-                text = "+$more more"
+                text = tr(R.string.main_more, more)
                 textSize = 10f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -11967,16 +11967,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun applyChrootProcessKillUi(result: ChrootProcessManager.KillResult) {
         if (!result.rootOk || result.error == "root_required") {
-            chrootProcHintTv?.text = "Root required"
+            chrootProcHintTv?.text = tr(R.string.main_root_required)
             chrootProcHintTv?.setTextColor(NC.SECONDARY)
             setChrootProcKillEnabled(false)
-            Toast.makeText(this, "Root required to kill chroot processes", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_root_required_to_kill_chroot), Toast.LENGTH_SHORT).show()
             return
         }
         if (result.error == "stage_failed") {
-            chrootProcHintTv?.text = "Failed to stage helper script"
+            chrootProcHintTv?.text = tr(R.string.main_failed_to_stage_helper_script)
             chrootProcHintTv?.setTextColor(NC.ERROR)
-            Toast.makeText(this, "Could not stage kill helper", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_could_not_stage_kill_helper), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -12007,7 +12007,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         Toast.makeText(
             this,
-            if (result.verifiedClean) "Killed ${result.killed} · clean" else "Killed ${result.killed} · $rem remaining",
+            if (result.verifiedClean) tr(R.string.main_killed_clean, result.killed) else tr(R.string.main_killed_remaining, result.killed, rem),
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -12017,14 +12017,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (chrootMeasuring) return // P3: no concurrent su with size probe
         val n = chrootProcLastCount.coerceAtLeast(0)
         showBrutalistConfirmDialog(
-            title = "KILL CHROOT PROCESSES?",
+            title = tr(R.string.main_kill_chroot_processes),
             message =
                 "Sends SIGKILL to every process whose root is ${ChrootCommandBuilder.CHROOT_PATH}.\n\n" +
                     "Open chroot shells and guest daemons will die. Host Android processes are not targeted.\n\n" +
                     "Rootfs and mounts stay (use Uninstall to remove)." +
                     if (n > 0) "\n\nDetected: $n process(es)." else "",
-            confirmLabel = "KILL ALL",
-            cancelLabel = "CANCEL",
+            confirmLabel = tr(R.string.main_kill_all),
+            cancelLabel = tr(R.string.x11_cancel),
             destructive = true,
             onConfirm = {
                 if (!chrootMeasuring) {
@@ -12050,7 +12050,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         title: String,
         message: String,
         confirmLabel: String,
-        cancelLabel: String = "CANCEL",
+        cancelLabel: String = tr(R.string.x11_cancel),
         destructive: Boolean = false,
         body: View? = null,
         onConfirm: () -> Unit
@@ -12251,7 +12251,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         applyInstantChrootStatus()
         chrootSizeValueTv?.text = "—"
         chrootSizeUnitTv?.text = ""
-        chrootSizeHintTv?.text = "Uninstalled"
+        chrootSizeHintTv?.text = tr(R.string.main_uninstalled)
         applyChrootRootBadge(chrootRootBadge, rootOk = false, checking = false)
         chrootProcCountTv?.text = "0"
         chrootProcHintTv?.text = "No chroot processes"
@@ -12261,9 +12261,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         setChrootProcKillEnabled(false)
         refreshChrootSettingsPage(force = true)
         val msg = if (fromCallback) {
-            "Chroot uninstalled — switched to PRoot if needed"
+            tr(R.string.main_chroot_uninstalled_switched_to_proot)
         } else {
-            "Chroot uninstall finished — storage will refresh"
+            tr(R.string.main_chroot_uninstall_finished_storage_wi)
         }
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
     }
@@ -12305,7 +12305,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         softwareManagerScrollView.addView(softwareManagerBody)
 
         softwareManagerBody.addView(buildSubPageHeader(
-            title = "SOFTWARE MANAGER",
+            title = tr(R.string.main_software_manager),
             subtitle = "// INSTALLED PACKAGES",
             iconRes = R.drawable.ic_extension,
             pageId = ID_SOFTWARE_MANAGER
@@ -12316,7 +12316,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
         }
         val search = EditText(this).apply {
-            hint = "Search packages…"
+            hint = tr(R.string.main_search_packages)
             setHintTextColor(NC.ON_SURF_VAR)
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -12371,8 +12371,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
         }
-        chips.addView(chip("All", "all"))
-        chips.addView(chip("System", "system"))
+        chips.addView(chip(tr(R.string.chat_all), "all"))
+        chips.addView(chip(tr(R.string.main_system), "system"))
         toolbar.addView(chips)
 
         val refreshRow = LinearLayout(this).apply {
@@ -12381,14 +12381,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, dp(8), 0, dp(8))
         }
         smStatusTv = TextView(this).apply {
-            text = "Tap refresh to scan guest apt"
+            text = tr(R.string.main_tap_refresh_to_scan_guest)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         smRefreshBtn = TextView(this).apply {
-            text = "REFRESH"
+            text = tr(R.string.git_refresh)
             textSize = 12f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -12425,7 +12425,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         marketplaceScrollView.addView(marketplaceBody)
 
         marketplaceBody.addView(buildSubPageHeader(
-            title = "MARKETPLACE",
+            title = tr(R.string.main_marketplace),
             subtitle = "// CURATED COMPONENTS & APPS",
             iconRes = R.drawable.ic_download,
             pageId = ID_MARKETPLACE
@@ -12437,14 +12437,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(8) }
         }
         mpSyncTv = TextView(this).apply {
-            text = "Catalog not loaded"
+            text = tr(R.string.main_catalog_not_loaded)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val updateBtn = TextView(this).apply {
-            text = "UPDATE CATALOG"
+            text = tr(R.string.main_update_catalog)
             textSize = 11f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -12469,7 +12469,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         marketplaceBody.addView(mpStatusTv)
 
         val mpSearch = EditText(this).apply {
-            hint = "Search apps, components, deps…"
+            hint = tr(R.string.main_search_apps_components_deps)
             setHintTextColor(NC.ON_SURF_VAR)
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -12517,14 +12517,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         appsScrollView.addView(appsBody)
 
         appsBody.addView(buildSubPageHeader(
-            title = "APPS",
+            title = tr(R.string.main_apps),
             subtitle = "// INSTALLED LAUNCHABLE APPS",
             iconRes = R.drawable.ic_play_thick,
             pageId = ID_APPS
         ) { appsEnvBadge = it })
 
         val search = EditText(this).apply {
-            hint = "Filter apps…"
+            hint = tr(R.string.main_filter_apps)
             setHintTextColor(NC.ON_SURF_VAR)
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -12558,14 +12558,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(10))
         }
         appsStatusTv = TextView(this).apply {
-            text = "Installed apps for current env"
+            text = tr(R.string.main_installed_apps_for_current_env)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         appsRefreshBtn = TextView(this).apply {
-            text = "REFRESH"
+            text = tr(R.string.git_refresh)
             textSize = 12f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -12589,11 +12589,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val env = currentLinuxEnv()
         if (appsLoading) return
         appsLoading = true
-        appsStatusTv?.text = "Loading apps ($env)…"
+        appsStatusTv?.text = tr(R.string.main_loading_apps, env)
         appsRefreshBtn?.isEnabled = false
         appsRefreshBtn?.alpha = 0.45f
         appsListContainer?.removeAllViews()
-        appsListContainer?.addView(buildListLoadingView("LOADING APPS…", skeletonRows = 4))
+        appsListContainer?.addView(buildListLoadingView(tr(R.string.main_loading_apps_2), skeletonRows = 4))
         executor.execute {
             // Hydrate catalog titles when possible (offline → registry ids only)
             val cat = try {
@@ -12626,7 +12626,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 text = if (env == "chroot")
                     "Guest not ready. Open Settings → Chroot Settings to install rootfs."
                 else
-                    "Guest not ready. Complete onboarding / PRoot Settings for Alpaquita."
+                    tr(R.string.main_guest_not_ready_complete_onboarding)
                 setTextColor(NC.ERROR)
                 typeface = Typeface.MONOSPACE
                 textSize = 12f
@@ -12648,8 +12648,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setPadding(0, dp(16), 0, dp(8))
             }
             empty.addView(TextView(this).apply {
-                text = if (appsItems.isEmpty()) "No installed apps found."
-                else "No apps match \"$appsSearchQuery\"."
+                text = if (appsItems.isEmpty()) tr(R.string.main_no_installed_apps_found)
+                else tr(R.string.main_no_apps_match, appsSearchQuery)
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
                 textSize = 12f
@@ -12736,7 +12736,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         val canLaunch = !item.launchCommand.isNullOrBlank()
         val launchBtn = TextView(this).apply {
-            text = "LAUNCH"
+            text = tr(R.string.main_launch)
             textSize = 11f
             typeface = Typeface.DEFAULT_BOLD
             setPadding(dp(12), dp(10), dp(12), dp(10))
@@ -12882,15 +12882,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        btnRow.addView(sheetBtn("CLOSE", primary = false) { })
+        btnRow.addView(sheetBtn(tr(R.string.term_close), primary = false) { })
         if (!item.launchCommand.isNullOrBlank()) {
-            btnRow.addView(sheetBtn("LAUNCH", primary = true) { launchInstalledApp(item) })
+            btnRow.addView(sheetBtn(tr(R.string.main_launch), primary = true) { launchInstalledApp(item) })
         }
-        btnRow.addView(sheetBtn("UNINSTALL", primary = false, destructive = true) {
+        btnRow.addView(sheetBtn(tr(R.string.main_uninstall), primary = false, destructive = true) {
             showBrutalistConfirmDialog(
-                title = "Uninstall ${item.title}?",
-                message = "Removes marketplace install for ${item.id} in ${currentLinuxEnv()}.\nDependencies stay installed.",
-                confirmLabel = "UNINSTALL",
+                title = tr(R.string.main_uninstall_2, item.title),
+                message = tr(R.string.main_removes_marketplace_install_for_in, item.id, currentLinuxEnv()),
+                confirmLabel = tr(R.string.main_uninstall),
                 destructive = true,
                 onConfirm = { runAppsUninstall(item) }
             )
@@ -12905,17 +12905,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val env = currentLinuxEnv()
         val entry = item.registry
         if (!entry.isApp || item.launchCommand.isNullOrBlank()) {
-            Toast.makeText(this, "Not a launchable app", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_not_a_launchable_app), Toast.LENGTH_SHORT).show()
             return
         }
         if (!desktop.isRunning) {
-            Toast.makeText(this, "Start Graphical Desktop for best results", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_start_graphical_desktop_for_best), Toast.LENGTH_SHORT).show()
         }
         try {
             desktop.view(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         } catch (_: Exception) { /* ignore */ }
         if (mpBusy || isScriptRunning) {
-            Toast.makeText(this, "Busy — try again", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_busy_try_again), Toast.LENGTH_SHORT).show()
             return
         }
         mpBusy = true
@@ -12931,7 +12931,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         is InstallEvent.Finished -> {
                             mpBusy = false
                             if (!ev.success) {
-                                Toast.makeText(this, "Launch failed", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, tr(R.string.main_launch_failed), Toast.LENGTH_SHORT).show()
                             }
                         }
                         else -> {}
@@ -12945,24 +12945,24 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val env = currentLinuxEnv()
         if (item.source != "marketplace" && item.registry.source != "marketplace") {
             // v1: only marketplace-installed apps
-            Toast.makeText(this, "Only marketplace apps can be uninstalled here", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_only_marketplace_apps_can_be), Toast.LENGTH_SHORT).show()
             return
         }
         val cat = mpCatalog
         if (cat == null) {
             // Registry-only fallback (same as MP when catalog missing)
             InstallRegistry.remove(this, env, item.id)
-            Toast.makeText(this, "Removed registry entry", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_removed_registry_entry), Toast.LENGTH_SHORT).show()
             refreshAppsPage(force = false)
             if (::marketplaceScrollView.isInitialized) renderMarketplaceList()
             return
         }
         if (mpBusy || isScriptRunning) {
-            Toast.makeText(this, "Another install is running", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_another_install_is_running), Toast.LENGTH_SHORT).show()
             return
         }
         mpBusy = true
-        Toast.makeText(this, "Preparing uninstall ${item.id}…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, tr(R.string.main_preparing_uninstall, item.id), Toast.LENGTH_SHORT).show()
         executor.execute {
             val prepared = PackageInstallRunner.prepareUninstall(this, cat, item.id, env)
             mainHandler.post {
@@ -12970,7 +12970,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     mpBusy = false
                     Toast.makeText(
                         this,
-                        prepared.exceptionOrNull()?.message ?: "Prepare failed",
+                        prepared.exceptionOrNull()?.message ?: tr(R.string.main_prepare_failed),
                         Toast.LENGTH_LONG
                     ).show()
                     return@post
@@ -13067,11 +13067,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (!AptInventoryService.guestReady(this, env)) {
             smPackages = emptyList()
             smScanEnv = null
-            smStatusTv?.text = "Guest not ready ($env). Install Alpaquita first."
+            smStatusTv?.text = tr(R.string.main_guest_not_ready_install_alpaquita, env)
             smListContainer?.removeAllViews()
             smListContainer?.addView(TextView(this).apply {
                 text = if (env == "chroot") "Open Chroot Settings to install rootfs."
-                else "Complete onboarding / PRoot Alpaquita install."
+                else tr(R.string.main_complete_onboarding_proot_alpaquita)
                 setTextColor(NC.ERROR)
                 typeface = Typeface.MONOSPACE
                 textSize = 12f
@@ -13088,11 +13088,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             return
         }
         smScanning = true
-        smStatusTv?.text = "Scanning packages ($env)…"
+        smStatusTv?.text = tr(R.string.main_scanning_packages, env)
         smRefreshBtn?.isEnabled = false
         smRefreshBtn?.alpha = 0.45f
         smListContainer?.removeAllViews()
-        smListContainer?.addView(buildListLoadingView("SCANNING PACKAGES…", skeletonRows = 8))
+        smListContainer?.addView(buildListLoadingView(tr(R.string.main_scanning_packages_2), skeletonRows = 8))
         executor.execute {
             val result = AptInventoryService.scan(this, env)
             mainHandler.post {
@@ -13115,7 +13115,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         smStatusTv?.text = "Scan failed ($env): ${e.message}"
                         smListContainer?.removeAllViews()
                         smListContainer?.addView(TextView(this).apply {
-                            text = e.message ?: "Scan failed"
+                            text = e.message ?: tr(R.string.main_scan_failed)
                             setTextColor(NC.ERROR)
                             typeface = Typeface.MONOSPACE
                             textSize = 12f
@@ -13201,7 +13201,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val container = smListContainer ?: return
         if (smScanning) {
             container.removeAllViews()
-            container.addView(buildListLoadingView("SCANNING PACKAGES…", skeletonRows = 8))
+            container.addView(buildListLoadingView(tr(R.string.main_scanning_packages_2), skeletonRows = 8))
             return
         }
         container.removeAllViews()
@@ -13221,8 +13221,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         if (filtered.isEmpty()) {
             container.addView(TextView(this).apply {
-                text = if (smPackages.isEmpty()) "No packages loaded. Tap REFRESH."
-                else "No packages match."
+                text = if (smPackages.isEmpty()) tr(R.string.main_no_packages_loaded_tap_refresh)
+                else tr(R.string.main_no_packages_match)
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
                 textSize = 12f
@@ -13288,7 +13288,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setPadding(0, 0, dp(8), 0)
             })
             header.addView(TextView(this).apply {
-                text = if (expanded) "COLLAPSE" else "EXPAND"
+                text = if (expanded) tr(R.string.main_collapse) else tr(R.string.main_expand)
                 textSize = 10f
                 setTextColor(if (expanded) NC.ON_SURF_VAR else NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
@@ -13382,13 +13382,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val entry = InstallRegistry.forEnv(this, env).find {
             it.id == aptOrId || it.aptProvides.any { p -> p.equals(aptOrId, true) }
         } ?: run {
-            Toast.makeText(this, "Not a marketplace package", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_not_a_marketplace_package), Toast.LENGTH_SHORT).show()
             return
         }
         showBrutalistConfirmDialog(
-            title = "Uninstall ${entry.id}?",
-            message = "Runs marketplace uninstall.sh for this package only (not dependencies).",
-            confirmLabel = "UNINSTALL",
+            title = tr(R.string.main_uninstall_2, entry.id),
+            message = tr(R.string.main_runs_marketplace_uninstall_sh_for),
+            confirmLabel = tr(R.string.main_uninstall),
             destructive = true,
             onConfirm = { runMarketplaceUninstall(entry.id) }
         )
@@ -13400,7 +13400,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
      */
     private fun openMarketplace() {
         if (BuildConfig.PLAY_STORE_BUILD) {
-            Toast.makeText(this, "Marketplace is unavailable in the Google Play build", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_marketplace_is_unavailable_in_the), Toast.LENGTH_SHORT).show()
             return
         }
         if (MarketplaceConsent.isAccepted(this)) {
@@ -13408,7 +13408,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             return
         }
         showBrutalistConfirmDialog(
-            title = "Marketplace consent",
+            title = tr(R.string.main_marketplace_consent),
             message = "Marketplace loads a catalog and optional install scripts from " +
                 "GitHub (${MarketplacePaths.OWNER}/${MarketplacePaths.REPO}).\n\n" +
                 "Installs run inside your Linux guest (proot/chroot), may use network, " +
@@ -13416,8 +13416,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 "Third-party scripts — review package details before install. " +
                 "Not required for core NativeCode or Alpaquita shells.\n\n" +
                 "Accept once to open Marketplace.",
-            confirmLabel = "I UNDERSTAND",
-            cancelLabel = "NOT NOW",
+            confirmLabel = tr(R.string.main_i_understand),
+            cancelLabel = tr(R.string.main_not_now),
             onConfirm = {
                 MarketplaceConsent.setAccepted(this, true)
                 goToMarketplace()
@@ -13437,10 +13437,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (BuildConfig.PLAY_STORE_BUILD) return
         mpEnvBadge?.text = envBadgeLabel()
         if (!MarketplaceConsent.isAccepted(this)) {
-            mpStatusTv?.text = "Consent required"
+            mpStatusTv?.text = tr(R.string.main_consent_required)
             mpListContainer?.removeAllViews()
             mpListContainer?.addView(TextView(this).apply {
-                text = "Accept Marketplace consent to load the remote catalog."
+                text = tr(R.string.main_accept_marketplace_consent_to_load)
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
                 textSize = 12f
@@ -13450,9 +13450,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         if (mpLoading) return
         mpLoading = true
-        mpStatusTv?.text = "Loading catalog…"
+        mpStatusTv?.text = tr(R.string.main_loading_catalog)
         mpListContainer?.removeAllViews()
-        mpListContainer?.addView(buildListLoadingView("LOADING CATALOG…", skeletonRows = 5))
+        mpListContainer?.addView(buildListLoadingView(tr(R.string.main_loading_catalog_2), skeletonRows = 5))
         executor.execute {
             val result = MarketplaceClient.loadCatalog(this, forceRefresh = force)
             mainHandler.post {
@@ -13463,7 +13463,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         val sync = MarketplaceClient.lastSyncMs(this)
                         mpSyncTv?.text = if (sync > 0)
                             "Last sync · ${java.text.SimpleDateFormat("HH:mm", Locale.US).format(java.util.Date(sync))}"
-                        else "Catalog loaded"
+                        else tr(R.string.main_catalog_loaded)
                         mpStatusTv?.text = "${cat.packages.size} packages · github.com/${MarketplacePaths.OWNER}/${MarketplacePaths.REPO}"
                         renderMarketplaceList()
                     },
@@ -13471,7 +13471,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         mpStatusTv?.text = "Catalog error: ${e.message}"
                         mpListContainer?.removeAllViews()
                         mpListContainer?.addView(TextView(this).apply {
-                            text = "Need network once to fetch catalog from GitHub."
+                            text = tr(R.string.main_need_network_once_to_fetch)
                             setTextColor(NC.ERROR)
                             typeface = Typeface.MONOSPACE
                             textSize = 12f
@@ -13486,7 +13486,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val container = mpListContainer ?: return
         if (mpLoading) {
             container.removeAllViews()
-            container.addView(buildListLoadingView("LOADING CATALOG…", skeletonRows = 5))
+            container.addView(buildListLoadingView(tr(R.string.main_loading_catalog_2), skeletonRows = 5))
             return
         }
         val cat = mpCatalog ?: return
@@ -13523,7 +13523,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             chips.addView(tv)
         }
-        addChip("All", "all")
+        addChip(tr(R.string.chat_all), "all")
         cat.categoriesSorted().forEach { c -> addChip(c.title, c.id) }
         horizontal.addView(chips)
         container.addView(horizontal)
@@ -13552,8 +13552,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         if (pkgs.isEmpty()) {
             container.addView(TextView(this).apply {
-                text = if (q.isNotEmpty()) "No results for \"$q\"."
-                else "No packages for $env in this category."
+                text = if (q.isNotEmpty()) tr(R.string.main_no_results_for, q)
+                else tr(R.string.main_no_packages_for_in_this, env)
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
                 setPadding(0, dp(16), 0, 0)
@@ -13676,7 +13676,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(TextView(this).apply {
             text = when {
                 installed != null -> "INSTALLED"
-                pkg.experimental -> "EXPERIMENTAL"
+                pkg.experimental -> tr(R.string.main_experimental)
                 else -> if (pkg.kind == PackageKind.APP) "APP" else "COMPONENT"
             }
             setTextColor(if (installed != null) NC.PRIMARY else NC.ON_SURF_VAR)
@@ -13827,22 +13827,22 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        btnRow.addView(sheetBtn("CLOSE", primary = false) { })
+        btnRow.addView(sheetBtn(tr(R.string.term_close), primary = false) { })
         if (installed != null) {
             if (pkg.kind == PackageKind.APP && !pkg.launch?.command.isNullOrBlank()) {
-                btnRow.addView(sheetBtn("LAUNCH", primary = true) { launchMarketplaceApp(pkg) })
+                btnRow.addView(sheetBtn(tr(R.string.main_launch), primary = true) { launchMarketplaceApp(pkg) })
             }
-            btnRow.addView(sheetBtn("UNINSTALL", primary = false, destructive = true) {
+            btnRow.addView(sheetBtn(tr(R.string.main_uninstall), primary = false, destructive = true) {
                 showBrutalistConfirmDialog(
-                    title = "Uninstall ${pkg.name}?",
-                    message = "Runs uninstall.sh. Dependencies stay installed.",
-                    confirmLabel = "UNINSTALL",
+                    title = tr(R.string.main_uninstall_2, pkg.name),
+                    message = tr(R.string.main_runs_uninstall_sh_dependencies_stay),
+                    confirmLabel = tr(R.string.main_uninstall),
                     destructive = true,
                     onConfirm = { runMarketplaceUninstall(pkg.id) }
                 )
             })
         } else {
-            btnRow.addView(sheetBtn("INSTALL", primary = true) {
+            btnRow.addView(sheetBtn(tr(R.string.usage_install), primary = true) {
                 val cat = mpCatalog ?: return@sheetBtn
                 val plan = try {
                     PackageInstallRunner.resolveOrder(cat, pkg.id)
@@ -13853,9 +13853,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     return@sheetBtn
                 }
                 showBrutalistConfirmDialog(
-                    title = "Install ${pkg.name}?",
-                    message = "Will install: $plan\n\nSource: ${MarketplacePaths.OWNER}/${MarketplacePaths.REPO}\nRuns as root inside $env.",
-                    confirmLabel = "INSTALL",
+                    title = tr(R.string.main_install, pkg.name),
+                    message = tr(R.string.main_will_install_source_runs_as, plan, MarketplacePaths.OWNER, MarketplacePaths.REPO, env),
+                    confirmLabel = tr(R.string.usage_install),
                     onConfirm = { runMarketplaceInstall(pkg.id) }
                 )
             })
@@ -13957,21 +13957,21 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         if (installed != null) {
             if (pkg.kind == PackageKind.APP && !pkg.launch?.command.isNullOrBlank()) {
-                actions.addView(actionBtn("LAUNCH", true) {
+                actions.addView(actionBtn(tr(R.string.main_launch), true) {
                     launchMarketplaceApp(pkg)
                 })
             }
-            actions.addView(actionBtn("UNINSTALL", false) {
+            actions.addView(actionBtn(tr(R.string.main_uninstall), false) {
                 showBrutalistConfirmDialog(
-                    title = "Uninstall ${pkg.id}?",
-                    message = "Runs uninstall.sh. Dependencies stay installed.",
-                    confirmLabel = "UNINSTALL",
+                    title = tr(R.string.main_uninstall_2, pkg.id),
+                    message = tr(R.string.main_runs_uninstall_sh_dependencies_stay),
+                    confirmLabel = tr(R.string.main_uninstall),
                     destructive = true,
                     onConfirm = { runMarketplaceUninstall(pkg.id) }
                 )
             })
         } else {
-            actions.addView(actionBtn("INSTALL", true) {
+            actions.addView(actionBtn(tr(R.string.usage_install), true) {
                 val cat = mpCatalog ?: return@actionBtn
                 val plan = try {
                     PackageInstallRunner.resolveOrder(cat, pkg.id)
@@ -13982,9 +13982,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     return@actionBtn
                 }
                 showBrutalistConfirmDialog(
-                    title = "Install ${pkg.name}?",
-                    message = "Will install: $plan\n\nSource: ${MarketplacePaths.OWNER}/${MarketplacePaths.REPO}\nRuns as root inside $env.",
-                    confirmLabel = "INSTALL",
+                    title = tr(R.string.main_install, pkg.name),
+                    message = tr(R.string.main_will_install_source_runs_as, plan, MarketplacePaths.OWNER, MarketplacePaths.REPO, env),
+                    confirmLabel = tr(R.string.usage_install),
                     onConfirm = { runMarketplaceInstall(pkg.id) }
                 )
             })
@@ -14010,15 +14010,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val cat = mpCatalog ?: return
         val env = currentLinuxEnv()
         if (!AptInventoryService.guestReady(this, env)) {
-            Toast.makeText(this, "Guest not ready ($env)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_guest_not_ready, env), Toast.LENGTH_SHORT).show()
             return
         }
         if (mpBusy || isScriptRunning) {
-            Toast.makeText(this, "Another install is running", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_another_install_is_running), Toast.LENGTH_SHORT).show()
             return
         }
         mpBusy = true
-        Toast.makeText(this, "Preparing $id…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, tr(R.string.main_preparing, id), Toast.LENGTH_SHORT).show()
         executor.execute {
             val prepared = PackageInstallRunner.prepareInstall(this, cat, id, env)
             mainHandler.post {
@@ -14026,7 +14026,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     mpBusy = false
                     Toast.makeText(
                         this,
-                        prepared.exceptionOrNull()?.message ?: "Prepare failed",
+                        prepared.exceptionOrNull()?.message ?: tr(R.string.main_prepare_failed),
                         Toast.LENGTH_LONG
                     ).show()
                     return@post
@@ -14041,18 +14041,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val cat = mpCatalog
         if (cat == null) {
             InstallRegistry.remove(this, currentLinuxEnv(), id)
-            Toast.makeText(this, "Removed registry entry", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_removed_registry_entry), Toast.LENGTH_SHORT).show()
             renderMarketplaceList()
             if (::softwareManagerScrollView.isInitialized) renderSoftwareManagerList()
             return
         }
         val env = currentLinuxEnv()
         if (mpBusy || isScriptRunning) {
-            Toast.makeText(this, "Another install is running", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_another_install_is_running), Toast.LENGTH_SHORT).show()
             return
         }
         mpBusy = true
-        Toast.makeText(this, "Preparing uninstall $id…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, tr(R.string.main_preparing_uninstall, id), Toast.LENGTH_SHORT).show()
         executor.execute {
             val prepared = PackageInstallRunner.prepareUninstall(this, cat, id, env)
             mainHandler.post {
@@ -14060,7 +14060,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     mpBusy = false
                     Toast.makeText(
                         this,
-                        prepared.exceptionOrNull()?.message ?: "Prepare failed",
+                        prepared.exceptionOrNull()?.message ?: tr(R.string.main_prepare_failed),
                         Toast.LENGTH_LONG
                     ).show()
                     return@post
@@ -14095,7 +14095,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setOnClickListener { leaveMarketplaceInstaller() }
         }
         mpInstallerTitleTv = TextView(this).apply {
-            text = "Installer"
+            text = tr(R.string.main_installer)
             textSize = 16f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.DEFAULT_BOLD
@@ -14125,7 +14125,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         mpInstallerNameTv = TextView(this).apply {
-            text = "Package"
+            text = tr(R.string.main_package)
             textSize = 18f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -14186,7 +14186,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         }
         mpInstallerHintTv = TextView(this).apply {
-            text = "Installation complete"
+            text = tr(R.string.main_installation_complete)
             textSize = 14f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -14194,7 +14194,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(12))
         }
         mpInstallerDoneBtn = TextView(this).apply {
-            text = "DONE"
+            text = tr(R.string.main_done)
             textSize = 14f
             gravity = Gravity.CENTER
             typeface = Typeface.MONOSPACE
@@ -14219,7 +14219,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Always return to Marketplace — never projects / home stack guess. */
     private fun leaveMarketplaceInstaller() {
         if (isScriptRunning && mpInstallerFinishedOk == null) {
-            Toast.makeText(this, "Install still running…", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_install_still_running), Toast.LENGTH_SHORT).show()
             return
         }
         mpInstallerSession?.finishIfRunning()
@@ -14248,25 +14248,25 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun setMpInstallerStatus(state: String, ok: Boolean?) {
         when {
             ok == true -> {
-                mpInstallerStatusTv.text = "DONE"
+                mpInstallerStatusTv.text = tr(R.string.main_done)
                 mpInstallerStatusTv.setTextColor(Color.parseColor("#0A0A0A"))
                 mpInstallerStatusTv.background = GradientDrawable().apply { setColor(NC.PRIMARY) }
                 mpInstallerHintTv.text = if (pendingMarketplaceRun?.uninstall == true)
-                    "Uninstall complete" else "Installation complete"
+                    "Uninstall complete" else tr(R.string.main_installation_complete)
                 mpInstallerHintTv.setTextColor(NC.PRIMARY)
-                mpInstallerDoneBtn.text = "DONE"
+                mpInstallerDoneBtn.text = tr(R.string.main_done)
                 mpInstallerFooter.visibility = View.VISIBLE
                 mpInstallerBackBtn.visibility = View.VISIBLE
             }
             ok == false -> {
-                mpInstallerStatusTv.text = "FAILED"
+                mpInstallerStatusTv.text = tr(R.string.ssh_failed)
                 mpInstallerStatusTv.setTextColor(Color.WHITE)
                 mpInstallerStatusTv.background = GradientDrawable().apply {
                     setColor(Color.parseColor("#93000A"))
                 }
-                mpInstallerHintTv.text = "Install failed — see log above"
+                mpInstallerHintTv.text = tr(R.string.main_install_failed_see_log_above)
                 mpInstallerHintTv.setTextColor(NC.ERROR)
-                mpInstallerDoneBtn.text = "CLOSE"
+                mpInstallerDoneBtn.text = tr(R.string.term_close)
                 mpInstallerFooter.visibility = View.VISIBLE
                 mpInstallerBackBtn.visibility = View.VISIBLE
             }
@@ -14286,7 +14286,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         pendingMarketplaceRun = run
         mpInstallerFinishedOk = null
         val primary = run.packages.lastOrNull()
-        val action = if (run.uninstall) "Uninstall" else "Install"
+        val action = if (run.uninstall) tr(R.string.main_uninstall_3) else tr(R.string.chat_install)
         mpInstallerTitleTv.text = "$action · ${run.method}"
         mpInstallerNameTv.text = primary?.name ?: run.packageIds.joinToString()
         mpInstallerMetaTv.text = buildString {
@@ -14380,7 +14380,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                             this@MainActivity, pending, ok
                         )
                     }
-                    setMpInstallerStatus(if (ok) "DONE" else "FAILED", ok)
+                    setMpInstallerStatus(if (ok) tr(R.string.main_done) else tr(R.string.ssh_failed), ok)
                     smPackages = emptyList()
                     smScanEnv = null
                     if (::marketplaceScrollView.isInitialized) renderMarketplaceList()
@@ -14399,9 +14399,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     Toast.makeText(
                         this@MainActivity,
                         if (ok) {
-                            if (run.uninstall) "Uninstalled"
+                            if (run.uninstall) tr(R.string.main_uninstalled)
                             else "Installed ${run.packageIds.joinToString()}"
-                        } else "Failed (exit $code)",
+                        } else tr(R.string.main_failed_exit, code),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -14461,12 +14461,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val env = currentLinuxEnv()
         val entry = InstallRegistry.get(this, env, pkg.id) ?: return
         // Require GUI already running (locked product decision)
-        Toast.makeText(this, "Ensure Graphical Desktop is running", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, tr(R.string.main_ensure_graphical_desktop_is_running), Toast.LENGTH_SHORT).show()
         try {
             desktop.view(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         } catch (_: Exception) { /* ignore */ }
         mpBusy = true
-        appendMpLog("Launch ${pkg.launch?.command} …")
+        appendMpLog(tr(R.string.main_launch_2, pkg.launch?.command))
         executor.execute {
             PackageInstallRunner.launchApp(this, entry, env) { ev ->
                 mainHandler.post {
@@ -14630,7 +14630,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 stopGuiBtn.isEnabled = true; stopGuiBtn.alpha = 1f
             }
             if (::homeStatusLabel.isInitialized) {
-                homeStatusLabel.text = "Ready"
+                homeStatusLabel.text = tr(R.string.main_ready)
             }
             initTerminalView()
         }
@@ -14731,7 +14731,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (::startGuiBtn.isInitialized) {
             startGuiBtn.isEnabled = false
             startGuiBtn.alpha = 0.5f
-            startGuiBtn.text = "STARTING..."
+            startGuiBtn.text = tr(R.string.ssh_starting_2)
         }
     }
 
@@ -14740,7 +14740,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (::stopGuiBtn.isInitialized) {
             stopGuiBtn.isEnabled = false
             stopGuiBtn.alpha = 0.5f
-            stopGuiBtn.text = "STOPPING..."
+            stopGuiBtn.text = tr(R.string.main_stopping)
         }
     }
 
@@ -14772,7 +14772,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             return
         }
         val min = (desktop.remainingMs + 59_999) / 60_000
-        startGuiBtn.text = "START PHOSH DESKTOP\n$min min left today"
+        startGuiBtn.text = tr(R.string.main_start_phosh_desktop_min_left, min)
         startGuiBtn.markProLocked(min == 0L)
     }
 
@@ -14787,7 +14787,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             startGuiBtn.alpha = 1f
             paintGuiBudget()
         } else {
-            startGuiBtn.text = "PHOSH NOT INSTALLED"
+            startGuiBtn.text = tr(R.string.main_phosh_not_installed)
             startGuiBtn.isEnabled = false
             startGuiBtn.alpha = 0.4f
         }
@@ -14795,7 +14795,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopGuiBtn.visibility = View.GONE
         stopGuiBtn.isEnabled = false
         stopGuiBtn.alpha = 0.5f
-        stopGuiBtn.text = "STOP PHOSH DESKTOP"
+        stopGuiBtn.text = tr(R.string.main_stop_phosh_desktop)
     }
 
     /** Running: full-width STOP. Log capture stays; no VIEW LOGS button. */
@@ -14805,7 +14805,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         stopGuiBtn.visibility = View.VISIBLE
         stopGuiBtn.isEnabled = true
         stopGuiBtn.alpha = 1f
-        stopGuiBtn.text = "STOP PHOSH DESKTOP"
+        stopGuiBtn.text = tr(R.string.main_stop_phosh_desktop)
         stopGuiBtn.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
     }
 
@@ -14831,15 +14831,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun openGuiLogPage() {
         val f = desktop.logFile()
         if (!f.exists() || f.length() == 0L) {
-            Toast.makeText(this, "No desktop log yet", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_no_desktop_log_yet), Toast.LENGTH_SHORT).show()
             return
         }
         if (isScriptRunning) {
             // Real setup/uninstall in progress — do not steal the shared session
-            Toast.makeText(this, "Script runner busy", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_script_runner_busy), Toast.LENGTH_SHORT).show()
             return
         }
-        showLogFileInScriptPage(f, title = "Graphical Desktop Log")
+        showLogFileInScriptPage(f, title = tr(R.string.main_graphical_desktop_log))
     }
 
     /**
@@ -15374,7 +15374,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             infoCol.addView(timeTv)
 
             val badgeBox = TextView(this@MainActivity).apply {
-                text = if (isGit) "GIT" else "LOCAL"
+                text = if (isGit) "GIT" else tr(R.string.main_local)
                 textSize = 11f
                 setTextColor(if (isGit) NC.PRIMARY else Color.WHITE)
                 typeface = Typeface.MONOSPACE
@@ -15728,18 +15728,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun formatRelativeTime(timestamp: Long): String {
-        if (timestamp <= 0L) return "Recent"
+        if (timestamp <= 0L) return tr(R.string.main_recent)
         val diff = System.currentTimeMillis() - timestamp
         val seconds = diff / 1000
         val minutes = seconds / 60
         val hours = minutes / 60
         val days = hours / 24
         return when {
-            seconds < 60 -> "Just now"
+            seconds < 60 -> tr(R.string.main_just_now)
             minutes < 60 -> "${minutes}m ago"
             hours < 24 -> "${hours}h ago"
             days < 7 -> "${days}d ago"
-            else -> "Recently"
+            else -> tr(R.string.main_recently)
         }
     }
 
@@ -15783,7 +15783,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun updateAppStorageUsage(valTv: TextView, subTv: TextView, fillView: View, refreshBtn: View?) {
-        valTv.text = "Calculating..."
+        valTv.text = tr(R.string.main_calculating)
         executor.execute {
             try {
                 val apkSize = File(applicationInfo.sourceDir).length()
@@ -15834,7 +15834,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 e.printStackTrace()
                 mainHandler.post {
                     valTv.text = "N/A"
-                    subTv.text = "Could not calculate storage size"
+                    subTv.text = tr(R.string.main_could_not_calculate_storage_size)
                 }
             }
         }
@@ -15874,13 +15874,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 .getBoolean(PREF_CHROOT_ROOT_OK, false)
         return when {
             !rootOk && !installed ->
-                "Chroot needs root + install (Settings → Chroot)"
+                tr(R.string.main_chroot_needs_root_install_settings)
             !rootOk ->
-                "Root access was not granted"
+                tr(R.string.main_root_access_was_not_granted)
             !installed ->
-                "Chroot not installed. Install via Settings → Chroot."
+                tr(R.string.main_chroot_not_installed_install_via)
             else ->
-                "Chroot unavailable"
+                tr(R.string.main_chroot_unavailable)
         }
     }
 
@@ -15951,14 +15951,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         col.addView(TextView(this).apply {
-            text = "CONNECT TO GITHUB"
+            text = tr(R.string.main_connect_to_github)
             setTextColor(NC.PRIMARY)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
         })
         val sub = TextView(this).apply {
-            text = "Checking gh…"
+            text = tr(R.string.cli_checking_gh)
             setTextColor(NC.ON_SURF_VAR)
             textSize = 11f
             typeface = Typeface.MONOSPACE
@@ -15966,7 +15966,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         ghCreateSubtitle = sub
         col.addView(sub)
-        val action = primaryButton("CONNECT") {
+        val action = primaryButton(tr(R.string.ssh_connect)) {
             startGithubConnect(projectCreateSelectedMethod, fromSettings = false)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(8) }
@@ -16001,7 +16001,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(10))
         }
         titleRow.addView(TextView(this).apply {
-            text = "YOUR REPOSITORIES"
+            text = tr(R.string.main_your_repositories)
             setTextColor(NC.PRIMARY)
             textSize = 12f
             typeface = Typeface.MONOSPACE
@@ -16038,7 +16038,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             isFocusable = true
         }
         val triggerLabel = TextView(this).apply {
-            text = "Select a repository…"
+            text = tr(R.string.main_select_a_repository)
             textSize = 13f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -16183,14 +16183,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { rightMargin = dp(10) }
         })
         ghHeader.addView(TextView(this).apply {
-            text = "GitHub Account"
+            text = tr(R.string.main_github_account)
             textSize = 15f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
         })
         card.addView(ghHeader)
         val sub = TextView(this).apply {
-            text = "Checking…"
+            text = tr(R.string.main_checking_2)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -16206,7 +16206,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val connectBtn = primaryButton("CONNECT WITH GITHUB") {
+        val connectBtn = primaryButton(tr(R.string.main_connect_with_github)) {
             startGithubConnect(LinuxCommandBuilder.currentMethod, fromSettings = true)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
@@ -16214,7 +16214,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             if (proLocked()) markProLocked()
         }
         settingsGhActionBtn = connectBtn
-        val logoutBtn = secondaryButton("LOGOUT") {
+        val logoutBtn = secondaryButton(tr(R.string.main_logout)) {
             performGithubLogout()
         }.apply {
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(8) }
@@ -16240,7 +16240,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         logoutBtn?.isEnabled = false
         connectBtn?.isEnabled = false
         badge?.apply {
-            text = "LOGGING OUT…"
+            text = tr(R.string.main_logging_out)
             setTextColor(Color.parseColor("#0A0A0A"))
             background = roundedBg(NC.PRIMARY, NC.PRIMARY, dp(0))
             visibility = View.VISIBLE
@@ -16290,14 +16290,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     )
                     if (ok) {
                         badge?.apply {
-                            text = "SIGNED OUT"
+                            text = tr(R.string.main_signed_out)
                             setTextColor(Color.parseColor("#0A0A0A"))
                             background = roundedBg(NC.PRIMARY_CON, NC.PRIMARY_CON, dp(0))
                             visibility = View.VISIBLE
                         }
                     } else {
                         badge?.apply {
-                            text = "FAILED"
+                            text = tr(R.string.ssh_failed)
                             setTextColor(Color.parseColor("#0A0A0A"))
                             background = roundedBg(NC.ERROR, NC.ERROR, dp(0))
                             visibility = View.VISIBLE
@@ -16324,7 +16324,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun refreshCreateGithubUi() {
         val method = projectCreateSelectedMethod
-        ghCreateSubtitle?.text = "Checking gh…"
+        ghCreateSubtitle?.text = tr(R.string.cli_checking_gh)
         ghCreateActionBtn?.apply {
             isEnabled = false
             alpha = 0.5f
@@ -16336,7 +16336,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         ghReposLoading = false
         ghReposForMethod = emptyList()
         ghRepoSearchInput?.setText("")
-        ghRepoTriggerLabel?.text = "Select a repository…"
+        ghRepoTriggerLabel?.text = tr(R.string.main_select_a_repository)
         ghRepoTriggerLabel?.setTextColor(NC.ON_SURFACE)
         ghRepoCountTv?.text = "0"
         renderGithubRepoList("")
@@ -16353,9 +16353,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val btn = ghCreateActionBtn
         when {
             !status.ghInstalled || !status.loggedIn -> {
-                sub?.text = "Not connected"
+                sub?.text = tr(R.string.main_not_connected)
                 btn?.apply {
-                    text = "CONNECT"
+                    text = tr(R.string.ssh_connect)
                     markProLocked(proLocked())
                     isEnabled = !GitHubCliService.isSessionActive()
                     alpha = if (isEnabled) 1f else 0.5f
@@ -16368,28 +16368,28 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             else -> {
                 sub?.text = "@${status.username}"
                 btn?.apply {
-                    text = "REFRESH"
+                    text = tr(R.string.git_refresh)
                     markProLocked(false)
                     isEnabled = true
                     alpha = 1f
                     setOnClickListener {
                         loadCreateGithubRepos(projectCreateSelectedMethod)
-                        Toast.makeText(this@MainActivity, "Refreshing repos…", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, tr(R.string.main_refreshing_repos), Toast.LENGTH_SHORT).show()
                     }
                 }
                 ghRepoCard?.visibility = View.VISIBLE
             }
         }
         if (status.error != null) {
-            sub?.text = "Error"
-            btn?.text = "RETRY"
+            sub?.text = tr(R.string.main_error)
+            btn?.text = tr(R.string.preview_retry)
         }
     }
 
     private fun loadCreateGithubRepos(method: String) {
         ghReposLoading = true
         ghReposForMethod = emptyList()
-        ghRepoTriggerLabel?.text = "Loading repositories…"
+        ghRepoTriggerLabel?.text = tr(R.string.main_loading_repositories)
         ghRepoTriggerLabel?.setTextColor(NC.ON_SURF_VAR)
         ghRepoCountTv?.text = "…"
         // Immediate loading UI (panel open or closed — visible once expanded)
@@ -16419,7 +16419,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (ghSelectedRepo != null) {
             paintGithubRepoSelection(ghSelectedRepo!!)
         } else {
-            ghRepoTriggerLabel?.text = if (repos.isEmpty()) "No repositories found" else "Select a repository…"
+            ghRepoTriggerLabel?.text = if (repos.isEmpty()) tr(R.string.main_no_repositories_found) else tr(R.string.main_select_a_repository)
             ghRepoTriggerLabel?.setTextColor(if (repos.isEmpty()) NC.ON_SURF_VAR else NC.ON_SURFACE)
         }
         renderGithubRepoList(ghRepoSearchInput?.text?.toString().orEmpty())
@@ -16461,7 +16461,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 paint.isFakeBoldText = true
             })
             loadingRow.addView(TextView(this).apply {
-                text = "fetching from gh…"
+                text = tr(R.string.main_fetching_from_gh)
                 textSize = 10f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -16540,7 +16540,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             row.addView(col)
             if (repo.isPrivate) {
                 row.addView(TextView(this).apply {
-                    text = "PRIVATE"
+                    text = tr(R.string.main_private)
                     textSize = 9f
                     setTextColor(Color.parseColor("#0A0A0A"))
                     typeface = Typeface.MONOSPACE
@@ -16609,7 +16609,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun refreshSettingsGithubCard() {
         val method = LinuxCommandBuilder.currentMethod
-        settingsGhSubtitle?.text = "Checking…"
+        settingsGhSubtitle?.text = tr(R.string.main_checking_2)
         settingsGhActionBtn?.isEnabled = false
         settingsGhLogoutBtn?.visibility = View.GONE
         // Clear stale badge
@@ -16632,13 +16632,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             status.loggedIn && !status.username.isNullOrBlank() -> {
                 settingsGhSubtitle?.text = "@${status.username}"
                 settingsGhBadge?.apply {
-                    text = "LOGGED IN"
+                    text = tr(R.string.main_logged_in)
                     setTextColor(Color.parseColor("#0A0A0A"))
                     background = roundedBg(NC.PRIMARY, NC.PRIMARY, dp(4))
                     visibility = View.VISIBLE
                 }
                 settingsGhActionBtn?.apply {
-                    text = "RE-AUTH"
+                    text = tr(R.string.main_re_auth)
                     isEnabled = !GitHubCliService.isSessionActive()
                     setOnClickListener {
                         startGithubConnect(LinuxCommandBuilder.currentMethod, fromSettings = true)
@@ -16647,15 +16647,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 settingsGhLogoutBtn?.visibility = View.VISIBLE
             }
             else -> {
-                settingsGhSubtitle?.text = "Not signed in"
+                settingsGhSubtitle?.text = tr(R.string.main_not_signed_in)
                 settingsGhBadge?.apply {
-                    text = "OFFLINE"
+                    text = tr(R.string.main_offline)
                     setTextColor(NC.ON_SURF_VAR)
                     background = roundedBg(NC.SURFACE_HIGHEST, NC.OUTLINE_VAR, dp(4))
                     visibility = View.VISIBLE
                 }
                 settingsGhActionBtn?.apply {
-                    text = "CONNECT WITH GITHUB"
+                    text = tr(R.string.main_connect_with_github)
                     isEnabled = !GitHubCliService.isSessionActive()
                     setOnClickListener {
                         startGithubConnect(LinuxCommandBuilder.currentMethod, fromSettings = true)
@@ -16670,11 +16670,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun startGithubConnect(method: String, fromSettings: Boolean) {
         if (!gateAllows(FeatureGate.canUse(isPro(), ProFeature.GITHUB_LOGIN))) return
         if (GitHubCliService.isSessionActive()) {
-            Toast.makeText(this, "Auth already in progress", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.cli_auth_already_in_progress), Toast.LENGTH_SHORT).show()
             return
         }
         if (method == "chroot" && !ProjectPathResolver.isChrootInstalled()) {
-            Toast.makeText(this, "Chroot not installed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_chroot_not_installed), Toast.LENGTH_SHORT).show()
             return
         }
         showGithubAuthOverlay(method, fromSettings)
@@ -16719,7 +16719,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
         val phaseTv = TextView(this).apply {
-            text = "Starting…"
+            text = tr(R.string.main_starting)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -16741,7 +16741,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             paint.isFakeBoldText = true
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
-        val openBrowserBtn = secondaryButton("OPEN BROWSER") {}.apply {
+        val openBrowserBtn = secondaryButton(tr(R.string.main_open_browser)) {}.apply {
             textSize = 11f
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
         }
@@ -16776,7 +16776,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
         }
 
-        val cancelBtn = primaryButton("CANCEL") {
+        val cancelBtn = primaryButton(tr(R.string.x11_cancel)) {
             ghAuthSession?.cancel()
             dismissGithubAuthOverlay()
             if (fromSettings) refreshSettingsGithubCard() else refreshCreateGithubUi()
@@ -16805,10 +16805,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 lastOtp = code
                 otpRow.visibility = View.VISIBLE
                 otpTv.text = "$code  · Copied"
-                phaseTv.text = "Waiting for browser…"
+                phaseTv.text = tr(R.string.main_waiting_for_browser)
             }
             override fun onDone(status: GhAuthStatus) {
-                phaseTv.text = "Signed in as @${status.username}"
+                phaseTv.text = tr(R.string.cli_signed_in_as, status.username)
                 appendLog("OK @${status.username}")
                 mainHandler.postDelayed({
                     dismissGithubAuthOverlay()
@@ -16822,9 +16822,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }, 400)
             }
             override fun onFailed(message: String) {
-                phaseTv.text = "Failed"
+                phaseTv.text = tr(R.string.chat_failed)
                 appendLog(message)
-                cancelBtn.text = "CLOSE"
+                cancelBtn.text = tr(R.string.term_close)
                 cancelBtn.setOnClickListener {
                     dismissGithubAuthOverlay()
                     if (fromSettings) refreshSettingsGithubCard() else refreshCreateGithubUi()
@@ -16943,7 +16943,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         val titleTv = TextView(this).apply {
-            text = "AI SAFETY & REPORT"
+            text = tr(R.string.main_ai_safety_report)
             textSize = 20f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -16970,7 +16970,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Disclaimer
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
-                text = "DISCLAIMER"
+                text = tr(R.string.main_disclaimer)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
@@ -16992,7 +16992,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Report to NativeCode
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
-                text = "REPORT TO NATIVECODE"
+                text = tr(R.string.main_report_to_nativecode)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
@@ -17009,7 +17009,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setPadding(0, 0, 0, dp(10))
             })
             addView(
-                primaryButton("REPORT ISSUE") {
+                primaryButton(tr(R.string.main_report_issue)) {
                     showAiReportComposer(preselectedToolId = null)
                 }.apply {
                     layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
@@ -17022,7 +17022,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Vendor list
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
-                text = "REPORT / ToS BY VENDOR"
+                text = tr(R.string.main_report_tos_by_vendor)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
@@ -17039,7 +17039,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Data / sign-out (C10)
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
-                text = "YOUR DATA / SIGN-OUT"
+                text = tr(R.string.main_your_data_sign_out)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
@@ -17060,7 +17060,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setPadding(0, 0, 0, dp(10))
             })
             addView(
-                primaryButton("OPEN AI CLI TOOLS") {
+                primaryButton(tr(R.string.main_open_ai_cli_tools)) {
                     if (pageStack.isEmpty() || pageStack.peek() != ID_CLI_AUTH) {
                         pageStack.push(ID_CLI_AUTH)
                     }
@@ -17071,7 +17071,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             )
             addView(
-                secondaryButton("PRIVACY & LICENSES") {
+                secondaryButton(tr(R.string.main_privacy_licenses)) {
                     if (pageStack.isEmpty() || pageStack.peek() != ID_PRIVACY_POLICY) {
                         pageStack.push(ID_PRIVACY_POLICY)
                     }
@@ -17159,11 +17159,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             when {
                 !links.reportUrl.isNullOrBlank() ->
-                    addAction("REPORT") {
-                        openExternalUrl(links.reportUrl!!, "No browser for report link")
+                    addAction(tr(R.string.main_report)) {
+                        openExternalUrl(links.reportUrl!!, tr(R.string.main_no_browser_for_report_link))
                     }
                 !links.reportMailto.isNullOrBlank() ->
-                    addAction("REPORT") {
+                    addAction(tr(R.string.main_report)) {
                         val ok = ReportMailHelper.openVendorMailto(
                             this@MainActivity,
                             links.reportMailto!!,
@@ -17172,24 +17172,24 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         if (!ok) {
                             Toast.makeText(
                                 this@MainActivity,
-                                "No mail app available",
+                                tr(R.string.main_no_mail_app_available),
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
                     }
                 else ->
-                    addAction("REPORT APP") {
+                    addAction(tr(R.string.main_report_app)) {
                         showAiReportComposer(preselectedToolId = links.toolId)
                     }
             }
             if (!links.tosUrl.isNullOrBlank()) {
                 addAction("ToS") {
-                    openExternalUrl(links.tosUrl!!, "No browser for ToS")
+                    openExternalUrl(links.tosUrl!!, tr(R.string.main_no_browser_for_tos))
                 }
             }
             if (!links.aupUrl.isNullOrBlank()) {
                 addAction("AUP") {
-                    openExternalUrl(links.aupUrl!!, "No browser for AUP")
+                    openExternalUrl(links.aupUrl!!, tr(R.string.main_no_browser_for_aup))
                 }
             }
             addView(btnRow)
@@ -17217,7 +17217,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)))
             } catch (_: Exception) {
-                Toast.makeText(this, "No browser available to open privacy policy", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr(R.string.main_no_browser_available_to_open), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -17258,13 +17258,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         val titleTv = TextView(this).apply {
-            text = "PRIVACY & LICENSES"
+            text = tr(R.string.main_privacy_licenses)
             textSize = 20f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
-        val fossBadge = textBadge("GPL-3.0 · FOSS", NC.SURFACE_HIGHEST, NC.PRIMARY)
+        val fossBadge = textBadge(tr(R.string.main_gpl_3_0_foss), NC.SURFACE_HIGHEST, NC.PRIMARY)
         headerTitleRow.addView(pageBackBtn)
         headerTitleRow.addView(titleTv)
         headerTitleRow.addView(fossBadge)
@@ -17281,7 +17281,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Web Link Action Card
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
-                text = "OFFICIAL WEB PORTAL"
+                text = tr(R.string.main_official_web_portal)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
@@ -17295,7 +17295,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setPadding(0, 0, 0, dp(10))
             })
             addView(
-                primaryButton("OPEN IN BROWSER") {
+                primaryButton(tr(R.string.main_open_in_browser)) {
                     openPrivacyPolicyUrl()
                 }.apply {
                     layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
@@ -17308,18 +17308,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Privacy Summary Card
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
-                text = "PRIVACY POLICY OVERVIEW"
+                text = tr(R.string.main_privacy_policy_overview)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(0, 0, 0, dp(6))
             })
             val bullets = listOf(
-                "• Local-First & Zero Tracking: NativeCode collects no personal data, device identifiers, or analytics.",
-                "• Isolated Guest Environment: Alpaquita Linux, terminal sessions, projects, and editor caches run on-device inside rootless PRoot.",
+                tr(R.string.main_local_first_zero_tracking_nativecode),
+                tr(R.string.main_isolated_guest_environment_alpaquita),
                 "• On-Demand Network Only: Internet permission is invoked exclusively when you trigger package installs, git sync, or external repository downloads.",
                 "• Third-Party Tools: AI CLIs may send prompts, selected code, account identifiers, and diagnostics directly to the provider you authenticate; each provider's policy applies.",
-                "• Data Erasure: Deleting projects, clearing app storage, or uninstalling completely removes all guest rootfs data from this device."
+                tr(R.string.main_data_erasure_deleting_projects_clear)
             )
             bullets.forEach { b ->
                 addView(TextView(this@MainActivity).apply {
@@ -17332,7 +17332,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 })
             }
             addView(TextView(this@MainActivity).apply {
-                text = "Privacy contact: zenithblue.dev@gmail.com"
+                text = tr(R.string.main_privacy_contact_zenithblue_dev_gmail)
                 textSize = 10f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.MONOSPACE
@@ -17343,14 +17343,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         // Open Source Header
         pageLayout.addView(TextView(this).apply {
-            text = "OPEN SOURCE LICENSES"
+            text = tr(R.string.main_open_source_licenses)
             textSize = 14f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, dp(6), 0, dp(6))
         })
         pageLayout.addView(TextView(this).apply {
-            text = "NativeCode is built on free and open-source software under GPL-3.0, Apache-2.0, and MIT licenses."
+            text = tr(R.string.main_nativecode_is_built_on_free)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -17403,7 +17403,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
                 if (item.url.isNotBlank()) {
                     addView(
-                        secondaryButton("VIEW SOURCE REPOSITORY") {
+                        secondaryButton(tr(R.string.main_view_source_repository)) {
                             openExternalUrl(item.url, "No browser available to open ${item.name}")
                         }.apply {
                             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
@@ -17419,8 +17419,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun buildHardwareSectionButton(): View {
         return settingsHubNavRow(
             iconRes = R.drawable.ic_tune_thick,
-            title = "HARDWARE",
-            subtitle = "GPU, VPU & host IPC",
+            title = tr(R.string.cli_hardware),
+            subtitle = tr(R.string.main_gpu_vpu_host_ipc),
             pageId = ID_HARDWARE
         )
     }
@@ -17459,13 +17459,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         val titleTv = TextView(this).apply {
-            text = "HARDWARE & VPU"
+            text = tr(R.string.main_hardware_vpu)
             textSize = 20f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
-        val vpuBadge = textBadge("MEDIACODEC · IPC", NC.SURFACE_HIGHEST, NC.PRIMARY)
+        val vpuBadge = textBadge(tr(R.string.main_mediacodec_ipc), NC.SURFACE_HIGHEST, NC.PRIMARY)
         headerTitleRow.addView(pageBackBtn)
         headerTitleRow.addView(titleTv)
         headerTitleRow.addView(vpuBadge)
@@ -17485,18 +17485,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 gravity = Gravity.CENTER_VERTICAL
             }
             val cardTitle = TextView(this@MainActivity).apply {
-                text = "GPU ACCELERATION"
+                text = tr(R.string.main_gpu_acceleration)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
-            gpuStatusBadge = textBadge("DETECT", NC.SURFACE_HIGHEST, NC.PRIMARY)
+            gpuStatusBadge = textBadge(tr(R.string.main_detect), NC.SURFACE_HIGHEST, NC.PRIMARY)
             titleRow.addView(cardTitle)
             titleRow.addView(gpuStatusBadge)
             addView(titleRow)
             gpuDetailTv = TextView(this@MainActivity).apply {
-                text = "GPU: Loading..."
+                text = tr(R.string.main_gpu_loading)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -17509,14 +17509,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
-                text = "HOST SERVERS"
+                text = tr(R.string.main_host_servers)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(0, 0, 0, dp(4))
             })
             hostServersBlurbTv = TextView(this@MainActivity).apply {
-                text = "PulseAudio TCP (FluxLinux style). No root."
+                text = tr(R.string.main_pulseaudio_tcp_fluxlinux_style_no)
                 textSize = 10f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -17538,11 +17538,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             })
-            venusServerBadge = textBadge("STOPPED", NC.SURFACE_HIGHEST, NC.ERROR)
+            venusServerBadge = textBadge(tr(R.string.ssh_stopped), NC.SURFACE_HIGHEST, NC.ERROR)
             venusRow.addView(venusServerBadge)
             venusHostBlock.addView(venusRow)
             venusServerDetailTv = TextView(this@MainActivity).apply {
-                text = "Venus: probing..."
+                text = tr(R.string.main_venus_probing)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -17564,11 +17564,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             })
-            pulseServerBadge = textBadge("STOPPED", NC.SURFACE_HIGHEST, NC.ERROR)
+            pulseServerBadge = textBadge(tr(R.string.ssh_stopped), NC.SURFACE_HIGHEST, NC.ERROR)
             pulseRow.addView(pulseServerBadge)
             addView(pulseRow)
             pulseServerDetailTv = TextView(this@MainActivity).apply {
-                text = "PulseAudio: probing..."
+                text = tr(R.string.main_pulseaudio_probing)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -17587,19 +17587,19 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 gravity = Gravity.CENTER_VERTICAL
             }
             val cardTitle = TextView(this@MainActivity).apply {
-                text = "VPU HARDWARE ACCELERATION"
+                text = tr(R.string.main_vpu_hardware_acceleration)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             }
-            vpuStatusBadge = textBadge("ACTIVE", NC.SURFACE_HIGHEST, NC.PRIMARY)
+            vpuStatusBadge = textBadge(tr(R.string.main_active), NC.SURFACE_HIGHEST, NC.PRIMARY)
             titleRow.addView(cardTitle)
             titleRow.addView(vpuStatusBadge)
             addView(titleRow)
 
             vpuSocDetailTv = TextView(this@MainActivity).apply {
-                text = "SoC: Loading..."
+                text = tr(R.string.main_soc_loading)
                 textSize = 12f
                 setTextColor(NC.PRIMARY_CON)
                 typeface = Typeface.MONOSPACE
@@ -17608,7 +17608,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             addView(vpuSocDetailTv)
 
             vpuDecodersTv = TextView(this@MainActivity).apply {
-                text = "Decoders: Loading..."
+                text = tr(R.string.main_decoders_loading)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -17617,7 +17617,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             addView(vpuDecodersTv)
 
             vpuEncodersTv = TextView(this@MainActivity).apply {
-                text = "Encoders: Loading..."
+                text = tr(R.string.main_encoders_loading)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -17631,7 +17631,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Bridge Daemon Card
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
-                text = "NATIVECODE HOST IPC BRIDGE"
+                text = tr(R.string.main_nativecode_host_ipc_bridge)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
@@ -17639,7 +17639,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             })
 
             bridgeStatusTv = TextView(this@MainActivity).apply {
-                text = "Bridge: Active (Abstract AF_UNIX)"
+                text = tr(R.string.main_bridge_active_abstract_af_unix)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -17652,13 +17652,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
 
             val testPingBtn = Button(this@MainActivity).apply {
-                text = "TEST PING"
+                text = tr(R.string.main_test_ping)
                 textSize = 11f
                 setTextColor(NC.PRIMARY)
                 background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
                 setOnClickListener {
-                    bridgeLogTv.text = "Testing @nativecode.agent.v1 ping..."
+                    bridgeLogTv.text = tr(R.string.main_testing_nativecode_agent_v1_ping)
                     Thread {
                         try {
                             val sock = connectAgentSocket()
@@ -17676,7 +17676,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
                             runOnUiThread {
                                 if (resp.optBoolean("ok", false)) {
-                                    Toast.makeText(this@MainActivity, "Agent Ping OK (${elapsed}ms)", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, tr(R.string.main_agent_ping_ok_ms, elapsed), Toast.LENGTH_SHORT).show()
                                     bridgeLogTv.text = "Agent Ping: OK (Host UID ${resp.optInt("host_uid")}, RT ${elapsed}ms)"
                                 } else {
                                     bridgeLogTv.text = "Agent Ping Failed: ${resp.optString("error")}"
@@ -17692,13 +17692,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
 
             val testNotifBtn = Button(this@MainActivity).apply {
-                text = "TEST NOTIFY"
+                text = tr(R.string.main_test_notify)
                 textSize = 11f
                 setTextColor(NC.PRIMARY)
                 background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
                 setOnClickListener {
-                    bridgeLogTv.text = "Dispatching notification via @nativecode.agent.v1..."
+                    bridgeLogTv.text = tr(R.string.main_dispatching_notification_via_nativec)
                     Thread {
                         try {
                             val sock = connectAgentSocket()
@@ -17718,8 +17718,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
                             runOnUiThread {
                                 if (resp.optBoolean("ok", false)) {
-                                    Toast.makeText(this@MainActivity, "Notification Posted via Bridge!", Toast.LENGTH_SHORT).show()
-                                    bridgeLogTv.text = "Notification Posted: OK (Tag: hardware_ui, ID: 1002)"
+                                    Toast.makeText(this@MainActivity, tr(R.string.main_notification_posted_via_bridge), Toast.LENGTH_SHORT).show()
+                                    bridgeLogTv.text = tr(R.string.main_notification_posted_ok_tag_hardware)
                                 } else {
                                     bridgeLogTv.text = "Notification Failed: ${resp.optString("error")}"
                                 }
@@ -17743,7 +17743,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
 
             val benchDecBtn = Button(this@MainActivity).apply {
-                text = "BENCH DECODE"
+                text = tr(R.string.main_bench_decode)
                 textSize = 11f
                 setTextColor(NC.PRIMARY)
                 background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
@@ -17751,17 +17751,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 setOnClickListener {
                     val testFile = File(filesDir, "home/test_1080p30.mp4")
                     if (!testFile.exists()) {
-                        bridgeLogTv.text = "Benchmark: /home/test_1080p30.mp4 not found"
+                        bridgeLogTv.text = tr(R.string.main_benchmark_home_test_1080p30_mp4)
                         return@setOnClickListener
                     }
-                    bridgeLogTv.text = "Benchmarking 1080p VPU hardware decode..."
+                    bridgeLogTv.text = tr(R.string.main_benchmarking_1080p_vpu_hardware_deco)
                     Thread {
                         val res = MediaCodecDecodeBenchmark.runDecode(testFile, MediaCodecDecodeBenchmark.OutputMode.SURFACE_IMAGE_READER)
                         runOnUiThread {
                             if (res.error == null) {
                                 val fpsFormatted = String.format(Locale.US, "%.1f", res.fps)
                                 val rtFormatted = String.format(Locale.US, "%.1f", res.realtimeFactor)
-                                bridgeLogTv.text = "VPU Decode: ${res.codecName}\n${res.decodedFrames} frames in ${res.wallTimeMs} ms -> $fpsFormatted FPS (${rtFormatted}x realtime)"
+                                bridgeLogTv.text = tr(R.string.main_vpu_decode_frames_in_ms, res.codecName, res.decodedFrames, res.wallTimeMs, fpsFormatted, rtFormatted)
                             } else {
                                 bridgeLogTv.text = "VPU Decode Error: ${res.error}"
                             }
@@ -17771,13 +17771,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
 
             val benchEncBtn = Button(this@MainActivity).apply {
-                text = "BENCH ENCODE"
+                text = tr(R.string.main_bench_encode)
                 textSize = 11f
                 setTextColor(NC.PRIMARY)
                 background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
                 setOnClickListener {
-                    bridgeLogTv.text = "Benchmarking 720p VPU hardware encode..."
+                    bridgeLogTv.text = tr(R.string.main_benchmarking_720p_vpu_hardware_encod)
                     Thread {
                         val testOutputFile = File(cacheDir, "bench_encoded_720p.mp4")
                         val res = MediaCodecEncodeBenchmark.runEncodeBenchmark(
@@ -17794,7 +17794,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                                 val fpsFormatted = String.format(Locale.US, "%.1f", res.fps)
                                 val rtFormatted = String.format(Locale.US, "%.1f", res.realtimeFactor)
                                 val sizeKb = res.outputSizeBytes / 1024
-                                bridgeLogTv.text = "VPU Encode: ${res.codecName}\n${res.encodedFrames} frames in ${res.wallTimeMs} ms -> $fpsFormatted FPS (${rtFormatted}x realtime) [${sizeKb} KB MP4]"
+                                bridgeLogTv.text = tr(R.string.main_vpu_encode_frames_in_ms, res.codecName, res.encodedFrames, res.wallTimeMs, fpsFormatted, rtFormatted, sizeKb)
                             } else {
                                 bridgeLogTv.text = "VPU Encode Error: ${res.error}"
                             }
@@ -17813,13 +17813,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
 
             val testOpenLinkBtn = Button(this@MainActivity).apply {
-                text = "TEST OPEN LINK"
+                text = tr(R.string.main_test_open_link)
                 textSize = 11f
                 setTextColor(NC.PRIMARY)
                 background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(6) }
                 setOnClickListener {
-                    bridgeLogTv.text = "Testing @nativecode.agent.v1 open_link..."
+                    bridgeLogTv.text = tr(R.string.main_testing_nativecode_agent_v1_open)
                     Thread {
                         try {
                             val sock = connectAgentSocket()
@@ -17852,13 +17852,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
 
             val testInstallApkBtn = Button(this@MainActivity).apply {
-                text = "TEST INSTALL APK"
+                text = tr(R.string.main_test_install_apk)
                 textSize = 11f
                 setTextColor(NC.PRIMARY)
                 background = cyberBrutalistBg(NC.SURFACE_HIGH, NC.OUTLINE_VAR, NC.SHADOW_DARK, 4, 0)
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
                 setOnClickListener {
-                    bridgeLogTv.text = "Testing @nativecode.agent.v1 install_apk..."
+                    bridgeLogTv.text = tr(R.string.main_testing_nativecode_agent_v1_install)
                     Thread {
                         try {
                             var apkTarget = File(filesDir, "home/test_app.apk")
@@ -17890,7 +17890,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                             runOnUiThread {
                                 if (resp.optBoolean("ok", false)) {
                                     val name = resp.optString("app_label", apkTarget.name)
-                                    bridgeLogTv.text = "Agent Install APK: OK ($name)"
+                                    bridgeLogTv.text = tr(R.string.main_agent_install_apk_ok, name)
                                 } else {
                                     bridgeLogTv.text = "Agent Install APK Failed: ${resp.optString("error")}"
                                 }
@@ -17909,7 +17909,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             addView(btnRow3)
 
             bridgeLogTv = TextView(this@MainActivity).apply {
-                text = "Bridge status: Ready"
+                text = tr(R.string.main_bridge_status_ready)
                 textSize = 11f
                 setTextColor(NC.PRIMARY_CON)
                 typeface = Typeface.MONOSPACE
@@ -17950,7 +17950,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         bindHostServerStatus()
         android.util.Log.i(
             "GpuRuntimeStatus",
-            "GPU=${gpu.gpuName} GL=${gpu.glVersion} VK=${gpu.vulkanVersion} method=${gpu.method}"
+            tr(R.string.main_gpu_gl_vk_method, gpu.gpuName, gpu.glVersion, gpu.vulkanVersion, gpu.method)
         )
 
         val soc = "${Build.MANUFACTURER} ${Build.MODEL} (${Build.HARDWARE})"
@@ -17965,21 +17965,21 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val hevcEnc = MediaCodecSelector.selectHardwareEncoder("video/hevc")?.name ?: "None"
 
         val hasHw = avcDec != "None" || hevcDec != "None"
-        vpuStatusBadge.text = if (hasHw) "ACTIVE" else "UNAVAILABLE"
+        vpuStatusBadge.text = if (hasHw) tr(R.string.main_active) else "UNAVAILABLE"
         vpuStatusBadge.setTextColor(if (hasHw) NC.PRIMARY else NC.ERROR)
 
         vpuDecodersTv.text = "Hardware Decoders:\n• H.264 / AVC: $avcDec\n• HEVC / H.265: $hevcDec\n• AV1: $av1Dec\n• VP9: $vp9Dec"
         vpuEncodersTv.text = "Hardware Encoders:\n• H.264: $avcEnc\n• HEVC: $hevcEnc"
 
-        bridgeStatusTv.text = "AF_UNIX Bridge Sockets:\n• Agent Bridge: Probing...\n• Media VPU Bridge: Probing...\n• Peer UID: ${android.os.Process.myUid()} (Security Enforced)"
+        bridgeStatusTv.text = tr(R.string.main_af_unix_bridge_sockets_agent, android.os.Process.myUid())
 
         Thread {
             val agentLive = probeLocalSocket("nativecode.agent.v1") || probeLocalSocket("nativecode.agent.v1.${android.os.Process.myUid()}")
             val mediaLive = probeLocalSocket("nativecode.media.v1") || probeLocalSocket("nativecode.media.v1.${android.os.Process.myUid()}")
             runOnUiThread {
-                val agentStatus = if (agentLive) "● ACTIVE (Live)" else "○ OFFLINE"
-                val mediaStatus = if (mediaLive) "● ACTIVE (Live)" else "○ OFFLINE"
-                bridgeStatusTv.text = "AF_UNIX Bridge Sockets:\n• Agent Bridge: @nativecode.agent.v1 ($agentStatus)\n• Media VPU Bridge: @nativecode.media.v1 ($mediaStatus)\n• Peer UID: ${android.os.Process.myUid()} (Security Enforced)"
+                val agentStatus = if (agentLive) tr(R.string.main_active_live) else tr(R.string.main_offline_2)
+                val mediaStatus = if (mediaLive) tr(R.string.main_active_live) else tr(R.string.main_offline_2)
+                bridgeStatusTv.text = tr(R.string.main_af_unix_bridge_sockets_agent_2, agentStatus, mediaStatus, android.os.Process.myUid())
             }
         }.start()
     }
@@ -18011,9 +18011,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
         }
-        row.addView(btn("START") { HostServerController.start(it, kind) })
-        row.addView(btn("STOP") { HostServerController.stop(kind) })
-        row.addView(btn("RESTART") { HostServerController.restart(it, kind) })
+        row.addView(btn(tr(R.string.ssh_start)) { HostServerController.start(it, kind) })
+        row.addView(btn(tr(R.string.chat_stop)) { HostServerController.stop(kind) })
+        row.addView(btn(tr(R.string.main_restart)) { HostServerController.restart(it, kind) })
         return row
     }
 
@@ -18027,7 +18027,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             hostServersBlurbTv.text = if (turnip) {
                 "PulseAudio TCP (FluxLinux style). Venus is Mali-only; Adreno uses Turnip/KGSL."
             } else {
-                "Venus vtest + PulseAudio TCP (FluxLinux style). No root."
+                tr(R.string.main_venus_vtest_pulseaudio_tcp_fluxlinux)
             }
         }
         val venus = HostServerController.status(HostServerController.Kind.VENUS)
@@ -18036,7 +18036,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val label = when {
                 !st.binaryExists -> "MISSING"
                 st.running -> "RUNNING"
-                else -> "STOPPED"
+                else -> tr(R.string.ssh_stopped)
             }
             badge.text = label
             badge.setTextColor(
@@ -18088,10 +18088,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val method = LinuxCommandBuilder.currentMethod
         val tools = CliToolCatalog.forMethod(method)
         val categories = listOf(
-            "Harmful content",
-            "Illegal content",
-            "Privacy",
-            "Other"
+            tr(R.string.main_harmful_content),
+            tr(R.string.main_illegal_content),
+            tr(R.string.main_privacy),
+            tr(R.string.main_other)
         )
         var selectedCategory = categories[0]
         var selectedToolId: String? = preselectedToolId
@@ -18122,7 +18122,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         card.addView(TextView(this).apply {
-            text = "REPORT ISSUE"
+            text = tr(R.string.main_report_issue)
             textSize = 16f
             setTextColor(Color.WHITE)
             typeface = Typeface.MONOSPACE
@@ -18130,7 +18130,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(8))
         })
         card.addView(TextView(this).apply {
-            text = "SUBMITS IN APP · NO FILES, TOKENS, OR TERMINAL HISTORY"
+            text = tr(R.string.main_submits_in_app_no_files)
             textSize = 11f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -18138,7 +18138,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         })
 
         card.addView(TextView(this).apply {
-            text = "CATEGORY"
+            text = tr(R.string.main_category)
             textSize = 10f
             setTextColor(NC.OUTLINE)
             typeface = Typeface.MONOSPACE
@@ -18193,13 +18193,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(catRow)
 
         card.addView(TextView(this).apply {
-            text = "TOOL (OPTIONAL)"
+            text = tr(R.string.main_tool_optional)
             textSize = 10f
             setTextColor(NC.OUTLINE)
             typeface = Typeface.MONOSPACE
             setPadding(0, dp(8), 0, dp(6))
         })
-        val toolLabels = listOf("All / general") + tools.map { it.displayName }
+        val toolLabels = listOf(tr(R.string.main_all_general)) + tools.map { it.displayName }
         val toolIds: List<String?> = listOf(null) + tools.map { it.id }
         var toolIndex = toolIds.indexOf(preselectedToolId).let { if (it < 0) 0 else it }
         selectedToolId = toolIds[toolIndex]
@@ -18215,14 +18215,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(toolBtn)
 
         card.addView(TextView(this).apply {
-            text = "DESCRIPTION"
+            text = tr(R.string.main_description)
             textSize = 10f
             setTextColor(NC.OUTLINE)
             typeface = Typeface.MONOSPACE
             setPadding(0, 0, 0, dp(6))
         })
         val descInput = EditText(this).apply {
-            hint = "What happened? (optional but helpful)"
+            hint = tr(R.string.main_what_happened_optional_but_helpful)
             setHintTextColor(NC.OUTLINE)
             setTextColor(Color.WHITE)
             typeface = Typeface.MONOSPACE
@@ -18244,15 +18244,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             orientation = LinearLayout.HORIZONTAL
         }
         btnRow.addView(
-            secondaryButton("CANCEL") { dialog.dismiss() }.apply {
+            secondaryButton(tr(R.string.x11_cancel)) { dialog.dismiss() }.apply {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
                 textSize = 12f
             }
         )
-        val submitButton = primaryButton("SUBMIT IN APP") {}
+        val submitButton = primaryButton(tr(R.string.main_submit_in_app)) {}
         submitButton.setOnClickListener {
                 submitButton.isEnabled = false
-                submitButton.text = "SUBMITTING…"
+                submitButton.text = tr(R.string.main_submitting)
                 InAppReportService.submit(
                     context = this@MainActivity,
                     toolId = selectedToolId,
@@ -18261,16 +18261,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 ) { result ->
                     runOnUiThread {
                         val message = when (result) {
-                            InAppReportService.Result.DELIVERED -> "Report submitted"
+                            InAppReportService.Result.DELIVERED -> tr(R.string.main_report_submitted)
                             InAppReportService.Result.QUEUED ->
                                 "Report queued securely; automatic retry enabled"
                             InAppReportService.Result.REJECTED ->
-                                "Report not saved: description is too long"
+                                tr(R.string.main_report_not_saved_description_is)
                         }
                         Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
                         if (result == InAppReportService.Result.REJECTED) {
                             submitButton.isEnabled = true
-                            submitButton.text = "SUBMIT IN APP"
+                            submitButton.text = tr(R.string.main_submit_in_app)
                         } else {
                             dialog.dismiss()
                         }
@@ -18351,13 +18351,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(dotColor) }
             })
             addView(label(
-                when (state) { AuthState.SIGNED_IN -> "SIGNED IN"; AuthState.SIGNED_OUT -> "NOT SIGNED IN"; AuthState.UNKNOWN -> "UNKNOWN" },
+                when (state) { AuthState.SIGNED_IN -> tr(R.string.main_signed_in); AuthState.SIGNED_OUT -> tr(R.string.main_not_signed_in_2); AuthState.UNKNOWN -> tr(R.string.main_unknown) },
                 NC.ON_SURF_VAR, 10f, false
             ).apply {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
-            if (!signedIn) addView(label("LOGIN", NC.PRIMARY, 11f, true))
+            if (!signedIn) addView(label(tr(R.string.main_login), NC.PRIMARY, 11f, true))
         }
     }
 
@@ -18443,7 +18443,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             body.addView(card)
         }
-        body.addView(secondaryButton("AI SAFETY & REPORT") {
+        body.addView(secondaryButton(tr(R.string.main_ai_safety_report)) {
             if (pageStack.isEmpty() || pageStack.peek() != ID_AI_SAFETY) pageStack.push(ID_AI_SAFETY)
             navigateToPage(ID_AI_SAFETY)
         }.apply {
@@ -18467,9 +18467,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         })
         card.addView(TextView(this).apply {
             text = when (info.state) {
-                AuthState.SIGNED_IN -> "SIGNED IN"
-                AuthState.SIGNED_OUT -> "NOT SIGNED IN"
-                AuthState.UNKNOWN -> "STATE UNKNOWN · open the terminal to check"
+                AuthState.SIGNED_IN -> tr(R.string.main_signed_in)
+                AuthState.SIGNED_OUT -> tr(R.string.main_not_signed_in_2)
+                AuthState.UNKNOWN -> tr(R.string.main_state_unknown_open_the_terminal)
             }
             textSize = 14f
             setTextColor(if (signedIn) NC.PRIMARY else NC.ON_SURF_VAR)
@@ -18492,13 +18492,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             body.addView(b)
         }
         if (signedIn) {
-            add(primaryButton("SIGN OUT") { confirmCliLogout(id, method) })
+            add(primaryButton(tr(R.string.main_sign_out)) { confirmCliLogout(id, method) })
         } else {
             val label = when {
                 def == null -> "SIGN IN WITH GITHUB"
                 def.strategy == CliLoginStrategy.API_KEY_FORM -> "SET API KEY"
                 def.strategy == CliLoginStrategy.TERMINAL_GUIDED -> "SIGN IN (TERMINAL)"
-                else -> "SIGN IN"
+                else -> tr(R.string.usage_sign_in)
             }
             add(primaryButton(label) { startCliLogin(id, method) })
             if (def?.envKey != null && def.strategy != CliLoginStrategy.API_KEY_FORM) {
@@ -18508,12 +18508,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         if (def != null) {
-            add(secondaryButton("OPEN TERMINAL") { openCliTerminal(def) })
+            add(secondaryButton(tr(R.string.main_open_terminal)) { openCliTerminal(def) })
             if (!def.consoleUrl.isNullOrBlank()) {
-                add(secondaryButton("OPEN WEBSITE") { CliAuthService.openBrowser(this, def.consoleUrl) })
+                add(secondaryButton(tr(R.string.main_open_website)) { CliAuthService.openBrowser(this, def.consoleUrl) })
             }
         }
-        add(secondaryButton("REFRESH") { paintCliAuth() })
+        add(secondaryButton(tr(R.string.git_refresh)) { paintCliAuth() })
     }
 
     private fun startCliLogin(id: String, method: String) {
@@ -18524,7 +18524,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val def = CliToolCatalog.byId(id) ?: return
         if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), def.terminalType))) return
         if (CliAuthService.isSessionActive()) {
-            Toast.makeText(this, "Auth already in progress", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.cli_auth_already_in_progress), Toast.LENGTH_SHORT).show()
             return
         }
         when (def.strategy) {
@@ -18547,9 +18547,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun confirmCliLogout(id: String, method: String) {
         androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Sign out of ${cliAuthName(id)}?")
-            .setMessage("This removes the saved login for this tool only. Other tools are not affected.")
-            .setPositiveButton("SIGN OUT") { _, _ ->
+            .setTitle(tr(R.string.main_sign_out_of, cliAuthName(id)))
+            .setMessage(tr(R.string.main_this_removes_the_saved_login))
+            .setPositiveButton(tr(R.string.main_sign_out)) { _, _ ->
                 val done = { _: Boolean, msg: String ->
                     Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                     paintCliAuth()
@@ -18557,14 +18557,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 if (id == "gh") GitHubCliService.logout(this, method, done)
                 else CliAuthService.logout(this, method, id, done)
             }
-            .setNegativeButton("CANCEL", null)
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .show()
     }
 
     private fun showCliApiKeyDialog(def: CliToolDef) {
         val method = LinuxCommandBuilder.currentMethod
         val input = EditText(this).apply {
-            hint = def.envKey ?: "API key"
+            hint = def.envKey ?: tr(R.string.main_api_key)
             setTextColor(Color.WHITE)
             setHintTextColor(NC.OUTLINE)
             typeface = Typeface.MONOSPACE
@@ -18581,7 +18581,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), dp(8), dp(8), 0)
             addView(TextView(this@MainActivity).apply {
-                text = "Paste key for ${def.displayName}. Stored in guest ~/.config/fluxlinux/cli-auth.env ($method)."
+                text = tr(R.string.main_paste_key_for_stored_in, def.displayName, method)
                 textSize = 12f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -18592,17 +18592,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         android.app.AlertDialog.Builder(this)
             .setTitle("${def.displayName} API key")
             .setView(box)
-            .setPositiveButton("SAVE") { _, _ ->
+            .setPositiveButton(tr(R.string.x11_save)) { _, _ ->
                 val key = input.text?.toString().orEmpty()
                 CliAuthService.saveApiKey(this, method, def.id, key) { ok, msg, _ ->
                     Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                     if (ok) paintCliAuth()
                 }
             }
-            .setNeutralButton("OPEN WEB") { _, _ ->
+            .setNeutralButton(tr(R.string.main_open_web)) { _, _ ->
                 def.consoleUrl?.let { CliAuthService.openBrowser(this, it) }
             }
-            .setNegativeButton("CANCEL", null)
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .show()
     }
 
@@ -18647,7 +18647,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         panel.addView(header)
 
         val phaseTv = TextView(this).apply {
-            text = "Starting…"
+            text = tr(R.string.main_starting)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -18668,11 +18668,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             paint.isFakeBoldText = true
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
-        val openBrowserBtn = secondaryButton("OPEN BROWSER") {}.apply {
+        val openBrowserBtn = secondaryButton(tr(R.string.main_open_browser)) {}.apply {
             textSize = 11f
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
         }
-        val copyUrlBtn = secondaryButton("COPY") {}.apply {
+        val copyUrlBtn = secondaryButton(tr(R.string.skills_copy)) {}.apply {
             textSize = 11f
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(6) }
         }
@@ -18689,7 +18689,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(8))
         }
         val pasteInput = EditText(this).apply {
-            hint = "Paste the code from the browser"
+            hint = tr(R.string.main_paste_the_code_from_the)
             setTextColor(Color.WHITE)
             setHintTextColor(NC.OUTLINE)
             typeface = Typeface.MONOSPACE
@@ -18728,18 +18728,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
         }
 
-        pasteRow.addView(secondaryButton("SEND") {
+        pasteRow.addView(secondaryButton(tr(R.string.main_send)) {
             val code = pasteInput.text?.toString().orEmpty().trim()
             if (code.isNotEmpty() && cliAuthSession?.writeLine(code) == true) {
                 pasteInput.setText("")
-                phaseTv.text = "Code sent, waiting…"
+                phaseTv.text = tr(R.string.main_code_sent_waiting)
             }
         }.apply {
             textSize = 11f
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
         })
 
-        val cancelBtn = primaryButton("CANCEL") {
+        val cancelBtn = primaryButton(tr(R.string.x11_cancel)) {
             cliAuthSession?.cancel()
             dismissCliAuthOverlay()
             paintCliAuth()
@@ -18757,13 +18757,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         openBrowserBtn.setOnClickListener {
             val u = lastUrl
             if (!u.isNullOrBlank()) CliAuthService.openBrowser(this, u)
-            else Toast.makeText(this, "No URL yet", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(this, tr(R.string.main_no_url_yet), Toast.LENGTH_SHORT).show()
         }
         copyUrlBtn.setOnClickListener {
             val u = lastUrl
             if (!u.isNullOrBlank()) {
                 CliAuthService.copyCode(this, u)
-                Toast.makeText(this, "Link copied", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr(R.string.main_link_copied), Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -18778,7 +18778,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 lastOtp = code
                 otpRow.visibility = View.VISIBLE
                 otpTv.text = "$code  · Copied"
-                phaseTv.text = "Waiting for browser…"
+                phaseTv.text = tr(R.string.main_waiting_for_browser)
             }
             override fun onUrl(url: String) {
                 lastUrl = url
@@ -18788,7 +18788,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 appendLog("URL: $url")
             }
             override fun onDone(status: CliToolStatus) {
-                phaseTv.text = if (status.loggedIn) "Signed in" else (status.detail ?: "Done")
+                phaseTv.text = if (status.loggedIn) tr(R.string.cli_signed_in) else (status.detail ?: tr(R.string.chat_done))
                 appendLog("Done · loggedIn=${status.loggedIn}")
                 mainHandler.postDelayed({
                     dismissCliAuthOverlay()
@@ -18803,9 +18803,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }, 500)
             }
             override fun onFailed(message: String) {
-                phaseTv.text = "Failed"
+                phaseTv.text = tr(R.string.chat_failed)
                 appendLog(message)
-                cancelBtn.text = "CLOSE"
+                cancelBtn.text = tr(R.string.term_close)
                 cancelBtn.setOnClickListener {
                     dismissCliAuthOverlay()
                     paintCliAuth()
@@ -18900,7 +18900,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         val titleTv = TextView(this).apply {
-            text = "Create / Import Project"
+            text = tr(R.string.main_create_import_project)
             textSize = 16f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -18931,7 +18931,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(14) }
         }
         nameCard.addView(TextView(this).apply {
-            text = "PROJECT NAME"
+            text = tr(R.string.main_project_name)
             setTextColor(NC.PRIMARY)
             textSize = 12f
             typeface = Typeface.MONOSPACE
@@ -18939,7 +18939,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(8))
         })
         projectNameInput = EditText(this).apply {
-            hint = "My Awesome App"
+            hint = tr(R.string.main_my_awesome_app)
             setHintTextColor(NC.OUTLINE)
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -18971,7 +18971,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(14) }
         }
         iconCard.addView(TextView(this).apply {
-            text = "PROJECT ICON"
+            text = tr(R.string.main_project_icon)
             setTextColor(NC.PRIMARY)
             textSize = 12f
             typeface = Typeface.MONOSPACE
@@ -19016,7 +19016,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             hint = ""
         }
 
-        val chooseIconBtn = secondaryButton("Browse") {
+        val chooseIconBtn = secondaryButton(tr(R.string.main_browse)) {
             activeIconInput = projectIconInput
             activeIconPreviewIv = iconPreviewIv
             activeIconPreviewTv = iconPreviewTv
@@ -19062,7 +19062,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply { rightMargin = dp(8) }
         })
         ghUrlHeader.addView(TextView(this).apply {
-            text = "GITHUB REPOSITORY URL (OPTIONAL)"
+            text = tr(R.string.main_github_repository_url_optional)
             setTextColor(NC.PRIMARY)
             textSize = 12f
             typeface = Typeface.MONOSPACE
@@ -19102,7 +19102,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(20) }
         }
         methodCard.addView(TextView(this).apply {
-            text = "LINUX ISOLATION MODE"
+            text = tr(R.string.main_linux_isolation_mode_2)
             setTextColor(NC.PRIMARY)
             textSize = 12f
             typeface = Typeface.MONOSPACE
@@ -19110,7 +19110,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, 0, 0, dp(8))
         })
         methodCard.addView(TextView(this).apply {
-            text = "Select engine for this project. Toggle updates selection immediately."
+            text = tr(R.string.main_select_engine_for_this_project)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -19121,7 +19121,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         projectCreateSelectedMethod = "proot"
 
         val prootChip = TextView(this).apply {
-            text = "Standard"
+            text = tr(R.string.main_standard)
             textSize = 13f
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
@@ -19199,7 +19199,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // projectCreateSelectedMethod stays default "proot"
 
         // --- Primary Button ---
-        projectCreateBtn = primaryButton("CREATE / IMPORT PROJECT") {
+        projectCreateBtn = primaryButton(tr(R.string.main_create_import_project_2)) {
             val name = projectNameInput.text.toString().trim()
             val gitUrl = projectGithubInput.text.toString().trim()
             val createFeature = if (gitUrl.isEmpty()) ProFeature.PROJECTS else ProFeature.PROJECT_IMPORT
@@ -19216,7 +19216,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
 
             if (name.isEmpty()) {
-                Toast.makeText(this, "Please enter a project name", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr(R.string.main_please_enter_a_project_name), Toast.LENGTH_SHORT).show()
                 return@primaryButton
             }
 
@@ -19266,7 +19266,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     tag = "PULSE_ICON"
                 }
                 val overlayTitle = TextView(this).apply {
-                    text = "CLONING REPOSITORY"
+                    text = tr(R.string.main_cloning_repository)
                     textSize = 14f
                     setTextColor(NC.ON_SURFACE)
                     typeface = Typeface.MONOSPACE
@@ -19345,14 +19345,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     layoutParams = FrameLayout.LayoutParams(MATCH, dp(48)).apply { gravity = Gravity.BOTTOM }
                 }
                 val statusTv = TextView(this).apply {
-                    text = "Connecting to GitHub..."
+                    text = tr(R.string.main_connecting_to_github)
                     textSize = 12f
                     setTextColor(NC.PRIMARY)
                     typeface = Typeface.MONOSPACE
                     layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
                 }
                 val lineTv = TextView(this).apply {
-                    text = "0 lines"
+                    text = tr(R.string.main_0_lines)
                     textSize = 11f
                     setTextColor(NC.ON_SURF_VAR)
                     typeface = Typeface.MONOSPACE
@@ -19436,7 +19436,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                                     }
                                     addAndOpenProject(name, icon, path, method, skipEnsureDir = true)
                                 } else {
-                                    Toast.makeText(this@MainActivity, "Clone failed. Check URL or network.", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, tr(R.string.main_clone_failed_check_url_or), Toast.LENGTH_LONG).show()
                                     navigateToPage(ID_PROJECT_CREATE)
                                 }
                             }
@@ -19530,7 +19530,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             gravity = Gravity.CENTER_VERTICAL
         }
         topRow.addView(TextView(this).apply {
-            text = "PROJECTS"
+            text = tr(R.string.main_projects_2)
             textSize = 22f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -19556,9 +19556,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         fun action(label: String, icon: Int, primary: Boolean, last: Boolean, onClick: () -> Unit) =
             actions.addView(projectsActionButton(label, icon, primary, onClick),
                 LinearLayout.LayoutParams(0, WRAP, 1f).apply { if (!last) rightMargin = dp(10) })
-        action("NEW", R.drawable.ic_lucide_plus, true, false) { openProjectCreate(clone = false) }
-        action("CLONE", R.drawable.ic_lucide_download, false, false) { openProjectCreate(clone = true) }
-        action("IMPORT", R.drawable.ic_lucide_folder_input, false, true) { showImportProjectDialog() }
+        action(tr(R.string.main_new), R.drawable.ic_lucide_plus, true, false) { openProjectCreate(clone = false) }
+        action(tr(R.string.main_clone), R.drawable.ic_lucide_download, false, false) { openProjectCreate(clone = true) }
+        action(tr(R.string.main_import), R.drawable.ic_lucide_folder_input, false, true) { showImportProjectDialog() }
         projectsListLayout.addView(actions)
 
         if (list.isEmpty()) {
@@ -19573,14 +19573,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     layoutParams = LinearLayout.LayoutParams(dp(150), dp(120)).apply { bottomMargin = dp(20) }
                 })
                 addView(TextView(this@MainActivity).apply {
-                    text = "No projects yet"
+                    text = tr(R.string.main_no_projects_yet)
                     textSize = 18f
                     setTextColor(NC.ON_SURFACE)
                     typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
                 })
                 addView(TextView(this@MainActivity).apply {
-                    text = "Create a blank project, clone a Git repository, or import a folder that already lives in /home/flux/repos."
+                    text = tr(R.string.main_create_a_blank_project_clone)
                     textSize = 13f
                     setTextColor(NC.ON_SURF_VAR)
                     gravity = Gravity.CENTER
@@ -19596,7 +19596,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(20) }
         }
         val search = EditText(this).apply {
-            hint = "Search projects"
+            hint = tr(R.string.main_search_projects)
             setText(projectsQuery)
             setHintTextColor(NC.OUTLINE)
             setTextColor(NC.ON_SURFACE)
@@ -19624,7 +19624,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         val sort = TextView(this).apply {
             fun paint() {
-                text = if (projectsSortByName) "NAME" else "RECENT"
+                text = if (projectsSortByName) tr(R.string.ssh_name) else tr(R.string.main_recent_2)
                 contentDescription = "Sort by ${if (projectsSortByName) "name" else "last opened"}. Tap to change."
             }
             paint()
@@ -19698,7 +19698,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             .let { l -> if (projectsSortByName) l.sortedBy { it.name.lowercase() } else l.sortedByDescending { it.lastOpened } }
         if (shown.isEmpty()) {
             host.addView(TextView(this).apply {
-                text = "No project matches \"$q\""
+                text = tr(R.string.main_no_project_matches, q)
                 textSize = 13f
                 setTextColor(NC.ON_SURF_VAR)
                 gravity = Gravity.CENTER
@@ -19732,7 +19732,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             "package.json" to "NODE", "Cargo.toml" to "RUST", "go.mod" to "GO", "pyproject.toml" to "PYTHON",
             "requirements.txt" to "PYTHON", "CMakeLists.txt" to "C/C++", "build.gradle.kts" to "GRADLE",
             "build.gradle" to "GRADLE", "pom.xml" to "MAVEN", "pubspec.yaml" to "FLUTTER", "Gemfile" to "RUBY",
-            "composer.json" to "PHP", "index.html" to "WEB",
+            "composer.json" to "PHP", "index.html" to tr(R.string.main_web),
         ).firstOrNull { File(dir, it.first).exists() }?.second
     }.getOrNull()
 
@@ -19814,7 +19814,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val pad = dp((44 - ToolRail.ICON_DP) / 2)
             setPadding(pad, pad, pad, pad)
             contentDescription = "Actions for ${p.name}"
-            tooltipText = "Actions"
+            tooltipText = tr(R.string.main_actions)
             layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
         }
         more.setOnClickListener { showProjectActions(more, p) }
@@ -19831,8 +19831,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val running = projectSessionsMap[p.path]?.count { it.isRunning } ?: 0
         if (running > 0) chips.addView(projectChip("$running RUNNING", null, NC.PRIMARY))
         if (FeatureGate.canUse(isPro(), ProFeature.WORKSPACE) is GateResult.Deny) chips.addView(projectChip("PRO", R.drawable.ic_lock, NC.ERROR))
-        val opened = if (p.lastOpened <= 0L) "Never opened"
-            else if (System.currentTimeMillis() - p.lastOpened < 60_000L) "Opened just now" else "Opened " +
+        val opened = if (p.lastOpened <= 0L) tr(R.string.main_never_opened)
+            else if (System.currentTimeMillis() - p.lastOpened < 60_000L) tr(R.string.main_opened_just_now) else "Opened " +
             android.text.format.DateUtils.getRelativeTimeSpanString(p.lastOpened, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS)
         chips.addView(projectChip(opened, R.drawable.ic_lucide_clock, NC.ON_SURF_VAR))
         card.addView(HorizontalScrollView(this).apply {
@@ -19848,19 +19848,19 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun showProjectActions(anchor: View, p: Project) {
         val menu = android.widget.PopupMenu(this, anchor)
-        menu.menu.add(0, 1, 0, "Open")
-        menu.menu.add(0, 2, 1, "Open terminal here")
-        menu.menu.add(0, 3, 2, "Rename")
-        menu.menu.add(0, 4, 3, "Remove project")
+        menu.menu.add(0, 1, 0, tr(R.string.chat_open))
+        menu.menu.add(0, 2, 1, tr(R.string.chat_open_terminal_here))
+        menu.menu.add(0, 3, 2, tr(R.string.term_rename))
+        menu.menu.add(0, 4, 3, tr(R.string.main_remove_project))
         menu.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> openProjectFromList(p)
                 2 -> openProjectFromList(p, terminal = true)
                 3 -> showRenameProjectDialog(p)
                 4 -> showBrutalistConfirmDialog(
-                    title = "REMOVE PROJECT",
-                    message = "Remove ${p.name} from NativeCode? Its sessions stop and its chat threads are deleted. Files in ${p.path} stay on disk.",
-                    confirmLabel = "REMOVE",
+                    title = tr(R.string.main_remove_project_2),
+                    message = tr(R.string.main_remove_from_nativecode_its_sessions, p.name, p.path),
+                    confirmLabel = tr(R.string.ssh_remove),
                     destructive = true,
                 ) { removeProject(p.path); populateProjectsList() }
             }
@@ -19895,9 +19895,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(dp(10), dp(10), dp(10), dp(10))
         }
         showBrutalistConfirmDialog(
-            title = "RENAME PROJECT",
-            message = "Display name only; the folder ${p.path} is not moved.",
-            confirmLabel = "SAVE",
+            title = tr(R.string.main_rename_project),
+            message = tr(R.string.main_display_name_only_the_folder, p.path),
+            confirmLabel = tr(R.string.x11_save),
             body = input,
         ) {
             val name = input.text.toString().trim()
@@ -19926,9 +19926,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             .sortedBy { it.name.lowercase() }
         if (dirs.isEmpty()) {
             showBrutalistConfirmDialog(
-                title = "NOTHING TO IMPORT",
-                message = "Every folder in $reposPath is already a project. Clone a repository or create a new project instead.",
-                confirmLabel = "NEW PROJECT",
+                title = tr(R.string.main_nothing_to_import),
+                message = tr(R.string.main_every_folder_in_is_already, reposPath),
+                confirmLabel = tr(R.string.main_new_project),
             ) { openProjectCreate(clone = false) }
             return
         }
@@ -19963,9 +19963,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, dp(minOf(dirs.size * 48, 288)))
         }
         dialog = showBrutalistConfirmDialog(
-            title = "IMPORT FOLDER",
-            message = "Open a folder from $reposPath as a project.",
-            confirmLabel = "NEW PROJECT",
+            title = tr(R.string.main_import_folder),
+            message = tr(R.string.main_open_a_folder_from_as, reposPath),
+            confirmLabel = tr(R.string.main_new_project),
             body = scroll,
         ) { openProjectCreate(clone = false) }
     }
@@ -19981,7 +19981,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             activeProjectName = ""
             activeProjectPath = ""
         }
-        Toast.makeText(this, "Project removed.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, tr(R.string.main_project_removed), Toast.LENGTH_SHORT).show()
     }
 
     private fun refreshWorkspaceDirTree() {
@@ -20042,7 +20042,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun createWorkspaceTerminalTab(type: String) {
         if (!gateAllows(FeatureGate.canUse(isPro(), ProFeature.WORKSPACE))) return
         if (workspaceSessions.size + pendingWorkspaceTerminalSlots >= 10) {
-            Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_maximum_10_tabs_allowed), Toast.LENGTH_SHORT).show()
             return
         }
         if (!aiLaunchAllowed(type)) return
@@ -20053,13 +20053,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             alignGlobalMethodToProject()
             Toast.makeText(
                 this,
-                "Install AI CLI tools for $method (Settings → AI CLI tools)",
+                tr(R.string.main_install_ai_cli_tools_for, method),
                 Toast.LENGTH_LONG
             ).show()
             return
         }
         if (type == "codex" && method == "chroot") {
-            Toast.makeText(this, "Codex unavailable in chroot", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_codex_unavailable_in_chroot), Toast.LENGTH_SHORT).show()
             return
         }
         if (type == "shell-root" && method == "chroot") {
@@ -20069,7 +20069,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     if (!rootOk) {
                         Toast.makeText(
                             this,
-                            "Root required for rooted chroot shell",
+                            tr(R.string.main_root_required_for_rooted_chroot),
                             Toast.LENGTH_SHORT
                         ).show()
                     } else {
@@ -20087,7 +20087,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun startWorkspaceTerminalTab(type: String) {
         if (!reserveTerminalSlot(app = false)) {
-            Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(R.string.main_maximum_10_tabs_allowed), Toast.LENGTH_SHORT).show()
             return
         }
         setTerminalMode(ws = true, chat = false)
@@ -20107,7 +20107,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     if (!releaseTerminalLaunch(ticket)) return@post
                     Toast.makeText(
                         this,
-                        e.message?.takeIf { it.isNotBlank() } ?: "Failed to prepare terminal",
+                        e.message?.takeIf { it.isNotBlank() } ?: tr(R.string.main_failed_to_prepare_terminal),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -20578,7 +20578,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) }
             })
             addView(TextView(this@MainActivity).apply {
-                text = "GIT BRANCHES"
+                text = tr(R.string.main_git_branches)
                 textSize = 14f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.MONOSPACE
@@ -20593,7 +20593,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         })
         card.addView(TextView(this).apply {
-            text = "Loading branches…"
+            text = tr(R.string.main_loading_branches)
             textSize = 13f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -20601,7 +20601,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         })
         card.addView(TextView(this).apply {
-            text = "Reading local + remote refs from guest git"
+            text = tr(R.string.main_reading_local_remote_refs_from)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -20640,7 +20640,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) }
         })
         titleRow.addView(TextView(this).apply {
-            text = "GIT BRANCHES"
+            text = tr(R.string.main_git_branches)
             textSize = 14f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -20656,12 +20656,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         card.addView(titleRow)
 
         val currentLabel = when {
-            info.detached -> "DETACHED HEAD"
+            info.detached -> tr(R.string.main_detached_head)
             !info.current.isNullOrBlank() -> info.current!!
             else -> "(unknown)"
         }
         card.addView(TextView(this).apply {
-            text = "Current branch"
+            text = tr(R.string.main_current_branch)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -20686,7 +20686,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val localN = info.localBranches.size
         val remoteN = info.remoteBranches.size
         card.addView(TextView(this).apply {
-            text = "All branches ($localN local · $remoteN remote) — tap to expand"
+            text = tr(R.string.main_all_branches_local_remote_tap, localN, remoteN)
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -20720,7 +20720,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             isFocusable = true
         }
         trigger.addView(TextView(this).apply {
-            text = "▾  Switch branches / tags (view only)"
+            text = tr(R.string.main_switch_branches_tags_view_only)
             textSize = 12f
             setTextColor(NC.ON_SURFACE)
             typeface = Typeface.MONOSPACE
@@ -20745,7 +20745,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             listHost.removeAllViews()
             if (all.isEmpty()) {
                 listHost.addView(TextView(this).apply {
-                    text = "No branches found (fetch remotes in terminal if needed)"
+                    text = tr(R.string.main_no_branches_found_fetch_remotes)
                     textSize = 11f
                     setTextColor(NC.OUTLINE)
                     typeface = Typeface.MONOSPACE
@@ -20755,7 +20755,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             if (info.localBranches.isNotEmpty()) {
                 listHost.addView(TextView(this).apply {
-                    text = "LOCAL"
+                    text = tr(R.string.main_local)
                     textSize = 9f
                     setTextColor(NC.PRIMARY)
                     typeface = Typeface.MONOSPACE
@@ -20768,7 +20768,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             if (info.remoteBranches.isNotEmpty()) {
                 listHost.addView(TextView(this).apply {
-                    text = "REMOTE"
+                    text = tr(R.string.main_remote)
                     textSize = 9f
                     setTextColor(NC.TERTIARY)
                     typeface = Typeface.MONOSPACE
@@ -20783,7 +20783,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
             listHost.addView(TextView(this).apply {
-                text = "Checkout disabled — display only"
+                text = tr(R.string.main_checkout_disabled_display_only)
                 textSize = 10f
                 setTextColor(NC.OUTLINE)
                 typeface = Typeface.MONOSPACE
@@ -20854,7 +20854,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 })
             } else if (isRemote) {
                 addView(TextView(this@MainActivity).apply {
-                    text = "REMOTE"
+                    text = tr(R.string.main_remote)
                     textSize = 8f
                     setTextColor(NC.ON_SURF_VAR)
                     typeface = Typeface.MONOSPACE
@@ -20889,7 +20889,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             gravity = Gravity.CENTER_VERTICAL
         }
         val settingsHeaderTitle = TextView(this).apply {
-            text = "SETTINGS"
+            text = tr(R.string.main_settings)
             textSize = 18f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -20928,7 +20928,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsContentLayout.addView(settingsHeaderRow)
         settingsContentLayout.addView(settingsDivider)
         settingsContentLayout.addView(TextView(this).apply {
-            text = "Isolation: ${ProjectPathResolver.methodLabel(projMethod)} (project sticky — not Settings global card)"
+            text = tr(R.string.main_isolation_project_sticky_not_setting, ProjectPathResolver.methodLabel(projMethod))
             textSize = 10f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -20959,7 +20959,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) }
         }
         val nameCardTitle = TextView(this).apply {
-            text = "PROJECT NAME"
+            text = tr(R.string.main_project_name)
             textSize = 14f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -20969,7 +20969,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         nameCardTitleRow.addView(nameCardTitle)
         nameCard.addView(nameCardTitleRow)
         nameCard.addView(TextView(this).apply {
-            text = "Display name only — repo path stays the same."
+            text = tr(R.string.main_display_name_only_repo_path)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -20977,7 +20977,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         })
         val configNameInput = EditText(this).apply {
             setText(activeProjectName)
-            hint = "Project name"
+            hint = tr(R.string.main_project_name_2)
             setHintTextColor(NC.OUTLINE)
             setTextColor(NC.ON_SURFACE)
             textSize = 14f
@@ -21032,7 +21032,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) }
         }
         val iconCardTitle = TextView(this).apply {
-            text = "PROJECT ICON"
+            text = tr(R.string.main_project_icon)
             textSize = 14f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -21137,7 +21137,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             textSize = 12f
             setTextColor(NC.ON_SURFACE)
             setHintTextColor(NC.ON_SURF_VAR)
-            hint = "Path / URL / emoji"
+            hint = tr(R.string.main_path_url_emoji)
             typeface = Typeface.MONOSPACE
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
@@ -21156,7 +21156,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         activeIconInput = configIconInput
 
-        val chooseIconBtn = secondaryButton("Browse") {
+        val chooseIconBtn = secondaryButton(tr(R.string.main_browse)) {
             activeIconInput = configIconInput
             projectIconPickerLauncher.launch("image/*")
         }.apply {
@@ -21169,11 +21169,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         iconCard.addView(iconRowLayout)
         settingsContentLayout.addView(iconCard)
 
-        val saveBtn = primaryButton("SAVE CONFIGURATION") {
+        val saveBtn = primaryButton(tr(R.string.main_save_configuration)) {
             val newName = configNameInput.text.toString().trim()
             val newIcon = configIconInput.text.toString().trim()
             if (newName.isEmpty()) {
-                Toast.makeText(this, "Project name cannot be empty", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr(R.string.main_project_name_cannot_be_empty), Toast.LENGTH_SHORT).show()
                 return@primaryButton
             }
             val list = getProjects().toMutableList()
@@ -21198,7 +21198,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 if (::projectGitDiffTopBar.isInitialized) {
                     updateProjectSubpageTopBar(projectGitDiffTopBar)
                 }
-                Toast.makeText(this, "Configuration saved successfully!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr(R.string.main_configuration_saved_successfully), Toast.LENGTH_SHORT).show()
                 onBackPressed()
             }
         }.apply {
@@ -21209,7 +21209,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsContentLayout.addView(saveBtn)
 
         settingsContentLayout.addView(spacer(16))
-        val removeBtn = dangerButton("REMOVE PROJECT") {
+        val removeBtn = dangerButton(tr(R.string.main_remove_project_2)) {
             if (getProjects().any { it.path == activeProjectPath }) {
                 removeProject(activeProjectPath)
                 while (pageStack.isNotEmpty() && (
@@ -21257,7 +21257,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun copyText(label: String, text: String) = copyToClipboard(label, text)
         override fun guestPath(file: File) = ProjectPathResolver.toDebianPath(this@MainActivity, file, activeProjectMethod)
         override fun openTerminalHere(dir: File) {
-            val guest = guestPath(dir) ?: return Toast.makeText(this@MainActivity, "Folder is outside the guest", Toast.LENGTH_SHORT).show()
+            val guest = guestPath(dir) ?: return Toast.makeText(this@MainActivity, tr(R.string.main_folder_is_outside_the_guest), Toast.LENGTH_SHORT).show()
             navigateToPage(ID_PROJECT_WORKSPACE, false)
             wsTermCwd = guest
             createWorkspaceTerminalTab("shell")
@@ -21271,9 +21271,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         override fun confirmDelete(name: String, isDir: Boolean, onConfirm: () -> Unit) {
             showBrutalistConfirmDialog(
-                title = if (isDir) "DELETE FOLDER" else "DELETE FILE",
-                message = if (isDir) "Delete $name and everything inside it? This can not be undone." else "Delete $name? This can not be undone.",
-                confirmLabel = "DELETE",
+                title = if (isDir) tr(R.string.main_delete_folder) else tr(R.string.main_delete_file),
+                message = if (isDir) tr(R.string.main_delete_and_everything_inside_it, name) else tr(R.string.main_delete_this_can_not_be, name),
+                confirmLabel = tr(R.string.git_delete),
                 destructive = true,
                 onConfirm = onConfirm,
             )
@@ -21311,7 +21311,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(12), dp(8), dp(12), dp(4))
         }
-        projectGitTabBtns = listOf("CHANGES", "HISTORY").mapIndexed { i, label ->
+        projectGitTabBtns = listOf(tr(R.string.git_changes), tr(R.string.main_history)).mapIndexed { i, label ->
             TextView(this).apply {
                 text = label
                 textSize = 12f
@@ -21370,7 +21370,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             gravity = Gravity.CENTER_VERTICAL
         }
         val gitHeaderTitle = TextView(this).apply {
-            text = "GIT DIFF"
+            text = tr(R.string.main_git_diff)
             textSize = 18f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -21473,7 +21473,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (type != "codex") return
         Toast.makeText(
             this,
-            "Loading Codex (~250MB). If blank, run: codex login",
+            tr(R.string.main_loading_codex_250mb_if_blank),
             Toast.LENGTH_LONG
         ).show()
     }
@@ -21510,7 +21510,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(8) }
         }
         val title = TextView(this).apply {
-            text = "TERMINAL SETTINGS"
+            text = tr(R.string.main_terminal_settings)
             textSize = 16f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -21518,7 +21518,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         termTitleRow.addView(termTitleIcon)
         termTitleRow.addView(title)
         val sub = TextView(this).apply {
-            text = "Configure global terminal font zoom size and extra keyboard toolbar buttons."
+            text = tr(R.string.main_configure_global_terminal_font_zoom)
             textSize = 12f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -21529,7 +21529,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         // 1. Global Terminal Zoom Section
         val zoomHeader = TextView(this).apply {
-            text = "GLOBAL TERMINAL ZOOM"
+            text = tr(R.string.main_global_terminal_zoom)
             textSize = 13f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.MONOSPACE
@@ -21700,13 +21700,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(12) }
         }
         val toggleTitle = TextView(this).apply {
-            text = "EXTRA KEYS BAR"
+            text = tr(R.string.main_extra_keys_bar)
             textSize = 13f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
         }
         val toggleSub = TextView(this).apply {
-            text = "ESC, TAB, sticky CTRL/ALT/SHIFT, arrows, symbols. Hold arrows to repeat; swipe a key up for its corner alternate; • switches page."
+            text = tr(R.string.main_esc_tab_sticky_ctrl_alt)
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -21731,13 +21731,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(12) }
                 addView(TextView(this@MainActivity).apply {
-                    text = "CHAT VIEW (BETA)"
+                    text = tr(R.string.main_chat_view_beta)
                     textSize = 13f
                     setTextColor(Color.WHITE)
                     typeface = Typeface.DEFAULT_BOLD
                 })
                 addView(TextView(this@MainActivity).apply {
-                    text = "Agent chat on the Terminal tab and the project workspace, with a Chat/Terminal switch. Off = terminal only."
+                    text = tr(R.string.main_agent_chat_on_the_terminal)
                     textSize = 11f
                     setTextColor(NC.ON_SURF_VAR)
                     typeface = Typeface.MONOSPACE
@@ -21804,7 +21804,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         topBarScrollView.addView(page)
         page.addView(
             buildSubPageHeader(
-                title = "TOP BAR",
+                title = tr(R.string.main_top_bar),
                 subtitle = "// PHONE STATS IN THE TOP BAR",
                 iconRes = R.drawable.ic_tune_thick,
                 pageId = ID_TOPBAR
@@ -21842,7 +21842,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Settings -> AI usage (plan 18): per-CLI tokens and cost from ccusage, drawn natively. */
     private fun buildUsagePage() {
         val p = com.zenithblue.nativecode.usage.ui.UsagePage(this, usageHost).also { usagePage = it }
-        buildExtraPage(ID_USAGE, "AI USAGE", "// TOKENS AND COST", R.drawable.ic_lucide_chart, p.content) { p.refresh() }
+        buildExtraPage(ID_USAGE, tr(R.string.main_ai_usage), "// TOKENS AND COST", R.drawable.ic_lucide_chart, p.content) { p.refresh() }
     }
 
     private var homeUsageSubtitle: TextView? = null
@@ -21862,7 +21862,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 val repo = com.zenithblue.nativecode.usage.UsageRepository
                 val m = com.zenithblue.nativecode.usage.UsageModel
                 val lim = com.zenithblue.nativecode.usage.LimitsRepository
-                val usage = if (!repo.isInstalled(this)) "Tokens and cost per AI CLI. Tap to set up."
+                val usage = if (!repo.isInstalled(this)) tr(R.string.main_tokens_and_cost_per_ai_3)
                 else {
                     if (repo.cacheAgeMs(this) > 600_000L) repo.load(this)
                     val rep = repo.cached(this)?.only(usageHost::allowed)
@@ -21871,7 +21871,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     when {
                         rep == null -> "No usage data yet. Tap to read it."
                         t == null -> "Today: no AI usage yet."
-                        else -> "Today: ${m.fmtTokens(t.first)} tokens · ${m.fmtCost(t.second)} est."
+                        else -> tr(R.string.main_today_tokens_est, m.fmtTokens(t.first), m.fmtCost(t.second))
                     }
                 }
                 var l = lim.cached(this)
@@ -21880,7 +21880,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 val signed = l.filter { it.state == com.zenithblue.nativecode.usage.LimitState.OK && usageHost.allowed(it.agent) }.map { it.agent }
                 logos = lim.AGENTS.filter { it in logos || it in signed }
                 if (worst != null) usage + "\n" + worst.first + ": " + worst.second.usedPercent.toInt() + "%" else usage
-            } catch (_: Exception) { "Tokens and cost per AI CLI." }
+            } catch (_: Exception) { tr(R.string.main_tokens_and_cost_per_ai_2) }
             homeUsageRefreshing.set(false)
             runOnUiThread {
                 homeUsageSubtitle?.text = line
@@ -21912,7 +21912,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         backupScrollView.addView(page)
         page.addView(
             buildSubPageHeader(
-                title = "BACKUP",
+                title = tr(R.string.main_backup),
                 subtitle = "// BACK UP AND RESTORE",
                 iconRes = R.drawable.ic_lucide_archive,
                 pageId = ID_BACKUP
