@@ -1096,7 +1096,7 @@
     <string name="main_termux_x11_phosh_mobile_shell">Termux X11 + Phosh 移动 Shell 图形环境。</string>
     <string name="main_stop_phosh_desktop">停止 PHOSH 桌面</string>
     <string name="main_app_storage_used">已用应用存储</string>
-    <string name="main_0_load">负载 0%</string>
+    <string name="main_0_load" formatted="false">负载 0%</string>
     <string name="main_100_max">最大 100%</string>
     <string name="main_disk">磁盘</string>
     <string name="main_package_scan">软件包扫描</string>

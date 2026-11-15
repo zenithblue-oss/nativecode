@@ -1096,7 +1096,7 @@
     <string name="main_termux_x11_phosh_mobile_shell">Графическая среда Termux X11 + Phosh Mobile Shell.</string>
     <string name="main_stop_phosh_desktop">ОСТАНОВИТЬ РАБОЧИЙ СТОЛ PHOSH</string>
     <string name="main_app_storage_used">ЗАНЯТО В ХРАНИЛИЩЕ ПРИЛОЖЕНИЯ</string>
-    <string name="main_0_load">0% НАГРУЗКИ</string>
+    <string name="main_0_load" formatted="false">0% НАГРУЗКИ</string>
     <string name="main_100_max">100% МАКС.</string>
     <string name="main_disk">ДИСК</string>
     <string name="main_package_scan">СКАНИРОВАНИЕ ПАКЕТОВ</string>

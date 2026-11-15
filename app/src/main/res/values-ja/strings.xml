@@ -1096,7 +1096,7 @@
     <string name="main_termux_x11_phosh_mobile_shell">Termux X11 + Phoshモバイルshellのグラフィカル環境。</string>
     <string name="main_stop_phosh_desktop">Phoshデスクトップを停止</string>
     <string name="main_app_storage_used">アプリのストレージ使用量</string>
-    <string name="main_0_load">負荷 0%</string>
+    <string name="main_0_load" formatted="false">負荷 0%</string>
     <string name="main_100_max">最大 100%</string>
     <string name="main_disk">ディスク</string>
     <string name="main_package_scan">パッケージスキャン</string>

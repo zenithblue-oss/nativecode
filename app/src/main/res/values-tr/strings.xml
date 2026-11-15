@@ -1096,7 +1096,7 @@
     <string name="main_termux_x11_phosh_mobile_shell">Termux X11 + Phosh Mobile Shell grafik ortamı.</string>
     <string name="main_stop_phosh_desktop">PHOSH MASAÜSTÜNÜ DURDUR</string>
     <string name="main_app_storage_used">KULLANILAN UYGULAMA DEPOLAMASI</string>
-    <string name="main_0_load">0% YÜK</string>
+    <string name="main_0_load" formatted="false">0% YÜK</string>
     <string name="main_100_max">100% MAKS</string>
     <string name="main_disk">DİSK</string>
     <string name="main_package_scan">PAKET TARAMASI</string>

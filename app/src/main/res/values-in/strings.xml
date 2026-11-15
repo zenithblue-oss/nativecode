@@ -1096,7 +1096,7 @@
     <string name="main_termux_x11_phosh_mobile_shell">Lingkungan grafis Termux X11 + Phosh Mobile Shell.</string>
     <string name="main_stop_phosh_desktop">HENTIKAN DESKTOP PHOSH</string>
     <string name="main_app_storage_used">PENYIMPANAN APLIKASI TERPAKAI</string>
-    <string name="main_0_load">0% BEBAN</string>
+    <string name="main_0_load" formatted="false">0% BEBAN</string>
     <string name="main_100_max">100% MAKS</string>
     <string name="main_disk">DISK</string>
     <string name="main_package_scan">PEMINDAIAN PAKET</string>

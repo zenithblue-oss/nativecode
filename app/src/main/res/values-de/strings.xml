@@ -1096,7 +1096,7 @@
     <string name="main_termux_x11_phosh_mobile_shell">Grafische Umgebung mit Termux X11 + Phosh Mobile Shell.</string>
     <string name="main_stop_phosh_desktop">PHOSH-DESKTOP STOPPEN</string>
     <string name="main_app_storage_used">APP-SPEICHER BELEGT</string>
-    <string name="main_0_load">0% LAST</string>
+    <string name="main_0_load" formatted="false">0% LAST</string>
     <string name="main_100_max">100% MAX</string>
     <string name="main_disk">SPEICHER</string>
     <string name="main_package_scan">PAKETSCAN</string>

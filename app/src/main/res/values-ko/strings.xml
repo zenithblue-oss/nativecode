@@ -1096,7 +1096,7 @@
     <string name="main_termux_x11_phosh_mobile_shell">Termux X11 + Phosh Mobile Shell 그래픽 환경입니다.</string>
     <string name="main_stop_phosh_desktop">PHOSH 데스크톱 중지</string>
     <string name="main_app_storage_used">앱 저장소 사용량</string>
-    <string name="main_0_load">부하 0%</string>
+    <string name="main_0_load" formatted="false">부하 0%</string>
     <string name="main_100_max">최대 100%</string>
     <string name="main_disk">디스크</string>
     <string name="main_package_scan">패키지 검사</string>

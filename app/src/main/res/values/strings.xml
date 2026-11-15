@@ -1113,7 +1113,7 @@
     <string name="main_termux_x11_phosh_mobile_shell">Termux X11 + Phosh Mobile Shell graphical environment.</string>
     <string name="main_stop_phosh_desktop">STOP PHOSH DESKTOP</string>
     <string name="main_app_storage_used">APP STORAGE USED</string>
-    <string name="main_0_load">0% LOAD</string>
+    <string name="main_0_load" formatted="false">0% LOAD</string>
     <string name="main_100_max">100% MAX</string>
     <string name="main_disk">DISK</string>
     <string name="main_package_scan">PACKAGE SCAN</string>
