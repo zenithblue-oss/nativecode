@@ -77,7 +77,10 @@ object RuntimeUpdatePack {
         }
         val archive = resolveArchive(context)
             ?: return ApplyResult(false, "Runtime update pack is not downloaded")
-        return applyTo(root, archive).also { if (it.success) removePack(context) }
+        return applyTo(root, archive).also {
+            if (it.success) removePack(context)
+            com.zenithblue.nativecode.telemetry.Telemetry.componentUpdate(context, "runtime_pack", it.success)
+        }
     }
 
     /** Drop the ~135 MB on-demand pack once applied; the marker in the rootfs keeps [isNeeded] false. */

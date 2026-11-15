@@ -1244,6 +1244,8 @@ One observation for the owner: the bridge carries messages from agent to user. T
 
 **Effort.** M.
 
+**Built in 1.8.0.** Plugins applied only when `app/google-services.json` exists; BoM 35.2.0 (analytics, crashlytics, crashlytics-ndk); manifest flags off and AD_ID permission removed. `telemetry/Telemetry.kt` is the only Firebase importer (fixed `Event`/`Param` enums, `token()` turns free-form text into `other`); `ConsentSheet` is shown on the onboarding privacy page, once for upgraders, and from Settings → Crash reports & usage stats; revoke deletes unsent reports and resets Analytics data. All events in the table are wired, including `ai_session_start` surface (terminal/chat), `setup_complete` duration bucket and `component_update` (runtime pack, PanVK) which also sets a `component_<id>` Crashlytics key. Unit test `TelemetryTest`. Still owner work: Data safety form, hosted policy, Google Ads linking.
+
 ---
 
 ## 15. Backup and restore

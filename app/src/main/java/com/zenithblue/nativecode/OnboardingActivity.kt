@@ -68,6 +68,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     // ── Shared setup status state ──────────────────────────────────────────────
     private var isDebianBaseSetupStarted = false
+    private var setupStartedAt = 0L // elapsedRealtime; only feeds the setup_complete duration bucket
     private val setupProgressCoordinator = SetupProgressCoordinator()
     private var setupProgressGeneration = 0L
 
@@ -2361,6 +2362,7 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun runDebianBaseSetup() {
+        if (setupStartedAt == 0L) setupStartedAt = android.os.SystemClock.elapsedRealtime()
         startSetupFgs(
             "Installing Alpaquita Linux — setup scripts running"
         )
@@ -2910,7 +2912,10 @@ class OnboardingActivity : AppCompatActivity() {
         com.zenithblue.nativecode.telemetry.Telemetry.logOnce(
             this,
             com.zenithblue.nativecode.telemetry.Telemetry.Event.SETUP_COMPLETE,
-            com.zenithblue.nativecode.telemetry.Telemetry.Param.BACKEND to selectedIsolationMethod
+            com.zenithblue.nativecode.telemetry.Telemetry.Param.BACKEND to selectedIsolationMethod,
+            com.zenithblue.nativecode.telemetry.Telemetry.Param.DURATION to com.zenithblue.nativecode.telemetry.Telemetry.durationBucket(
+                if (setupStartedAt == 0L) 0 else android.os.SystemClock.elapsedRealtime() - setupStartedAt
+            )
         )
         HostServerController.ensureServers(this)
 

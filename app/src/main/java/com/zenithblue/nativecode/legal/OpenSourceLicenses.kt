@@ -85,6 +85,14 @@ object OpenSourceLicenses {
             licenseSummary = "Apache License 2.0. Common core Java utilities and future contract implementations."
         ),
         OssLicenseItem(
+            name = "Firebase Android SDK",
+            component = "Crashlytics (+ NDK) and Google Analytics for Firebase (opt-in only)",
+            licenseType = "Apache-2.0 / Firebase Terms of Service",
+            copyright = "Copyright (C) Google LLC",
+            url = "https://github.com/firebase/firebase-android-sdk",
+            licenseSummary = "Open-source SDK parts are Apache License 2.0; the Analytics service is used under the Firebase Terms of Service. Off until the user opts in."
+        ),
+        OssLicenseItem(
             name = "libsuperuser",
             component = "Root shell process management (StreamGobbler)",
             licenseType = "Apache-2.0",

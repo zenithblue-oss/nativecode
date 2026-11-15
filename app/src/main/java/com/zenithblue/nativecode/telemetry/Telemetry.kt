@@ -31,10 +31,33 @@ object Telemetry {
         TRIAL_START("trial_start"),
         PRO_PURCHASE("pro_purchase"),
         DESKTOP_START("desktop_start"),
+        COMPONENT_UPDATE("component_update"),
     }
 
     enum class Param(val key: String) {
-        BACKEND("backend"), TOOL("tool"), LIMIT("limit"), SOURCE("source"), SKU("sku")
+        BACKEND("backend"), TOOL("tool"), LIMIT("limit"), SOURCE("source"), SKU("sku"),
+        SURFACE("surface"), DURATION("duration"), ID("id"), RESULT("result")
+    }
+
+    /** Setup time as a coarse bucket, never the raw value. */
+    fun durationBucket(ms: Long): String = when {
+        ms <= 0 -> "unknown"
+        ms < 5 * 60_000 -> "lt5m"
+        ms < 15 * 60_000 -> "5to15m"
+        ms < 30 * 60_000 -> "15to30m"
+        else -> "gt30m"
+    }
+
+    /** Updater result: event (with consent) + a Crashlytics key so crashes show the component state. */
+    fun componentUpdate(ctx: Context, id: String, ok: Boolean) {
+        val result = if (ok) "ok" else "fail"
+        log(ctx, Event.COMPONENT_UPDATE, Param.ID to id, Param.RESULT to result)
+        if (!available(ctx)) return
+        try {
+            FirebaseCrashlytics.getInstance().setCustomKey("component_${token(id)}", result)
+        } catch (e: Exception) {
+            Log.w(TAG, "component key failed", e)
+        }
     }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

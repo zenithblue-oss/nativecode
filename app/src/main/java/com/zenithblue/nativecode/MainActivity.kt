@@ -4265,7 +4265,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private val chatGate = object : ChatGate {
-        override fun allowLaunch(tool: String, projectPath: String?) = aiLaunchAllowed(tool)
+        override fun allowLaunch(tool: String, projectPath: String?) = aiLaunchAllowed(tool, "chat")
         override fun canUseTool(tool: String) = FeatureGate.canLaunchAiTool(isPro(), tool) is GateResult.Allow
         override fun showUpsell(tool: String) { gateAllows(FeatureGate.canLaunchAiTool(isPro(), tool)) }
     }
@@ -4771,6 +4771,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         status?.text = "Updating PanVK driver…"
         executor.execute {
             val (ok, msg) = PanvkDriverUpdate.update(this)
+            Telemetry.componentUpdate(this, "panvk", ok)
             runOnUiThread {
                 panvkBusy = false
                 btn?.isEnabled = true
@@ -5527,7 +5528,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     /** AI tool + concurrent AI session gates (app tabs + all project workspaces). */
-    private fun aiLaunchAllowed(type: String): Boolean {
+    private fun aiLaunchAllowed(type: String, surface: String = "terminal"): Boolean {
         GuestGate.syncAsync(this)
         if (!ToolLauncherCatalog.isAiToolType(type)) return gateAllows(FeatureGate.canOpenShell(isPro()))
         if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), type))) return false
@@ -5535,7 +5536,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val ok = gateAllows(FeatureGate.canOpenAiSession(isPro(), aiSessionCount()))
         if (ok) {
             Telemetry.logOnce(this, Telemetry.Event.FIRST_AI_SESSION, Telemetry.Param.TOOL to type)
-            Telemetry.log(this, Telemetry.Event.AI_SESSION_START, Telemetry.Param.TOOL to type)
+            Telemetry.log(this, Telemetry.Event.AI_SESSION_START, Telemetry.Param.TOOL to type, Telemetry.Param.SURFACE to surface)
         }
         return ok
     }
