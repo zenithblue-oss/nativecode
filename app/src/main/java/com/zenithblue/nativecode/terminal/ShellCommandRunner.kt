@@ -99,6 +99,17 @@ object ShellCommandRunner {
         return pb.start()
     }
 
+    /**
+     * Starts a process with stdin, stdout and (unless [mergeStderr]) stderr all piped, for callers that stream raw
+     * bytes in or out (guest `tar` backup / restore). The caller owns reading and closing every stream.
+     */
+    fun startPiped(ctx: Context, cmd: Array<String>, envMap: Map<String, String>? = null, mergeStderr: Boolean = false): Process {
+        val pb = ProcessBuilder(*adjustHostCmd(cmd))
+        applyEnvironment(ctx, pb, envMap)
+        pb.redirectErrorStream(mergeStderr)
+        return pb.start()
+    }
+
     /** Runs a command and streams each output line to [onLine] on the main thread. */
     fun runStreamed(
         ctx: Context,

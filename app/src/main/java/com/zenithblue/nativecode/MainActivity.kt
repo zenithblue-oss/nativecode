@@ -186,7 +186,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var fileViewerContentHost: FrameLayout
     private lateinit var fileViewerScrollView: ScrollView
     private lateinit var fileViewerContainer: LinearLayout
-    private var dirSearchQuery: String = ""
     private lateinit var diffViewerRootContainer: LinearLayout
     private lateinit var diffViewerTopBar: WorkspaceTopBar
     private lateinit var diffViewerScrollView: ScrollView
@@ -452,7 +451,25 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val ID_PROOT_FILES = 26
     private val ID_SKILLS = 27
     private val ID_TOPBAR = 28
+    private val ID_BACKUP = 29
     private lateinit var topBarScrollView: ScrollView
+    private lateinit var backupScrollView: ScrollView
+    private var backupPage: com.zenithblue.nativecode.backup.ui.BackupPage? = null
+    private var docResult: ((Uri?) -> Unit)? = null
+    private val createDocLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        docResult.also { docResult = null }?.invoke(uri)
+    }
+    private val openDocLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        docResult.also { docResult = null }?.invoke(uri)
+    }
+    private val backupHost = object : com.zenithblue.nativecode.backup.ui.BackupHost {
+        override fun createDocument(name: String, onResult: (Uri?) -> Unit) { docResult = onResult; createDocLauncher.launch(name) }
+        override fun openDocument(onResult: (Uri?) -> Unit) { docResult = onResult; openDocLauncher.launch(arrayOf("*/*")) }
+        override fun aiSessionsOpen() = aiSessionCount() > 0
+        override fun keepAwake(on: Boolean) {
+            if (on) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else applyKeepAwake()
+        }
+    }
 
     private var fileViewerBackPage = ID_FILES
     private var diffViewerBackPage = ID_GIT
@@ -577,12 +594,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var configIconInput: EditText
 
     private lateinit var projectDirTreeContainer: FrameLayout
-    private lateinit var projectDirTreeScrollView: ScrollView
-    private lateinit var projectDirTreeLayout: LinearLayout
+    private lateinit var directoryPage: com.zenithblue.nativecode.workspace.DirectoryPage
     /** Sticky DIRECTORY title + search (outside ScrollView). */
-    private lateinit var projectDirStickyHeader: LinearLayout
-    private var projectDirSearchEt: EditText? = null
-    private var projectDirSearchClear: ImageView? = null
     private lateinit var projectGitDiffContainer: FrameLayout
     private lateinit var projectGitDiffScrollView: ScrollView
     private lateinit var projectGitDiffLayout: LinearLayout
@@ -592,7 +605,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Non-null while the diff viewer shows one file of a commit (from the history page). */
     private var diffViewerCommit: String? = null
 
-    private val expandedFolders = HashSet<String>()
 
     private lateinit var projectWorkspaceContainer: FrameLayout
     private lateinit var projectWorkspaceLayout: LinearLayout
@@ -602,7 +614,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var workspaceHubLayout: View
     /** Host for workspace hub AI tool cards; rebuilt on linux_method change. */
     private var workspaceHubToolsHost: LinearLayout? = null
-    private lateinit var workspaceDirTreeLayout: LinearLayout
     private lateinit var projectGitChangesView: com.zenithblue.nativecode.git.ui.GitChangesView
     private lateinit var workspaceProjectNameTv: TextView
     private lateinit var workspaceProjectIconIv: ImageView
@@ -1148,6 +1159,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (::topBarScrollView.isInitialized) {
             topBarScrollView.visibility = View.GONE
         }
+        if (::backupScrollView.isInitialized) {
+            backupScrollView.visibility = View.GONE
+        }
         if (::hardwareScrollView.isInitialized) {
             hardwareScrollView.visibility = View.GONE
         }
@@ -1349,6 +1363,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     topBarScrollView.scrollTo(0, 0)
                 }
             }
+            ID_BACKUP -> {
+                if (::backupScrollView.isInitialized) {
+                    backupScrollView.visibility = View.VISIBLE
+                    backupScrollView.scrollTo(0, 0)
+                }
+                backupPage?.refresh()
+            }
             ID_COMPONENTS -> {
                 if (::componentsScrollView.isInitialized) {
                     componentsScrollView.visibility = View.VISIBLE
@@ -1512,6 +1533,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             navigateBackFromSubpage(ID_TOPBAR, fallback = ID_SETTINGS)
             return
         }
+        if (::backupScrollView.isInitialized && backupScrollView.visibility == View.VISIBLE) {
+            navigateBackFromSubpage(ID_BACKUP, fallback = ID_SETTINGS)
+            return
+        }
         if (::aiSafetyScrollView.isInitialized && aiSafetyScrollView.visibility == View.VISIBLE) {
             navigateBackFromSubpage(ID_AI_SAFETY, fallback = ID_SETTINGS)
             return
@@ -1568,6 +1593,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         if (::projectDirTreeContainer.isInitialized && projectDirTreeContainer.visibility == View.VISIBLE) {
+            if (::directoryPage.isInitialized && directoryPage.handleBack()) return
             navigateToPage(ID_PROJECT_WORKSPACE, false)
             return
         }
@@ -1650,7 +1676,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             id == ID_CHROOT_SETTINGS || id == ID_PROOT_SETTINGS ||
             id == ID_SOFTWARE_MANAGER || id == ID_MARKETPLACE || id == ID_APPS || id == ID_MP_INSTALLER ||
             id == ID_CLI_AUTH || id == ID_AI_SAFETY || id == ID_PRIVACY_POLICY || id == ID_COMPONENTS ||
-            id == ID_HARDWARE || id == ID_X11_SETTINGS || id == ID_SKILLS || id == ID_TOPBAR
+            id == ID_HARDWARE || id == ID_X11_SETTINGS || id == ID_SKILLS || id == ID_TOPBAR || id == ID_BACKUP
         ) {
             showGlobalNav = false
             showProjectNav = false
@@ -1986,6 +2012,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         buildAiSafetyPage()
         buildComponentsPage()
         buildTopBarPage()
+        buildBackupPage()
         buildPrivacyPolicyPage()
         buildHardwarePage()
         buildProotSettingsPage()
@@ -2018,6 +2045,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         contentFrame.addView(aiSafetyScrollView)
         contentFrame.addView(componentsScrollView)
         contentFrame.addView(topBarScrollView)
+        contentFrame.addView(backupScrollView)
         contentFrame.addView(privacyPolicyScrollView)
         contentFrame.addView(hardwareScrollView)
         contentFrame.addView(x11SettingsScrollView)
@@ -4464,6 +4492,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         )
         settingsHubLayout.addView(spacer(16))
 
+        settingsHubLayout.addView(
+            settingsHubNavRow(
+                iconRes = R.drawable.ic_lucide_archive,
+                title = "BACKUP",
+                subtitle = "Back up and restore your guest home",
+                pageId = ID_BACKUP
+            )
+        )
+        settingsHubLayout.addView(spacer(16))
+
         // GitHub account
         settingsHubLayout.addView(buildSettingsGithubCard())
         settingsHubLayout.addView(spacer(16))
@@ -6823,6 +6861,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     // ── Helper Sub-page Actions ──────────────────────────────────────────────
 
     private fun showFileViewer(name: String, backPage: Int = ID_FILES) {
+        // Opening another file while the editor holds unsaved edits: ask first (Save / Discard / Cancel).
+        fileEditor?.let { ed ->
+            val f = File(name).let { if (!it.exists() && !it.isAbsolute) File(activeProjectHostDir(), name) else it }
+            if (ed.dirty && ed.file.absolutePath != f.absolutePath) {
+                ed.confirmLeave { showFileViewer(name, backPage) }
+                return
+            }
+        }
         fileViewerBackPage = backPage
         if (backPage == ID_PROJECT_DIR_TREE ||
             backPage == ID_PROJECT_WORKSPACE ||
@@ -6897,6 +6943,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
      */
     private fun dismissFileViewer() {
         if (!::fileViewerRootContainer.isInitialized) return
+        val ed = fileEditor
+        if (ed != null && ed.dirty) {
+            ed.confirmLeave { dismissFileViewer() }
+            return
+        }
+        releaseFileEditor()
         fileViewerRootContainer.visibility = View.GONE
         val target = when (fileViewerBackPage) {
             ID_PROJECT_DIR_TREE,
@@ -6963,25 +7015,41 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val ext = targetFile.extension.lowercase(Locale.ROOT)
+        val forceEditor = editFileOnce == targetFile.absolutePath
+        editFileOnce = null
+        fileViewerStickyHeader.visibility = View.VISIBLE
         // Code + markdown fill host and scroll internally; media/binary use outer scroll
         when {
-            ext == "md" || ext == "markdown" -> {
+            (ext == "md" || ext == "markdown") && !forceEditor -> {
                 fileViewerContentHost.addView(
                     buildMarkdownViewerCard(targetFile).apply {
                         layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
                     }
                 )
+                addEditPill(targetFile, backPage)
             }
             isTextFile(targetFile, ext) &&
-                ext !in listOf("html", "htm") &&
+                (forceEditor || ext !in listOf("html", "htm")) &&
                 ext !in listOf("png", "jpg", "jpeg", "webp", "gif", "bmp", "ico", "svg") &&
                 ext !in listOf("mp4", "webm", "mkv", "3gp", "avi", "mov") &&
                 ext != "apk" -> {
-                fileViewerContentHost.addView(
-                    buildCodeViewerCard(targetFile, fillParent = true).apply {
-                        layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
-                    }
-                )
+                if (targetFile.length() <= com.zenithblue.nativecode.editor.EditorLimits.VIEW_MAX_BYTES) {
+                    val ed = fileEditor?.takeIf { it.file.absolutePath == targetFile.absolutePath }
+                        ?: run {
+                            releaseFileEditor()
+                            com.zenithblue.nativecode.editor.EditorView(this, targetFile).also { fileEditor = it }
+                        }
+                    fileViewerStickyHeader.visibility = View.GONE // the editor has its own header
+                    (ed.parent as? ViewGroup)?.removeView(ed)
+                    ed.layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+                    fileViewerContentHost.addView(ed)
+                } else {
+                    fileViewerContentHost.addView(
+                        buildCodeViewerCard(targetFile, fillParent = true).apply {
+                            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+                        }
+                    )
+                }
             }
             else -> {
                 val scroll = ScrollView(this).apply {
@@ -7008,11 +7076,58 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
                 scroll.addView(wrap)
                 fileViewerContentHost.addView(scroll)
+                if (ext in listOf("html", "htm")) addEditPill(targetFile, backPage)
             }
         }
         // Keep legacy fields in sync for any other callers
         fileViewerContainer.removeAllViews()
         fileViewerScrollView.scrollTo(0, 0)
+    }
+
+    // ── Built-in code editor (plan 16) ───────────────────────────────────────
+
+    private var fileEditor: com.zenithblue.nativecode.editor.EditorView? = null
+    /** Absolute path to open in the editor even when a rendered viewer (markdown / html) is the default. */
+    private var editFileOnce: String? = null
+
+    private fun releaseFileEditor() {
+        fileEditor?.let { (it.parent as? ViewGroup)?.removeView(it); it.release() }
+        fileEditor = null
+    }
+
+    /** EDIT pill over a rendered viewer (markdown, html) that switches to the editor. */
+    private fun addEditPill(file: File, backPage: Int) {
+        val pill = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply { setColor(NC.PRIMARY_CON) }
+            setPadding(dp(12), dp(10), dp(14), dp(10))
+            elevation = dp(4).toFloat()
+            contentDescription = "Edit ${file.name}"
+            isClickable = true
+            setOnClickListener {
+                editFileOnce = file.absolutePath
+                renderFileViewerContent(file.absolutePath, backPage)
+            }
+            addView(ImageView(this@MainActivity).apply {
+                setImageResource(R.drawable.ic_lucide_pencil)
+                setColorFilter(Color.parseColor("#0A0A0A"))
+                layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply { rightMargin = dp(6) }
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "EDIT"
+                textSize = 12f
+                typeface = Typeface.MONOSPACE
+                paint.isFakeBoldText = true
+                setTextColor(Color.parseColor("#0A0A0A"))
+            })
+            layoutParams = FrameLayout.LayoutParams(WRAP, WRAP).apply {
+                gravity = Gravity.BOTTOM or Gravity.END
+                rightMargin = dp(16)
+                bottomMargin = dp(16)
+            }
+        }
+        fileViewerContentHost.addView(pill)
     }
 
     private fun buildImageGifCard(file: File): View {
@@ -19657,480 +19772,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun refreshWorkspaceDirTree() {
-        if (!::workspaceDirTreeLayout.isInitialized) return
-        workspaceDirTreeLayout.removeAllViews()
-        val projectHostDir = activeProjectHostDir()
-        if (projectHostDir.exists() && projectHostDir.isDirectory) {
-            if (dirSearchQuery.isEmpty()) {
-                renderDirectoryTree(projectHostDir, workspaceDirTreeLayout, 0)
-            } else {
-                renderSearchDirectoryResults(projectHostDir, dirSearchQuery, workspaceDirTreeLayout)
-            }
-            if (workspaceDirTreeLayout.childCount == 0) {
-                val emptyCard = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    background = cyberBrutalistBg(
-                        fillColor = NC.SURFACE_LOW,
-                        strokeColor = Color.parseColor("#3c4a3f"),
-                        shadowColor = NC.SHADOW_DARK,
-                        offsetDp = 6,
-                        cornerRadiusDp = 0,
-                        rightFaceColor = Color.parseColor("#3c4a3f")
-                    )
-                    setPadding(dp(24), dp(32), dp(24), dp(32))
-                    layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
-                        topMargin = dp(16)
-                        leftMargin = dp(8)
-                        rightMargin = dp(8)
-                    }
-                }
-
-                val emptyIcon = ImageView(this).apply {
-                    setImageResource(R.drawable.ic_folder_special)
-                    setColorFilter(NC.PRIMARY)
-                    layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply {
-                        bottomMargin = dp(12)
-                    }
-                }
-
-                val emptyTitle = TextView(this).apply {
-                    text = "NO FILES IN DIRECTORY"
-                    textSize = 15f
-                    setTextColor(Color.WHITE)
-                    typeface = Typeface.MONOSPACE
-                    paint.isFakeBoldText = true
-                    gravity = Gravity.CENTER
-                }
-
-                val emptyDesc = TextView(this).apply {
-                    text = "Workspace folder is currently empty:\n${projectHostDir.absolutePath}\n\nUse terminal to create files or refresh directory below."
-                    textSize = 11f
-                    setTextColor(NC.ON_SURF_VAR)
-                    typeface = Typeface.MONOSPACE
-                    gravity = Gravity.CENTER
-                    setPadding(0, dp(8), 0, dp(16))
-                }
-
-                val refreshBtn = primaryButton("REFRESH DIRECTORY") {
-                    refreshWorkspaceDirTree()
-                }
-
-                emptyCard.addView(emptyIcon)
-                emptyCard.addView(emptyTitle)
-                emptyCard.addView(emptyDesc)
-                emptyCard.addView(refreshBtn)
-
-                workspaceDirTreeLayout.addView(emptyCard)
-            }
-        } else {
-            val emptyCard = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_LOW,
-                    strokeColor = Color.parseColor("#93000a"),
-                    shadowColor = NC.SHADOW_DARK,
-                    offsetDp = 6,
-                    cornerRadiusDp = 0,
-                    rightFaceColor = Color.parseColor("#93000a")
-                )
-                setPadding(dp(24), dp(32), dp(24), dp(32))
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
-                    topMargin = dp(16)
-                    leftMargin = dp(8)
-                    rightMargin = dp(8)
-                }
-            }
-
-            val emptyIcon = ImageView(this).apply {
-                setImageResource(R.drawable.ic_folder)
-                setColorFilter(Color.parseColor("#ffb4ab"))
-                layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply {
-                    bottomMargin = dp(12)
-                }
-            }
-
-            val emptyTitle = TextView(this).apply {
-                text = "DIRECTORY NOT FOUND"
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.MONOSPACE
-                paint.isFakeBoldText = true
-                gravity = Gravity.CENTER
-            }
-
-            val emptyDesc = TextView(this).apply {
-                text = "Workspace folder does not exist:\n${projectHostDir.absolutePath}\n\nTap below to initialize directory."
-                textSize = 11f
-                setTextColor(Color.parseColor("#ffb4ab"))
-                typeface = Typeface.MONOSPACE
-                gravity = Gravity.CENTER
-                setPadding(0, dp(8), 0, dp(16))
-            }
-
-            val createDirBtn = primaryButton("CREATE DIRECTORY") {
-                try {
-                    projectHostDir.mkdirs()
-                    refreshWorkspaceDirTree()
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "Failed to create directory", Toast.LENGTH_SHORT).show()
-                }
-            }
-
-            emptyCard.addView(emptyIcon)
-            emptyCard.addView(emptyTitle)
-            emptyCard.addView(emptyDesc)
-            emptyCard.addView(createDirBtn)
-
-            workspaceDirTreeLayout.addView(emptyCard)
-        }
-    }
-
-    private fun renderSearchDirectoryResults(rootDir: File, query: String, container: LinearLayout) {
-        val matches = mutableListOf<File>()
-        fun scan(dir: File) {
-            val files = dir.listFiles() ?: return
-            for (f in files) {
-                if (f.name.startsWith(".")) continue
-                val relPath = if (f.absolutePath.startsWith(rootDir.absolutePath)) {
-                    f.absolutePath.removePrefix(rootDir.absolutePath).trimStart('/')
-                } else {
-                    f.name
-                }
-                if (f.name.contains(query, ignoreCase = true) || relPath.contains(query, ignoreCase = true)) {
-                    matches.add(f)
-                }
-                if (f.isDirectory) {
-                    scan(f)
-                }
-            }
-        }
-        scan(rootDir)
-        matches.sortWith(compareBy({ !it.isDirectory }, { it.name }))
-
-        if (matches.isEmpty()) {
-            val emptyCard = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_LOW,
-                    strokeColor = NC.BORDER,
-                    shadowColor = NC.SHADOW_DARK,
-                    offsetDp = 4,
-                    cornerRadiusDp = 0,
-                    rightFaceColor = NC.BORDER
-                )
-                setPadding(dp(20), dp(24), dp(20), dp(24))
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) }
-            }
-            val emptyTv = TextView(this).apply {
-                text = "NO FILES MATCHING \"$query\""
-                textSize = 13f
-                setTextColor(NC.ON_SURF_VAR)
-                typeface = Typeface.MONOSPACE
-                gravity = Gravity.CENTER
-            }
-            emptyCard.addView(emptyTv)
-            container.addView(emptyCard)
-            return
-        }
-
-        val searchHeaderRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), dp(8), dp(4), dp(8))
-        }
-        val searchHeaderTitle = TextView(this).apply {
-            text = "SEARCH RESULTS // ${matches.size} MATCHES FOR \"$query\""
-            textSize = 10f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.MONOSPACE
-            paint.isFakeBoldText = true
-        }
-        searchHeaderRow.addView(searchHeaderTitle)
-        container.addView(searchHeaderRow)
-
-        val resultsCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = NC.BORDER,
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 6,
-                cornerRadiusDp = 0,
-                rightFaceColor = NC.BORDER
-            )
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-        }
-
-        for ((idx, file) in matches.withIndex()) {
-            val relPath = if (file.absolutePath.startsWith(rootDir.absolutePath)) {
-                file.absolutePath.removePrefix(rootDir.absolutePath).trimStart('/')
-            } else {
-                file.name
-            }
-            val isDir = file.isDirectory
-
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(12), dp(10), dp(12), dp(10))
-                setOnClickListener {
-                    if (isDir) {
-                        expandedFolders.add(file.absolutePath)
-                        dirSearchQuery = ""
-                        refreshWorkspaceDirTree()
-                    } else {
-                        showFileViewer(file.absolutePath, ID_PROJECT_DIR_TREE)
-                    }
-                }
-                setOnLongClickListener {
-                    copyToClipboard("File Path", relPath)
-                    true
-                }
-                setOnTouchListener { v, event ->
-                    when (event.action) {
-                        MotionEvent.ACTION_DOWN -> v.setBackgroundColor(NC.SURFACE_HIGH)
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.setBackgroundColor(Color.TRANSPARENT)
-                    }
-                    false
-                }
-            }
-
-            val iconIv = ImageView(this).apply {
-                setImageResource(if (isDir) R.drawable.ic_folder else R.drawable.ic_extension)
-                setColorFilter(if (isDir) NC.PRIMARY else NC.ON_SURF_VAR)
-                layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { rightMargin = dp(10) }
-            }
-
-            val textCol = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            }
-
-            val nameTv = TextView(this).apply {
-                text = file.name
-                textSize = 13f
-                setTextColor(NC.ON_SURFACE)
-                typeface = Typeface.DEFAULT_BOLD
-            }
-            val pathTv = TextView(this).apply {
-                text = relPath
-                textSize = 10f
-                setTextColor(NC.ON_SURF_VAR)
-                typeface = Typeface.MONOSPACE
-            }
-            textCol.addView(nameTv)
-            textCol.addView(pathTv)
-
-            val copyPathBtn = TextView(this).apply {
-                text = "COPY PATH"
-                textSize = 9f
-                setTextColor(NC.PRIMARY)
-                typeface = Typeface.DEFAULT_BOLD
-                background = roundedBg(NC.SURFACE_VAR, NC.BORDER, dp(4))
-                setPadding(dp(8), dp(4), dp(8), dp(4))
-                setOnClickListener {
-                    copyToClipboard("File Path", relPath)
-                }
-            }
-
-            row.addView(iconIv)
-            row.addView(textCol)
-            row.addView(copyPathBtn)
-            resultsCard.addView(row)
-
-            if (idx < matches.size - 1) {
-                val divider = View(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(MATCH, dp(1)).apply {
-                        leftMargin = dp(12)
-                        rightMargin = dp(12)
-                    }
-                    setBackgroundColor(NC.BORDER_VAR)
-                }
-                resultsCard.addView(divider)
-            }
-        }
-
-        container.addView(resultsCard)
-    }
-
-    private fun renderDirectoryTree(dir: File, container: LinearLayout, depth: Int) {
-        val materialTf = try {
-            Typeface.createFromAsset(assets, "fonts/material_icons.ttf")
-        } catch (e: Exception) {
-            Typeface.DEFAULT
-        }
-        val files = dir.listFiles()?.sortedWith(compareBy({ !it.isDirectory }, { it.name })) ?: return
-        for (file in files) {
-            if (file.name.startsWith(".")) continue
-            val isExpanded = expandedFolders.contains(file.absolutePath)
-            val indentPx = dp(16 * depth + 8)
-            val isDir = file.isDirectory
-
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(indentPx, dp(9), dp(12), dp(9))
-                background = if (isDir) GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    setColor(if (isExpanded) NC.SURFACE_CONTAINER else Color.TRANSPARENT)
-                    setStroke(0, Color.TRANSPARENT)
-                } else null
-                setOnClickListener {
-                    if (isDir) {
-                        if (isExpanded) {
-                            expandedFolders.remove(file.absolutePath)
-                        } else {
-                            expandedFolders.add(file.absolutePath)
-                        }
-                        refreshWorkspaceDirTree()
-                    } else {
-                        showFileViewer(file.absolutePath, ID_PROJECT_DIR_TREE)
-                    }
-                }
-                setOnLongClickListener {
-                    val projectHost = activeProjectHostDir()
-                    val rel = if (file.absolutePath.startsWith(projectHost.absolutePath)) {
-                        file.absolutePath.removePrefix(projectHost.absolutePath).trimStart('/')
-                    } else {
-                        file.name
-                    }
-                    copyToClipboard("File Path", rel)
-                    true
-                }
-                setOnTouchListener { v, event ->
-                    when (event.action) {
-                        MotionEvent.ACTION_DOWN -> v.setBackgroundColor(NC.SURFACE_HIGH)
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.background = if (isDir && isExpanded) GradientDrawable().apply {
-                            shape = GradientDrawable.RECTANGLE
-                            setColor(NC.SURFACE_CONTAINER)
-                        } else null
-                    }
-                    false
-                }
-            }
-
-            // Left accent bar for directories
-            if (depth == 0 && isDir) {
-                val accent = View(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp(2), ViewGroup.LayoutParams.MATCH_PARENT)
-                    setBackgroundColor(if (isExpanded) NC.PRIMARY else NC.OUTLINE_VAR)
-                }
-                row.addView(accent)
-                row.addView(spacer(6).apply { layoutParams = LinearLayout.LayoutParams(dp(6), ViewGroup.LayoutParams.MATCH_PARENT) })
-            }
-            
-            val indicatorTv = TextView(this).apply {
-                if (isDir) {
-                    typeface = materialTf
-                    text = if (isExpanded) "\uE313" else "\uE315"
-                    textSize = 16f
-                    setTextColor(if (isExpanded) NC.PRIMARY else NC.ON_SURF_VAR)
-                    setPadding(0, 0, dp(4), 0)
-                } else {
-                    text = ""
-                    setPadding(0, 0, dp(20), 0)
-                }
-            }
-            
-            val iconTv = TextView(this).apply {
-                typeface = materialTf
-                val icon = when {
-                    isDir -> {
-                        if (isExpanded) "\uE2C8" else "\uE2C7" // folder_open or folder
-                    }
-                    else -> {
-                        val name = file.name.lowercase()
-                        val ext = name.substringAfterLast('.', "")
-                        when {
-                            name == "license" || name == "license.txt" || name == "license.md" -> "\uE90F" // gavel
-                            name == "readme.md" || name == "readme" || name == "readme.txt" -> "\uE24D" // insert_drive_file
-                            name == "todo.md" || name == "todo" || name == "todo.txt" -> "\uE24D"
-                            name == "plan.md" || name == "plan" || name == "plan.txt" -> "\uE24D"
-                            name == "gradlew" || name == "gradlew.bat" -> "\uEB8E" // terminal
-                            name == "build.gradle.kts" || name == "build.gradle" || name == "settings.gradle.kts" || name == "settings.gradle" -> "\uE8B8" // settings
-                            ext == "kt" -> "\uE86F" // code
-                            ext == "kts" -> "\uE86F"
-                            ext == "java" -> "\uE86F"
-                            ext == "class" -> "\uE86F"
-                            ext == "jar" -> "\uE149" // archive
-                            ext == "xml" -> "\uE86F" // code
-                            ext == "json" -> "\uE8B8" // settings
-                            ext == "yml" || ext == "yaml" -> "\uE8B8" // settings
-                            ext == "properties" || ext == "prop" -> "\uE8B8"
-                            ext == "pro" -> "\uE8B8"
-                            ext == "sh" || ext == "bash" || ext == "zsh" -> "\uEB8E" // terminal
-                            ext == "bat" || ext == "cmd" -> "\uEB8E" // terminal
-                            ext in listOf("png", "jpg", "jpeg", "gif", "webp", "ico", "svg") -> "\uE3F4" // image
-                            ext == "md" -> "\uE24D" // insert_drive_file
-                            ext == "txt" -> "\uE24D"
-                            ext == "pdf" -> "\uE24D"
-                            ext in listOf("zip", "tar", "gz", "rar", "7z") -> "\uE149" // archive
-                            ext == "apk" -> "\uE859" // android
-                            else -> "\uE24D"
-                        }
-                    }
-                }
-                text = icon
-                textSize = 16f
-                setPadding(0, 0, dp(8), 0)
-                setTextColor(if (isDir) NC.PRIMARY else NC.SECONDARY)
-            }
-            
-            val nameTv = TextView(this).apply {
-                text = file.name
-                textSize = 14f
-                setTextColor(if (isDir) NC.ON_SURFACE else NC.ON_SURF_VAR)
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-                if (isDir) {
-                    typeface = Typeface.DEFAULT_BOLD
-                } else {
-                    typeface = Typeface.MONOSPACE
-                }
-            }
-
-            val sizeOrChevron: View = if (isDir) {
-                ImageView(this).apply {
-                    setImageResource(R.drawable.ic_chevron_right)
-                    setColorFilter(if (isExpanded) NC.PRIMARY else NC.OUTLINE_VAR)
-                    layoutParams = LinearLayout.LayoutParams(dp(16), dp(16))
-                }
-            } else {
-                val ext = file.extension.uppercase()
-                TextView(this).apply {
-                    text = if (ext.isNotEmpty()) ext else "FILE"
-                    textSize = 9f
-                    setTextColor(NC.ON_SURF_VAR)
-                    typeface = Typeface.MONOSPACE
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.RECTANGLE
-                        setColor(NC.SURFACE_HIGHEST)
-                        setStroke(dp(1), NC.OUTLINE_VAR)
-                    }
-                    setPadding(dp(4), dp(2), dp(4), dp(2))
-                }
-            }
-            
-            row.addView(indicatorTv)
-            row.addView(iconTv)
-            row.addView(nameTv)
-            row.addView(sizeOrChevron)
-            container.addView(row)
-
-            if (depth == 0) {
-                val rowDiv = View(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(MATCH, dp(1))
-                    setBackgroundColor(NC.SURFACE_HIGH)
-                }
-                container.addView(rowDiv)
-            }
-            
-            if (isDir && isExpanded) {
-                renderDirectoryTree(file, container, depth + 1)
-            }
-        }
+        if (::directoryPage.isInitialized) directoryPage.refresh()
     }
 
     private fun projectGitMethod(): String =
@@ -20227,6 +19869,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         startWorkspaceTerminalTab(type)
     }
 
+    /** One-shot guest cwd for the next workspace terminal tab (Directory page "Open terminal here"). */
+    private var wsTermCwd: String? = null
+
     private fun startWorkspaceTerminalTab(type: String) {
         if (!reserveTerminalSlot(app = false)) {
             Toast.makeText(this, "Maximum 10 tabs allowed", Toast.LENGTH_SHORT).show()
@@ -20236,7 +19881,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         maybeToastHeavyToolLaunch(type)
         val ticket = captureTerminalLaunch(app = false, type)
         // shell-root: login at /root (no project cwd — avoid root-owned files under flux home)
-        val workDir = if (type == "shell-root") null else ticket.project
+        val workDir = if (type == "shell-root") null else (wsTermCwd.also { wsTermCwd = null } ?: ticket.project)
         val user = LinuxCommandBuilder.sessionUserForType(type)
         if (ticket.method == "chroot") {
             executor.execute { try { RootShell.isRootAvailable() } catch (_: Exception) {} }
@@ -21514,128 +21159,46 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
         }
         projectDirTreeTopBar = createProjectSubpageTopBar()
-        projectDirStickyHeader = buildDirStickyHeader()
-        projectDirTreeScrollView = ScrollView(this).apply {
+        directoryPage = com.zenithblue.nativecode.workspace.DirectoryPage(this, directoryHost).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
-            clipToPadding = false
-            setPadding(0, 0, 0, dp(100))
-            setBackgroundColor(NC.BG)
         }
-        projectDirTreeLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        workspaceDirTreeLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(8), dp(4), dp(8), dp(8))
-        }
-        projectDirTreeLayout.addView(workspaceDirTreeLayout)
-        projectDirTreeScrollView.addView(projectDirTreeLayout)
         col.addView(projectDirTreeTopBar)
-        col.addView(projectDirStickyHeader)
-        col.addView(projectDirTreeScrollView)
+        col.addView(directoryPage)
         projectDirTreeContainer.addView(col)
     }
 
-    /** Sticky title + search; lives outside ScrollView so it stays pinned. */
-    private fun buildDirStickyHeader(): LinearLayout {
-        val dirHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(8))
-            setBackgroundColor(NC.BG)
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+    private val directoryHost = object : com.zenithblue.nativecode.workspace.DirectoryHost {
+        override fun root() = activeProjectHostDir()
+        override fun openFile(file: File) = showFileViewer(file.absolutePath, ID_PROJECT_DIR_TREE)
+        override fun copyText(label: String, text: String) = copyToClipboard(label, text)
+        override fun guestPath(file: File) = ProjectPathResolver.toDebianPath(this@MainActivity, file, activeProjectMethod)
+        override fun openTerminalHere(dir: File) {
+            val guest = guestPath(dir) ?: return Toast.makeText(this@MainActivity, "Folder is outside the guest", Toast.LENGTH_SHORT).show()
+            navigateToPage(ID_PROJECT_WORKSPACE, false)
+            wsTermCwd = guest
+            createWorkspaceTerminalTab("shell")
+            wsTermCwd = null
         }
-        val dirHeaderRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+        override fun gitChanges(): List<Pair<String, Char>>? {
+            val method = projectGitMethod()
+            if (!com.zenithblue.nativecode.git.GitRepoService.isGitRepo(this@MainActivity, activeProjectPath, method)) return null
+            val r = com.zenithblue.nativecode.git.GitRepoService.loadChanges(this@MainActivity, activeProjectPath, method)
+            return (r as? com.zenithblue.nativecode.git.RepoStatusResult.Ok)?.status?.files?.map { it.path to it.status }
         }
-        dirHeaderRow.addView(TextView(this).apply {
-            text = "DIRECTORY"
-            textSize = 18f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        })
-        dirHeaderRow.addView(TextView(this).apply {
-            text = "// FILE TREE"
-            textSize = 10f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-        })
-
-        val searchCard = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(Color.parseColor("#0A0A0A"))
-                setStroke(dp(2), NC.SURFACE_HIGH)
-            }
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(12) }
+        override fun confirmDelete(name: String, isDir: Boolean, onConfirm: () -> Unit) {
+            showBrutalistConfirmDialog(
+                title = if (isDir) "DELETE FOLDER" else "DELETE FILE",
+                message = if (isDir) "Delete $name and everything inside it? This can not be undone." else "Delete $name? This can not be undone.",
+                confirmLabel = "DELETE",
+                destructive = true,
+                onConfirm = onConfirm,
+            )
         }
-        searchCard.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_search)
-            setColorFilter(NC.PRIMARY)
-            layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply { rightMargin = dp(8) }
-        })
-
-        val clearBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_close)
-            setColorFilter(NC.OUTLINE)
-            setPadding(dp(4), dp(4), dp(4), dp(4))
-            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
-            visibility = if (dirSearchQuery.isNotEmpty()) View.VISIBLE else View.GONE
-        }
-        val searchEt = EditText(this).apply {
-            hint = "// SEARCH FILES IN WORKSPACE..."
-            setHintTextColor(NC.OUTLINE)
-            setTextColor(NC.ON_SURFACE)
-            textSize = 12f
-            typeface = Typeface.MONOSPACE
-            background = null
-            setSingleLine(true)
-            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            setText(dirSearchQuery)
-        }
-        clearBtn.setOnClickListener { searchEt.setText("") }
-        searchEt.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                dirSearchQuery = s?.toString()?.trim() ?: ""
-                clearBtn.visibility = if (dirSearchQuery.isNotEmpty()) View.VISIBLE else View.GONE
-                if (::workspaceDirTreeLayout.isInitialized) {
-                    refreshWorkspaceDirTree()
-                }
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
-        searchCard.addView(searchEt)
-        searchCard.addView(clearBtn)
-        projectDirSearchEt = searchEt
-        projectDirSearchClear = clearBtn
-
-        dirHeader.addView(dirHeaderRow)
-        dirHeader.addView(searchCard)
-        dirHeader.addView(View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, dp(1)).apply { topMargin = dp(10) }
-            setBackgroundColor(NC.OUTLINE_VAR)
-        })
-        return dirHeader
     }
 
     private fun openProjectDirTree() {
-        projectDirTreeScrollView.scrollTo(0, 0)
         updateProjectSubpageTopBar(projectDirTreeTopBar)
-        projectDirSearchEt?.let { et ->
-            if (et.text?.toString() != dirSearchQuery) {
-                et.setText(dirSearchQuery)
-                et.setSelection(et.text?.length ?: 0)
-            }
-        }
-        projectDirSearchClear?.visibility =
-            if (dirSearchQuery.isNotEmpty()) View.VISIBLE else View.GONE
-        refreshWorkspaceDirTree()
+        directoryPage.refresh()
     }
 
     private fun buildProjectGitDiffLayout() {
@@ -22167,6 +21730,29 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun openTopBarPage() = navigateToPage(ID_TOPBAR)
+
+    /** Settings -> Backup (plan 15): backup/restore of the guest home. */
+    private fun buildBackupPage() {
+        backupScrollView = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            visibility = View.GONE
+            setBackgroundColor(NC.BG)
+        }
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        backupScrollView.addView(page)
+        page.addView(
+            buildSubPageHeader(
+                title = "BACKUP",
+                subtitle = "// BACK UP AND RESTORE",
+                iconRes = R.drawable.ic_lucide_archive,
+                pageId = ID_BACKUP
+            ) { badge -> badge.visibility = View.GONE }
+        )
+        backupPage = com.zenithblue.nativecode.backup.ui.BackupPage(this, backupHost).also { page.addView(it.content) }
+    }
 
     
     // CustomBrutalistToggle is imported as an alias of the shared ui.BrutalistToggle.
