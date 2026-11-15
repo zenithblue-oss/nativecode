@@ -153,7 +153,9 @@ class DesktopController(
     }
 
     private fun notifyState() {
+        synced = true
         listeners.toList().forEach { it() }
+        com.zenithblue.nativecode.quick.QuickActions.onDesktopState(activity, running || starting) // tile + widget
     }
 
     // ── Budget ───────────────────────────────────────────────────────────────
@@ -198,6 +200,7 @@ class DesktopController(
         if (free && (running || starting) && !userStopping) {
             userStopping = true
             stopGui()
+            com.zenithblue.nativecode.quick.QuickActions.onDesktopState(activity, false) // no screen left to report the stop
         } else {
             releaseFgs()
         }
@@ -416,6 +419,15 @@ class DesktopController(
 
         /** Bumped by every start and stop; queued work from an older one is dropped (stop/start race). */
         @Volatile private var gen = 0
+
+        /** True once this process has painted a state; before that the persisted flag stands in (tile/widget). */
+        @Volatile private var synced = false
+
+        /** Tile/widget state: in-process flags when this process has a controller, else the persisted flag. */
+        fun quickState(ctx: Context, enforce: Boolean, pro: Boolean, remainingMs: Long): State {
+            val persisted = !synced && com.zenithblue.nativecode.quick.QuickActions.persistedDesktopOn(ctx)
+            return stateOf(running || persisted, starting, enforce, pro, remainingMs)
+        }
 
         /** Session ended: idle state even when no screen is alive. */
         private fun markIdleLive() {

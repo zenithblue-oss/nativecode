@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_terminal"
+        android:enabled="true"
+        android:icon="@drawable/ic_lucide_terminal"
+        android:shortcutShortLabel="@string/quick_shortcut_terminal">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="com.zenithblue.nativecode"
+            android:targetClass="com.zenithblue.nativecode.SplashActivity">
+            <extra android:name="QUICK_ACTION" android:value="new_terminal" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="last_project"
+        android:enabled="true"
+        android:icon="@drawable/ic_lucide_folder"
+        android:shortcutShortLabel="@string/quick_shortcut_project">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="com.zenithblue.nativecode"
+            android:targetClass="com.zenithblue.nativecode.SplashActivity">
+            <extra android:name="QUICK_ACTION" android:value="last_project" />
+        </intent>
+    </shortcut>
+</shortcuts>

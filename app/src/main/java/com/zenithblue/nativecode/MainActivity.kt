@@ -59,6 +59,7 @@ import com.zenithblue.nativecode.entitlements.GateResult
 import com.zenithblue.nativecode.entitlements.ProFeature
 import com.zenithblue.nativecode.desktop.DesktopController
 import com.zenithblue.nativecode.desktop.DesktopPill
+import com.zenithblue.nativecode.quick.QuickActions
 import com.zenithblue.nativecode.workspace.StatStrip
 import com.zenithblue.nativecode.workspace.StatsEditor
 import com.zenithblue.nativecode.workspace.ToolRail
@@ -938,6 +939,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 it.action = null // one-shot: not replayed if this Activity is recreated
                 desktop.stop()
             }
+            // Tile / widget / shortcuts: one fixed action, validated, one-shot (quick/QuickActions).
+            QuickActions.parse(it)?.let { a -> it.removeExtra(QuickActions.EXTRA); handleQuickAction(a) }
             // Chroot uninstall script deep-link: nativecode://callback?result=success&name=distro_uninstall_...
             val data = it.data
             if (!BuildConfig.PLAY_STORE_BUILD && data != null && data.scheme == "nativecode" && data.host == "callback") {
@@ -994,6 +997,29 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 showAgentOpenLinkDialog(agentOpenUrl, title, message)
             }
         }
+    }
+
+    /** Every action goes through the usual gates (desktop budget, AI tool/session, workspace). */
+    private fun handleQuickAction(action: String) {
+        when (action) {
+            QuickActions.START_DESKTOP -> desktop.start()
+            QuickActions.STOP_DESKTOP -> desktop.stop()
+            QuickActions.NEW_TERMINAL -> { createNewTerminalSession("shell"); navigateToPage(ID_TERMINAL) }
+            QuickActions.LAST_PROJECT -> openLastProject(null)
+            // Free: opencode in the app terminal (workspace is Pro). Pro: last-used tool in the last project.
+            QuickActions.AGENT -> {
+                val tool = QuickActions.agentTool(this)
+                if (isPro()) openLastProject(tool) else { createNewTerminalSession(tool); navigateToPage(ID_TERMINAL) }
+            }
+        }
+    }
+
+    /** Most recently opened project; none yet → the project picker. */
+    private fun openLastProject(tool: String?) {
+        val p = getProjects().maxByOrNull { it.lastOpened }
+        if (p == null) { navigateToPage(ID_PROJECTS_LIST); return }
+        openProjectFromList(p)
+        if (tool != null && FeatureGate.canUse(isPro(), ProFeature.WORKSPACE) is GateResult.Allow) createWorkspaceTerminalTab(tool)
     }
 
     private fun ensurePostNotificationsPermission() {
@@ -5756,6 +5782,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // Launches still starting count too, or fast taps (or a chat handshake) pass the cap together.
         val ok = gateAllows(FeatureGate.canOpenAiSession(isPro(), aiSessionCount()))
         if (ok) {
+            QuickActions.rememberTool(this, type) // widget "Agent" relaunches the last-used tool (Pro)
             Telemetry.logOnce(this, Telemetry.Event.FIRST_AI_SESSION, Telemetry.Param.TOOL to type)
             Telemetry.log(this, Telemetry.Event.AI_SESSION_START, Telemetry.Param.TOOL to type, Telemetry.Param.SURFACE to surface)
         }

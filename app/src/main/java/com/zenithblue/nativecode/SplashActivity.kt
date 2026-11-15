@@ -214,6 +214,11 @@ class SplashActivity : AppCompatActivity() {
             Intent(this, OnboardingActivity::class.java)
         }
 
+        // Shortcuts/widget arrive here: forward the one validated quick action to MainActivity.
+        if (onboardingCompleted) com.zenithblue.nativecode.quick.QuickActions.parse(intent)?.let {
+            nextIntent.putExtra(com.zenithblue.nativecode.quick.QuickActions.EXTRA, it)
+        }
+
         startActivity(nextIntent)
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()

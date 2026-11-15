@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Quick Settings tile, widget, shortcuts (1.8.0 plan 19) -->
+    <string name="quick_tile_label">Linux desktop</string>
+    <string name="quick_start">Start</string>
+    <string name="quick_start_min">Start · %1$dm</string>
+    <string name="quick_starting">Starting</string>
+    <string name="quick_stop">Stop</string>
+    <string name="quick_stop_min">Stop · %1$dm</string>
+    <string name="quick_upgrade">Upgrade</string>
+    <string name="quick_widget_agent">Agent</string>
+    <string name="quick_widget_desktop">Desktop</string>
+    <string name="quick_widget_description">Start an AI agent or the Linux desktop</string>
+    <string name="quick_shortcut_terminal">New terminal</string>
+    <string name="quick_shortcut_project">Last project</string>
+</resources>
