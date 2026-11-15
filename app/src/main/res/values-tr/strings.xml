@@ -818,7 +818,6 @@
     <string name="backup_restore_rolled_back">Geri yükleme geri alındı</string>
     <string name="ssh_starting">Başlatılıyor...</string>
     <string name="ssh_nativecode_ssh_server">NativeCode SSH sunucusu</string>
-    <string name="ssh_install_openssh">OPENSSH KUR</string>
     <string name="ssh_copy_command">KOMUTU KOPYALA</string>
     <string name="ssh_start_server">SUNUCUYU BAŞLAT</string>
     <string name="ssh_keep_running_when_wi_fi">Wi-Fi kesilse de çalışmaya devam et</string>
@@ -843,7 +842,6 @@
     <string name="ssh_open_an_ssh_port">Bir SSH portu açılsın mı?</string>
     <string name="ssh_this_opens_port_on_your">Bu işlem, geçerli Wi-Fi ağınızda %1$s portunu açar. Yalnızca Yetkili anahtarlar altına eklediğiniz bir anahtara sahip bilgisayarlar giriş yapabilir; parolalar reddedilir. Güvenmediğiniz bir ağda kullanmayın. Çalışırken bir bildirim gösterilir.</string>
     <string name="ssh_start">BAŞLAT</string>
-    <string name="ssh_installing">KURULUYOR...</string>
     <string name="ssh_no_keys_yet_nobody_can">Henüz anahtar yok. Kimse giriş yapamaz.</string>
     <string name="ssh_remove">KALDIR</string>
     <string name="ssh_remove_this_key">Bu anahtar kaldırılsın mı?</string>
@@ -859,7 +857,6 @@
     <string name="ssh_no_keys_yet">Henüz anahtar yok.</string>
     <string name="ssh_copy_public_key">GENEL ANAHTARI KOPYALA</string>
     <string name="ssh_could_not_read_the_public">Genel anahtar okunamadı.</string>
-    <string name="ssh_install_openssh_first">Önce OpenSSH\'ı kurun.</string>
     <string name="ssh_key_name">ANAHTAR ADI</string>
     <string name="ssh_generate_key">Anahtar oluştur</string>
     <string name="ssh_generate">OLUŞTUR</string>
@@ -895,8 +892,6 @@
     <string name="usage_chat_threads_already_in_the">SOHBET KONUŞMALARI (toplamlara dahil)</string>
     <string name="usage_token_split_range">TOKEN DAĞILIMI (aralık)</string>
     <string name="usage_set_up_usage">KULLANIMI KUR</string>
-    <string name="usage_install_ccusage_about_3_mb">Yapay zeka kullanımınızı okumak için ccusage %1$s kurun (yaklaşık 3 MB). Bu telefonda çevrimdışı çalışır.</string>
-    <string name="usage_install">KUR</string>
     <string name="usage_try_again">TEKRAR DENE</string>
     <string name="app_ai_developer_environment">YAPAY ZEKA GELİŞTİRİCİ ORTAMI</string>
     <string name="app_initializing_environment">&gt; ORTAM BAŞLATILIYOR...</string>
@@ -1488,4 +1483,8 @@
     <string name="main_opened_ago">Açıldı: %1$s</string>
     <string name="main_one_project_caps">1 PROJE</string>
     <string name="main_n_projects_caps">%1$d PROJE</string>
+    <string name="usage_install">KUR</string>
+    <string name="common_open_components">BİLEŞENLERİ AÇ</string>
+    <string name="usage_ccusage_in_runtime_update">ccusage %1$s, Linux çalışma ortamı güncellemesiyle gelir. Yapay zekâ kullanımınızı görmek için Bileşenler bölümünde Linux çalışma ortamını güncelleyin.</string>
+    <string name="ssh_openssh_in_runtime_update">OpenSSH, Linux çalışma ortamı güncellemesiyle gelir. Bileşenler bölümünde Linux çalışma ortamını güncelleyin.</string>
 </resources>

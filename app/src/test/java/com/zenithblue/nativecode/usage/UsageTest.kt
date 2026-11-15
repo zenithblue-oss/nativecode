@@ -4,15 +4,10 @@ import com.zenithblue.nativecode.entitlements.FeatureGate
 import com.zenithblue.nativecode.entitlements.GateResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.ByteArrayOutputStream
-import java.security.MessageDigest
-import java.util.Base64
 import java.util.TimeZone
-import java.util.zip.GZIPOutputStream
 
 class UsageTest {
     /** Shape of real `ccusage daily --sections daily,weekly,monthly,session --by-agent --json` output (20.0.49), trimmed. */
@@ -188,34 +183,14 @@ class UsageTest {
         assertEquals("20250901", UsageRepository.sinceDate(utc, 1_770_000_000_000L)) // 2026-02-02
     }
 
-    // region pinned download
+    // region bundled ccusage
 
-    private fun tar(vararg files: Pair<String, ByteArray>): ByteArray {
-        val o = ByteArrayOutputStream()
-        for ((name, data) in files) {
-            val h = ByteArray(512)
-            name.toByteArray().copyInto(h)
-            String.format("%011o", data.size).toByteArray().copyInto(h, 124)
-            h[156] = '0'.code.toByte()
-            o.write(h); o.write(data); o.write(ByteArray(((data.size + 511) / 512 * 512) - data.size))
-        }
-        o.write(ByteArray(1024))
-        return o.toByteArray()
-    }
-
-    private fun gz(b: ByteArray): ByteArray = ByteArrayOutputStream().also { o -> GZIPOutputStream(o).use { it.write(b) } }.toByteArray()
-
-    @Test fun tgzExtractsOneFileAndChecksIntegrity() {
-        val bin = ByteArray(1300) { (it % 251).toByte() }
-        val t = gz(tar("package/package.json" to "{}".toByteArray(), "package/bin/ccusage" to bin))
-        assertTrue(bin.contentEquals(Tgz.extract(t, "package/bin/ccusage")))
-        assertNull(Tgz.extract(t, "package/bin/other"))
-        assertNull(Tgz.extract(t, "../../evil"))
-        val good = "sha512-" + Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-512").digest(t))
-        assertTrue(Tgz.integrityOk(t, good))
-        assertFalse(Tgz.integrityOk(t + 1, good))
-        assertFalse(Tgz.integrityOk(t, "sha1-abc")); assertFalse(Tgz.integrityOk(t, "sha512-!!!"))
-        assertNotNull(UsageModel.VERSION)
+    /** The bundled ccusage (update pack, build_update_pack.py) must be the version the page parses. */
+    @Test fun bundledCcusageVersionMatchesTheBuild() {
+        val env = listOf("../tools/rootfs/versions.env", "tools/rootfs/versions.env").map { java.io.File(it) }.first { it.isFile }
+        val pinned = env.readLines().first { it.startsWith("CCUSAGE_VERSION=") }.substringAfter('=')
+        assertEquals(UsageModel.VERSION, pinned)
+        assertTrue(java.io.File(env.parentFile, "build_update_pack.py").readText().contains("CCUSAGE_VERSION = \"$pinned\""))
     }
 
     // endregion

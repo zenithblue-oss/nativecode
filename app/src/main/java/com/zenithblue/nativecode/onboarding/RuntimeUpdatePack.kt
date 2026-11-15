@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.google.android.play.core.assetpacks.AssetPackManagerFactory
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.BufferedInputStream
 import java.io.File
@@ -19,19 +18,22 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
 /**
- * Small 1.8.0 runtime update for installs that already have the 1.7.x rootfs: opencode 2.3.0, GitHub CLI
- * and the rebuilt zsh, delivered as one Play asset pack (`nativecode_update_core`, about 135 MB) instead
- * of the whole 1.3 GB rootfs.
+ * The 1.8.0 runtime delta on top of the 1.7.1 rootfs: opencode 2.3.0, GitHub CLI, the rebuilt zsh, OpenSSH 10.6
+ * (server + client) and the pinned ccusage 20.0.49, delivered as one Play asset pack (`nativecode_update_core`,
+ * about 140 MB) instead of the whole 1.3 GB rootfs.
+ *
+ * The 1.8.0 `nativecode_runtime` pack is byte-identical to 1.7.1's, so Play has nothing to patch on update and
+ * existing users download only this pack. A FRESH install extracts the same 1.7.1 archive and then applies this
+ * pack right after (OnboardingActivity), so fresh and upgraded installs end with the same files and the same marker.
  *
  * Applied with plain Kotlin file I/O: stream-verify the pinned sha256, then unpack a tar.gz into the
  * rootfs, every file written to a temp name and renamed over the old one. No shell, no guest command.
- * A new 1.8.0 rootfs already carries the marker, so this never runs there.
  */
 object RuntimeUpdatePack {
     private const val TAG = "RuntimeUpdatePack"
     const val ARCHIVE_NAME = "nativecode_update.tgz"
     const val SHA_NAME = "$ARCHIVE_NAME.sha256"
-    const val PINNED_SHA256 = "112468d020ef52877f471d10dbe886fde78578716ee151ad8b9e440cca46e4b9"
+    const val PINNED_SHA256 = "2ddd44b20ac446a41186189912772f86b34871a0bb9f7345535d522b05de3611"
     const val MARKER_REL = "etc/nativecode/update-pack-1.8.0.sha256"
 
     private const val MIN_FREE_BYTES = 400L * 1024L * 1024L // opencode alone unpacks to ~254 MB
@@ -77,14 +79,19 @@ object RuntimeUpdatePack {
         return applyTo(root, archive).also { if (it.success) removePack(context) }
     }
 
-    /** Drop the ~135 MB on-demand pack once applied; the marker in the rootfs keeps [isNeeded] false. */
-    private fun removePack(context: Context) {
-        val pack = PlayAssetDeliveryManager.PACK_UPDATE_CORE
-        if (PlayAssetDeliveryManager.getInstalledPackLocation(context, pack) == null) return
-        runCatching {
-            AssetPackManagerFactory.getInstance(context).removePack(pack)
-                .addOnFailureListener { Log.w(TAG, "removePack failed: ${it.message}") }
-        }.onFailure { Log.w(TAG, "removePack failed: ${it.message}") }
+    /** Drop the ~140 MB on-demand pack once applied; the marker in the rootfs keeps [isNeeded] false. */
+    private fun removePack(context: Context) =
+        PlayAssetDeliveryManager.removePack(context, PlayAssetDeliveryManager.PACK_UPDATE_CORE)
+
+    /**
+     * 1.7.1 never removed the multi-GB `nativecode_runtime` pack, so it stays on every existing install and Play keeps
+     * patching it on updates. Once the rootfs is installed nothing reads it again, so drop it (also frees ~1.3 GB).
+     * A reinstall requests it from Play again through the onboarding delivery page.
+     */
+    fun dropInstalledRuntimePack(context: Context) {
+        val root = ProjectPathResolver.prootRootfsDir(context)
+        if (!File(root, "etc/nativecode/rootfs-release").isFile) return
+        PlayAssetDeliveryManager.removePack(context, PlayAssetDeliveryManager.PACK_RUNTIME)
     }
 
     /** Pure JVM and idempotent: used by [apply] and by the unit tests. */
@@ -248,8 +255,8 @@ object RuntimeUpdatePack {
     // What the Components card shows (no dialog: the update lives on Settings > Components).
     const val TITLE = "Linux runtime update"
     const val FROM_TO = "1.7 runtime to 1.8.0 runtime"
-    const val SIZE = "About 135 MB download"
-    const val CHANGES = "opencode 2.3.0, GitHub CLI 2.104 and a zsh fix. Replaces ~/.opencode/bin/opencode, /usr/local/bin/gh and zsh (a newer self-updated opencode is replaced too); your other files are not touched."
+    const val SIZE = "About 140 MB download"
+    const val CHANGES = "opencode 2.3.0, GitHub CLI 2.104, a zsh fix, OpenSSH 10.6 and ccusage 20.0.49. Replaces ~/.opencode/bin/opencode, /usr/local/bin/gh, zsh and the OpenSSH files (a newer self-updated opencode is replaced too); your other files are not touched."
 
     /** App start: a pack already on the device is applied silently; otherwise the Components card offers it. */
     fun applyIfDownloaded(app: Context) {
@@ -271,7 +278,7 @@ object RuntimeUpdatePack {
     fun update(activity: Activity, onState: (Progress) -> Unit) {
         val app = activity.applicationContext
         val main = Handler(Looper.getMainLooper())
-        fun applyNow() {
+        download(activity, onState) {
             onState(Progress.Running("Applying the runtime update…", null))
             Thread {
                 val r = apply(app)
@@ -279,7 +286,16 @@ object RuntimeUpdatePack {
                 main.post { onState(Progress.Finished(r.success, r.message)) }
             }.start()
         }
-        if (resolveArchive(app) != null) return applyNow()
+    }
+
+    /**
+     * Makes sure the pack is on the device (asks Play if not), without applying it: the fresh-install delivery page uses
+     * this before any rootfs exists. [onReady] runs on the main thread once the archive is available; a failure or
+     * cancel is reported as [Progress.Finished] with ok = false.
+     */
+    fun download(activity: Activity, onState: (Progress) -> Unit, onReady: () -> Unit) {
+        val app = activity.applicationContext
+        if (resolveArchive(app) != null) return onReady()
         onState(Progress.Running("Requesting the update from Google Play…", null))
         var listener: com.google.android.play.core.assetpacks.AssetPackStateUpdateListener? = null
         listener = PlayAssetDeliveryManager.requestDownload(activity, PlayAssetDeliveryManager.PACK_UPDATE_CORE) { state ->
@@ -292,7 +308,7 @@ object RuntimeUpdatePack {
                 is PlayAssetDeliveryManager.DownloadState.WaitingForWifi -> onState(Progress.Running("Waiting for Wi-Fi approval…", null))
                 is PlayAssetDeliveryManager.DownloadState.Completed -> {
                     listener?.let { PlayAssetDeliveryManager.unregisterListener(app, it) }
-                    applyNow()
+                    onReady()
                 }
                 is PlayAssetDeliveryManager.DownloadState.Failed -> {
                     listener?.let { PlayAssetDeliveryManager.unregisterListener(app, it) }

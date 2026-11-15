@@ -38,6 +38,7 @@ import com.zenithblue.nativecode.onboarding.LinuxGuestDefaults
 import com.zenithblue.nativecode.onboarding.OnboardingIo
 import com.zenithblue.nativecode.onboarding.RootfsSource
 import com.zenithblue.nativecode.onboarding.RootfsSourceResolver
+import com.zenithblue.nativecode.onboarding.RuntimeUpdatePack
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
 import com.zenithblue.nativecode.terminal.HostServerController
 import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
@@ -1543,7 +1544,10 @@ class OnboardingActivity : AppCompatActivity() {
         var devPackReady = !BuildConfig.PLAY_STORE_BUILD ||
             AndroidDevPackManager.resolveArchive(this) != null ||
             AndroidDevPackManager.isApplied(this)
-        fun deliveryReady() = currentSource != null && devPackReady
+        // The 1.8.0 runtime changes (opencode, gh, zsh, OpenSSH, ccusage) live in nativecode_update_core, applied right
+        // after the rootfs is extracted. Debug sideloads without Play packs may skip it.
+        var updatePackReady = BuildConfig.DEBUG || RuntimeUpdatePack.resolveArchive(this) != null
+        fun deliveryReady() = currentSource != null && devPackReady && updatePackReady
 
         val padCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1613,6 +1617,30 @@ class OnboardingActivity : AppCompatActivity() {
             startBtnRef?.alpha = if (enabled) 1f else 0.45f
         }
 
+        fun requestUpdatePack() {
+            padProgressBar.visibility = View.VISIBLE
+            padProgressBar.isIndeterminate = true
+            RuntimeUpdatePack.download(this, { p ->
+                when (p) {
+                    is RuntimeUpdatePack.Progress.Running -> {
+                        detailTv.text = p.text
+                        p.percent?.let { padProgressBar.isIndeterminate = false; padProgressBar.progress = it }
+                    }
+                    is RuntimeUpdatePack.Progress.Finished -> {
+                        padProgressBar.visibility = View.GONE
+                        detailTv.text = p.message
+                    }
+                }
+            }) {
+                updatePackReady = true
+                padProgressBar.isIndeterminate = false
+                padProgressBar.visibility = View.GONE
+                detailTv.text = tr(R.string.onb_ready)
+                downloadBtnRef?.visibility = View.GONE
+                updateStartBtnState()
+            }
+        }
+
         fun requestAndroidDevPack() {
             padProgressBar.visibility = View.VISIBLE
             detailTv.text = tr(R.string.onb_requesting_nativecode_android_dev_fr)
@@ -1647,7 +1675,7 @@ class OnboardingActivity : AppCompatActivity() {
                             statusBadgeTv.text = tr(R.string.onb_ready)
                             statusBadgeTv.setBackgroundColor(NC.PRIMARY_CON)
                             statusBadgeTv.setTextColor(NC.ON_PRIMARY_CON)
-                            downloadBtnRef?.visibility = View.GONE
+                            if (updatePackReady) downloadBtnRef?.visibility = View.GONE else requestUpdatePack()
                         }
                         updateStartBtnState()
                     }
@@ -1667,6 +1695,10 @@ class OnboardingActivity : AppCompatActivity() {
         val downloadBtn = primaryButton(tr(R.string.onb_download_via_google_play), R.drawable.ic_download) {
             if (currentSource != null && BuildConfig.PLAY_STORE_BUILD && !devPackReady) {
                 requestAndroidDevPack()
+                return@primaryButton
+            }
+            if (currentSource != null && !updatePackReady) {
+                requestUpdatePack()
                 return@primaryButton
             }
             padProgressBar.visibility = View.VISIBLE
@@ -1698,6 +1730,8 @@ class OnboardingActivity : AppCompatActivity() {
                         statusBadgeTv.setTextColor(NC.ON_PRIMARY_CON)
                         if (BuildConfig.PLAY_STORE_BUILD && !devPackReady) {
                             requestAndroidDevPack()
+                        } else if (!updatePackReady) {
+                            requestUpdatePack()
                         } else {
                             downloadBtnRef?.visibility = View.GONE
                             updateStartBtnState()
@@ -2630,6 +2664,13 @@ class OnboardingActivity : AppCompatActivity() {
                 )
                 check(installCode == 0) { "proot-distro install failed with code $installCode" }
 
+                // The extracted archive is the 1.7.1 rootfs; opencode, gh, zsh, OpenSSH and ccusage come from the update
+                // pack, the same one existing users apply from Components. Debug sideloads may lack it.
+                appendSetupLog(">>> Applying the runtime update pack (OpenSSH, ccusage, opencode, gh, zsh)…\n")
+                val updateResult = RuntimeUpdatePack.apply(this@OnboardingActivity)
+                appendSetupLog(">>> ${updateResult.message}\n")
+                check(updateResult.success || BuildConfig.DEBUG) { updateResult.message }
+
                 setSetupPhaseFraction(1f, tr(R.string.onb_alpaquita_container_installed))
 
                 val gpuDetect = GpuAccelDetector.detect()
@@ -2655,6 +2696,8 @@ class OnboardingActivity : AppCompatActivity() {
                 LegacyProotDataMigrator.migrateIfNeeded(this@OnboardingActivity)
 
                 AiCliProvisionState.markAiCliProvisioned(this@OnboardingActivity, "proot", true)
+                // Extracted and verified: the multi-GB pack is dead weight now and Play would patch it on every update.
+                PlayAssetDeliveryManager.removePack(this@OnboardingActivity, PlayAssetDeliveryManager.PACK_RUNTIME)
                 updateBaseStatus(tr(R.string.onb_prebuilt_linux_runtime_setup_success))
                 setSetupPhaseFraction(1f, tr(R.string.onb_environment_verified))
                 finishSetupProgressSuccess()
@@ -2751,6 +2794,7 @@ class OnboardingActivity : AppCompatActivity() {
             File(rootfsDir, "usr/local/bin/wvkbd-mobintl").exists()
         ) { tr(R.string.onb_sentinel_check_failed_terminal_keybo) }
         check(
+            File(rootfsDir, "home/flux/.opencode/bin/opencode").exists() ||
             File(rootfsDir, "home/flux/.local/bin/opencode").exists() ||
             File(rootfsDir, "usr/local/bin/opencode").exists() ||
             File(rootfsDir, "usr/bin/opencode").exists()

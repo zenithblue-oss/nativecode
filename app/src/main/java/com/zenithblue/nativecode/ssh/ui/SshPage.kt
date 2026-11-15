@@ -39,6 +39,8 @@ internal interface SshHostApi {
     fun connect(title: String, command: String)
     fun openDocument(onResult: (Uri?) -> Unit)
     fun requestNotifications()
+    /** Opens Settings > Components, where the Linux runtime update (OpenSSH, ccusage) is applied. */
+    fun openComponents()
 }
 
 /**
@@ -97,7 +99,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
     // Banner
     private val bannerCard = card()
     private val bannerTv = text(12f, NC.ON_SURFACE)
-    private val installBtn = button(tr(R.string.ssh_install_openssh), true)
+    private val installBtn = button(tr(R.string.common_open_components), true)
 
     // Server
     private val serverCard = card()
@@ -138,12 +140,13 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         })
 
         bannerCard.addView(text(15f, NC.TERTIARY, bold = true, mono = true).apply { text = tr(R.string.ssh_openssh_not_installed) })
-        bannerTv.text = "The SSH server, the ssh client and key generation need OpenSSH in your Linux. It is installed with apk (a few MB, needs internet)."
+        // OpenSSH ships in the Linux runtime update (Components); the app never installs packages itself.
+        bannerTv.text = tr(R.string.ssh_openssh_in_runtime_update)
         bannerTv.setPadding(0, dp(4), 0, dp(12))
         bannerCard.addView(bannerTv)
         bannerCard.addView(installBtn, lp())
         content.addView(bannerCard)
-        installBtn.setOnClickListener { install() }
+        installBtn.setOnClickListener { host.openComponents() }
 
         serverCard.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(R.string.ssh_ssh_server_pro) })
         serverCard.addView(text(12f, NC.ON_SURF_VAR).apply {
@@ -262,22 +265,6 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
             .setPositiveButton(tr(R.string.ssh_start)) { _, _ -> SshServerController.setWarned(ctx); go() }
             .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(ctx)
-    }
-
-    private fun install() {
-        if (busy) return
-        busy = true
-        installBtn.text = tr(R.string.ssh_installing)
-        renderServer()
-        bg.execute {
-            val err = SshServerController.install(ctx)
-            ui.post {
-                busy = false
-                installBtn.text = tr(R.string.ssh_install_openssh)
-                if (err != null) Toast.makeText(ctx, err, Toast.LENGTH_LONG).show()
-                renderAll()
-            }
-        }
     }
 
     // endregion
@@ -448,7 +435,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
     }
 
     private fun generateKey() {
-        if (!SshServerController.isInstalled(ctx)) { Toast.makeText(ctx, tr(R.string.ssh_install_openssh_first), Toast.LENGTH_LONG).show(); return }
+        if (!SshServerController.isInstalled(ctx)) { Toast.makeText(ctx, tr(R.string.ssh_openssh_in_runtime_update), Toast.LENGTH_LONG).show(); return }
         val existing = SshServerController.clientKeys(ctx).toSet()
         val suggested = if ("id_ed25519" !in existing) "id_ed25519" else generateSequence(2) { it + 1 }.map { "id_ed25519_$it" }.first { it !in existing }
         val (box, name) = field(tr(R.string.ssh_key_name), suggested)

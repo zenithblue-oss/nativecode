@@ -15,7 +15,8 @@ data class SshStatus(val state: SshState, val address: String? = null, val messa
 
 /**
  * Runs `sshd` as the guest user `flux` inside PRoot (plan 17): key auth only, one LAN address, port 8022.
- * Files are written straight into the guest home (Kotlin I/O, no guest scripts); only `apk add`, `ssh-keygen`
+ * OpenSSH itself is bundled in the Linux runtime update pack (RuntimeUpdatePack); nothing is installed here.
+ * Files are written straight into the guest home (Kotlin I/O, no guest scripts); only `ssh-keygen`
  * and `sshd` itself run in the guest. Private keys are never read, logged or copied by this class.
  * [start], [stop] and the install/keygen calls block or spawn threads: call them off the main thread.
  */
@@ -62,13 +63,6 @@ object SshServerController {
         val (args, env) = LinuxCommandBuilder.build(ctx, cmd, user, method = METHOD)
         return ShellCommandRunner.runCaptureExit(ctx, args, env)
     }
-
-    /** `apk add openssh` as the guest root (a feature command, not a migration). Returns null on success, else a short error. */
-    fun install(ctx: Context): String? = try {
-        val (code, out) = guest(ctx, "apk add --no-cache openssh 2>&1", user = "root")
-        if (code == 0 && isInstalled(ctx)) null
-        else "apk add openssh failed (exit $code): " + out.lines().filter { it.isNotBlank() }.takeLast(3).joinToString(" | ")
-    } catch (e: Exception) { e.message ?: e.javaClass.simpleName }
 
     private fun mkdir700(f: File) { f.mkdirs(); Os.chmod(f.absolutePath, 448) }
     private fun chmod600(f: File) { Os.chmod(f.absolutePath, 384) }

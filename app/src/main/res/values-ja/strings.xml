@@ -818,7 +818,6 @@
     <string name="backup_restore_rolled_back">復元をロールバックしました</string>
     <string name="ssh_starting">開始中...</string>
     <string name="ssh_nativecode_ssh_server">NativeCode SSHサーバー</string>
-    <string name="ssh_install_openssh">OpenSSHをインストール</string>
     <string name="ssh_copy_command">コマンドをコピー</string>
     <string name="ssh_start_server">サーバーを開始</string>
     <string name="ssh_keep_running_when_wi_fi">Wi-Fiが切れても実行を続ける</string>
@@ -843,7 +842,6 @@
     <string name="ssh_open_an_ssh_port">SSHポートを開きますか？</string>
     <string name="ssh_this_opens_port_on_your">現在のWi-Fiネットワークでポート%1$sを開きます。認証済みキーに追加した鍵を持つコンピューターのみログインでき、パスワードは拒否されます。信頼できないネットワークでは使用しないでください。実行中は通知が表示されます。</string>
     <string name="ssh_start">開始</string>
-    <string name="ssh_installing">インストール中...</string>
     <string name="ssh_no_keys_yet_nobody_can">キーがまだありません。誰もログインできません。</string>
     <string name="ssh_remove">削除</string>
     <string name="ssh_remove_this_key">このキーを削除しますか？</string>
@@ -859,7 +857,6 @@
     <string name="ssh_no_keys_yet">キーがまだありません。</string>
     <string name="ssh_copy_public_key">公開鍵をコピー</string>
     <string name="ssh_could_not_read_the_public">公開鍵を読み取れませんでした。</string>
-    <string name="ssh_install_openssh_first">先にOpenSSHをインストールしてください。</string>
     <string name="ssh_key_name">キー名</string>
     <string name="ssh_generate_key">キーを生成</string>
     <string name="ssh_generate">生成</string>
@@ -895,8 +892,6 @@
     <string name="usage_chat_threads_already_in_the">チャットスレッド（合計に含まれています）</string>
     <string name="usage_token_split_range">トークン内訳（期間）</string>
     <string name="usage_set_up_usage">使用状況を設定</string>
-    <string name="usage_install_ccusage_about_3_mb">AIの使用状況を読み取るには、ccusage %1$s（約3 MB）をインストールしてください。この端末上でオフラインで動作します。</string>
-    <string name="usage_install">インストール</string>
     <string name="usage_try_again">再試行</string>
     <string name="app_ai_developer_environment">AI開発環境</string>
     <string name="app_initializing_environment">&gt; 環境を初期化中...</string>
@@ -1488,4 +1483,8 @@
     <string name="main_opened_ago">%1$sに開いた</string>
     <string name="main_one_project_caps">1件のプロジェクト</string>
     <string name="main_n_projects_caps">%1$d件のプロジェクト</string>
+    <string name="usage_install">インストール</string>
+    <string name="common_open_components">コンポーネントを開く</string>
+    <string name="usage_ccusage_in_runtime_update">ccusage %1$s は Linux ランタイムの更新に含まれています。AI の使用状況を見るには、コンポーネントで Linux ランタイムを更新してください。</string>
+    <string name="ssh_openssh_in_runtime_update">OpenSSH は Linux ランタイムの更新に含まれています。コンポーネントで Linux ランタイムを更新してください。</string>
 </resources>

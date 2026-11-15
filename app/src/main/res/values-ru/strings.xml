@@ -818,7 +818,6 @@
     <string name="backup_restore_rolled_back">Восстановление откатено</string>
     <string name="ssh_starting">Запуск...</string>
     <string name="ssh_nativecode_ssh_server">SSH-сервер NativeCode</string>
-    <string name="ssh_install_openssh">УСТАНОВИТЬ OPENSSH</string>
     <string name="ssh_copy_command">КОПИРОВАТЬ КОМАНДУ</string>
     <string name="ssh_start_server">ЗАПУСТИТЬ СЕРВЕР</string>
     <string name="ssh_keep_running_when_wi_fi">Не останавливать при потере Wi-Fi</string>
@@ -843,7 +842,6 @@
     <string name="ssh_open_an_ssh_port">Открыть SSH-порт?</string>
     <string name="ssh_this_opens_port_on_your">Это открывает порт %1$s в вашей текущей сети Wi-Fi. Войти могут только компьютеры с ключом, добавленным в «Авторизованные ключи»; пароли отклоняются. Не используйте в недоверенной сети. Пока сервер работает, показывается уведомление.</string>
     <string name="ssh_start">ЗАПУСТИТЬ</string>
-    <string name="ssh_installing">УСТАНОВКА...</string>
     <string name="ssh_no_keys_yet_nobody_can">Ключей пока нет. Войти никто не может.</string>
     <string name="ssh_remove">УДАЛИТЬ</string>
     <string name="ssh_remove_this_key">Удалить этот ключ?</string>
@@ -859,7 +857,6 @@
     <string name="ssh_no_keys_yet">Ключей пока нет.</string>
     <string name="ssh_copy_public_key">КОПИРОВАТЬ ОТКРЫТЫЙ КЛЮЧ</string>
     <string name="ssh_could_not_read_the_public">Не удалось прочитать открытый ключ.</string>
-    <string name="ssh_install_openssh_first">Сначала установите OpenSSH.</string>
     <string name="ssh_key_name">ИМЯ КЛЮЧА</string>
     <string name="ssh_generate_key">Создать ключ</string>
     <string name="ssh_generate">СОЗДАТЬ</string>
@@ -895,8 +892,6 @@
     <string name="usage_chat_threads_already_in_the">ДИАЛОГИ ЧАТА (уже в итогах)</string>
     <string name="usage_token_split_range">РАСПРЕДЕЛЕНИЕ ТОКЕНОВ (период)</string>
     <string name="usage_set_up_usage">НАСТРОИТЬ УЧЁТ</string>
-    <string name="usage_install_ccusage_about_3_mb">Установите ccusage %1$s (около 3 MB), чтобы видеть использование ИИ. Работает офлайн на этом телефоне.</string>
-    <string name="usage_install">УСТАНОВИТЬ</string>
     <string name="usage_try_again">ПОВТОРИТЬ</string>
     <string name="app_ai_developer_environment">СРЕДА РАЗРАБОТКИ С ИИ</string>
     <string name="app_initializing_environment">&gt; ИНИЦИАЛИЗАЦИЯ СРЕДЫ...</string>
@@ -1488,4 +1483,8 @@
     <string name="main_opened_ago">Открыто %1$s</string>
     <string name="main_one_project_caps">1 ПРОЕКТ</string>
     <string name="main_n_projects_caps">ПРОЕКТОВ: %1$d</string>
+    <string name="usage_install">УСТАНОВИТЬ</string>
+    <string name="common_open_components">ОТКРЫТЬ КОМПОНЕНТЫ</string>
+    <string name="usage_ccusage_in_runtime_update">ccusage %1$s входит в обновление среды Linux. Обновите среду Linux в разделе «Компоненты», чтобы увидеть использование ИИ.</string>
+    <string name="ssh_openssh_in_runtime_update">OpenSSH входит в обновление среды Linux. Обновите среду Linux в разделе «Компоненты».</string>
 </resources>

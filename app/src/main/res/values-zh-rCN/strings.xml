@@ -818,7 +818,6 @@
     <string name="backup_restore_rolled_back">恢复已回滚</string>
     <string name="ssh_starting">正在启动...</string>
     <string name="ssh_nativecode_ssh_server">NativeCode SSH 服务器</string>
-    <string name="ssh_install_openssh">安装 OPENSSH</string>
     <string name="ssh_copy_command">复制命令</string>
     <string name="ssh_start_server">启动服务器</string>
     <string name="ssh_keep_running_when_wi_fi">Wi-Fi 断开后继续运行</string>
@@ -843,7 +842,6 @@
     <string name="ssh_open_an_ssh_port">开放 SSH 端口？</string>
     <string name="ssh_this_opens_port_on_your">这将在当前 Wi-Fi 网络上开放端口 %1$s。只有持有您在“授权密钥”中添加的密钥的电脑才能登录；密码会被拒绝。请勿在不信任的网络上使用。运行期间会显示通知。</string>
     <string name="ssh_start">启动</string>
-    <string name="ssh_installing">安装中...</string>
     <string name="ssh_no_keys_yet_nobody_can">暂无密钥。任何人都无法登录。</string>
     <string name="ssh_remove">移除</string>
     <string name="ssh_remove_this_key">移除此密钥？</string>
@@ -859,7 +857,6 @@
     <string name="ssh_no_keys_yet">暂无密钥。</string>
     <string name="ssh_copy_public_key">复制公钥</string>
     <string name="ssh_could_not_read_the_public">无法读取公钥。</string>
-    <string name="ssh_install_openssh_first">请先安装 OpenSSH。</string>
     <string name="ssh_key_name">密钥名称</string>
     <string name="ssh_generate_key">生成密钥</string>
     <string name="ssh_generate">生成</string>
@@ -895,8 +892,6 @@
     <string name="usage_chat_threads_already_in_the">对话（已计入总计）</string>
     <string name="usage_token_split_range">令牌分布（范围）</string>
     <string name="usage_set_up_usage">设置用量</string>
-    <string name="usage_install_ccusage_about_3_mb">安装 ccusage %1$s（约 3 MB）以读取您的 AI 用量。它在本手机上离线运行。</string>
-    <string name="usage_install">安装</string>
     <string name="usage_try_again">重试</string>
     <string name="app_ai_developer_environment">AI 开发环境</string>
     <string name="app_initializing_environment">&gt; 正在初始化环境...</string>
@@ -1488,4 +1483,8 @@
     <string name="main_opened_ago">%1$s打开</string>
     <string name="main_one_project_caps">1 个项目</string>
     <string name="main_n_projects_caps">%1$d 个项目</string>
+    <string name="usage_install">安装</string>
+    <string name="common_open_components">打开组件</string>
+    <string name="usage_ccusage_in_runtime_update">ccusage %1$s 随 Linux 运行环境更新一起提供。请在“组件”中更新 Linux 运行环境，以查看 AI 用量。</string>
+    <string name="ssh_openssh_in_runtime_update">OpenSSH 随 Linux 运行环境更新一起提供。请在“组件”中更新 Linux 运行环境。</string>
 </resources>

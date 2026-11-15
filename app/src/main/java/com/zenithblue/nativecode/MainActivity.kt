@@ -464,6 +464,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             if (pageStack.isEmpty() || pageStack.peek() != ID_CLI_AUTH) pageStack.push(ID_CLI_AUTH)
             navigateToPage(ID_CLI_AUTH)
         }
+        override fun openComponents() = openComponentsPage()
+    }
+    private fun openComponentsPage() {
+        if (pageStack.isEmpty() || pageStack.peek() != ID_COMPONENTS) pageStack.push(ID_COMPONENTS)
+        navigateToPage(ID_COMPONENTS)
     }
     /** Settings sub-pages built by [buildExtraPage] (SSH, AI usage): shown/hidden/back-handled generically. */
     private val extraPages = LinkedHashMap<Int, ScrollView>()
@@ -478,6 +483,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun connect(title: String, command: String) = openSshTab(title, command)
         override fun openDocument(onResult: (Uri?) -> Unit) { docResult = onResult; openDocLauncher.launch(arrayOf("*/*")) }
         override fun requestNotifications() = NativeCodeFgs.ensurePostNotificationsPermission(this@MainActivity)
+        override fun openComponents() = openComponentsPage()
     }
     private lateinit var topBarScrollView: ScrollView
     private lateinit var backupScrollView: ScrollView
@@ -753,6 +759,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         // PLAY_STORE_BUILD is hard-coded false since the play flavor was removed, so it cannot gate this.
         // Not downloaded yet: no dialog, the Components card + home banner offer it (refreshComponentUpdates).
         RuntimeUpdatePack.applyIfDownloaded(applicationContext)
+        // 1.7.1 kept the 1.3 GB nativecode_runtime pack after extracting it; Play would patch it on every update.
+        RuntimeUpdatePack.dropInstalledRuntimePack(applicationContext)
 
         buildRootLayout()
         setContentView(drawerLayout)

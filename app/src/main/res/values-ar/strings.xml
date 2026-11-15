@@ -818,7 +818,6 @@
     <string name="backup_restore_rolled_back">تم التراجع عن الاستعادة</string>
     <string name="ssh_starting">جارٍ البدء...</string>
     <string name="ssh_nativecode_ssh_server">خادم SSH في NativeCode</string>
-    <string name="ssh_install_openssh">تثبيت OPENSSH</string>
     <string name="ssh_copy_command">نسخ الأمر</string>
     <string name="ssh_start_server">بدء الخادم</string>
     <string name="ssh_keep_running_when_wi_fi">الاستمرار في العمل عند فقدان Wi-Fi</string>
@@ -843,7 +842,6 @@
     <string name="ssh_open_an_ssh_port">فتح منفذ SSH؟</string>
     <string name="ssh_this_opens_port_on_your">يفتح هذا المنفذ %1$s على شبكة Wi-Fi الحالية. يمكن فقط للحواسيب التي تملك مفتاحًا أضفته ضمن «المفاتيح المصرّح بها» تسجيل الدخول؛ تُرفض كلمات المرور. لا تستخدمه على شبكة لا تثق بها. يظهر إشعار أثناء التشغيل.</string>
     <string name="ssh_start">ابدأ</string>
-    <string name="ssh_installing">جارٍ التثبيت...</string>
     <string name="ssh_no_keys_yet_nobody_can">لا توجد مفاتيح بعد. لا يستطيع أحد تسجيل الدخول.</string>
     <string name="ssh_remove">إزالة</string>
     <string name="ssh_remove_this_key">إزالة هذا المفتاح؟</string>
@@ -859,7 +857,6 @@
     <string name="ssh_no_keys_yet">لا توجد مفاتيح بعد.</string>
     <string name="ssh_copy_public_key">نسخ المفتاح العام</string>
     <string name="ssh_could_not_read_the_public">تعذّرت قراءة المفتاح العام.</string>
-    <string name="ssh_install_openssh_first">ثبّت OpenSSH أولًا.</string>
     <string name="ssh_key_name">اسم المفتاح</string>
     <string name="ssh_generate_key">إنشاء مفتاح</string>
     <string name="ssh_generate">إنشاء</string>
@@ -895,8 +892,6 @@
     <string name="usage_chat_threads_already_in_the">محادثات الدردشة (محسوبة ضمن الإجماليات)</string>
     <string name="usage_token_split_range">توزيع الرموز (النطاق)</string>
     <string name="usage_set_up_usage">إعداد الاستخدام</string>
-    <string name="usage_install_ccusage_about_3_mb">ثبّت ccusage %1$s (حوالي 3 MB) لقراءة استخدامك للذكاء الاصطناعي. يعمل دون اتصال على هذا الهاتف.</string>
-    <string name="usage_install">تثبيت</string>
     <string name="usage_try_again">أعد المحاولة</string>
     <string name="app_ai_developer_environment">بيئة مطوّر الذكاء الاصطناعي</string>
     <string name="app_initializing_environment">&gt; جارٍ تهيئة البيئة...</string>
@@ -1488,4 +1483,8 @@
     <string name="main_opened_ago">فُتح %1$s</string>
     <string name="main_one_project_caps">مشروع واحد</string>
     <string name="main_n_projects_caps">%1$d مشاريع</string>
+    <string name="usage_install">تثبيت</string>
+    <string name="common_open_components">فتح المكوّنات</string>
+    <string name="usage_ccusage_in_runtime_update">يأتي ccusage %1$s مع تحديث بيئة تشغيل Linux. حدّث بيئة تشغيل Linux في المكوّنات لرؤية استخدامك للذكاء الاصطناعي.</string>
+    <string name="ssh_openssh_in_runtime_update">يأتي OpenSSH مع تحديث بيئة تشغيل Linux. حدّث بيئة تشغيل Linux في المكوّنات.</string>
 </resources>

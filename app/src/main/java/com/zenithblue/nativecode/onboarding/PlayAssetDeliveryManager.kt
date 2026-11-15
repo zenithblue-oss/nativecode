@@ -149,6 +149,18 @@ object PlayAssetDeliveryManager {
         return listener
     }
 
+    /**
+     * Asks Play to delete an on-demand pack we no longer read, so a later app update does not download a patch for it
+     * (Play patches every installed pack). No-op when the pack is not installed. Failures are logged only.
+     */
+    fun removePack(context: Context, packName: String) {
+        runCatching {
+            val manager = AssetPackManagerFactory.getInstance(context)
+            if (manager.getPackLocation(packName) == null) return
+            manager.removePack(packName).addOnFailureListener { Log.w(TAG, "removePack($packName) failed: ${it.message}") }
+        }.onFailure { Log.w(TAG, "removePack($packName) failed: ${it.message}") }
+    }
+
     fun unregisterListener(context: Context, listener: AssetPackStateUpdateListener) {
         try {
             AssetPackManagerFactory.getInstance(context).unregisterListener(listener)

@@ -160,6 +160,21 @@ class RuntimeUpdatePackTest {
         }
     }
 
+    /**
+     * Upgrade-size guard: the runtime pack must stay byte-identical to the 1.7.1 archive (Play patches installed packs),
+     * and the update pack pin must be the one built by tools/rootfs/build_update_overlay.sh.
+     */
+    @Test
+    fun compiledPinsMatchTheShippedPackShaFiles() {
+        fun shaOf(rel: String): String {
+            val f = listOf("../$rel", rel).map { File(it) }.first { it.isFile }
+            return f.readText().trim().split(Regex("\\s+")).first()
+        }
+        assertEquals(RuntimeUpdatePack.PINNED_SHA256, shaOf("nativecode_update_core/src/main/assets/nativecode_update.tgz.sha256"))
+        assertEquals(RootfsSourceResolver.PINNED_ALPAQUITA_SHA256, shaOf("nativecode_runtime/src/main/assets/alpaquita_rootfs.tar.zst.sha256"))
+        assertEquals("edeec26af1c7d7dedd490c99473733ad90b8fff16aab27c63c6f43d467ff0698", RootfsSourceResolver.PINNED_ALPAQUITA_SHA256)
+    }
+
     @Test
     fun truncatedArchiveKeepsOldFileAndNoMarker() {
         val root = Files.createTempDirectory("rt5").toFile()

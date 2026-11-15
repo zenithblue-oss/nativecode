@@ -40,6 +40,8 @@ internal interface UsageHostApi {
     fun upgrade()
     /** Opens the CLI sign-in page (Settings). */
     fun openLogin()
+    /** Opens Settings > Components, where the Linux runtime update (ccusage, OpenSSH) is applied. */
+    fun openComponents()
 }
 
 /** One colour per CLI, the same in every chart. Names always sit beside the colour. */
@@ -196,15 +198,6 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
         bg.execute {
             val l = LimitsRepository.refresh(ctx, host::allowed)
             ui.post { limitsBusy = false; limits = l; render() }
-        }
-    }
-
-    private fun install() {
-        if (busy) return
-        busy = true; error = null; render()
-        bg.execute {
-            val err = UsageRepository.install(ctx)
-            ui.post { busy = false; if (err != null) { error = err; render() } else refreshAll() }
         }
     }
 
@@ -542,11 +535,11 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
 
     // ---- states ----
 
+    /** ccusage ships in the Linux runtime update (Components); the app never downloads it. */
     private fun installCard(): View = card(tr(R.string.usage_set_up_usage)).apply {
         addView(ImageView(ctx).apply { setImageResource(R.drawable.ic_usage_empty); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(dp(132), dp(104)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(12) })
-        addView(text(13f, NC.ON_SURFACE, mono = false).apply { text = tr(R.string.usage_install_ccusage_about_3_mb, UsageModel.VERSION); gravity = Gravity.CENTER; setPadding(0, dp(12), 0, dp(12)) })
-        error?.let { addView(text(12f, NC.ERROR, mono = false).apply { text = it; gravity = Gravity.CENTER; setPadding(0, 0, 0, dp(10)) }) }
-        addView(chip(if (busy) tr(R.string.ssh_installing) else tr(R.string.usage_install), true) { install() }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        addView(text(13f, NC.ON_SURFACE, mono = false).apply { text = tr(R.string.usage_ccusage_in_runtime_update, UsageModel.VERSION); gravity = Gravity.CENTER; setPadding(0, dp(12), 0, dp(12)) })
+        addView(chip(tr(R.string.common_open_components), true) { host.openComponents() }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
     }
 
     private fun emptyCard(message: String, retry: Boolean): View = card().apply {

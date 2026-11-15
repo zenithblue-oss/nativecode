@@ -818,7 +818,6 @@
     <string name="backup_restore_rolled_back">Pemulihan dibatalkan</string>
     <string name="ssh_starting">Memulai...</string>
     <string name="ssh_nativecode_ssh_server">Server SSH NativeCode</string>
-    <string name="ssh_install_openssh">PASANG OPENSSH</string>
     <string name="ssh_copy_command">SALIN PERINTAH</string>
     <string name="ssh_start_server">MULAI SERVER</string>
     <string name="ssh_keep_running_when_wi_fi">Tetap berjalan saat Wi-Fi terputus</string>
@@ -843,7 +842,6 @@
     <string name="ssh_open_an_ssh_port">Buka port SSH?</string>
     <string name="ssh_this_opens_port_on_your">Ini membuka port %1$s di jaringan Wi-Fi Anda saat ini. Hanya komputer yang memiliki kunci yang Anda tambahkan di Kunci terizinkan yang dapat login; kata sandi ditolak. Jangan gunakan di jaringan yang tidak Anda percayai. Notifikasi ditampilkan selama berjalan.</string>
     <string name="ssh_start">MULAI</string>
-    <string name="ssh_installing">MEMASANG...</string>
     <string name="ssh_no_keys_yet_nobody_can">Belum ada kunci. Tidak ada yang dapat login.</string>
     <string name="ssh_remove">HAPUS</string>
     <string name="ssh_remove_this_key">Hapus kunci ini?</string>
@@ -859,7 +857,6 @@
     <string name="ssh_no_keys_yet">Belum ada kunci.</string>
     <string name="ssh_copy_public_key">SALIN KUNCI PUBLIK</string>
     <string name="ssh_could_not_read_the_public">Tidak dapat membaca kunci publik.</string>
-    <string name="ssh_install_openssh_first">Pasang OpenSSH terlebih dahulu.</string>
     <string name="ssh_key_name">NAMA KUNCI</string>
     <string name="ssh_generate_key">Buat kunci</string>
     <string name="ssh_generate">BUAT</string>
@@ -895,8 +892,6 @@
     <string name="usage_chat_threads_already_in_the">THREAD CHAT (sudah termasuk dalam total)</string>
     <string name="usage_token_split_range">PEMBAGIAN TOKEN (rentang)</string>
     <string name="usage_set_up_usage">SIAPKAN PENGGUNAAN</string>
-    <string name="usage_install_ccusage_about_3_mb">Pasang ccusage %1$s (sekitar 3 MB) untuk membaca penggunaan AI Anda. Berjalan offline di ponsel ini.</string>
-    <string name="usage_install">PASANG</string>
     <string name="usage_try_again">COBA LAGI</string>
     <string name="app_ai_developer_environment">LINGKUNGAN DEVELOPER AI</string>
     <string name="app_initializing_environment">&gt; MENGINISIALISASI LINGKUNGAN...</string>
@@ -1488,4 +1483,8 @@
     <string name="main_opened_ago">Dibuka %1$s</string>
     <string name="main_one_project_caps">1 PROYEK</string>
     <string name="main_n_projects_caps">%1$d PROYEK</string>
+    <string name="usage_install">PASANG</string>
+    <string name="common_open_components">BUKA KOMPONEN</string>
+    <string name="usage_ccusage_in_runtime_update">ccusage %1$s tersedia dalam pembaruan runtime Linux. Perbarui runtime Linux di Komponen untuk melihat penggunaan AI Anda.</string>
+    <string name="ssh_openssh_in_runtime_update">OpenSSH tersedia dalam pembaruan runtime Linux. Perbarui runtime Linux di Komponen.</string>
 </resources>

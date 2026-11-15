@@ -833,7 +833,6 @@
     <string name="backup_restore_rolled_back">Restore rolled back</string>
     <string name="ssh_starting">Starting...</string>
     <string name="ssh_nativecode_ssh_server">NativeCode SSH server</string>
-    <string name="ssh_install_openssh">INSTALL OPENSSH</string>
     <string name="ssh_copy_command">COPY COMMAND</string>
     <string name="ssh_start_server">START SERVER</string>
     <string name="ssh_keep_running_when_wi_fi">Keep running when Wi-Fi is lost</string>
@@ -858,7 +857,6 @@
     <string name="ssh_open_an_ssh_port">Open an SSH port?</string>
     <string name="ssh_this_opens_port_on_your">This opens port %1$s on your current Wi-Fi network. Only computers holding a key you add under Authorized keys can log in; passwords are refused. Do not use it on a network you do not trust. A notification shows while it runs.</string>
     <string name="ssh_start">START</string>
-    <string name="ssh_installing">INSTALLING...</string>
     <string name="ssh_no_keys_yet_nobody_can">No keys yet. Nobody can log in.</string>
     <string name="ssh_remove">REMOVE</string>
     <string name="ssh_remove_this_key">Remove this key?</string>
@@ -874,7 +872,6 @@
     <string name="ssh_no_keys_yet">No keys yet.</string>
     <string name="ssh_copy_public_key">COPY PUBLIC KEY</string>
     <string name="ssh_could_not_read_the_public">Could not read the public key.</string>
-    <string name="ssh_install_openssh_first">Install OpenSSH first.</string>
     <string name="ssh_key_name">KEY NAME</string>
     <string name="ssh_generate_key">Generate key</string>
     <string name="ssh_generate">GENERATE</string>
@@ -910,8 +907,6 @@
     <string name="usage_chat_threads_already_in_the">CHAT THREADS (already in the totals)</string>
     <string name="usage_token_split_range">TOKEN SPLIT (range)</string>
     <string name="usage_set_up_usage">SET UP USAGE</string>
-    <string name="usage_install_ccusage_about_3_mb">Install ccusage %1$s (about 3 MB) to read your AI usage. It runs offline on this phone.</string>
-    <string name="usage_install">INSTALL</string>
     <string name="usage_try_again">TRY AGAIN</string>
     <string name="app_ai_developer_environment">AI DEVELOPER ENVIRONMENT</string>
     <string name="app_initializing_environment">&gt; INITIALIZING ENVIRONMENT...</string>
@@ -1505,4 +1500,8 @@
     <string name="main_opened_ago">Opened %1$s</string>
     <string name="main_one_project_caps">1 PROJECT</string>
     <string name="main_n_projects_caps">%1$d PROJECTS</string>
+    <string name="usage_install">INSTALL</string>
+    <string name="common_open_components">OPEN COMPONENTS</string>
+    <string name="usage_ccusage_in_runtime_update">ccusage %1$s comes with the Linux runtime update. Update the Linux runtime in Components to see your AI usage.</string>
+    <string name="ssh_openssh_in_runtime_update">OpenSSH comes with the Linux runtime update. Update the Linux runtime in Components.</string>
 </resources>

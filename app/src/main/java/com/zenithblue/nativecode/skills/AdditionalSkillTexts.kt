@@ -6437,7 +6437,7 @@ metadata:
   title: "SSH Server and Client"
   category: "INSTALL"
   group: "Remote access"
-  engine: "OpenSSH (apk add openssh), managed by the NativeCode SSH page"
+  engine: "OpenSSH (bundled in the NativeCode Linux runtime update), managed by the NativeCode SSH page"
   status: "NativeCode manages the server; the agent only checks and helps with keys"
   dependencies: ""
   reviewed: "2026-11-15"
@@ -6450,7 +6450,7 @@ metadata:
 ## What NativeCode already does
 - **Client (Free):** the `ssh` command in the guest, plus saved remote hosts on the SSH page; a saved host opens an `ssh` terminal tab. Keys live in `~/.ssh` of the guest.
 - **Server (Pro):** off by default. The user switches it on in Settings → SSH; NativeCode starts `sshd` as `flux`, **key login only**, port **8022**, bound to the Wi-Fi (or hotspot) address, with a notification that has a Stop action. It stops when Wi-Fi is lost or Pro ends.
-- OpenSSH is installed from the SSH page (`apk add openssh`); you do not need to install it yourself.
+- OpenSSH ships with the NativeCode Linux runtime update (Settings > Components); you do not need to install it yourself.
 
 Do **not** start `sshd` yourself, edit `~/.config/nativecode/sshd_config` (it is rewritten on every start) or open a different port. Passwords, root login and agent/X11 forwarding are off by design and must stay off.
 

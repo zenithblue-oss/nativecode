@@ -818,7 +818,6 @@
     <string name="backup_restore_rolled_back">Ripristino annullato</string>
     <string name="ssh_starting">Avvio...</string>
     <string name="ssh_nativecode_ssh_server">Server SSH di NativeCode</string>
-    <string name="ssh_install_openssh">INSTALLA OPENSSH</string>
     <string name="ssh_copy_command">COPIA COMANDO</string>
     <string name="ssh_start_server">AVVIA SERVER</string>
     <string name="ssh_keep_running_when_wi_fi">Mantieni attivo se il Wi-Fi si disconnette</string>
@@ -843,7 +842,6 @@
     <string name="ssh_open_an_ssh_port">Aprire una porta SSH?</string>
     <string name="ssh_this_opens_port_on_your">Questo apre la porta %1$s sulla tua rete Wi-Fi attuale. Possono accedere solo i computer con una chiave aggiunta in Chiavi autorizzate; le password sono rifiutate. Non usarlo su una rete di cui non ti fidi. Una notifica resta visibile mentre è in esecuzione.</string>
     <string name="ssh_start">AVVIA</string>
-    <string name="ssh_installing">INSTALLAZIONE...</string>
     <string name="ssh_no_keys_yet_nobody_can">Ancora nessuna chiave. Nessuno può accedere.</string>
     <string name="ssh_remove">RIMUOVI</string>
     <string name="ssh_remove_this_key">Rimuovere questa chiave?</string>
@@ -859,7 +857,6 @@
     <string name="ssh_no_keys_yet">Ancora nessuna chiave.</string>
     <string name="ssh_copy_public_key">COPIA CHIAVE PUBBLICA</string>
     <string name="ssh_could_not_read_the_public">Impossibile leggere la chiave pubblica.</string>
-    <string name="ssh_install_openssh_first">Installa prima OpenSSH.</string>
     <string name="ssh_key_name">NOME CHIAVE</string>
     <string name="ssh_generate_key">Genera chiave</string>
     <string name="ssh_generate">GENERA</string>
@@ -895,8 +892,6 @@
     <string name="usage_chat_threads_already_in_the">THREAD DI CHAT (già nei totali)</string>
     <string name="usage_token_split_range">RIPARTIZIONE TOKEN (intervallo)</string>
     <string name="usage_set_up_usage">CONFIGURA UTILIZZO</string>
-    <string name="usage_install_ccusage_about_3_mb">Installa ccusage %1$s (circa 3 MB) per leggere il tuo utilizzo AI. Funziona offline su questo telefono.</string>
-    <string name="usage_install">INSTALLA</string>
     <string name="usage_try_again">RIPROVA</string>
     <string name="app_ai_developer_environment">AMBIENTE DI SVILUPPO AI</string>
     <string name="app_initializing_environment">&gt; INIZIALIZZAZIONE AMBIENTE...</string>
@@ -1488,4 +1483,8 @@
     <string name="main_opened_ago">Aperto %1$s</string>
     <string name="main_one_project_caps">1 PROGETTO</string>
     <string name="main_n_projects_caps">%1$d PROGETTI</string>
+    <string name="usage_install">INSTALLA</string>
+    <string name="common_open_components">APRI COMPONENTI</string>
+    <string name="usage_ccusage_in_runtime_update">ccusage %1$s è incluso nell\'aggiornamento del runtime Linux. Aggiorna il runtime Linux in Componenti per vedere l\'uso dell\'IA.</string>
+    <string name="ssh_openssh_in_runtime_update">OpenSSH è incluso nell\'aggiornamento del runtime Linux. Aggiorna il runtime Linux in Componenti.</string>
 </resources>
