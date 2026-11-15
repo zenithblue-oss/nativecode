@@ -1,0 +1,11 @@
+<!-- Empty-state illustration: three bars rising, a baseline and two sparkles. Obsidian palette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="132dp" android:height="104dp" android:viewportWidth="132" android:viewportHeight="104">
+    <path android:fillColor="#2A2A2A" android:pathData="M18,60h18v28h-18z" />
+    <path android:fillColor="#3C4A3F" android:pathData="M48,44h18v44h-18z" />
+    <path android:fillColor="#3DDC84" android:pathData="M78,26h18v62h-18z" />
+    <path android:strokeColor="#869587" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M8,92h116" />
+    <path android:strokeColor="#60F99E" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M108,10v14 M101,17h14" />
+    <path android:strokeColor="#FFB175" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M30,24v8 M26,28h8" />
+    <path android:strokeColor="#3C4A3F" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M20,50l24,-14l24,-4l24,-16" />
+</vector>

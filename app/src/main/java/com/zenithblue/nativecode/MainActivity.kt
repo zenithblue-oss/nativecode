@@ -459,6 +459,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun allowed(agent: String) =
             FeatureGate.canLaunchAiTool(isPro(), com.zenithblue.nativecode.usage.UsageModel.toolId(agent)) is GateResult.Allow
         override fun upgrade() { gateAllows(FeatureGate.canLaunchAiTool(isPro(), "claude-code")) }
+        override fun openLogin() {
+            if (pageStack.isEmpty() || pageStack.peek() != ID_CLI_AUTH) pageStack.push(ID_CLI_AUTH)
+            navigateToPage(ID_CLI_AUTH)
+        }
     }
     /** Settings sub-pages built by [buildExtraPage] (SSH, AI usage): shown/hidden/back-handled generically. */
     private val extraPages = LinkedHashMap<Int, ScrollView>()
@@ -9778,6 +9782,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             pageId = ID_USAGE,
             onSubtitle = { tv ->
                 homeUsageSubtitle = tv
+                (tv.parent as? LinearLayout)?.let { p ->
+                    val row = LinearLayout(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) } }
+                    p.addView(row, p.indexOfChild(tv) + 1)
+                    homeUsageLogos = row
+                }
                 refreshHomeUsage()
             }
         ).apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(16) } })
@@ -21797,30 +21806,46 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private var homeUsageSubtitle: TextView? = null
+    private var homeUsageLogos: LinearLayout? = null
     private val homeUsageRefreshing = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    /** Home AI usage card: today's tokens and cost from the cached report; reloads it in the background when older than 10 minutes. */
+    /**
+     * Home AI usage card: today's tokens and cost from the cached report plus the most constrained plan limit
+     * (for example "Claude 5h: 62%"). Both reload in the background when older than 10 and 15 minutes.
+     */
     private fun refreshHomeUsage() {
         val tv = homeUsageSubtitle ?: return
         if (!homeUsageRefreshing.compareAndSet(false, true)) return
         Thread {
+            var logos = emptyList<String>()
             val line = try {
                 val repo = com.zenithblue.nativecode.usage.UsageRepository
                 val m = com.zenithblue.nativecode.usage.UsageModel
-                if (!repo.isInstalled(this)) "Tokens and cost per AI CLI. Tap to set up."
+                val lim = com.zenithblue.nativecode.usage.LimitsRepository
+                val usage = if (!repo.isInstalled(this)) "Tokens and cost per AI CLI. Tap to set up."
                 else {
                     if (repo.cacheAgeMs(this) > 600_000L) repo.load(this)
                     val rep = repo.cached(this)?.only(usageHost::allowed)
                     val t = rep?.let { m.today(it, repo.todayString()) }
+                    logos = rep?.let { m.activeAgents(it, repo.todayString()) }.orEmpty()
                     when {
                         rep == null -> "No usage data yet. Tap to read it."
                         t == null -> "Today: no AI usage yet."
                         else -> "Today: ${m.fmtTokens(t.first)} tokens · ${m.fmtCost(t.second)} est."
                     }
                 }
+                var l = lim.cached(this)
+                if (l.isEmpty() || System.currentTimeMillis() - l.maxOf { it.fetchedAt } > 900_000L) l = lim.refresh(this, usageHost::allowed)
+                val worst = com.zenithblue.nativecode.usage.LimitsModel.mostConstrained(l, usageHost::allowed)
+                val signed = l.filter { it.state == com.zenithblue.nativecode.usage.LimitState.OK && usageHost.allowed(it.agent) }.map { it.agent }
+                logos = lim.AGENTS.filter { it in logos || it in signed }
+                if (worst != null) usage + "\n" + worst.first + ": " + worst.second.usedPercent.toInt() + "%" else usage
             } catch (_: Exception) { "Tokens and cost per AI CLI." }
             homeUsageRefreshing.set(false)
-            runOnUiThread { homeUsageSubtitle?.text = line }
+            runOnUiThread {
+                homeUsageSubtitle?.text = line
+                homeUsageLogos?.let { r -> r.removeAllViews(); if (logos.isNotEmpty()) r.addView(com.zenithblue.nativecode.usage.ui.CliLogos.row(this, logos, 22)) }
+            }
         }.start()
     }
 

@@ -115,6 +115,31 @@ class UsageTest {
         assertEquals(listOf("2026-11-14", "2026-11-15"), UsageModel.fillDays(report.daily, "bad", 2).map { it.period })
     }
 
+    private fun row(period: String, cost: Double) = UsageRow(period, listOf(AgentUse("claude", Tok(total = 10), cost, emptyList())))
+
+    @Test fun fillRowsDaysGapsSinglePointAndZeros() {
+        val g = Granularity.DAY
+        val gaps = UsageModel.fillRows(listOf(row("2026-11-15", 3.0), row("2026-11-12", 1.0)), g, "2026-11-15", 5)   // unsorted input
+        assertEquals(listOf("2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15"), gaps.map { it.period })
+        assertEquals(listOf(0.0, 1.0, 0.0, 0.0, 3.0), gaps.map { it.cost })
+        val one = UsageModel.fillRows(listOf(row("2026-11-15", 2.0)), g, "2026-11-15", 14)
+        assertEquals(14, one.size); assertEquals(2.0, one.last().cost, 0.0); assertEquals(13.0, one.count { it.agents.isEmpty() }.toDouble(), 0.0)
+        val zeros = UsageModel.fillRows(emptyList(), g, "2026-11-15", 14)
+        assertEquals(14, zeros.size); assertTrue(zeros.all { it.cost == 0.0 })
+        assertEquals(listOf("2026-11-15"), UsageModel.fillRows(listOf(row("2025-01-01", 9.0)), g, "2026-11-15", 1).map { it.period }) // out of window ignored
+        assertEquals(1, UsageModel.fillRows(listOf(row("2026-11-15", 1.0)), g, "bad", 1).size)
+    }
+
+    @Test fun fillRowsWeeksAndMonthsAlignToTheirKeys() {
+        // 2026-11-15 is a Sunday: its week starts Monday 2026-11-09.
+        val w = UsageModel.fillRows(listOf(row("2026-10-26", 4.0)), Granularity.WEEK, "2026-11-15", 4)
+        assertEquals(listOf("2026-10-26", "2026-11-02", "2026-11-09").let { listOf("2026-10-19") + it }, w.map { it.period })
+        assertEquals(listOf(0.0, 4.0, 0.0, 0.0), w.map { it.cost })
+        val m = UsageModel.fillRows(listOf(row("2025-12", 5.0)), Granularity.MONTH, "2026-02-10", 4)
+        assertEquals(listOf("2025-11", "2025-12", "2026-01", "2026-02"), m.map { it.period })     // crosses the year
+        assertEquals(listOf(0.0, 5.0, 0.0, 0.0), m.map { it.cost })
+    }
+
     @Test fun todayAndRecentSessions() {
         val t = UsageModel.today(report, "2026-11-15")!!
         assertEquals(10L, t.first); assertEquals(0.0, t.second, 0.0)

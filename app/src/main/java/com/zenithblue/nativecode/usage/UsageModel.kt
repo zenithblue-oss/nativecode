@@ -67,20 +67,20 @@ object UsageModel {
 
     private fun parseRow(o: JSONObject?): UsageRow? {
         if (o == null) return null
-        val period = o.optString("period", "").ifBlank { return null }
+        val period = o.s("period") ?: return null
         val arr = o.optJSONArray("agents")
         val agents = if (arr != null && arr.length() > 0) (0 until arr.length()).mapNotNull { parseAgent(arr.optJSONObject(it), null) }
         else listOfNotNull(parseAgent(o, "all"))
-        return UsageRow(period, agents, o.optJSONObject("metadata")?.optString("lastActivity", "")?.ifBlank { null })
+        return UsageRow(period, agents, o.optJSONObject("metadata")?.s("lastActivity"))
     }
 
     private fun parseAgent(o: JSONObject?, fallbackName: String?): AgentUse? {
         if (o == null) return null
-        val name = o.optString("agent", "").ifBlank { fallbackName ?: return null }
+        val name = o.s("agent") ?: fallbackName ?: return null
         val models = o.optJSONArray("modelBreakdowns")?.let { a ->
             (0 until a.length()).mapNotNull { i ->
                 val m = a.optJSONObject(i) ?: return@mapNotNull null
-                val n = m.optString("modelName", "").ifBlank { return@mapNotNull null }
+                val n = m.s("modelName") ?: return@mapNotNull null
                 ModelUse(n, tok(m), num(m, "cost"))
             }
         } ?: emptyList()
@@ -91,6 +91,9 @@ object UsageModel {
         val i = lng(o, "inputTokens"); val out = lng(o, "outputTokens"); val cr = lng(o, "cacheReadTokens"); val cw = lng(o, "cacheCreationTokens")
         return Tok(i, out, cr, cw, if (o.has("totalTokens")) lng(o, "totalTokens") else i + out + cr + cw)
     }
+
+    /** String field or null when missing, JSON null or blank (Android's optString turns JSON null into "null"). */
+    private fun JSONObject.s(k: String): String? = if (has(k) && !isNull(k)) optString(k).ifBlank { null } else null
 
     private fun lng(o: JSONObject, k: String): Long = o.optLong(k, 0).coerceAtLeast(0)
     private fun num(o: JSONObject, k: String): Double = o.optDouble(k, 0.0).let { if (it.isNaN() || it < 0) 0.0 else it }
@@ -126,11 +129,63 @@ object UsageModel {
     /** The last [n] rows by period, oldest first. */
     fun lastRows(rows: List<UsageRow>, n: Int): List<UsageRow> = rows.sortedBy { it.period }.takeLast(n)
 
-    /** Exactly [n] consecutive days ending [endDate] (`yyyy-MM-dd`), an empty row for a day with no usage, so the day chart keeps a steady scale. */
-    fun fillDays(rows: List<UsageRow>, endDate: String, n: Int): List<UsageRow> {
+    /**
+     * Exactly [n] consecutive buckets of [g] ending at the one holding [endDate] (`yyyy-MM-dd`): days, weeks (period = their Monday)
+     * or months (`yyyy-MM`). A bucket with no usage is an empty row, so a chart keeps a steady x-scale and gaps count as 0.
+     * Input order does not matter; rows outside the window are ignored. An unparseable [endDate] falls back to the last [n] rows.
+     */
+    fun fillRows(rows: List<UsageRow>, g: Granularity, endDate: String, n: Int): List<UsageRow> {
         val end = runCatching { java.time.LocalDate.parse(endDate) }.getOrNull() ?: return lastRows(rows, n)
+        val keys = when (g) {
+            Granularity.DAY -> (n - 1 downTo 0).map { end.minusDays(it.toLong()).toString() }
+            Granularity.WEEK -> end.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)).let { mon ->
+                (n - 1 downTo 0).map { mon.minusWeeks(it.toLong()).toString() }
+            }
+            Granularity.MONTH -> java.time.YearMonth.from(end).let { ym -> (n - 1 downTo 0).map { ym.minusMonths(it.toLong()).toString() } }
+        }
         val by = rows.associateBy { it.period }
-        return (n - 1 downTo 0).map { end.minusDays(it.toLong()).toString().let { d -> by[d] ?: UsageRow(d, emptyList()) } }
+        return keys.map { by[it] ?: UsageRow(it, emptyList()) }
+    }
+
+    fun fillDays(rows: List<UsageRow>, endDate: String, n: Int): List<UsageRow> = fillRows(rows, Granularity.DAY, endDate, n)
+
+    /** One stat tile: [value] now, [prev] for the period before, and the last days as a sparkline. */
+    data class Stat(val value: Double, val prev: Double, val spark: List<Double>) {
+        /** Change versus [prev] in percent, or null when there is nothing to compare. */
+        val deltaPct: Double? get() = if (prev <= 0.0) null else (value - prev) / prev * 100.0
+    }
+
+    data class Hero(val todayCost: Stat, val todayTokens: Stat, val weekCost: Stat, val activeClis: Stat)
+
+    /**
+     * The four hero tiles from the daily rows ([today] is `yyyy-MM-dd`): today versus yesterday, the last 7 days versus the 7
+     * before, and the number of CLIs used in those 7 days. Sparklines show the selected range [g] (its [Granularity.bars]
+     * buckets, gaps as 0), so every one spans the whole tile.
+     */
+    fun hero(report: UsageReport, today: String, g: Granularity = Granularity.DAY): Hero {
+        val days = fillDays(report.daily, today, 14)
+        val cur = days.takeLast(7)
+        val old = days.take(7)
+        val rng = fillRows(report.rows(g), g, today, g.bars)
+        fun cost(l: List<UsageRow>) = l.map { it.cost }
+        fun clis(l: List<UsageRow>) = l.flatMap { r -> r.agents.filter { it.tokens.total > 0 || it.cost > 0 }.map { it.agent } }.toSet().size.toDouble()
+        return Hero(
+            Stat(cur.last().cost, days[12].cost, cost(rng)),
+            Stat(cur.last().tokens.total.toDouble(), days[12].tokens.total.toDouble(), rng.map { it.tokens.total.toDouble() }),
+            Stat(cost(cur).sum(), cost(old).sum(), cost(rng)),
+            Stat(clis(cur), clis(old), rng.map { clis(listOf(it)) }),
+        )
+    }
+
+    /** CLIs with usage in the last 7 days to [today], most cost first. */
+    fun activeAgents(report: UsageReport, today: String): List<String> =
+        summarize(fillDays(report.daily, today, 7)).byAgent.filter { it.tokens.total > 0 || it.cost > 0 }.map { it.agent }
+
+    /** `+12%`, `-4%`, `new` when the earlier period was zero and this one is not, empty when both are zero. */
+    fun fmtDelta(s: Stat): String = when {
+        s.deltaPct != null -> String.format(Locale.US, "%+.0f%%", s.deltaPct)
+        s.value > 0 -> "new"
+        else -> ""
     }
 
     /** Chart bars for [rows] (already limited): value is cost or total tokens per CLI. Zero values are dropped. */
