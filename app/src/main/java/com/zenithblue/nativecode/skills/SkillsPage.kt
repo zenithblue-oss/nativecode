@@ -23,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.zenithblue.nativecode.NC
 import com.zenithblue.nativecode.R
+import com.zenithblue.nativecode.tr
 
 private fun Context.dp(v: Int): Int =
     TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
@@ -134,13 +135,13 @@ class SkillsPage(
             }
         })
         row.addView(TextView(ctx).apply {
-            text = "SKILLS"
+            text = tr(R.string.skills_skills)
             textSize = 20f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         })
-        row.addView(badge("CLI AGENTS"))
+        row.addView(badge(tr(R.string.skills_cli_agents)))
         col.addView(row)
         col.addView(TextView(ctx).apply {
             text = "// PASTE INTO CLAUDE, CODEX, OR ANY CLI AGENT"
@@ -228,7 +229,7 @@ class SkillsPage(
             layoutParams = LinearLayout.LayoutParams(ctx.dp(18), ctx.dp(18)).apply { rightMargin = ctx.dp(8) }
         })
         row.addView(EditText(ctx).apply {
-            hint = "SEARCH SKILLS"
+            hint = tr(R.string.skills_search_skills)
             setHintTextColor(NC.OUTLINE)
             setTextColor(Color.WHITE)
             textSize = 13f
@@ -300,13 +301,13 @@ class SkillsPage(
                 setPadding(0, ctx.dp(8), 0, ctx.dp(12))
             })
             val actions = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-            actions.addView(actionBtn("VIEW") {
+            actions.addView(actionBtn(tr(R.string.skills_view)) {
                 viewing = skill
                 renderDetail(skill)
             }.also {
                 it.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = ctx.dp(8) }
             })
-            actions.addView(actionBtn("COPY") { copy(skill) }.also {
+            actions.addView(actionBtn(tr(R.string.skills_copy)) { copy(skill) }.also {
                 it.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             })
             addView(actions)
@@ -319,16 +320,16 @@ class SkillsPage(
             background = ctx.brutalistBg(NC.SURFACE_LOW, offsetDp = 4)
             setPadding(ctx.dp(16), ctx.dp(20), ctx.dp(16), ctx.dp(20))
             addView(TextView(ctx).apply {
-                text = "EMPTY"
+                text = tr(R.string.skills_empty)
                 textSize = 13f
                 setTextColor(NC.PRIMARY)
                 typeface = Typeface.DEFAULT_BOLD
             })
             addView(TextView(ctx).apply {
                 text = if (query.isBlank()) {
-                    "No skills in this category yet. Inbuilt holds the NativeCode hardware skills."
+                    tr(R.string.skills_no_skills_in_this_category)
                 } else {
-                    "No skills match that search."
+                    tr(R.string.skills_no_skills_match_that_search)
                 }
                 textSize = 12f
                 setTextColor(NC.ON_SURF_VAR)
@@ -377,7 +378,7 @@ class SkillsPage(
             setTextColor(NC.ON_SURF_VAR)
             setPadding(0, ctx.dp(8), 0, ctx.dp(12))
         })
-        detailHost.addView(actionBtn("COPY SKILL") { copy(skill) }.also {
+        detailHost.addView(actionBtn(tr(R.string.skills_copy_skill)) { copy(skill) }.also {
             it.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = ctx.dp(12) }
         })
         detailHost.addView(WebView(ctx).apply {
@@ -392,7 +393,7 @@ class SkillsPage(
     private fun copy(skill: Skill) {
         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText(skill.title, skill.body))
-        Toast.makeText(ctx, "Skill copied", Toast.LENGTH_SHORT).show()
+        Toast.makeText(ctx, tr(R.string.skills_skill_copied), Toast.LENGTH_SHORT).show()
     }
 
     private fun actionBtn(label: String, onClick: () -> Unit): TextView {

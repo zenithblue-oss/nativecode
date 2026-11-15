@@ -47,6 +47,17 @@ def generic_ok(line_pre, post, fmt):
     return letters >= 0.6 * len(s)
 
 
+def ctx_before(src, s):
+    """Text before the literal on its line; a literal alone on its line also sees the line above it."""
+    pre = src[max(0, s - 240):s]
+    cur = pre[pre.rfind('\n') + 1:]
+    if cur.strip() == '' and '\n' in pre:
+        prev = pre[:pre.rfind('\n')]
+        prev = prev[prev.rfind('\n') + 1:]
+        return prev.rstrip() + ' ' + cur.strip()
+    return cur
+
+
 def lex(src):
     """Yield (start, end) of every normal "string" token (not raw, not char, not in comments)."""
     i, n, out = 0, len(src), []
@@ -160,7 +171,14 @@ def slug(fmt, prefix, used):
     return k
 
 
+def auto_prefix(path):
+    parts = path.split('/')
+    if len(parts) == 1: return 'app'
+    return {'agent': 'chat', 'terminal': 'term', 'workspace': 'ws'}.get(parts[0], parts[0])
+
+
 def process(path, prefix, keys, used, dry):
+    if prefix == 'auto': prefix = auto_prefix(path)
     full = os.path.join(SRC, path)
     src = open(full).read()
     repl, new_entries = [], []
@@ -169,12 +187,11 @@ def process(path, prefix, keys, used, dry):
     logic = set()
     for (s, e, nested) in toks:
         if nested: continue
-        pre = src[max(0, s - 160):s]; lp = pre[pre.rfind('\n') + 1:]
+        lp = ctx_before(src, s)
         if EXCL_PRE.search(lp) or EXCL_POST.match(src[e:e + 40]): logic.add(src[s + 1:e - 1])
     for (s, e, nested) in toks:
         if nested: continue
-        pre = src[max(0, s - 160):s]
-        line_pre = pre[pre.rfind('\n') + 1:] if '\n' in pre else pre
+        line_pre = ctx_before(src, s)
         post = src[e:e + 40]
         if re.match(r'\s*\+', post) or re.search(r'\+\s*$', line_pre) or re.match(r'\s*\.format\(', post): continue
         if src[s + 1:e - 1] in logic: continue

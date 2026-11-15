@@ -13,6 +13,8 @@ import com.zenithblue.nativecode.agent.chat.core.RuntimeCaps
 import com.zenithblue.nativecode.agent.chat.core.SlashCommand
 import com.zenithblue.nativecode.agent.chat.core.TurnItem
 import com.zenithblue.nativecode.agent.chat.core.Usage
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Banner slot content. [action] labels the button (null = none). kind: signin | ratelimit | queue | ended | info */
 data class Banner(val kind: String, val text: String, val action: String? = null)
@@ -41,7 +43,7 @@ data class LiveState(
     val runId: String? = null,
 )
 
-enum class DiffScope(val label: String) { TURN("This turn"), THREAD("Whole thread"), UNCOMMITTED("Uncommitted") }
+enum class DiffScope(val label: String) { TURN(tr(R.string.chat_this_turn)), THREAD(tr(R.string.chat_whole_thread)), UNCOMMITTED(tr(R.string.chat_uncommitted)) }
 
 /**
  * The UI's whole view of the chat engine: store queries (IO thread) + controller commands (any thread).

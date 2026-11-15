@@ -35,6 +35,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.zenithblue.nativecode.NC
 import com.zenithblue.nativecode.R
 import java.util.concurrent.Executors
+import com.zenithblue.nativecode.tr
 
 /**
  * In-app preview of a dev server running in the guest (plan 12). Loopback only: any other host opens in the
@@ -54,7 +55,7 @@ class PreviewActivity : Activity() {
 
         fun openExternal(ctx: Context, url: String) {
             runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                .onFailure { Toast.makeText(ctx, "No browser can open this link", Toast.LENGTH_SHORT).show() }
+                .onFailure { Toast.makeText(ctx, tr(R.string.preview_no_browser_can_open_this), Toast.LENGTH_SHORT).show() }
         }
     }
 
@@ -86,7 +87,7 @@ class PreviewActivity : Activity() {
             setPadding(dp(4), dp(6), dp(8), dp(6))
             setBackgroundColor(NC.SURFACE_LOW)
         }
-        top.addView(iconBtn(R.drawable.ic_close, "Close preview") { finish() })
+        top.addView(iconBtn(R.drawable.ic_close, tr(R.string.preview_close_preview)) { finish() })
         urlBar = EditText(this).apply {
             setSingleLine()
             textSize = 13f
@@ -106,7 +107,7 @@ class PreviewActivity : Activity() {
         }
         top.addView(urlBar)
         portBtn = TextView(this).apply {
-            text = "PORTS"
+            text = tr(R.string.preview_ports)
             textSize = 12f
             typeface = Typeface.MONOSPACE
             paint.isFakeBoldText = true
@@ -126,20 +127,20 @@ class PreviewActivity : Activity() {
             setPadding(dp(4), 0, dp(4), dp(4))
             setBackgroundColor(NC.SURFACE_LOW)
         }
-        backBtn = iconBtn(R.drawable.ic_lucide_arrow_left, "Back") { if (web.canGoBack()) web.goBack() }
-        fwdBtn = iconBtn(R.drawable.ic_lucide_arrow_right, "Forward") { if (web.canGoForward()) web.goForward() }
+        backBtn = iconBtn(R.drawable.ic_lucide_arrow_left, tr(R.string.onb_back)) { if (web.canGoBack()) web.goBack() }
+        fwdBtn = iconBtn(R.drawable.ic_lucide_arrow_right, tr(R.string.preview_forward)) { if (web.canGoForward()) web.goForward() }
         nav.addView(backBtn)
         nav.addView(fwdBtn)
-        nav.addView(iconBtn(R.drawable.ic_lucide_rotate_cw, "Reload") { retry() })
+        nav.addView(iconBtn(R.drawable.ic_lucide_rotate_cw, tr(R.string.preview_reload)) { retry() })
         nav.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         nav.addView(TextView(this).apply {
-            text = "LOOPBACK ONLY"
+            text = tr(R.string.preview_loopback_only)
             textSize = 10f
             typeface = Typeface.MONOSPACE
             setTextColor(NC.ON_SURF_VAR)
             setPadding(0, 0, dp(8), 0)
         })
-        nav.addView(iconBtn(R.drawable.ic_lucide_external_link, "Open in browser") {
+        nav.addView(iconBtn(R.drawable.ic_lucide_external_link, tr(R.string.preview_open_in_browser)) {
             (current ?: urlBar.text.toString()).takeIf { it.isNotBlank() }?.let { openExternal(this, it) }
         })
         root.addView(nav)
@@ -199,7 +200,7 @@ class PreviewActivity : Activity() {
             }
             addView(errorDetail)
             addView(TextView(this@PreviewActivity).apply {
-                text = "RETRY"
+                text = tr(R.string.preview_retry)
                 textSize = 14f
                 typeface = Typeface.MONOSPACE
                 paint.isFakeBoldText = true
@@ -240,7 +241,7 @@ class PreviewActivity : Activity() {
         if (!::web.isInitialized) return
         backBtn.alpha = if (web.canGoBack()) 1f else 0.35f
         fwdBtn.alpha = if (web.canGoForward()) 1f else 0.35f
-        portBtn.text = PortProbe.portOf(current ?: "")?.let { ":$it" } ?: "PORTS"
+        portBtn.text = PortProbe.portOf(current ?: "")?.let { ":$it" } ?: tr(R.string.preview_ports)
     }
 
     /** Typed address: bare port ("5173", ":5173") or URL. Non-loopback goes to the browser. */
@@ -273,13 +274,13 @@ class PreviewActivity : Activity() {
     }
 
     private fun scanThenOpen() {
-        showMessage("Looking for a dev server…", "Probing 127.0.0.1 on common dev ports")
+        showMessage(tr(R.string.preview_looking_for_a_dev_server), tr(R.string.preview_probing_127_0_0_1))
         io.execute {
             val found = (PortProbe.seenPorts() + PortProbe.probe()).distinct().filter { PortProbe.isOpen(it) }
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 ports = found
-                if (found.isEmpty()) showMessage("No dev server found",
+                if (found.isEmpty()) showMessage(tr(R.string.preview_no_dev_server_found),
                     "Nothing listens on 127.0.0.1 (${PortProbe.COMMON.joinToString(", ")}).\nStart one (npx vite, python3 -m http.server) or type a port above.")
                 else go("http://127.0.0.1:${found.first()}/")
             }
@@ -295,7 +296,7 @@ class PreviewActivity : Activity() {
                 val menu = PopupMenu(this, portBtn)
                 if (found.isEmpty()) menu.menu.add("No listening ports found").isEnabled = false
                 found.forEach { p -> menu.menu.add(0, p, 0, "127.0.0.1:$p") }
-                menu.menu.add(0, -1, 1, "Scan again")
+                menu.menu.add(0, -1, 1, tr(R.string.preview_scan_again))
                 menu.setOnMenuItemClickListener { item ->
                     if (item.itemId == -1) showPorts() else if (item.itemId > 0) go("http://127.0.0.1:${item.itemId}/")
                     true
@@ -305,7 +306,7 @@ class PreviewActivity : Activity() {
         }
     }
 
-    private fun showError(port: Int?) = showMessage("Server not running",
+    private fun showError(port: Int?) = showMessage(tr(R.string.preview_server_not_running),
         "Nothing is listening on 127.0.0.1${port?.let { ":$it" } ?: ""}.\nStart the dev server, then retry.")
 
     private fun showMessage(title: String, detail: String) {

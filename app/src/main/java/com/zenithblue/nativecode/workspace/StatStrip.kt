@@ -32,6 +32,7 @@ import com.zenithblue.nativecode.ui.BrutalistToggle
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.Executors
+import com.zenithblue.nativecode.tr
 
 private fun Context.dp(v: Int): Int =
     TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
@@ -352,8 +353,8 @@ object StatsEditor {
                     layoutParams = LinearLayout.LayoutParams(context.dp(44), context.dp(44))
                     setOnClickListener { save(TopBarStats.move(enabled, stat, delta)) }
                 }
-                row.addView(arrow(R.drawable.ic_arrow_up, "Move up", -1))
-                row.addView(arrow(R.drawable.ic_arrow_down, "Move down", 1))
+                row.addView(arrow(R.drawable.ic_arrow_up, tr(R.string.ws_move_up), -1))
+                row.addView(arrow(R.drawable.ic_arrow_down, tr(R.string.ws_move_down), 1))
                 list.addView(row)
             }
             val actions = LinearLayout(context).apply {
@@ -373,8 +374,8 @@ object StatsEditor {
                 }
                 setOnClickListener { click() }
             }
-            actions.addView(action("HIDE ALL") { save(emptyList()) })
-            actions.addView(action("RESET") { save(TopBarStats.DEFAULT) })
+            actions.addView(action(tr(R.string.ws_hide_all)) { save(emptyList()) })
+            actions.addView(action(tr(R.string.ws_reset)) { save(TopBarStats.DEFAULT) })
             list.addView(actions)
         }
         // Re-render from the pref so the Settings card and the sheet never disagree.

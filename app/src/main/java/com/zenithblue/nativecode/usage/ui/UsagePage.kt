@@ -31,6 +31,7 @@ import com.zenithblue.nativecode.usage.UsageReport
 import com.zenithblue.nativecode.usage.UsageRepository
 import com.zenithblue.nativecode.usage.UsageRow
 import java.util.concurrent.Executors
+import com.zenithblue.nativecode.tr
 
 internal interface UsageHostApi {
     /** True when usage of [agent] (a ccusage name such as `claude`) may be shown to this user. */
@@ -182,7 +183,7 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
             val threads = UsageModel.chatThreads(UsageRepository.chatRuns(ctx))
             ui.post {
                 busy = false
-                r.onSuccess { report = it; error = null }.onFailure { error = it.message ?: "Could not read usage." }
+                r.onSuccess { report = it; error = null }.onFailure { error = it.message ?: tr(R.string.usage_could_not_read_usage) }
                 chat = threads
                 render()
             }
@@ -216,7 +217,7 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
         val full = report
         body.addView(topRow())
         if (full == null) {
-            body.addView(emptyCard(if (busy) "Reading your AI logs..." else (error ?: "Nothing loaded yet."), retry = !busy))
+            body.addView(emptyCard(if (busy) tr(R.string.usage_reading_your_ai_logs) else (error ?: tr(R.string.usage_nothing_loaded_yet)), retry = !busy))
             addLimits()
             return
         }
@@ -230,7 +231,7 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
 
         val rows = UsageModel.fillRows(rep.rows(gran), gran, today, gran.bars)
         if (rows.all { it.agents.isEmpty() }) {
-            body.addView(emptyCard("No AI usage yet. Use opencode, Claude Code or Codex and it shows up here.", retry = false))
+            body.addView(emptyCard(tr(R.string.usage_no_ai_usage_yet_use), retry = false))
         } else {
             val sum = UsageModel.summarize(rows)
             val useCost = byCost && sum.cost > 0
@@ -245,12 +246,12 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
                 body.addView(donut); body.addView(bars); body.addView(trend); body.addView(modelsCard(sum.byAgent, useCost))
             }
         }
-        if (hidden) body.addView(card("MORE CLIS  ·  PRO").apply {
-            addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = "Usage of Claude Code, Codex and others is hidden on Free."; setPadding(0, dp(6), 0, dp(10)) })
-            addView(chip("SEE PRO", false) { host.upgrade() })
+        if (hidden) body.addView(card(tr(R.string.usage_more_clis_pro)).apply {
+            addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = tr(R.string.usage_usage_of_claude_code_codex); setPadding(0, dp(6), 0, dp(10)) })
+            addView(chip(tr(R.string.usage_see_pro), false) { host.upgrade() })
         })
         body.addView(details(rep))
-        body.addView(text(11f, NC.OUTLINE).apply { text = "Estimated cost, from ccusage prices. Not a bill."; setPadding(0, dp(16), 0, dp(8)) })
+        body.addView(text(11f, NC.OUTLINE).apply { text = tr(R.string.usage_estimated_cost_from_ccusage_prices); setPadding(0, dp(16), 0, dp(8)) })
     }
 
     private fun pair(a: View, b: View): View = LinearLayout(ctx).apply {
@@ -295,10 +296,10 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
             contentDescription = "$label $big ${if (d.isNotEmpty()) d else ""}"
         }
         val cells = listOf(
-            t("TODAY COST", UsageModel.fmtCost(h.todayCost.value), h.todayCost, NC.TERTIARY_CON, "vs yesterday"),
-            t("TODAY TOKENS", UsageModel.fmtTokens(h.todayTokens.value.toLong()) + " tok", h.todayTokens, NC.PRIMARY, "vs yesterday"),
-            t("7 DAYS", UsageModel.fmtCost(h.weekCost.value), h.weekCost, Color.parseColor("#8ab4ff"), "vs prior 7"),
-            t("ACTIVE CLIS", h.activeClis.value.toInt().toString(), h.activeClis, Color.parseColor("#c58cff"), "last 7 days", activeAgents),
+            t(tr(R.string.usage_today_cost), UsageModel.fmtCost(h.todayCost.value), h.todayCost, NC.TERTIARY_CON, "vs yesterday"),
+            t(tr(R.string.usage_today_tokens), UsageModel.fmtTokens(h.todayTokens.value.toLong()) + " tok", h.todayTokens, NC.PRIMARY, "vs yesterday"),
+            t(tr(R.string.usage_7_days), UsageModel.fmtCost(h.weekCost.value), h.weekCost, Color.parseColor("#8ab4ff"), "vs prior 7"),
+            t(tr(R.string.usage_active_clis), h.activeClis.value.toInt().toString(), h.activeClis, Color.parseColor("#c58cff"), "last 7 days", activeAgents),
         )
         val per = if (cols >= 2) 4 else 2
         return LinearLayout(ctx).apply {
@@ -318,7 +319,7 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
     private fun addLimits() {
         val shown = limits.filter { host.allowed(it.agent) }
         if (shown.isEmpty()) {
-            if (limitsBusy) body.addView(card("PLAN LIMITS").apply { addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = "Reading limits..."; setPadding(0, dp(8), 0, 0) }) })
+            if (limitsBusy) body.addView(card(tr(R.string.usage_plan_limits)).apply { addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = tr(R.string.usage_reading_limits); setPadding(0, dp(8), 0, 0) }) })
             return
         }
         val sorted = shown.sortedWith(compareBy({ it.state != LimitState.OK }, { LimitsRepository.AGENTS.indexOf(it.agent) }))
@@ -327,7 +328,7 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
         body.addView(LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(24) }
-            addView(text(13f, NC.PRIMARY, bold = true).apply { text = "PLAN LIMITS"; letterSpacing = 0.08f }, weight())
+            addView(text(13f, NC.PRIMARY, bold = true).apply { text = tr(R.string.usage_plan_limits); letterSpacing = 0.08f }, weight())
             addView(text(10f, NC.OUTLINE).apply { text = if (limitsBusy) "updating..." else if (at > 0) "updated " + ago(at) else "" })
         })
         if (cols >= 2) cards.chunked(2).forEach { r -> body.addView(LinearLayout(ctx).apply {
@@ -364,13 +365,13 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
                 }
                 l.windows.drop(rings.size).forEach { w -> addView(barRow(w), lp(10)) }
             }
-            LimitState.FREE -> addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = "Free models. No plan limits."; setPadding(0, dp(10), 0, 0) })
+            LimitState.FREE -> addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = tr(R.string.usage_free_models_no_plan_limits); setPadding(0, dp(10), 0, 0) })
             LimitState.NOT_SIGNED_IN -> {
-                addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = "Not signed in."; setPadding(0, dp(10), 0, dp(8)) })
-                addView(chip("SIGN IN", false) { host.openLogin() })
+                addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = tr(R.string.usage_not_signed_in); setPadding(0, dp(10), 0, dp(8)) })
+                addView(chip(tr(R.string.usage_sign_in), false) { host.openLogin() })
             }
-            LimitState.UNAVAILABLE -> addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = l.message ?: "Not available."; setPadding(0, dp(10), 0, 0) })
-            LimitState.ERROR -> addView(text(12f, NC.ERROR, mono = false).apply { text = l.message ?: "Could not read limits."; setPadding(0, dp(10), 0, 0) })
+            LimitState.UNAVAILABLE -> addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = l.message ?: tr(R.string.usage_not_available); setPadding(0, dp(10), 0, 0) })
+            LimitState.ERROR -> addView(text(12f, NC.ERROR, mono = false).apply { text = l.message ?: tr(R.string.usage_could_not_read_limits); setPadding(0, dp(10), 0, 0) })
         }
     }
 
@@ -408,15 +409,15 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
     private fun metricRow(useCost: Boolean): View = LinearLayout(ctx).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(24) }
-        addView(text(13f, NC.PRIMARY, bold = true).apply { text = "USAGE"; letterSpacing = 0.08f }, weight())
-        addView(chip("Cost", useCost) { byCost = true; render() })
-        addView(chip("Tokens", !useCost) { byCost = false; render() }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
+        addView(text(13f, NC.PRIMARY, bold = true).apply { text = tr(R.string.usage_usage); letterSpacing = 0.08f }, weight())
+        addView(chip(tr(R.string.usage_cost), useCost) { byCost = true; render() })
+        addView(chip(tr(R.string.usage_tokens), !useCost) { byCost = false; render() }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
     }
 
     private fun value(a: Double, useCost: Boolean) = if (useCost) UsageModel.fmtCost(a) else UsageModel.fmtTokens(a.toLong())
 
     private fun donutCard(byAgent: List<AgentUse>, cost: Double, tokens: Long, useCost: Boolean, rows: List<UsageRow>): LinearLayout {
-        val c = card("BY CLI")
+        val c = card(tr(R.string.usage_by_cli))
         val vals = byAgent.map { it to (if (useCost) it.cost else it.tokens.total.toDouble()) }
         val total = vals.sumOf { it.second }.takeIf { it > 0 } ?: 1.0
         val slices = vals.map { (a, v) -> Slice(UsageModel.agentLabel(a.agent), v, agentColor(a.agent), value(v, useCost)) }
@@ -433,12 +434,12 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
         val c = card(if (useCost) "COST BY ${gran.label}" else "TOKENS BY ${gran.label}")
         val bars = UsageModel.bars(rows, gran, useCost)
         val fmt: (Double) -> String = { value(it, useCost) }
-        val detail = text(11f, NC.ON_SURF_VAR).apply { text = "Tap a bar for details." }
+        val detail = text(11f, NC.ON_SURF_VAR).apply { text = tr(R.string.usage_tap_a_bar_for_details) }
         val desc = "Stacked bars by ${gran.label.lowercase()}: " + bars.joinToString(", ") { "${it.label} ${fmt(it.total)}" }
         val v = BarsView(ctx, ::agentColor).apply {
             set(bars, fmt, desc)
             onSelect = { i ->
-                detail.text = if (i < 0) "Tap a bar for details." else rows[i].let { r ->
+                detail.text = if (i < 0) tr(R.string.usage_tap_a_bar_for_details) else rows[i].let { r ->
                     r.period + "  ·  " + fmt(bars[i].total) + (if (r.agents.isEmpty()) "  ·  no usage" else "  ·  " + r.agents.joinToString(", ") { UsageModel.agentLabel(it.agent) + " " + value(if (useCost) it.cost else it.tokens.total.toDouble(), useCost) })
                 }
             }
@@ -458,21 +459,21 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
     }
 
     private fun trendCard(rows: List<UsageRow>, useCost: Boolean): LinearLayout {
-        val c = card("TREND")
+        val c = card(tr(R.string.usage_trend))
         val vals = rows.map { if (useCost) it.cost else it.tokens.total.toDouble() }
         val labels = rows.map { UsageModel.barLabel(it.period, gran) }
-        val detail = text(11f, NC.ON_SURF_VAR).apply { text = "Tap the line for a point." }
+        val detail = text(11f, NC.ON_SURF_VAR).apply { text = tr(R.string.usage_tap_the_line_for_a) }
         val desc = "Trend of ${if (useCost) "cost" else "tokens"}: " + labels.indices.joinToString(", ") { "${labels[it]} ${value(vals[it], useCost)}" }
         c.addView(AreaView(ctx).apply {
             set(vals, labels, desc)
-            onSelect = { i -> detail.text = if (i < 0) "Tap the line for a point." else rows[i].period + "  ·  " + value(vals[i], useCost) }
+            onSelect = { i -> detail.text = if (i < 0) tr(R.string.usage_tap_the_line_for_a) else rows[i].period + "  ·  " + value(vals[i], useCost) }
         }, lp(10))
         c.addView(detail, lp(8))
         return c
     }
 
     private fun modelsCard(byAgent: List<AgentUse>, useCost: Boolean): LinearLayout {
-        val c = card("MODELS")
+        val c = card(tr(R.string.usage_models))
         val list = byAgent.flatMap { a -> a.models.map { a.agent to it } }
             .sortedByDescending { if (useCost) it.second.cost else it.second.tokens.total.toDouble() }.take(6)
         val max = list.maxOfOrNull { if (useCost) it.second.cost else it.second.tokens.total.toDouble() }?.takeIf { it > 0 } ?: 1.0
@@ -502,14 +503,14 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
         c.addView(LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(48)
             isClickable = true; isFocusable = true; contentDescription = "Details, ${if (detailsOpen) "expanded" else "collapsed"}"
-            addView(text(13f, NC.PRIMARY, bold = true).apply { text = "DETAILS"; letterSpacing = 0.08f }, weight())
+            addView(text(13f, NC.PRIMARY, bold = true).apply { text = tr(R.string.usage_details); letterSpacing = 0.08f }, weight())
             addView(icon(R.drawable.ic_lucide_chevron_down, NC.ON_SURF_VAR).apply { rotation = if (detailsOpen) 180f else 0f })
             setOnClickListener { detailsOpen = !detailsOpen; render() }
         })
         if (!detailsOpen) return c
         val sessions = UsageModel.recentSessions(rep, 8)
         if (sessions.isNotEmpty()) {
-            c.addView(text(11f, NC.OUTLINE).apply { text = "RECENT SESSIONS"; setPadding(0, dp(8), 0, dp(4)) })
+            c.addView(text(11f, NC.OUTLINE).apply { text = tr(R.string.usage_recent_sessions); setPadding(0, dp(8), 0, dp(4)) })
             sessions.forEach { r ->
                 val a = r.agents.firstOrNull() ?: return@forEach
                 c.addView(LinearLayout(ctx).apply {
@@ -522,7 +523,7 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
         }
         val chatShown = chat.filter { host.allowed(it.agent) }.take(8)
         if (chatShown.isNotEmpty()) {
-            c.addView(text(11f, NC.OUTLINE).apply { text = "CHAT THREADS (already in the totals)"; setPadding(0, dp(16), 0, dp(4)) })
+            c.addView(text(11f, NC.OUTLINE).apply { text = tr(R.string.usage_chat_threads_already_in_the); setPadding(0, dp(16), 0, dp(4)) })
             chatShown.forEach { t ->
                 c.addView(LinearLayout(ctx).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -532,7 +533,7 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
             }
         }
         val s = UsageModel.summarize(rep.daily)
-        c.addView(text(11f, NC.OUTLINE).apply { text = "TOKEN SPLIT (range)"; setPadding(0, dp(16), 0, dp(4)) })
+        c.addView(text(11f, NC.OUTLINE).apply { text = tr(R.string.usage_token_split_range); setPadding(0, dp(16), 0, dp(4)) })
         c.addView(text(12f, NC.ON_SURF_VAR).apply {
             text = "in ${UsageModel.fmtTokens(s.tokens.input)} · out ${UsageModel.fmtTokens(s.tokens.output)}\ncache read ${UsageModel.fmtTokens(s.tokens.cacheRead)} · write ${UsageModel.fmtTokens(s.tokens.cacheWrite)}"
         })
@@ -541,17 +542,17 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
 
     // ---- states ----
 
-    private fun installCard(): View = card("SET UP USAGE").apply {
+    private fun installCard(): View = card(tr(R.string.usage_set_up_usage)).apply {
         addView(ImageView(ctx).apply { setImageResource(R.drawable.ic_usage_empty); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(dp(132), dp(104)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(12) })
-        addView(text(13f, NC.ON_SURFACE, mono = false).apply { text = "Install ccusage ${UsageModel.VERSION} (about 3 MB) to read your AI usage. It runs offline on this phone."; gravity = Gravity.CENTER; setPadding(0, dp(12), 0, dp(12)) })
+        addView(text(13f, NC.ON_SURFACE, mono = false).apply { text = tr(R.string.usage_install_ccusage_about_3_mb, UsageModel.VERSION); gravity = Gravity.CENTER; setPadding(0, dp(12), 0, dp(12)) })
         error?.let { addView(text(12f, NC.ERROR, mono = false).apply { text = it; gravity = Gravity.CENTER; setPadding(0, 0, 0, dp(10)) }) }
-        addView(chip(if (busy) "INSTALLING..." else "INSTALL", true) { install() }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        addView(chip(if (busy) tr(R.string.ssh_installing) else tr(R.string.usage_install), true) { install() }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
     }
 
     private fun emptyCard(message: String, retry: Boolean): View = card().apply {
         addView(ImageView(ctx).apply { setImageResource(R.drawable.ic_usage_empty); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }, LinearLayout.LayoutParams(dp(132), dp(104)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(8) })
         addView(text(13f, NC.ON_SURF_VAR, mono = false).apply { text = message; gravity = Gravity.CENTER; setPadding(0, dp(12), 0, if (retry) dp(12) else 0) })
-        if (retry) addView(chip("TRY AGAIN", true) { refreshAll() }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        if (retry) addView(chip(tr(R.string.usage_try_again), true) { refreshAll() }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL })
     }
 
 }

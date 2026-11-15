@@ -66,6 +66,8 @@ import com.zenithblue.nativecode.NC
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** App palette (DesignTokens.NC) for Compose: obsidian surfaces, green primary, square cyber-brutalist edges. */
 internal object C {
@@ -396,5 +398,5 @@ private object Logos {
 
 internal fun copyText(ctx: Context, text: String) {
     (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("chat", text))
-    Toast.makeText(ctx, "Copied", Toast.LENGTH_SHORT).show()
+    Toast.makeText(ctx, tr(R.string.chat_copied), Toast.LENGTH_SHORT).show()
 }

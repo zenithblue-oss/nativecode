@@ -1,5 +1,8 @@
 package com.zenithblue.nativecode.github
 
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
+
 /**
  * Pure guest shell snippets for `gh`. No Android / UI.
  * Auth + list always run as flux; install runs as root via PackageInstallRunner.
@@ -16,7 +19,7 @@ object GhGuestCommands {
         "GH_PROMPT_DISABLED" to "1",
         "GH_SPINNER_DISABLED" to "1",
         "NO_COLOR" to "1",
-        "BROWSER" to "true",
+        tr(R.string.cliauth_browser) to "true",
         "GH_BROWSER" to "true"
     )
 

@@ -88,7 +88,7 @@ fun SystemTelemetryCards(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "SYSTEM TELEMETRY",
+                text = tr(R.string.app_system_telemetry),
                 color = TextOnBackground,
                 style = SectionHeaderStyle
             )
@@ -101,10 +101,10 @@ fun SystemTelemetryCards(
         }
 
         val ramUsedGb = if (ramTotalMb > 0) String.format(java.util.Locale.US, "%.1fGB", ramUsedMb / 1024.0) else "$memPercentage%"
-        val ramSub = if (ramTotalMb > 0) "${ramUsedMb}M / ${ramTotalMb}M" else "RAM Allocated"
+        val ramSub = if (ramTotalMb > 0) "${ramUsedMb}M / ${ramTotalMb}M" else tr(R.string.app_ram_allocated)
         val swapPercentage = if (swapTotalMb > 0) ((swapUsedMb * 100) / swapTotalMb).toInt().coerceIn(0, 100) else 0
         val swapUsedGb = if (swapTotalMb > 0) String.format(java.util.Locale.US, "%.1fGB", swapUsedMb / 1024.0) else "0GB"
-        val swapSub = if (swapTotalMb > 0) "${swapUsedMb}M / ${swapTotalMb}M" else "No Swap"
+        val swapSub = if (swapTotalMb > 0) "${swapUsedMb}M / ${swapTotalMb}M" else tr(R.string.app_no_swap)
 
         Row(
             modifier = Modifier
@@ -114,16 +114,16 @@ fun SystemTelemetryCards(
         ) {
             CompactTelemetryCard(
                 modifier = Modifier.weight(1f),
-                title = "CPU USAGE",
+                title = tr(R.string.app_cpu_usage),
                 mainValue = "$cpuPercentage%",
-                subValue = if (cpuPercentage > 80) "[HIGH LOAD]" else "[NORMAL]",
+                subValue = if (cpuPercentage > 80) tr(R.string.app_high_load) else "[NORMAL]",
                 progress = cpuPercentage / 100f,
                 progressColor = if (cpuPercentage > 80) ErrorRed else PrimaryPurple
             )
 
             CompactTelemetryCard(
                 modifier = Modifier.weight(1f),
-                title = "RAM ALLOCATED",
+                title = tr(R.string.app_ram_allocated_2),
                 mainValue = ramUsedGb,
                 subValue = ramSub,
                 progress = memPercentage / 100f,
@@ -142,7 +142,7 @@ fun SystemTelemetryCards(
         ) {
             CompactTelemetryCard(
                 modifier = Modifier.weight(1f),
-                title = "SWAP USAGE",
+                title = tr(R.string.app_swap_usage),
                 mainValue = swapUsedGb,
                 subValue = swapSub,
                 progress = swapPercentage / 100f,
@@ -151,9 +151,9 @@ fun SystemTelemetryCards(
 
             CompactTelemetryCard(
                 modifier = Modifier.weight(1f),
-                title = "TOTAL STORAGE",
+                title = tr(R.string.app_total_storage),
                 mainValue = "$diskPercentage%",
-                subValue = "Disk Allocated",
+                subValue = tr(R.string.app_disk_allocated),
                 progress = diskPercentage / 100f,
                 progressColor = PrimaryPurple
             )

@@ -204,7 +204,7 @@ object RootShell {
         executor.execute {
             val inv = resolveSuInvocation()
             val code = if (inv == null) {
-                mainHandler.post { onLine("[RootShell] ERROR: no working su binary") }
+                mainHandler.post { onLine(tr(R.string.app_rootshell_error_no_working_su)) }
                 -1
             } else {
                 runCommand(buildSuArgs(inv, cmd), onLine)
@@ -253,14 +253,14 @@ object RootShell {
             val stagedPath = stageAsset(context, assetName)
             if (stagedPath == null) {
                 mainHandler.post {
-                    onLine("[RootShell] ERROR: Failed to stage asset '$assetName'")
+                    onLine(tr(R.string.app_rootshell_error_failed_to_stage, assetName))
                     onDone(-1)
                 }
                 return@execute
             }
             val inv = resolveSuInvocation()
             val code = if (inv == null) {
-                mainHandler.post { onLine("[RootShell] ERROR: no working su binary") }
+                mainHandler.post { onLine(tr(R.string.app_rootshell_error_no_working_su)) }
                 -1
             } else {
                 val argStr = if (args.isEmpty()) "" else " " + args.joinToString(" ") { "\"$it\"" }

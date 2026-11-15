@@ -8,6 +8,8 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import java.util.concurrent.Executors
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * Decoupled and cohesive TerminalSessionClient implementation for NativeCode terminals.
@@ -54,7 +56,7 @@ class NativeCodeTerminalSessionClient(
 
     override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Terminal Selection", text))
+        clipboard.setPrimaryClip(ClipData.newPlainText(tr(R.string.term_terminal_selection), text))
     }
 
     override fun onPasteTextFromClipboard(session: TerminalSession) {

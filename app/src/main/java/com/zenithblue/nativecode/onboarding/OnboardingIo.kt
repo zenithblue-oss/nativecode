@@ -5,6 +5,8 @@ import android.system.Os
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * Archive + asset IO extracted from OnboardingActivity.
@@ -43,7 +45,7 @@ internal object OnboardingIo {
                             "Copied ${formatBytes(readTotal)} / ${formatBytes(total)}"
                         )
                     } else {
-                        onProgress(0.3f, "Copied ${formatBytes(readTotal)}…")
+                        onProgress(0.3f, tr(R.string.onboarding_copied, formatBytes(readTotal)))
                     }
                 }
             }

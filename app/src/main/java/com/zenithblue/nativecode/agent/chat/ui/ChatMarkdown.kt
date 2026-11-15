@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * Streaming-tolerant markdown (t3code renders incrementally the same way): the text is split into block
@@ -409,7 +411,7 @@ internal fun CodeBlock(code: String, lang: String, modifier: Modifier = Modifier
     Column(modifier.fillMaxWidth().card(C.lowest)) {
         Row(Modifier.fillMaxWidth().background(C.container).padding(start = S.m), verticalAlignment = Alignment.CenterVertically) {
             Overline(lang.ifBlank { "code" }, Modifier.weight(1f), color = C.outline)
-            if (copyable) IconBtn(Ic.Copy, "Copy code", tint = C.onVar, size = 16.dp) { copyText(ctx, code) }
+            if (copyable) IconBtn(Ic.Copy, tr(R.string.chat_copy_code), tint = C.onVar, size = 16.dp) { copyText(ctx, code) }
             else Box(Modifier.size(48.dp, 36.dp))
         }
         Text(

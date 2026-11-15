@@ -37,6 +37,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** What the page needs from the activity (document pickers, open AI sessions, keep-awake). */
 internal interface BackupHost {
@@ -74,17 +76,17 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
     private val scopeRow = LinearLayout(ctx)
     private val exclBox = LinearLayout(ctx)
     private val estimateTv = text(12f, NC.ON_SURF_VAR, mono = true)
-    private val backupBtn = button("BACK UP NOW", true)
-    private val restoreBtn = button("RESTORE FROM BACKUP", false)
+    private val backupBtn = button(tr(R.string.backup_back_up_now), true)
+    private val restoreBtn = button(tr(R.string.backup_restore_from_backup), false)
     private val progressCard = LinearLayout(ctx)
     private val progressTitle = text(14f, NC.PRIMARY, bold = true, mono = true)
     private val bar = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal)
     private val progressTv = text(12f, NC.ON_SURF_VAR, mono = true)
-    private val cancelBtn = button("CANCEL", false)
+    private val cancelBtn = button(tr(R.string.x11_cancel), false)
     private val resultCard = LinearLayout(ctx)
     private val resultTitle = text(14f, NC.PRIMARY, bold = true, mono = true)
     private val resultTv = text(12f, NC.ON_SURFACE, mono = true)
-    private val sidecarBtn = button("SAVE CHECKSUM FILE", false)
+    private val sidecarBtn = button(tr(R.string.backup_save_checksum_file), false)
 
     private fun text(size: Float, color: Int, bold: Boolean = false, mono: Boolean = false) = TextView(ctx).apply {
         textSize = size
@@ -118,15 +120,15 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
     init {
         // Back up
         val backup = card()
-        backup.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = "BACK UP" })
+        backup.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(R.string.backup_back_up) })
         backup.addView(text(12f, NC.ON_SURF_VAR).apply {
-            text = "Saves your guest home to a file you choose (local storage, Drive or any document provider). It is a zstd-compressed tar with a sha256 checksum."
+            text = tr(R.string.backup_saves_your_guest_home_to)
             setPadding(0, dp(4), 0, dp(12))
         })
         scopeRow.orientation = LinearLayout.HORIZONTAL
         exclBox.orientation = LinearLayout.VERTICAL
         backup.addView(scopeRow)
-        backup.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = "LEAVE OUT"; setPadding(0, dp(14), 0, dp(2)) })
+        backup.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = tr(R.string.backup_leave_out); setPadding(0, dp(14), 0, dp(2)) })
         backup.addView(exclBox)
         estimateTv.setPadding(0, dp(10), 0, dp(12))
         backup.addView(estimateTv)
@@ -145,7 +147,7 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         progressCard.addView(progressTv)
         progressCard.addView(cancelBtn, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
         content.addView(progressCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
-        cancelBtn.setOnClickListener { job?.cancel(); progressTitle.text = "Cancelling..." }
+        cancelBtn.setOnClickListener { job?.cancel(); progressTitle.text = tr(R.string.backup_cancelling) }
 
         // Result
         resultCard.orientation = LinearLayout.VERTICAL
@@ -161,9 +163,9 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
 
         // Restore
         val restore = card()
-        restore.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = "RESTORE" })
+        restore.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(R.string.backup_restore) })
         restore.addView(text(12f, NC.ON_SURF_VAR).apply {
-            text = "Pick a backup file. It is checked against its checksum, unpacked into a staging folder, then moved into your home. Choose per top-level entry: Merge keeps files you already have; Replace moves them aside to .replaced-<time>. If anything fails the move is undone."
+            text = tr(R.string.backup_pick_a_backup_file_it)
             setPadding(0, dp(4), 0, dp(12))
         })
         restore.addView(restoreBtn, LinearLayout.LayoutParams(-1, -2))
@@ -238,9 +240,9 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
 
     private fun updateEstimateText(working: Boolean = false) {
         estimateTv.text = when {
-            working -> "Estimating size..."
+            working -> tr(R.string.backup_estimating_size)
             estimate == null -> "Size estimate unavailable."
-            else -> "About ${BackupPlan.formatBytes(estimate!!)} before compression."
+            else -> tr(R.string.backup_about_before_compression, BackupPlan.formatBytes(estimate!!))
         }
     }
 
@@ -304,19 +306,19 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         val pat = patterns()
         val est = estimate
         val name = displayName(uri) ?: BackupPlan.defaultName()
-        setBusy(true, "Backing up...")
+        setBusy(true, tr(R.string.backup_backing_up))
         bg.execute {
             val res = try {
                 ctx.contentResolver.openOutputStream(uri, "w")?.use { out ->
                     BackupService.backup(ctx, out, sc, pat, j) { p -> ui.post { progress(p, est?.let { (it / 2).coerceAtLeast(p) /* compressed size is about half the raw estimate here; the bar is a guide */ }) } }
-                } ?: com.zenithblue.nativecode.backup.BackupResult(false, "", 0, 0, "Could not open the destination file.", false)
+                } ?: com.zenithblue.nativecode.backup.BackupResult(false, "", 0, 0, tr(R.string.backup_could_not_open_the_destination), false)
             } catch (e: Exception) {
                 com.zenithblue.nativecode.backup.BackupResult(false, "", 0, 0, e.message ?: e.javaClass.simpleName, j.cancelled)
             }
             if (!res.ok) runCatching { DocumentsContract.deleteDocument(ctx.contentResolver, uri) }
             ui.post {
                 if (!res.ok) {
-                    showResult(false, if (res.cancelled) "Backup cancelled" else "Backup failed", (res.message ?: "") + "\nThe partial file was removed.")
+                    showResult(false, if (res.cancelled) tr(R.string.backup_backup_cancelled) else tr(R.string.backup_backup_failed), (res.message ?: "") + "\nThe partial file was removed.")
                     return@post
                 }
                 val m = Manifest(
@@ -324,7 +326,7 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                     mapOf("appVersionCode" to BuildConfig.VERSION_CODE.toString(), "guest" to ProjectPathResolver.DEFAULT_DISTRO, "method" to "proot", "android" to android.os.Build.VERSION.SDK_INT.toString()),
                 )
                 lastManifest = m; lastArchiveName = name
-                showResult(true, "Backup saved", "$name\n${BackupPlan.formatBytes(res.bytes)}, ${res.files} files\nsha256 ${res.sha256}" + (res.message?.let { "\n$it" } ?: "") + "\n\nSave the checksum file next to the backup so a restore can verify it.")
+                showResult(true, tr(R.string.backup_backup_saved), "$name\n${BackupPlan.formatBytes(res.bytes)}, ${res.files} files\nsha256 ${res.sha256}" + (res.message?.let { "\n$it" } ?: "") + "\n\nSave the checksum file next to the backup so a restore can verify it.")
                 sidecarBtn.visibility = View.VISIBLE
                 saveSidecar()
             }
@@ -355,7 +357,7 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
     private fun startRestore() {
         if (busy) return
         if (host.aiSessionsOpen()) {
-            showResult(false, "Close AI sessions first", "A restore changes files that open AI sessions are using. Close every AI chat and terminal tab, then try again.")
+            showResult(false, tr(R.string.backup_close_ai_sessions_first), tr(R.string.backup_a_restore_changes_files_that))
             return
         }
         host.openDocument { uri -> if (uri != null) askChecksum(uri) }
@@ -363,9 +365,9 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
 
     private fun askChecksum(archive: Uri) {
         AlertDialog.Builder(ctx, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("Verify checksum")
-            .setMessage("Pick the .json checksum file saved with this backup to verify it.")
-            .setPositiveButton("PICK FILE") { _, _ ->
+            .setTitle(tr(R.string.backup_verify_checksum))
+            .setMessage(tr(R.string.backup_pick_the_json_checksum_file))
+            .setPositiveButton(tr(R.string.backup_pick_file)) { _, _ ->
                 host.openDocument { s ->
                     if (s == null) return@openDocument
                     val m = try { ctx.contentResolver.openInputStream(s)?.use { BackupPlan.parseManifest(it.readBytes().toString(Charsets.UTF_8)) } } catch (_: Exception) { null }
@@ -373,8 +375,8 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                     else runVerify(archive, m.sha256)
                 }
             }
-            .setNeutralButton("CONTINUE WITHOUT") { _, _ -> runVerify(archive, null) }
-            .setNegativeButton("CANCEL", null)
+            .setNeutralButton(tr(R.string.backup_continue_without)) { _, _ -> runVerify(archive, null) }
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(ctx)
     }
 
@@ -382,11 +384,11 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         val size = docSize(archive)
         val free = try { StatFs(ctx.filesDir.absolutePath).availableBytes } catch (_: Exception) { Long.MAX_VALUE }
         if (size != null && free < size * 3 + 100L * 1024 * 1024) {
-            showResult(false, "Not enough free space", "Need about ${BackupPlan.formatBytes(size * 3 + 100L * 1024 * 1024)} free, have ${BackupPlan.formatBytes(free)}.")
+            showResult(false, tr(R.string.backup_not_enough_free_space), tr(R.string.backup_need_about_free_have, BackupPlan.formatBytes(size * 3 + 100L * 1024 * 1024), BackupPlan.formatBytes(free)))
             return
         }
         val j = BackupJob().also { job = it }
-        setBusy(true, "Verifying archive...")
+        setBusy(true, tr(R.string.backup_verifying_archive))
         bg.execute {
             val res = try {
                 ctx.contentResolver.openInputStream(archive)?.use { ins -> BackupService.verify(ctx, ins, j) { p -> ui.post { progress(p, size) } } }
@@ -394,8 +396,8 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
             ui.post {
                 when {
                     res == null -> showResult(false, "Could not read the backup", "The file could not be opened.")
-                    res.cancelled -> showResult(false, "Restore cancelled", "Nothing was changed.")
-                    !res.ok -> showResult(false, "Backup rejected", (res.message ?: "") + "\nNothing was changed.")
+                    res.cancelled -> showResult(false, "Restore cancelled", tr(R.string.backup_nothing_was_changed))
+                    !res.ok -> showResult(false, tr(R.string.backup_backup_rejected), (res.message ?: "") + "\nNothing was changed.")
                     expected != null && expected != res.sha256 -> showResult(false, "Checksum mismatch", "The archive does not match its checksum file, so it is corrupt or was modified.\nexpected $expected\ngot      ${res.sha256}\nNothing was changed.")
                     else -> { setBusy(false); chooseEntries(archive, size, res.topLevel, res.sha256, expected != null, res.members) }
                 }
@@ -423,7 +425,7 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                 setOnCheckedChangeListener { _, c -> if (c) on.add(n) else on.remove(n) }
             }
             val chip = TextView(ctx).apply {
-                text = "MERGE"; textSize = 11f; typeface = Typeface.MONOSPACE; gravity = Gravity.CENTER
+                text = tr(R.string.backup_merge); textSize = 11f; typeface = Typeface.MONOSPACE; gravity = Gravity.CENTER
                 setTextColor(NC.PRIMARY); minHeight = dp(40); minWidth = dp(76)
                 background = GradientDrawable().apply { setColor(Color.TRANSPARENT); setStroke(dp(1), NC.OUTLINE_VAR) }
                 contentDescription = "Merge or replace $n"
@@ -440,26 +442,26 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         }
         val scroll = android.widget.ScrollView(ctx).apply { addView(list) }
         AlertDialog.Builder(ctx, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle("Restore entries")
+            .setTitle(tr(R.string.backup_restore_entries))
             .setView(scroll)
-            .setPositiveButton("RESTORE") { _, _ ->
+            .setPositiveButton(tr(R.string.backup_restore)) { _, _ ->
                 val plans = top.filter { it in on }.map { EntryPlan(it, modes[it]!!) }
-                if (plans.isEmpty()) showResult(false, "Nothing selected", "Nothing was changed.") else runRestore(archive, size, plans)
+                if (plans.isEmpty()) showResult(false, tr(R.string.backup_nothing_selected), tr(R.string.backup_nothing_was_changed)) else runRestore(archive, size, plans)
             }
-            .setNegativeButton("CANCEL", null)
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(ctx)
     }
 
     private fun runRestore(archive: Uri, size: Long?, plans: List<EntryPlan>) {
         if (host.aiSessionsOpen()) {
-            showResult(false, "Close AI sessions first", "Nothing was changed.")
+            showResult(false, tr(R.string.backup_close_ai_sessions_first), tr(R.string.backup_nothing_was_changed))
             return
         }
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val home = ProjectPathResolver.guestHomeDir(ctx, "proot")
         val staging = File(home, ".restore-$stamp")
         val j = BackupJob().also { job = it }
-        setBusy(true, "Restoring...")
+        setBusy(true, tr(R.string.backup_restoring))
         bg.execute {
             val ex = try {
                 ctx.contentResolver.openInputStream(archive)?.use { ins ->
@@ -475,16 +477,16 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
             }
             if (j.cancelled) {
                 runCatching { DirModel.deleteTree(home, staging) }
-                ui.post { showResult(false, "Restore cancelled", "Nothing was changed.") }
+                ui.post { showResult(false, "Restore cancelled", tr(R.string.backup_nothing_was_changed)) }
                 return@execute
             }
             val sw = RestoreSwap.apply(home, staging, plans, stamp)
             if (!sw.ok) runCatching { DirModel.deleteTree(home, staging) }
             ui.post {
                 if (sw.ok) {
-                    showResult(true, "Restore complete", "${sw.moved} items restored, ${sw.kept} existing files kept." +
+                    showResult(true, tr(R.string.backup_restore_complete), "${sw.moved} items restored, ${sw.kept} existing files kept." +
                         (sw.replacedDir?.let { "\nReplaced items are in ${BackupPlan.GUEST_HOME}/${it.name}. Delete that folder when you are happy with the result." } ?: ""))
-                } else showResult(false, "Restore rolled back", "${sw.error}\nYour files are as they were.")
+                } else showResult(false, tr(R.string.backup_restore_rolled_back), "${sw.error}\nYour files are as they were.")
             }
         }
     }

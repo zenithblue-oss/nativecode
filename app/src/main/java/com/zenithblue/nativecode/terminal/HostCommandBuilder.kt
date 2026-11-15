@@ -1,6 +1,8 @@
 package com.zenithblue.nativecode.terminal
 
 import android.content.Context
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * Builds argv + environment for **host** (native Termux prefix) scripts/commands.
@@ -30,7 +32,7 @@ object HostCommandBuilder {
         env["LD_LIBRARY_PATH"] =
             "${TermuxHostPaths.LIB}:${TermuxHostPaths.PREFIX}/opt/virglrenderer-android/lib"
         env["PREFIX"] = TermuxHostPaths.PREFIX
-        env["HOME"] = TermuxHostPaths.HOME
+        env[tr(R.string.onb_home)] = TermuxHostPaths.HOME
         env["TMPDIR"] = TermuxHostPaths.TMPDIR
         env["PROOT_TMP_DIR"] = TermuxHostPaths.TMPDIR
         env["TERMUX_APP__PACKAGE_NAME"] = TermuxHostPaths.PACKAGE

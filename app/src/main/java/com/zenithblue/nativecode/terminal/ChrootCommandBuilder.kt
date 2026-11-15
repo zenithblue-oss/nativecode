@@ -6,6 +6,8 @@ import com.zenithblue.nativecode.RootShell
 import com.zenithblue.nativecode.entitlements.GuestGate
 import java.io.File
 import java.util.concurrent.TimeUnit
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Builds shell arguments and environment map for chroot Debian sessions (SSOT helper). */
 object ChrootCommandBuilder {
@@ -83,7 +85,7 @@ object ChrootCommandBuilder {
         val envMap = HashMap(System.getenv())
         envMap["PATH"] = "/system/bin:/system/xbin:/sbin:" + (envMap["PATH"] ?: "")
         envMap["TERM"] = "xterm-256color"
-        envMap["HOME"] = if (u == "root") "/root" else "/home/flux"
+        envMap[tr(R.string.onb_home)] = if (u == "root") "/root" else "/home/flux"
         envMap["LANG"] = "en_US.UTF-8"
         envMap["LC_ALL"] = "en_US.UTF-8"
         envMap["XDG_RUNTIME_DIR"] = "/tmp"
@@ -110,7 +112,7 @@ object ChrootCommandBuilder {
         val envMap = HashMap(System.getenv())
         envMap["PATH"] = "/system/bin:/system/xbin:/sbin:" + (envMap["PATH"] ?: "")
         envMap["TERM"] = "xterm-256color"
-        envMap["HOME"] = if (u == "root") "/root" else "/home/flux"
+        envMap[tr(R.string.onb_home)] = if (u == "root") "/root" else "/home/flux"
         envMap["LANG"] = "en_US.UTF-8"
         envMap["LC_ALL"] = "en_US.UTF-8"
         envMap["XDG_RUNTIME_DIR"] = "/tmp"

@@ -69,7 +69,7 @@ object PanvkDriverUpdate {
 
     /** Copy bundled files over the 3 target paths. Returns (ok, message). */
     fun update(ctx: Context): Pair<Boolean, String> {
-        if (desktopActive()) return false to "Desktop running. Stop the desktop first."
+        if (desktopActive()) return false to tr(R.string.app_desktop_running_stop_the_desktop)
         val stage = File(ctx.filesDir, "panvk_stage").apply { deleteRecursively(); mkdirs() }
         try {
             for ((name, _) in FILES) {

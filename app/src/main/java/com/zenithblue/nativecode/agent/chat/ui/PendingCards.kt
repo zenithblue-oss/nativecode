@@ -41,6 +41,8 @@ import com.zenithblue.nativecode.agent.chat.core.ChatRequest
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.RequestAnswer
 import com.zenithblue.nativecode.agent.chat.core.RequestKind
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** User-input progress, hoisted so the composer can type a custom answer for the current question. */
 internal class InputDraft(val requestId: String) {
@@ -97,10 +99,10 @@ internal fun ApprovalCard(v: AgentChatView, t: ChatThread, req: ChatRequest, fee
             }
             d.plan?.let { Markdown(it, streaming = false) }
             d.reason?.let {
-                Row(Modifier.clickable(onClickLabel = if (reasonOpen) "Hide reason" else "Show reason") { reasonOpen = !reasonOpen }.heightIn(min = 36.dp),
+                Row(Modifier.clickable(onClickLabel = if (reasonOpen) tr(R.string.chat_hide_reason) else tr(R.string.chat_show_reason)) { reasonOpen = !reasonOpen }.heightIn(min = 36.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Chevron(reasonOpen, size = 14.dp)
-                    Text("Reason", Modifier.padding(start = S.xs), color = C.onVar, style = T.label)
+                    Text(tr(R.string.chat_reason), Modifier.padding(start = S.xs), color = C.onVar, style = T.label)
                 }
                 if (reasonOpen) Text(it, color = C.onVar, style = T.bodySm)
             }
@@ -114,8 +116,8 @@ internal fun ApprovalCard(v: AgentChatView, t: ChatThread, req: ChatRequest, fee
         if (agentGone) {
             Row(Modifier.padding(top = S.m), verticalAlignment = Alignment.CenterVertically) {
                 NcIcon(Ic.CircleX, null, tint = C.error, size = 14.dp)
-                Text("Agent stopped", Modifier.weight(1f).padding(start = S.s), color = C.error, style = T.label)
-                NcButton("Restart", icon = Ic.Retry) { v.retry(t, req.runId) }
+                Text(tr(R.string.chat_agent_stopped), Modifier.weight(1f).padding(start = S.s), color = C.error, style = T.label)
+                NcButton(tr(R.string.chat_restart), icon = Ic.Retry) { v.retry(t, req.runId) }
             }
         } else FlowRow(Modifier.fillMaxWidth().padding(top = S.m), horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
             req.options.forEach { o ->
@@ -136,12 +138,12 @@ internal fun ApprovalCard(v: AgentChatView, t: ChatThread, req: ChatRequest, fee
 }
 
 private fun kindTitle(k: RequestKind) = when (k) {
-    RequestKind.COMMAND -> "Command approval"
-    RequestKind.FILE_CHANGE -> "Edit approval"
-    RequestKind.FILE_READ -> "Read approval"
-    RequestKind.PLAN_EXIT -> "Proposed plan"
-    RequestKind.USER_INPUT -> "Question"
-    else -> "Permission"
+    RequestKind.COMMAND -> tr(R.string.chat_command_approval)
+    RequestKind.FILE_CHANGE -> tr(R.string.chat_edit_approval)
+    RequestKind.FILE_READ -> tr(R.string.chat_read_approval)
+    RequestKind.PLAN_EXIT -> tr(R.string.chat_proposed_plan)
+    RequestKind.USER_INPUT -> tr(R.string.chat_question)
+    else -> tr(R.string.chat_permission)
 }
 
 /** User-input variant: options with descriptions, custom answer typed in the composer, Prev/Next, Dismiss. */
@@ -157,18 +159,18 @@ internal fun UserInputCard(v: AgentChatView, t: ChatThread, req: ChatRequest, dr
     }
     val i = draft.index.coerceIn(0, (qs.size - 1).coerceAtLeast(0))
     val q = qs.getOrNull(i)
-    PendingShell(Ic.Help, kindTitle(req.kind) + " · " + t.tool, q?.header ?: req.detail.title.ifBlank { "Question" }, if (qs.size > 1) "${i + 1}/${qs.size}" else null) {
+    PendingShell(Ic.Help, kindTitle(req.kind) + " · " + t.tool, q?.header ?: req.detail.title.ifBlank { tr(R.string.chat_question) }, if (qs.size > 1) "${i + 1}/${qs.size}" else null) {
         if (q == null) {
             FlowRow(Modifier.fillMaxWidth().padding(top = S.m), horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
                 req.options.forEach { o -> NcButton(o.label, icon = Ic.Check) { respond(RequestAnswer(optionId = o.id)) } }
-                NcButton("Dismiss", danger = true, icon = Ic.Close) { respond(RequestAnswer(cancel = true), ok = false) }
+                NcButton(tr(R.string.chat_dismiss), danger = true, icon = Ic.Close) { respond(RequestAnswer(cancel = true), ok = false) }
             }
         } else QuestionBody(q, draft, maxH)
         if (q != null) FlowRow(Modifier.fillMaxWidth().padding(top = S.m), horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
-            if (i > 0) NcButton("Prev", icon = Ic.Back) { draft.index = i - 1 }
-            if (i < qs.lastIndex) NcButton("Next", primary = draft.answers[q.id] != null, icon = Ic.ChevronRight) { draft.index = i + 1 }
-            else NcButton("Submit", primary = true, enabled = qs.all { draft.answers[it.id] != null }, icon = Ic.Check) { respond(RequestAnswer(answers = draft.answers.toMap())) }
-            NcButton("Dismiss", danger = true, icon = Ic.Close) { respond(RequestAnswer(cancel = true), ok = false) }
+            if (i > 0) NcButton(tr(R.string.chat_prev), icon = Ic.Back) { draft.index = i - 1 }
+            if (i < qs.lastIndex) NcButton(tr(R.string.chat_next), primary = draft.answers[q.id] != null, icon = Ic.ChevronRight) { draft.index = i + 1 }
+            else NcButton(tr(R.string.chat_submit), primary = true, enabled = qs.all { draft.answers[it.id] != null }, icon = Ic.Check) { respond(RequestAnswer(answers = draft.answers.toMap())) }
+            NcButton(tr(R.string.chat_dismiss), danger = true, icon = Ic.Close) { respond(RequestAnswer(cancel = true), ok = false) }
         }
     }
 }

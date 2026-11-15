@@ -2,6 +2,8 @@ package com.zenithblue.nativecode.telemetry
 
 import android.app.Activity
 import android.app.AlertDialog
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** One consent dialog for onboarding, the one-time prompt for existing users, and Settings. */
 object ConsentSheet {
@@ -9,12 +11,12 @@ object ConsentSheet {
     fun show(activity: Activity, onDone: () -> Unit = {}) {
         val checked = booleanArrayOf(Telemetry.crashConsent(activity), Telemetry.usageConsent(activity))
         AlertDialog.Builder(activity)
-            .setTitle("Help improve NativeCode (optional)")
+            .setTitle(tr(R.string.telemetry_help_improve_nativecode_optional))
             .setMultiChoiceItems(
-                arrayOf("Send crash reports", "Share anonymous usage statistics"),
+                arrayOf(tr(R.string.telemetry_send_crash_reports), tr(R.string.telemetry_share_anonymous_usage_statistics)),
                 checked
             ) { _, which, isChecked -> checked[which] = isChecked }
-            .setPositiveButton("Save") { _, _ -> Telemetry.setConsent(activity, checked[0], checked[1]) }
+            .setPositiveButton(tr(R.string.chat_save)) { _, _ -> Telemetry.setConsent(activity, checked[0], checked[1]) }
             // Dismiss without Save (back / outside tap) keeps the stored choice but stops re-asking.
             .setOnDismissListener {
                 if (!Telemetry.asked(activity)) {

@@ -33,6 +33,8 @@ import com.zenithblue.nativecode.cliauth.CliToolCatalog
 import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Screen C: pick-list sheet. Project fixed on the workspace page. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,22 +45,22 @@ internal fun NewThreadSheet(v: AgentChatView) {
     ModalBottomSheet(onDismissRequest = { v.sheet.value = false }, containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = S.l).padding(bottom = S.l).navigationBarsPadding()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("New thread", Modifier.weight(1f), color = C.on, style = T.title)
+                Text(tr(R.string.chat_new_thread), Modifier.weight(1f), color = C.on, style = T.title)
                 Box {
                     val projects = remember { if (v.isWorkspace) emptyList() else v.host.projects() }
                     val canPick = !v.isWorkspace && projects.isNotEmpty()
                     Chip(
-                        project?.let { ChatLogic.baseName(it) } ?: "No project",
+                        project?.let { ChatLogic.baseName(it) } ?: tr(R.string.chat_no_project),
                         Modifier.semantics { contentDescription = "Project ${project?.let { ChatLogic.baseName(it) } ?: "none"}" + if (canPick) ", change" else "" },
                         icon = Ic.Folder, trailing = if (canPick) Ic.ChevronDown else null,
                     ) { if (canPick) pick = true }
                     DropdownMenu(pick, { pick = false }, containerColor = C.low) {
-                        MItem("No project", Ic.Folder) { project = null; pick = false }
+                        MItem(tr(R.string.chat_no_project), Ic.Folder) { project = null; pick = false }
                         projects.forEach { (name, path) -> MItem(name, Ic.Folder) { project = path; pick = false } }
                     }
                 }
             }
-            Text("Pick an agent. Chat opens here; Terminal opens its TUI.", Modifier.padding(top = S.xs, bottom = S.l), color = C.onVar, style = T.bodySm)
+            Text(tr(R.string.chat_pick_an_agent_chat_opens), Modifier.padding(top = S.xs, bottom = S.l), color = C.onVar, style = T.bodySm)
             ToolCards(v, project)
         }
     }
@@ -84,16 +86,16 @@ internal fun ToolCards(v: AgentChatView, project: String?) {
                     Column(Modifier.weight(1f).padding(horizontal = S.m)) {
                         Text(def.displayName, color = C.on, style = T.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         when (auth[def.id]) {
-                            AuthState.SIGNED_IN -> AuthLine("Signed in", C.primary)
-                            AuthState.SIGNED_OUT -> if (def.loginOptional) AuthLine("Free models · sign in for more", C.onVar, link = true) { v.host.openCliLoginPage(def.id) }
-                            else AuthLine("Sign in", C.tertiary, link = true) { v.host.openCliLoginPage(def.id) }
-                            else -> if (def.loginOptional) AuthLine("Free models", C.onVar) else Text(def.subtitle, color = C.outline, style = T.meta, maxLines = 1)
+                            AuthState.SIGNED_IN -> AuthLine(tr(R.string.cli_signed_in), C.primary)
+                            AuthState.SIGNED_OUT -> if (def.loginOptional) AuthLine(tr(R.string.chat_free_models_sign_in_for), C.onVar, link = true) { v.host.openCliLoginPage(def.id) }
+                            else AuthLine(tr(R.string.chat_sign_in), C.tertiary, link = true) { v.host.openCliLoginPage(def.id) }
+                            else -> if (def.loginOptional) AuthLine(tr(R.string.chat_free_models), C.onVar) else Text(def.subtitle, color = C.outline, style = T.meta, maxLines = 1)
                         }
                     }
                     if (def.chat == null) Row(Modifier.card(C.lowest, C.border).padding(horizontal = S.s, vertical = S.xs),
                         verticalAlignment = Alignment.CenterVertically) {
                         NcIcon(Ic.Terminal, null, tint = C.onVar, size = 12.dp)
-                        Label("Terminal only", Modifier.padding(start = S.xs), color = C.onVar, size = 10)
+                        Label(tr(R.string.chat_terminal_only), Modifier.padding(start = S.xs), color = C.onVar, size = 10)
                     }
                     if (locked) Row(Modifier.card(C.tertiary.copy(alpha = 0.1f), C.tertiary.copy(alpha = 0.6f)).padding(horizontal = S.s, vertical = S.xs),
                         verticalAlignment = Alignment.CenterVertically) {
@@ -105,7 +107,7 @@ internal fun ToolCards(v: AgentChatView, project: String?) {
                     if (def.chat != null) NcButton("Chat", Modifier.weight(1f), kind = if (locked) BtnKind.OUTLINE else BtnKind.PRIMARY, icon = Ic.Message) {
                         gated { v.newThread(def.terminalType, project) }
                     }
-                    NcButton("Terminal", Modifier.weight(1f), icon = Ic.Terminal) {
+                    NcButton(tr(R.string.chat_terminal), Modifier.weight(1f), icon = Ic.Terminal) {
                         gated { v.sheet.value = false; v.host.openTerminal(def.terminalType, emptyList(), cwd, v.isWorkspace) }
                     }
                 }
@@ -114,11 +116,11 @@ internal fun ToolCards(v: AgentChatView, project: String?) {
         Row(Modifier.fillMaxWidth().card(C.lowest).padding(S.m), verticalAlignment = Alignment.CenterVertically) {
             ProviderLogo("shell", size = 32.dp)
             Column(Modifier.weight(1f).padding(horizontal = S.m)) {
-                Text("Raw shell", color = C.on, style = T.heading)
+                Text(tr(R.string.chat_raw_shell), color = C.on, style = T.heading)
                 Text("bash in ${ChatLogic.baseName(cwd)}", color = C.outline, style = T.meta)
             }
             if (!v.host.canUseTool("shell")) NcIcon(Ic.Lock, "Pro", Modifier.padding(end = S.s), tint = C.tertiary, size = 14.dp)
-            NcButton("Shell", icon = Ic.Terminal) { v.sheet.value = false; v.host.openShellHere(cwd, v.isWorkspace) }
+            NcButton(tr(R.string.chat_shell), icon = Ic.Terminal) { v.sheet.value = false; v.host.openShellHere(cwd, v.isWorkspace) }
         }
     }
 }

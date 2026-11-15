@@ -16,6 +16,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.zenithblue.nativecode.MainActivity
 import com.zenithblue.nativecode.R
+import com.zenithblue.nativecode.tr
 
 /**
  * Unified foreground service managing terminal sessions (both main app tabs and project workspaces).
@@ -187,7 +188,7 @@ class TerminalService : Service() {
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID_APP)
-            .setContentTitle("NativeCode — Terminal")
+            .setContentTitle(tr(R.string.term_nativecode_terminal))
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat_terminal)
             .setContentIntent(pendingIntent)
@@ -253,7 +254,7 @@ class TerminalService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val appChannel = NotificationChannel(
                 CHANNEL_ID_APP,
-                "NativeCode Terminal Sessions",
+                tr(R.string.term_nativecode_terminal_sessions),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Shows while app terminal sessions stay alive in the background"
@@ -261,7 +262,7 @@ class TerminalService : Service() {
             }
             val projectChannel = NotificationChannel(
                 CHANNEL_ID_PROJECT,
-                "NativeCode Project Terminals",
+                tr(R.string.term_nativecode_project_terminals),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Shows while project workspace CLI tools and terminals stay alive in the background"

@@ -31,6 +31,7 @@ import com.zenithblue.nativecode.R
 import com.zenithblue.nativecode.editor.showThemed
 import java.io.File
 import java.util.concurrent.Executors
+import com.zenithblue.nativecode.tr
 
 /** What the Directory page needs from the activity. */
 internal interface DirectoryHost {
@@ -129,7 +130,7 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
             setColorFilter(NC.PRIMARY)
         }, LayoutParams(dp(18), dp(18)).apply { rightMargin = dp(8) })
         searchEt.apply {
-            hint = "Filter or search project"
+            hint = tr(R.string.ws_filter_or_search_project)
             setHintTextColor(NC.OUTLINE)
             setTextColor(NC.ON_SURFACE)
             textSize = 14f
@@ -158,7 +159,7 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
         }
         searchBox.addView(clearBtn, LayoutParams(dp(40), dp(40)))
         bar.addView(searchBox, LayoutParams(0, -2, 1f))
-        bar.addView(iconBtn(R.drawable.ic_lucide_arrow_up_down, "Sort") { showSortMenu(it) })
+        bar.addView(iconBtn(R.drawable.ic_lucide_arrow_up_down, tr(R.string.ws_sort)) { showSortMenu(it) })
         hiddenBtn.apply {
             setImageResource(if (showHidden) R.drawable.ic_lucide_eye else R.drawable.ic_lucide_eye_off)
             setColorFilter(if (showHidden) NC.PRIMARY else NC.ON_SURF_VAR)
@@ -173,7 +174,7 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
             }
         }
         bar.addView(hiddenBtn, LayoutParams(dp(44), dp(44)))
-        bar.addView(iconBtn(R.drawable.ic_lucide_plus, "New") { showNewMenu(it) })
+        bar.addView(iconBtn(R.drawable.ic_lucide_plus, tr(R.string.ws_new)) { showNewMenu(it) })
         header.addView(bar, LayoutParams(-1, -2).apply { topMargin = dp(6) })
 
         summaryTv.apply { textSize = 11f; typeface = Typeface.MONOSPACE; setTextColor(NC.OUTLINE); setPadding(dp(2), dp(6), 0, dp(2)) }
@@ -196,8 +197,8 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
         emptyActions.orientation = HORIZONTAL
         emptyActions.gravity = Gravity.CENTER
         emptyActions.setPadding(0, dp(16), 0, 0)
-        emptyActions.addView(pill("NEW FILE", R.drawable.ic_lucide_file_plus) { promptCreate(false) })
-        emptyActions.addView(pill("NEW FOLDER", R.drawable.ic_lucide_folder_plus) { promptCreate(true) },
+        emptyActions.addView(pill(tr(R.string.ws_new_file), R.drawable.ic_lucide_file_plus) { promptCreate(false) })
+        emptyActions.addView(pill(tr(R.string.ws_new_folder), R.drawable.ic_lucide_folder_plus) { promptCreate(true) },
             LayoutParams(-2, -2).apply { leftMargin = dp(8) })
         emptyBox.addView(emptyTitle); emptyBox.addView(emptyBody); emptyBox.addView(emptyActions)
     }
@@ -293,12 +294,12 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
         if (result.isEmpty()) {
             emptyBox.visibility = VISIBLE
             if (q.isNotEmpty()) {
-                emptyTitle.text = "No matches"
-                emptyBody.text = "Nothing in this project matches \"$q\"."
+                emptyTitle.text = tr(R.string.ws_no_matches)
+                emptyBody.text = tr(R.string.ws_nothing_in_this_project_matches, q)
                 emptyActions.visibility = GONE
             } else {
-                emptyTitle.text = "This folder is empty"
-                emptyBody.text = if (showHidden) "Create a file or folder to get started." else "Create a file or folder to get started. Hidden files are not shown."
+                emptyTitle.text = tr(R.string.ws_this_folder_is_empty)
+                emptyBody.text = if (showHidden) tr(R.string.ws_create_a_file_or_folder) else tr(R.string.ws_create_a_file_or_folder_2)
                 emptyActions.visibility = VISIBLE
             }
         } else emptyBox.visibility = GONE
@@ -317,9 +318,9 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
 
     private fun showSortMenu(anchor: View) {
         PopupMenu(context, anchor).apply {
-            menu.add(0, 0, 0, "Name").isCheckable = true
-            menu.add(0, 1, 1, "Modified").isCheckable = true
-            menu.add(0, 2, 2, "Size").isCheckable = true
+            menu.add(0, 0, 0, tr(R.string.ws_name)).isCheckable = true
+            menu.add(0, 1, 1, tr(R.string.chat_modified)).isCheckable = true
+            menu.add(0, 2, 2, tr(R.string.ws_size)).isCheckable = true
             menu.setGroupCheckable(0, true, true)
             menu.getItem(sort.ordinal).isChecked = true
             setOnMenuItemClickListener {
@@ -332,9 +333,9 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
 
     private fun showNewMenu(anchor: View) {
         PopupMenu(context, anchor).apply {
-            menu.add(0, 0, 0, "New file")
-            menu.add(0, 1, 1, "New folder")
-            menu.add(0, 2, 2, "Open terminal here")
+            menu.add(0, 0, 0, tr(R.string.ws_new_file_2))
+            menu.add(0, 1, 1, tr(R.string.ws_new_folder_2))
+            menu.add(0, 2, 2, tr(R.string.chat_open_terminal_here))
             setOnMenuItemClickListener {
                 when (it.itemId) { 0 -> promptCreate(false); 1 -> promptCreate(true); else -> host.openTerminalHere(cur) }
                 true
@@ -344,18 +345,18 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
 
     private fun showRowMenu(anchor: View, e: DirEntry) {
         PopupMenu(context, anchor).apply {
-            menu.add(0, 0, 0, if (e.isDir) "Open folder" else "Open")
-            menu.add(0, 1, 1, "Rename")
-            menu.add(0, 2, 2, "Copy path")
-            menu.add(0, 3, 3, "Copy relative path")
-            menu.add(0, 4, 4, "Open terminal here")
-            menu.add(0, 5, 5, "Delete")
+            menu.add(0, 0, 0, if (e.isDir) tr(R.string.ws_open_folder) else tr(R.string.chat_open))
+            menu.add(0, 1, 1, tr(R.string.term_rename))
+            menu.add(0, 2, 2, tr(R.string.chat_copy_path))
+            menu.add(0, 3, 3, tr(R.string.ws_copy_relative_path))
+            menu.add(0, 4, 4, tr(R.string.chat_open_terminal_here))
+            menu.add(0, 5, 5, tr(R.string.chat_delete))
             setOnMenuItemClickListener {
                 when (it.itemId) {
                     0 -> open(e)
                     1 -> promptRename(e)
-                    2 -> host.copyText("File Path", host.guestPath(e.file) ?: e.file.absolutePath)
-                    3 -> host.copyText("File Path", DirModel.relativePath(host.root(), e.file))
+                    2 -> host.copyText(tr(R.string.ws_file_path), host.guestPath(e.file) ?: e.file.absolutePath)
+                    3 -> host.copyText(tr(R.string.ws_file_path), DirModel.relativePath(host.root(), e.file))
                     4 -> host.openTerminalHere(if (e.isDir) e.file else (e.file.parentFile ?: host.root()))
                     5 -> host.confirmDelete(e.name, e.isDir) { delete(e) }
                 }
@@ -381,7 +382,7 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
             .setTitle(title)
             .setView(box)
             .setPositiveButton(action) { _, _ -> onName(input.text.toString().trim()) }
-            .setNegativeButton("CANCEL", null)
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().also { dlg ->
                 input.imeOptions = EditorInfo.IME_ACTION_DONE
                 input.setOnEditorActionListener { _, _, _ -> dlg.getButton(AlertDialog.BUTTON_POSITIVE).performClick(); true }
@@ -392,8 +393,8 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
 
     private fun promptCreate(folder: Boolean) {
         val parent = if (query.isEmpty()) cur else host.root()
-        nameDialog(if (folder) "New folder" else "New file", "", "CREATE") { name ->
-            if (!DirModel.validName(name)) { toast("Invalid name"); return@nameDialog }
+        nameDialog(if (folder) tr(R.string.ws_new_folder_2) else tr(R.string.ws_new_file_2), "", tr(R.string.ws_create)) { name ->
+            if (!DirModel.validName(name)) { toast(tr(R.string.ws_invalid_name)); return@nameDialog }
             val f = File(parent, name)
             if (f.exists()) { toast("$name already exists"); return@nameDialog }
             val ok = try { if (folder) f.mkdirs() else f.createNewFile() } catch (_: Exception) { false }
@@ -406,12 +407,12 @@ internal class DirectoryPage(ctx: Context, private val host: DirectoryHost) : Li
     }
 
     private fun promptRename(e: DirEntry) {
-        nameDialog("Rename", e.name, "RENAME") { name ->
+        nameDialog(tr(R.string.term_rename), e.name, tr(R.string.ws_rename)) { name ->
             if (name == e.name) return@nameDialog
-            if (!DirModel.validName(name)) { toast("Invalid name"); return@nameDialog }
+            if (!DirModel.validName(name)) { toast(tr(R.string.ws_invalid_name)); return@nameDialog }
             val dest = File(e.file.parentFile, name)
             if (dest.exists()) { toast("$name already exists"); return@nameDialog }
-            if (!e.file.renameTo(dest)) toast("Rename failed")
+            if (!e.file.renameTo(dest)) toast(tr(R.string.ws_rename_failed))
             reload(); loadGit()
         }
     }

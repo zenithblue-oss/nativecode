@@ -145,7 +145,7 @@ class SplashActivity : AppCompatActivity() {
 
         // Subtitle
         val subtitleTv = TextView(this).apply {
-            text = "AI DEVELOPER ENVIRONMENT"
+            text = tr(R.string.app_ai_developer_environment)
             textSize = 10f
             isSingleLine = true
             maxLines = 1
@@ -163,7 +163,7 @@ class SplashActivity : AppCompatActivity() {
 
         // Minimal Status Text
         val statusTv = TextView(this).apply {
-            text = "> INITIALIZING ENVIRONMENT..."
+            text = tr(R.string.app_initializing_environment)
             textSize = 11f
             typeface = Typeface.MONOSPACE
             setTextColor(Color.parseColor("#3DDC84"))
@@ -194,7 +194,7 @@ class SplashActivity : AppCompatActivity() {
 
         // Status update & transition
         handler.postDelayed({
-            statusTv.text = "> SYSTEM READY."
+            statusTv.text = tr(R.string.app_system_ready)
         }, 800)
 
         handler.postDelayed({

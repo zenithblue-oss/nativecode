@@ -24,6 +24,8 @@ import com.zenithblue.nativecode.agent.chat.core.ItemPayload
 import com.zenithblue.nativecode.agent.chat.core.Run
 import com.zenithblue.nativecode.agent.chat.core.TurnItem
 import java.util.concurrent.Executor
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** One thread-list row. */
 data class ThreadRow(val thread: ChatThread, val status: ThreadStatus, val lastRun: Run?, val add: Int, val del: Int, val preview: String? = null)
@@ -267,7 +269,7 @@ class AgentChatView(
             main.post {
                 sheet.value = false
                 if (t == null) {
-                    android.widget.Toast.makeText(context, "Could not create the thread", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, tr(R.string.chat_could_not_create_the_thread), android.widget.Toast.LENGTH_SHORT).show()
                     return@post
                 }
                 reloadList(); push(Route.Chat(t.id))
@@ -281,7 +283,7 @@ class AgentChatView(
             val t = runCatching { backend.sideChat(parentId, prompt) }.onFailure { android.util.Log.w("NcChat", "side chat failed", it) }.getOrNull()
             main.post {
                 if (t == null) {
-                    android.widget.Toast.makeText(context, "Could not start a side chat", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, tr(R.string.chat_could_not_start_a_side), android.widget.Toast.LENGTH_SHORT).show()
                     return@post
                 }
                 reloadList(); push(Route.Chat(t.id))

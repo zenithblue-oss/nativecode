@@ -43,6 +43,7 @@ import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 import org.eclipse.tm4e.core.registry.IThemeSource
 import java.io.File
 import java.util.concurrent.Executors
+import com.zenithblue.nativecode.tr
 
 /** One-time Sora TextMate registry setup (grammars + the obsidian theme from assets). */
 internal object EditorSetup {
@@ -175,13 +176,13 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
         top.addView(saveBtn, LayoutParams(dp(40), dp(40)).apply { leftMargin = dp(4) })
 
         val tools = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val undo = icon(R.drawable.ic_lucide_undo, "Undo") { editor.undo(); refreshChrome() }
-        val redo = icon(R.drawable.ic_lucide_redo, "Redo") { editor.redo(); refreshChrome() }
-        val find = icon(R.drawable.ic_lucide_search, "Find and replace") { toggleFind() }
-        val goto = icon(R.drawable.ic_lucide_hash, "Go to line") { toggleGoto() }
-        val wrap = icon(R.drawable.ic_lucide_wrap_text, "Toggle word wrap") { setWrap(!editor.isWordwrap) }
-        val smaller = icon(R.drawable.ic_lucide_type, "Smaller text") { bumpFont(-1f) }
-        val bigger = icon(R.drawable.ic_lucide_type, "Larger text") { bumpFont(1f) }
+        val undo = icon(R.drawable.ic_lucide_undo, tr(R.string.chat_undo)) { editor.undo(); refreshChrome() }
+        val redo = icon(R.drawable.ic_lucide_redo, tr(R.string.editor_redo)) { editor.redo(); refreshChrome() }
+        val find = icon(R.drawable.ic_lucide_search, tr(R.string.editor_find_and_replace)) { toggleFind() }
+        val goto = icon(R.drawable.ic_lucide_hash, tr(R.string.editor_go_to_line)) { toggleGoto() }
+        val wrap = icon(R.drawable.ic_lucide_wrap_text, tr(R.string.editor_toggle_word_wrap)) { setWrap(!editor.isWordwrap) }
+        val smaller = icon(R.drawable.ic_lucide_type, tr(R.string.editor_smaller_text)) { bumpFont(-1f) }
+        val bigger = icon(R.drawable.ic_lucide_type, tr(R.string.editor_larger_text)) { bumpFont(1f) }
         bigger.setPadding(dp(5), dp(5), dp(5), dp(5)); smaller.setPadding(dp(11), dp(11), dp(11), dp(11))
         undoRef = undo; redoRef = redo; findRef = find; wrapRef = wrap
         for (v in listOf(undo, redo, find, goto, wrap, smaller, bigger)) tools.addView(v)
@@ -237,7 +238,7 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
         findBar.setBackgroundColor(NC.SURFACE_LOW)
         findBar.setPadding(dp(8), dp(6), dp(8), dp(6))
         val row1 = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        textInput(findEt, "Find")
+        textInput(findEt, tr(R.string.editor_find))
         findEt.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) { runSearch() }
@@ -250,16 +251,16 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
         row1.addView(caseChip, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(6) })
         row1.addView(regexChip, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(4) })
         row1.addView(countTv)
-        row1.addView(icon(R.drawable.ic_lucide_chevron_up, "Previous match") { runCatching { editor.searcher.gotoPrevious() } })
-        row1.addView(icon(R.drawable.ic_lucide_chevron_down, "Next match") { runCatching { editor.searcher.gotoNext() } })
-        row1.addView(icon(R.drawable.ic_lucide_x, "Close find") { closeFind() })
+        row1.addView(icon(R.drawable.ic_lucide_chevron_up, tr(R.string.editor_previous_match)) { runCatching { editor.searcher.gotoPrevious() } })
+        row1.addView(icon(R.drawable.ic_lucide_chevron_down, tr(R.string.editor_next_match)) { runCatching { editor.searcher.gotoNext() } })
+        row1.addView(icon(R.drawable.ic_lucide_x, tr(R.string.editor_close_find)) { closeFind() })
         replaceRow.orientation = HORIZONTAL
         replaceRow.gravity = Gravity.CENTER_VERTICAL
-        textInput(replaceEt, "Replace")
+        textInput(replaceEt, tr(R.string.editor_replace))
         replaceRow.addView(replaceEt, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        replaceRow.addView(textBtn("REPLACE") { runCatching { editor.searcher.replaceCurrentMatch(replaceEt.text.toString()) } },
+        replaceRow.addView(textBtn(tr(R.string.editor_replace_2)) { runCatching { editor.searcher.replaceCurrentMatch(replaceEt.text.toString()) } },
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(6) })
-        replaceRow.addView(textBtn("ALL") { runCatching { editor.searcher.replaceAll(replaceEt.text.toString()) } },
+        replaceRow.addView(textBtn(tr(R.string.editor_all)) { runCatching { editor.searcher.replaceAll(replaceEt.text.toString()) } },
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(4) })
         findBar.addView(row1)
         findBar.addView(replaceRow, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
@@ -277,12 +278,12 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
         gotoBar.visibility = GONE
         gotoBar.setBackgroundColor(NC.SURFACE_LOW)
         gotoBar.setPadding(dp(8), dp(6), dp(8), dp(6))
-        textInput(gotoEt, "Line number")
+        textInput(gotoEt, tr(R.string.editor_line_number))
         gotoEt.inputType = InputType.TYPE_CLASS_NUMBER
         gotoEt.setOnEditorActionListener { _, _, _ -> gotoLine(); true }
         gotoBar.addView(gotoEt, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         gotoBar.addView(textBtn("GO") { gotoLine() }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(6) })
-        gotoBar.addView(icon(R.drawable.ic_lucide_x, "Close go to line") { gotoBar.visibility = GONE })
+        gotoBar.addView(icon(R.drawable.ic_lucide_x, tr(R.string.editor_close_go_to_line)) { gotoBar.visibility = GONE })
     }
 
     private data class Key(val label: String? = null, val iconRes: Int = 0, val insert: String? = null, val keyCode: Int = 0, val desc: String = "")
@@ -294,10 +295,10 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
         val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val keys = listOf(
             Key("TAB", keyCode = KeyEvent.KEYCODE_TAB, desc = "Tab"),
-            Key(iconRes = R.drawable.ic_lucide_arrow_left, keyCode = KeyEvent.KEYCODE_DPAD_LEFT, desc = "Cursor left"),
-            Key(iconRes = R.drawable.ic_lucide_arrow_down, keyCode = KeyEvent.KEYCODE_DPAD_DOWN, desc = "Cursor down"),
-            Key(iconRes = R.drawable.ic_lucide_arrow_up, keyCode = KeyEvent.KEYCODE_DPAD_UP, desc = "Cursor up"),
-            Key(iconRes = R.drawable.ic_lucide_arrow_right, keyCode = KeyEvent.KEYCODE_DPAD_RIGHT, desc = "Cursor right"),
+            Key(iconRes = R.drawable.ic_lucide_arrow_left, keyCode = KeyEvent.KEYCODE_DPAD_LEFT, desc = tr(R.string.editor_cursor_left)),
+            Key(iconRes = R.drawable.ic_lucide_arrow_down, keyCode = KeyEvent.KEYCODE_DPAD_DOWN, desc = tr(R.string.editor_cursor_down)),
+            Key(iconRes = R.drawable.ic_lucide_arrow_up, keyCode = KeyEvent.KEYCODE_DPAD_UP, desc = tr(R.string.editor_cursor_up)),
+            Key(iconRes = R.drawable.ic_lucide_arrow_right, keyCode = KeyEvent.KEYCODE_DPAD_RIGHT, desc = tr(R.string.editor_cursor_right)),
         ) + "{}()[]<>\"'`;:=+-_*/\\|&!?#\$%^~@,.".map { Key(it.toString(), insert = it.toString()) }
         for (k in keys) {
             val v: View = if (k.iconRes != 0) ImageView(context).apply {
@@ -406,10 +407,10 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
         val ro = mode != EditMode.EDIT
         dirtyDot.visibility = if (dirty) VISIBLE else GONE
         chipTv.text = when (mode) {
-            EditMode.READ_ONLY_LARGE -> "READ ONLY - LARGE"
-            EditMode.READ_ONLY_BINARY -> "READ ONLY - BINARY"
-            EditMode.READ_ONLY_NO_WRITE -> "READ ONLY - NO WRITE ACCESS"
-            EditMode.EDIT -> (EditorLanguages.scopeFor(file.name)?.substringAfterLast('.')?.uppercase() ?: "TEXT")
+            EditMode.READ_ONLY_LARGE -> tr(R.string.editor_read_only_large)
+            EditMode.READ_ONLY_BINARY -> tr(R.string.editor_read_only_binary)
+            EditMode.READ_ONLY_NO_WRITE -> tr(R.string.editor_read_only_no_write_access)
+            EditMode.EDIT -> (EditorLanguages.scopeFor(file.name)?.substringAfterLast('.')?.uppercase() ?: tr(R.string.editor_text))
         }
         chipTv.setTextColor(if (ro) NC.TERTIARY_CON else NC.ON_SURF_VAR)
         saveBtn.setColorFilter(if (dirty) NC.PRIMARY else NC.OUTLINE)
@@ -491,7 +492,7 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
         gotoBar.visibility = if (gotoBar.visibility == VISIBLE) GONE else VISIBLE
         if (gotoBar.visibility == VISIBLE) {
             gotoEt.setText("")
-            gotoEt.hint = "Line 1-${editor.lineCount}"
+            gotoEt.hint = tr(R.string.editor_line_1, editor.lineCount)
             gotoEt.requestFocus()
         }
         refreshChrome()
@@ -513,16 +514,16 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
     /** Ctrl+S / button. [then] runs only after a successful save. */
     fun save(then: (() -> Unit)? = null) {
         if (mode != EditMode.EDIT || !loaded) {
-            Toast.makeText(context, "Read-only file", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, tr(R.string.editor_read_only_file), Toast.LENGTH_SHORT).show()
             return
         }
         if (DiskStamp.of(file) != stamp && file.exists()) {
             AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("File changed on disk")
+                .setTitle(tr(R.string.editor_file_changed_on_disk))
                 .setMessage("${file.name} was modified since you opened it.")
-                .setPositiveButton("OVERWRITE") { _, _ -> doSave(then) }
-                .setNeutralButton("RELOAD") { _, _ -> reload() }
-                .setNegativeButton("CANCEL", null)
+                .setPositiveButton(tr(R.string.editor_overwrite)) { _, _ -> doSave(then) }
+                .setNeutralButton(tr(R.string.git_reload)) { _, _ -> reload() }
+                .setNegativeButton(tr(R.string.x11_cancel), null)
                 .create().showThemed(context, setOf(AlertDialog.BUTTON_POSITIVE))
             return
         }
@@ -565,10 +566,10 @@ internal class EditorView(ctx: Context, val file: File) : LinearLayout(ctx) {
         if (!dirty) { proceed(); return }
         AlertDialog.Builder(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle("Unsaved changes")
-            .setMessage("Save changes to ${file.name}?")
-            .setPositiveButton("SAVE") { _, _ -> save { proceed() } }
-            .setNeutralButton("DISCARD") { _, _ -> dirty = false; proceed() }
-            .setNegativeButton("CANCEL", null)
+            .setMessage(tr(R.string.editor_save_changes_to, file.name))
+            .setPositiveButton(tr(R.string.x11_save)) { _, _ -> save { proceed() } }
+            .setNeutralButton(tr(R.string.git_discard)) { _, _ -> dirty = false; proceed() }
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(context, setOf(AlertDialog.BUTTON_NEUTRAL))
     }
 

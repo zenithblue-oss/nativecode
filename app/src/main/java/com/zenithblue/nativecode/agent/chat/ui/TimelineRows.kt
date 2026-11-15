@@ -65,6 +65,8 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Every timeline row: screen edge inset, half a gap above and below so consecutive rows sit one gap apart. */
 private val ROW_PAD = Modifier.fillMaxWidth().padding(horizontal = S.edge, vertical = S.xs)
@@ -91,8 +93,8 @@ private fun ItemRow(v: AgentChatView, t: ChatThread, item: TurnItem, live: Boole
         is ItemPayload.AssistantMessage -> Markdown(p.text, streaming = live && item.status == ItemStatus.RUNNING, modifier = ROW_PAD)
         is ItemPayload.Reasoning -> Reasoning(p, item.status == ItemStatus.RUNNING, ROW_PAD)
         is ItemPayload.ProposedPlan -> PlanCard(v, t, p.markdown, ROW_PAD)
-        is ItemPayload.ApprovalRequest -> RequestLine(Ic.ShieldAlert, "Approval", item.status, ROW_PAD)
-        is ItemPayload.UserInputRequest -> RequestLine(Ic.Help, "Question", item.status, ROW_PAD)
+        is ItemPayload.ApprovalRequest -> RequestLine(Ic.ShieldAlert, tr(R.string.chat_approval), item.status, ROW_PAD)
+        is ItemPayload.UserInputRequest -> RequestLine(Ic.Help, tr(R.string.chat_question), item.status, ROW_PAD)
         is ItemPayload.Error -> ErrorRow(v, t, item, p, ROW_PAD)
         is ItemPayload.Compaction -> Divider(
             if (item.status == ItemStatus.RUNNING) "Compacting context" else "Context compacted" + (p.tokens?.let { " · ${ChatLogic.tokens(it)} tok" } ?: ""),
@@ -123,8 +125,8 @@ private fun Divider(label: String, icon: ImageVector, shimmer: Boolean = false) 
 @Composable
 private fun RequestLine(icon: ImageVector, what: String, status: ItemStatus, modifier: Modifier) {
     val (label, color) = when (status) {
-        ItemStatus.WAITING, ItemStatus.PENDING -> "Waiting" to C.tertiary
-        ItemStatus.COMPLETED -> "Answered" to C.primary
+        ItemStatus.WAITING, ItemStatus.PENDING -> tr(R.string.chat_waiting) to C.tertiary
+        ItemStatus.COMPLETED -> tr(R.string.chat_answered) to C.primary
         else -> status.wire.replaceFirstChar { it.uppercase() } to C.outline
     }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
@@ -135,7 +137,7 @@ private fun RequestLine(icon: ImageVector, what: String, status: ItemStatus, mod
 }
 
 private val TIME = SimpleDateFormat("HH:mm", Locale.getDefault())
-private val FULL = SimpleDateFormat("EEE d MMM yyyy, HH:mm:ss", Locale.getDefault())
+private val FULL = SimpleDateFormat(tr(R.string.chat_eee_d_mmm_yyyy_hh), Locale.getDefault())
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -150,7 +152,7 @@ internal fun UserBubble(p: ItemPayload.UserMessage, at: Long, modifier: Modifier
     Column(modifier, horizontalAlignment = Alignment.End) {
         Column(
             Modifier.widthIn(max = maxW).background(C.high).border(1.dp, C.borderVar)
-                .combinedClickable(onClickLabel = null, onLongClickLabel = "Show time", onLongClick = { stamp = !stamp }, onClick = {})
+                .combinedClickable(onClickLabel = null, onLongClickLabel = tr(R.string.chat_show_time), onLongClick = { stamp = !stamp }, onClick = {})
                 .padding(S.inset)
                 .animateContentSize(),
         ) {
@@ -180,12 +182,12 @@ internal fun UserBubble(p: ItemPayload.UserMessage, at: Long, modifier: Modifier
                 Markdown(k.body, streaming = false, modifier = Modifier.padding(bottom = S.s).heightIn(max = 360.dp).verticalScroll(rememberScrollState()))
             }
             if (own.isNotBlank()) Text(if (expanded || !isFolded) own else folded, color = C.on, style = T.body)
-            if (isFolded) Text(if (expanded) "Show less" else "Show more", Modifier.clickable { expanded = !expanded }.padding(top = S.xs),
+            if (isFolded) Text(if (expanded) tr(R.string.chat_show_less) else tr(R.string.chat_show_more), Modifier.clickable { expanded = !expanded }.padding(top = S.xs),
                 color = C.primary, style = T.label)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (stamp) Text(FULL.format(Date(at)), color = C.outline, style = T.meta)
-            IconBtn(Ic.Copy, "Copy message", tint = C.outline, size = 14.dp, box = 36.dp) { copyText(ctx, p.text) }
+            IconBtn(Ic.Copy, tr(R.string.chat_copy_message), tint = C.outline, size = 14.dp, box = 36.dp) { copyText(ctx, p.text) }
         }
     }
 }
@@ -222,11 +224,11 @@ private fun Reasoning(p: ItemPayload.Reasoning, running: Boolean, modifier: Modi
     val secs = p.durationMs?.let { (it + 500) / 1000 }
     Column(modifier.animateContentSize()) {
         Row(
-            Modifier.heightIn(min = 32.dp).clickable(enabled = p.text.isNotBlank(), onClickLabel = if (open) "Hide reasoning" else "Show reasoning") { open = !open },
+            Modifier.heightIn(min = 32.dp).clickable(enabled = p.text.isNotBlank(), onClickLabel = if (open) tr(R.string.chat_hide_reasoning) else tr(R.string.chat_show_reasoning)) { open = !open },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NcIcon(Ic.Lightbulb, null, tint = if (running) C.primary else C.outline, size = 14.dp)
-            Text(if (running) "Thinking" else "Thought" + (secs?.let { " for ${it}s" } ?: ""), Modifier.padding(horizontal = S.s).shimmer(running),
+            Text(if (running) tr(R.string.chat_thinking) else "Thought" + (secs?.let { " for ${it}s" } ?: ""), Modifier.padding(horizontal = S.s).shimmer(running),
                 color = C.onVar, style = T.label)
             if (p.text.isNotBlank()) Chevron(open, size = 14.dp)
         }
@@ -245,7 +247,7 @@ private fun WorkGroup(v: AgentChatView, t: ChatThread, items: List<TurnItem>, ki
     val running = items.any { it.status == ItemStatus.RUNNING }
     Column(ROW_PAD.card(C.low).animateContentSize()) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable(onClickLabel = if (open) "Collapse work log" else "Expand work log") { open = !open }
+            Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable(onClickLabel = if (open) tr(R.string.chat_collapse_work_log) else tr(R.string.chat_expand_work_log)) { open = !open }
                 .padding(horizontal = S.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -290,7 +292,7 @@ private fun SubagentCard(v: AgentChatView, t: ChatThread, item: TurnItem, childr
     val running = item.status == ItemStatus.RUNNING || item.status == ItemStatus.PENDING
     var open by rememberSaveable(item.id) { mutableStateOf(false) }
     val steps = children.count { it.type != "assistant_message" && it.type != "reasoning" }
-    val title = p?.title ?: (item.payload as? ItemPayload.DynamicTool)?.name ?: ChatLogic.activity(item.payload) ?: "Subagent"
+    val title = p?.title ?: (item.payload as? ItemPayload.DynamicTool)?.name ?: ChatLogic.activity(item.payload) ?: tr(R.string.chat_subagent)
     val meta = when {
         running -> ChatLogic.currentActivity(children, item.runId) ?: "working"
         steps > 0 -> if (steps == 1) "1 step" else "$steps steps"
@@ -299,7 +301,7 @@ private fun SubagentCard(v: AgentChatView, t: ChatThread, item: TurnItem, childr
     val canOpen = children.isNotEmpty() || !p?.result.isNullOrBlank()
     Column(modifier.animateContentSize()) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(enabled = canOpen, onClickLabel = if (open) "Hide subagent activity" else "Show subagent activity") { open = !open }
+            Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(enabled = canOpen, onClickLabel = if (open) tr(R.string.chat_hide_subagent_activity) else tr(R.string.chat_show_subagent_activity)) { open = !open }
                 .padding(horizontal = S.m, vertical = S.s),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -322,7 +324,7 @@ private fun SubagentCard(v: AgentChatView, t: ChatThread, item: TurnItem, childr
                     }
                 }
                 p?.result?.takeIf { it.isNotBlank() && !running }?.let {
-                    Overline("Result", Modifier.padding(top = S.s), color = C.outline)
+                    Overline(tr(R.string.chat_result), Modifier.padding(top = S.s), color = C.outline)
                     Markdown(it, streaming = false, modifier = Modifier.padding(top = S.xs).heightIn(max = 320.dp).verticalScroll(rememberScrollState()))
                 }
             }
@@ -345,8 +347,8 @@ private fun ToolLine(icon: ImageVector, title: String, meta: String?, status: It
 private fun ItemStatusIcon(status: ItemStatus) {
     when (status) {
         ItemStatus.RUNNING, ItemStatus.PENDING -> Box(Modifier.padding(start = S.s)) { Spinner() }
-        ItemStatus.FAILED -> NcIcon(Ic.CircleX, "Failed", Modifier.padding(start = S.s), tint = C.error, size = 14.dp)
-        ItemStatus.CANCELLED, ItemStatus.INTERRUPTED -> NcIcon(Ic.Stop, "Stopped", Modifier.padding(start = S.s), tint = C.outline, size = 12.dp)
+        ItemStatus.FAILED -> NcIcon(Ic.CircleX, tr(R.string.chat_failed), Modifier.padding(start = S.s), tint = C.error, size = 14.dp)
+        ItemStatus.CANCELLED, ItemStatus.INTERRUPTED -> NcIcon(Ic.Stop, tr(R.string.chat_stopped), Modifier.padding(start = S.s), tint = C.outline, size = 12.dp)
         else -> {}
     }
 }
@@ -360,7 +362,7 @@ private fun CommandCard(p: ItemPayload.CommandExecution, status: ItemStatus, mod
     val failed = status == ItemStatus.FAILED || (exit != null && exit != 0)
     Column(modifier.animateContentSize()) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable(onClickLabel = if (open) "Hide output" else "Show output") { open = !open }
+            Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable(onClickLabel = if (open) tr(R.string.chat_hide_output) else tr(R.string.chat_show_output)) { open = !open }
                 .padding(horizontal = S.m, vertical = S.s),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -379,7 +381,7 @@ private fun CommandCard(p: ItemPayload.CommandExecution, status: ItemStatus, mod
                 Text(p.outputTail, Modifier.horizontalScroll(rememberScrollState()).padding(start = S.m, top = S.s, bottom = S.s, end = 48.dp),
                     color = C.onVar, style = T.codeSm, softWrap = false)
             }
-            IconBtn(Ic.Copy, "Copy output", Modifier.align(Alignment.TopEnd), tint = C.onVar, size = 14.dp, box = 40.dp) { copyText(ctx, p.outputTail) }
+            IconBtn(Ic.Copy, tr(R.string.chat_copy_output), Modifier.align(Alignment.TopEnd), tint = C.onVar, size = 14.dp, box = 40.dp) { copyText(ctx, p.outputTail) }
         }
     }
 }
@@ -400,7 +402,7 @@ private fun FileChangeRow(v: AgentChatView, t: ChatThread, p: ItemPayload.FileCh
                 p.path.substringBeforeLast('/', "").takeIf { it.isNotEmpty() }?.let { Label(it, color = C.outline, size = 10) }
             }
             AddDel(p.add, p.del)
-            IconBtn(Ic.FileDiff, "Open diff", tint = C.onVar, size = 16.dp, box = 44.dp) { v.push(Route.Diff(t.id)) }
+            IconBtn(Ic.FileDiff, tr(R.string.chat_open_diff), tint = C.onVar, size = 16.dp, box = 44.dp) { v.push(Route.Diff(t.id)) }
         }
         val diff = p.diff
         if (open && diff != null) {
@@ -420,19 +422,19 @@ private fun PlanCard(v: AgentChatView, t: ChatThread, md: String, modifier: Modi
         Column(Modifier.fillMaxWidth().brutal(shadow = C.shadowGreen).card(C.low, C.primary).padding(S.m).animateContentSize()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 NcIcon(Ic.ClipboardList, null, tint = C.primary, size = 16.dp)
-                Overline("Proposed plan", Modifier.padding(start = S.s), color = C.primary)
+                Overline(tr(R.string.chat_proposed_plan), Modifier.padding(start = S.s), color = C.primary)
             }
             Markdown(if (expanded || !isFolded) md else folded, streaming = false, modifier = Modifier.padding(vertical = S.s))
-            if (isFolded) Text(if (expanded) "Show less" else "Show more", Modifier.clickable { expanded = !expanded }.padding(vertical = S.xs),
+            if (isFolded) Text(if (expanded) tr(R.string.chat_show_less) else tr(R.string.chat_show_more), Modifier.clickable { expanded = !expanded }.padding(vertical = S.xs),
                 color = C.primary, style = T.label)
             FlowRow(Modifier.padding(top = S.s), horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
-                NcButton("Implement", primary = true, icon = Ic.Check) {
+                NcButton(tr(R.string.chat_implement), primary = true, icon = Ic.Check) {
                     v.bg {
                         v.backend.configure(t.id, ConfigChange(interactionMode = InteractionMode.DEFAULT))
                         v.backend.send(t.id, "PLEASE IMPLEMENT THIS PLAN:\n$md", emptyList(), steer = false)
                     }
                 }
-                NcButton("Copy", icon = Ic.Copy) { copyText(ctx, md) }
+                NcButton(tr(R.string.chat_copy), icon = Ic.Copy) { copyText(ctx, md) }
             }
         }
     }
@@ -452,17 +454,17 @@ private fun ErrorRow(v: AgentChatView, t: ChatThread, item: TurnItem, p: ItemPay
             }
             Text(p.message, Modifier.padding(vertical = S.s), color = C.on, style = T.bodySm)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
-                NcButton("Retry", icon = Ic.Retry) { v.retry(t, item.runId) }
-                NcButton("Terminal", icon = Ic.Terminal) { openInTerminal(v, t) }
-                if (!p.details.isNullOrBlank()) NcButton("Details", icon = Ic.FileText) { details = true }
+                NcButton(tr(R.string.chat_retry), icon = Ic.Retry) { v.retry(t, item.runId) }
+                NcButton(tr(R.string.chat_terminal), icon = Ic.Terminal) { openInTerminal(v, t) }
+                if (!p.details.isNullOrBlank()) NcButton(tr(R.string.chat_details), icon = Ic.FileText) { details = true }
             }
         }
     }
     if (details) AlertDialog(
         onDismissRequest = { details = false }, containerColor = C.low, shape = Square,
-        title = { Text("Error details", style = T.title, color = C.on) },
+        title = { Text(tr(R.string.chat_error_details), style = T.title, color = C.on) },
         text = { Text(p.details.orEmpty(), Modifier.verticalScroll(rememberScrollState()), style = T.codeSm, color = C.onVar) },
-        confirmButton = { NcButton("Close") { details = false } },
+        confirmButton = { NcButton(tr(R.string.chat_close)) { details = false } },
     )
 }
 
@@ -487,7 +489,7 @@ private fun MetaRow(run: Run, text: String?, ttft: Long?) {
         ttft?.let { "first token ${ChatLogic.duration(it)}" },
     )
     Row(
-        Modifier.fillMaxWidth().combinedClickable(onLongClickLabel = "Show details", onLongClick = { more = !more }, onClick = {})
+        Modifier.fillMaxWidth().combinedClickable(onLongClickLabel = tr(R.string.chat_show_details), onLongClick = { more = !more }, onClick = {})
             .padding(start = S.l, end = S.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {

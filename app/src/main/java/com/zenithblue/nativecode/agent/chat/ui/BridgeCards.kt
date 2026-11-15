@@ -47,22 +47,24 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Look of one bridge action: icon, overline label, accent. */
 private data class BridgeLook(val icon: ImageVector, val label: String, val accent: Color)
 
 private fun look(action: String) = when (action) {
-    "open_link" -> BridgeLook(Ic.ExternalLink, "Open link", C.primary)
-    "preview" -> BridgeLook(Ic.Globe, "Preview", C.primary)
-    "install_apk" -> BridgeLook(Ic.Package, "Install APK", C.primary)
-    "share_file" -> BridgeLook(Ic.Share, "File for you", C.primary)
-    "status" -> BridgeLook(Ic.Activity, "Task status", C.tertiary)
-    "toast" -> BridgeLook(Ic.Message, "Message", C.onVar)
-    else -> BridgeLook(Ic.Bell, "Notification", C.tertiary)
+    "open_link" -> BridgeLook(Ic.ExternalLink, tr(R.string.chat_open_link), C.primary)
+    "preview" -> BridgeLook(Ic.Globe, tr(R.string.chat_preview), C.primary)
+    "install_apk" -> BridgeLook(Ic.Package, tr(R.string.chat_install_apk), C.primary)
+    "share_file" -> BridgeLook(Ic.Share, tr(R.string.chat_file_for_you), C.primary)
+    "status" -> BridgeLook(Ic.Activity, tr(R.string.chat_task_status), C.tertiary)
+    "toast" -> BridgeLook(Ic.Message, tr(R.string.chat_message), C.onVar)
+    else -> BridgeLook(Ic.Bell, tr(R.string.chat_notification), C.tertiary)
 }
 
 private val TIME = SimpleDateFormat("HH:mm", Locale.getDefault())
-private val FULL = SimpleDateFormat("EEE d MMM, HH:mm:ss", Locale.getDefault())
+private val FULL = SimpleDateFormat(tr(R.string.chat_eee_d_mmm_hh_mm), Locale.getDefault())
 
 /** http(s) only: an agent-supplied `intent:` / `file:` / `javascript:` URI is never launched (Copy still works). */
 internal fun openableUrl(url: String?): Boolean = url != null && Regex("^https?://\\S+$", RegexOption.IGNORE_CASE).matches(url.trim())
@@ -87,9 +89,9 @@ internal fun BridgeCard(v: AgentChatView, threadId: String, item: TurnItem, p: B
         p.state == Bridge.DISMISSED -> "Dismissed" to C.outline
         p.action == "status" && p.state == Bridge.PENDING -> "Running" to C.tertiary
         p.state == Bridge.PENDING -> "Pending" to C.tertiary
-        p.action in setOf("notify", "toast") -> "Delivered" to C.outline
+        p.action in setOf("notify", "toast") -> tr(R.string.chat_delivered) to C.outline
         p.action == "preview" -> "Detected" to C.primary
-        else -> "Done" to C.primary
+        else -> tr(R.string.chat_done) to C.primary
     }
     fun mark(state: String) = v.bg { v.backend.bridgeState(threadId, item.id, state) }
     val at = p.at.takeIf { it > 0 } ?: item.updatedAt
@@ -124,30 +126,30 @@ internal fun BridgeCard(v: AgentChatView, threadId: String, item: TurnItem, p: B
         FlowRow(Modifier.fillMaxWidth().padding(top = S.s), horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
             when (p.action) {
                 "open_link" -> {
-                    if (openableUrl(p.target)) NcButton("Open", kind = if (pending) BtnKind.PRIMARY else BtnKind.OUTLINE, icon = Ic.ExternalLink) {
+                    if (openableUrl(p.target)) NcButton(tr(R.string.chat_open), kind = if (pending) BtnKind.PRIMARY else BtnKind.OUTLINE, icon = Ic.ExternalLink) {
                         runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(p.target!!.trim())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                            .onSuccess { mark(Bridge.DONE) }.onFailure { Toast.makeText(ctx, "No app can open this link", Toast.LENGTH_SHORT).show() }
+                            .onSuccess { mark(Bridge.DONE) }.onFailure { Toast.makeText(ctx, tr(R.string.chat_no_app_can_open_this), Toast.LENGTH_SHORT).show() }
                     }
-                    NcButton("Copy", icon = Ic.Copy) { copy(ctx, "URL", p.target.orEmpty()) }
+                    NcButton(tr(R.string.chat_copy), icon = Ic.Copy) { copy(ctx, "URL", p.target.orEmpty()) }
                 }
                 "preview" -> {
-                    NcButton("Open", kind = BtnKind.PRIMARY, icon = Ic.Globe) { v.host.openPreview(p.target) }
-                    NcButton("Browser", icon = Ic.ExternalLink) {
+                    NcButton(tr(R.string.chat_open), kind = BtnKind.PRIMARY, icon = Ic.Globe) { v.host.openPreview(p.target) }
+                    NcButton(tr(R.string.chat_browser), icon = Ic.ExternalLink) {
                         runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(p.target.orEmpty())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     }
-                    NcButton("Copy", icon = Ic.Copy) { copy(ctx, "URL", p.target.orEmpty()) }
+                    NcButton(tr(R.string.chat_copy), icon = Ic.Copy) { copy(ctx, "URL", p.target.orEmpty()) }
                 }
                 "install_apk" -> {
-                    NcButton("Install", kind = if (pending) BtnKind.PRIMARY else BtnKind.OUTLINE, icon = Ic.Download) { p.target?.let { v.host.saveApk(it); mark(Bridge.DONE) } }
-                    NcButton("Share", icon = Ic.Share) { p.target?.let { v.host.shareFile(it); mark(Bridge.DONE) } }
+                    NcButton(tr(R.string.chat_install), kind = if (pending) BtnKind.PRIMARY else BtnKind.OUTLINE, icon = Ic.Download) { p.target?.let { v.host.saveApk(it); mark(Bridge.DONE) } }
+                    NcButton(tr(R.string.chat_share), icon = Ic.Share) { p.target?.let { v.host.shareFile(it); mark(Bridge.DONE) } }
                 }
                 "share_file" -> {
-                    NcButton("Save / Share", kind = if (pending) BtnKind.PRIMARY else BtnKind.OUTLINE, icon = Ic.Share) { p.target?.let { v.host.shareFile(it); mark(Bridge.DONE) } }
-                    NcButton("Copy path", icon = Ic.Copy) { copy(ctx, "Path", p.target.orEmpty()) }
+                    NcButton(tr(R.string.chat_save_share), kind = if (pending) BtnKind.PRIMARY else BtnKind.OUTLINE, icon = Ic.Share) { p.target?.let { v.host.shareFile(it); mark(Bridge.DONE) } }
+                    NcButton(tr(R.string.chat_copy_path), icon = Ic.Copy) { copy(ctx, "Path", p.target.orEmpty()) }
                 }
-                else -> NcButton("Copy", icon = Ic.Copy) { copy(ctx, p.title, listOf(p.title, p.body).filter { it.isNotBlank() }.joinToString("\n")) }
+                else -> NcButton(tr(R.string.chat_copy), icon = Ic.Copy) { copy(ctx, p.title, listOf(p.title, p.body).filter { it.isNotBlank() }.joinToString("\n")) }
             }
-            if (pending) NcButton("Dismiss", kind = BtnKind.GHOST, icon = Ic.Close) { mark(Bridge.DISMISSED) }
+            if (pending) NcButton(tr(R.string.chat_dismiss), kind = BtnKind.GHOST, icon = Ic.Close) { mark(Bridge.DISMISSED) }
         }
     }
 }
@@ -166,7 +168,7 @@ private fun targetLine(p: Bridge): Pair<ImageVector, String>? = when (p.action) 
 
 private fun copy(ctx: Context, label: String, text: String) {
     (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.setPrimaryClip(ClipData.newPlainText(label, text))
-    Toast.makeText(ctx, "Copied", Toast.LENGTH_SHORT).show()
+    Toast.makeText(ctx, tr(R.string.chat_copied), Toast.LENGTH_SHORT).show()
 }
 
 /** Bridge history of one thread (chat overflow): every card, newest first, with date and time. */
@@ -182,8 +184,8 @@ internal fun BridgeHistoryScreen(v: AgentChatView, threadId: String) {
     val events by produceState<List<TurnItem>?>(null, threadId, tick) { value = withContext(Dispatchers.IO) { runCatching { v.backend.bridgeEvents(threadId) }.getOrDefault(emptyList()) } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().background(C.lowest).heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBtn(Ic.Back, "Back") { v.pop() }
-            Text("Agent bridge", Modifier.weight(1f), color = C.on, style = T.title)
+            IconBtn(Ic.Back, tr(R.string.onb_back)) { v.pop() }
+            Text(tr(R.string.chat_agent_bridge), Modifier.weight(1f), color = C.on, style = T.title)
             events?.let { Label("${it.size} event${if (it.size == 1) "" else "s"}", Modifier.padding(end = S.l), color = C.outline) }
         }
         Hairline()
@@ -192,8 +194,8 @@ internal fun BridgeHistoryScreen(v: AgentChatView, threadId: String) {
             list == null -> LoadingRows()
             list.isEmpty() -> Column(Modifier.fillMaxSize().padding(S.xl), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 NcIcon(Ic.History, null, tint = C.outline, size = 40.dp)
-                Text("No bridge events yet", Modifier.padding(top = S.l), color = C.on, style = T.heading)
-                Text("Links, APKs, files and notifications the agent sends with nativecode-agent show up here.",
+                Text(tr(R.string.chat_no_bridge_events_yet), Modifier.padding(top = S.l), color = C.on, style = T.heading)
+                Text(tr(R.string.chat_links_apks_files_and_notifications),
                     Modifier.padding(top = S.s), color = C.onVar, style = T.bodySm)
             }
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = S.s)) {

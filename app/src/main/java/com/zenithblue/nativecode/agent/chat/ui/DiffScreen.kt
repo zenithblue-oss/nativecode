@@ -37,6 +37,8 @@ import com.zenithblue.nativecode.agent.chat.core.ItemPayload
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Screen G: This turn · Whole thread · Uncommitted; file list + unified diff (own small renderer, sticky file headers). */
 @OptIn(ExperimentalFoundationApi::class)
@@ -55,8 +57,8 @@ internal fun DiffScreen(v: AgentChatView, threadId: String) {
     val co = rememberCoroutineScope()
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().background(C.lowest).heightIn(min = 56.dp).padding(end = S.s), verticalAlignment = Alignment.CenterVertically) {
-            IconBtn(Ic.Back, "Back") { v.pop() }
-            Text("Changes", Modifier.weight(1f), color = C.on, style = T.title)
+            IconBtn(Ic.Back, tr(R.string.onb_back)) { v.pop() }
+            Text(tr(R.string.chat_changes), Modifier.weight(1f), color = C.on, style = T.title)
             Box {
                 Chip(scope.label, Modifier.semantics { contentDescription = "Scope ${scope.label}, change" }, trailing = Ic.ChevronDown) { pick = true }
                 DropdownMenu(pick, { pick = false }, containerColor = C.low) {
@@ -127,10 +129,10 @@ internal fun DiffScreen(v: AgentChatView, threadId: String) {
 @Composable
 private fun KindBadge(kind: Char) {
     val (c, name) = when (kind) {
-        'A' -> C.primary to "Added"
-        'D' -> C.error to "Deleted"
-        'R' -> C.tertiary to "Renamed"
-        else -> C.onVar to "Modified"
+        'A' -> C.primary to tr(R.string.chat_added)
+        'D' -> C.error to tr(R.string.chat_deleted)
+        'R' -> C.tertiary to tr(R.string.chat_renamed)
+        else -> C.onVar to tr(R.string.chat_modified)
     }
     Box(
         Modifier.size(20.dp).background(c.copy(alpha = 0.14f)).semantics { contentDescription = name },
@@ -143,7 +145,7 @@ private fun FileHeader(f: DiffFile, open: Boolean, toggle: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(C.container)) {
         Hairline()
         Row(
-            Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "Collapse file" else "Expand file", onClick = toggle).heightIn(min = 44.dp).padding(horizontal = S.m),
+            Modifier.fillMaxWidth().clickable(onClickLabel = if (open) tr(R.string.chat_collapse_file) else tr(R.string.chat_expand_file), onClick = toggle).heightIn(min = 44.dp).padding(horizontal = S.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Chevron(open, size = 14.dp)

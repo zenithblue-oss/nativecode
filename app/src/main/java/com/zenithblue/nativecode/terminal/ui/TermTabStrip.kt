@@ -22,6 +22,7 @@ import com.zenithblue.nativecode.NC
 import com.zenithblue.nativecode.R
 import androidx.compose.ui.unit.Dp
 import com.zenithblue.nativecode.agent.chat.ui.Space
+import com.zenithblue.nativecode.tr
 
 /**
  * TERMINAL page tab strip (item 12 M1; replaces the drawer): one flush rail, cells split by hairlines, the active
@@ -145,8 +146,8 @@ class TermTabStrip(context: Context, onAdd: (View) -> Unit) : LinearLayout(conte
     }
 
     private fun menu(anchor: View, t: Tab) = PopupMenu(context, anchor).apply {
-        menu.add(0, 1, 0, "Rename")
-        menu.add(0, 2, 1, "Close others")
+        menu.add(0, 1, 0, tr(R.string.term_rename))
+        menu.add(0, 2, 1, tr(R.string.term_close_others))
         setOnMenuItemClickListener {
             if (it.itemId == 1) rename(t) else onCloseOthers(t)
             true
@@ -156,10 +157,10 @@ class TermTabStrip(context: Context, onAdd: (View) -> Unit) : LinearLayout(conte
     private fun rename(t: Tab) {
         val input = EditText(context).apply { setText(t.label); setSelectAllOnFocus(true); isSingleLine = true }
         androidx.appcompat.app.AlertDialog.Builder(context)
-            .setTitle("Rename tab")
+            .setTitle(tr(R.string.term_rename_tab))
             .setView(FrameLayout(context).apply { setPadding(px(Space.xl), px(Space.s), px(Space.xl), 0); addView(input) })
-            .setPositiveButton("Rename") { _, _ -> input.text.toString().trim().takeIf { it.isNotEmpty() }?.let { onRename(t, it) } }
-            .setNegativeButton("Cancel", null)
+            .setPositiveButton(tr(R.string.term_rename)) { _, _ -> input.text.toString().trim().takeIf { it.isNotEmpty() }?.let { onRename(t, it) } }
+            .setNegativeButton(tr(R.string.git_cancel), null)
             .show()
         input.requestFocus()
     }

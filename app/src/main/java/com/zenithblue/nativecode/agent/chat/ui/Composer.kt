@@ -62,6 +62,8 @@ import com.zenithblue.nativecode.agent.chat.core.SlashCommand
 import com.zenithblue.nativecode.skills.SkillsCatalog
 import org.json.JSONArray
 import org.json.JSONObject
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** One chip in the attachment strip: copying, done ([att]) or failed ([error], Retry). */
 internal data class Pending(val key: Long, val name: String, val uri: Uri?, val image: Boolean, val att: ChatAttachment? = null, val error: String? = null)
@@ -182,11 +184,11 @@ internal fun Composer(
             if (hits.isNotEmpty() || nc.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().padding(start = S.m, end = S.m, top = S.s).heightIn(max = 260.dp).brutal(3.dp).card(C.low)) {
                 items(cmds, key = { "c:" + it.name }) { c -> SlashRow(c, "/" + c.name) { onSlash(c) } }
                 if (skills.isNotEmpty()) item("skills") {
-                    Overline("Skills", Modifier.padding(start = S.m, end = S.m, top = S.s, bottom = S.xs), color = C.outline)
+                    Overline(tr(R.string.chat_skills), Modifier.padding(start = S.m, end = S.m, top = S.s, bottom = S.xs), color = C.outline)
                 }
                 items(skills, key = { "s:" + it.name }) { c -> SlashRow(c, "/skill:" + c.name) { onSlash(c) } }
                 if (nc.isNotEmpty()) item("nc") {
-                    Overline("NativeCode skills", Modifier.padding(start = S.m, end = S.m, top = S.s, bottom = S.xs), color = C.outline)
+                    Overline(tr(R.string.chat_nativecode_skills), Modifier.padding(start = S.m, end = S.m, top = S.s, bottom = S.xs), color = C.outline)
                 }
                 items(nc, key = { "n:" + it.id }) { sk ->
                     Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Attach skill ${sk.title}") {
@@ -227,9 +229,9 @@ internal fun Composer(
                 },
             )
             Row(Modifier.fillMaxWidth().padding(start = S.xs, end = S.xs, bottom = S.xs), verticalAlignment = Alignment.CenterVertically) {
-                IconBtn(Ic.Plus, "Add photo, file, @file, command or skill", tint = C.onVar, box = 40.dp) { s.sheet = ComposerSheet.PLUS }
+                IconBtn(Ic.Plus, tr(R.string.chat_add_photo_file_file_command), tint = C.onVar, box = 40.dp) { s.sheet = ComposerSheet.PLUS }
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
-                    val modelName = model?.name?.ifBlank { null } ?: currentModel?.substringAfterLast('/') ?: "Default model"
+                    val modelName = model?.name?.ifBlank { null } ?: currentModel?.substringAfterLast('/') ?: tr(R.string.chat_default_model)
                     Box {
                         Chip(
                             modelName + if (model?.free == true) " · free" else "",
@@ -241,10 +243,10 @@ internal fun Composer(
                         }
                     }
                     if (efforts.isNotEmpty()) Box {
-                        val e = t.effort ?: "Effort"
+                        val e = t.effort ?: tr(R.string.chat_effort)
                         Chip(e, Modifier.semantics { contentDescription = "Reasoning effort $e. Change effort" }, icon = Ic.Lightbulb, trailing = Ic.ChevronDown) { effortMenu = true }
                         DropdownMenu(effortMenu, { effortMenu = false }, containerColor = C.low) {
-                            Overline("Reasoning effort", Modifier.padding(horizontal = S.l, vertical = S.xs), color = C.outline)
+                            Overline(tr(R.string.chat_reasoning_effort), Modifier.padding(horizontal = S.l, vertical = S.xs), color = C.outline)
                             efforts.forEach { x ->
                                 DropdownMenuItem(
                                     text = { Text(x, style = T.bodySm, color = C.on) },
@@ -281,7 +283,7 @@ internal fun Composer(
                 ContextRing(context)
                 val canSend = (s.text.isNotBlank() || s.ready.isNotEmpty() || s.skills.isNotEmpty()) && !s.busy
                 val stop = !canSend && running
-                val label = when { stop && forceStop -> "Force stop"; stop -> "Stop"; running && canSteer -> "Steer now"; running -> "Queue message"; else -> "Send" }
+                val label = when { stop && forceStop -> tr(R.string.chat_force_stop); stop -> tr(R.string.quick_stop); running && canSteer -> tr(R.string.chat_steer_now); running -> tr(R.string.chat_queue_message); else -> tr(R.string.chat_send) }
                 Box(Modifier.padding(start = S.xs)) {
                     Box(
                         Modifier.size(40.dp).background(if (canSend) C.primary else if (stop) C.errorCon else C.high)
@@ -303,8 +305,8 @@ internal fun Composer(
                         }
                     }
                     DropdownMenu(sendMenu, { sendMenu = false }, containerColor = C.low) {
-                        MItem("Steer now", Ic.Steer) { sendMenu = false; onSend(true) }
-                        MItem("Queue", Ic.Clock) { sendMenu = false; onSend(false) }
+                        MItem(tr(R.string.chat_steer_now), Ic.Steer) { sendMenu = false; onSend(true) }
+                        MItem(tr(R.string.chat_queue), Ic.Clock) { sendMenu = false; onSend(false) }
                     }
                 }
             }
@@ -338,7 +340,7 @@ private fun AttachChip(v: AgentChatView, t: ChatThread, s: ComposerState, c: Pen
         Text(c.error ?: (c.name + (c.att?.let { " · " + size(it.sizeBytes) } ?: " · copying")),
             Modifier.padding(start = S.gap).widthIn(max = 180.dp), color = if (failed) C.error else C.on, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (failed && c.uri != null) IconBtn(Ic.Retry, "Retry attachment", tint = C.primary, size = 14.dp, box = 36.dp) { s.chips.remove(c); s.add(v, t, c.uri, c.image) }
-        IconBtn(Ic.Close, "Remove attachment", tint = C.onVar, size = 14.dp, box = 36.dp) { s.chips.remove(c) }
+        IconBtn(Ic.Close, tr(R.string.chat_remove_attachment), tint = C.onVar, size = 14.dp, box = 36.dp) { s.chips.remove(c) }
     }
 }
 
@@ -352,7 +354,7 @@ private fun ContextRing(c: ContextInfo) {
     val pct = f?.let { (it * 100).toInt() }
     Box {
         Box(
-            Modifier.size(40.dp).clickable(onClickLabel = "Context details") { open = true }
+            Modifier.size(40.dp).clickable(onClickLabel = tr(R.string.chat_context_details)) { open = true }
                 .semantics { contentDescription = if (c.compacting) "Compacting context" else "Context $pct percent used" },
             contentAlignment = Alignment.Center,
         ) {
@@ -367,16 +369,16 @@ private fun ContextRing(c: ContextInfo) {
         }
         DropdownMenu(open, { open = false }, containerColor = C.low) {
             Column(Modifier.padding(horizontal = S.l, vertical = S.s).widthIn(max = 260.dp)) {
-                Overline("Context window", color = C.outline)
+                Overline(tr(R.string.chat_context_window), color = C.outline)
                 Text(
                     if (c.used != null && c.size != null) "${ChatLogic.tokens(c.used)} / ${ChatLogic.tokens(c.size)} tokens · $pct%" else "Size not reported",
                     Modifier.padding(top = S.xs), color = C.on, style = T.label,
                 )
                 Text(
                     when {
-                        c.compacting -> "Compacting the conversation now."
-                        (f ?: 0f) >= 0.8f -> "Near the limit: the agent compacts older context soon."
-                        else -> "The agent compacts older context near the limit."
+                        c.compacting -> tr(R.string.chat_compacting_the_conversation_now)
+                        (f ?: 0f) >= 0.8f -> tr(R.string.chat_near_the_limit_the_agent)
+                        else -> tr(R.string.chat_the_agent_compacts_older_context)
                     },
                     Modifier.padding(top = S.xs), color = C.onVar, style = T.bodySm,
                 )

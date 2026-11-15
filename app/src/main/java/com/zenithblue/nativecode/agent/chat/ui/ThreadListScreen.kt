@@ -59,6 +59,8 @@ import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Screens A (TERMINAL tab, grouped by project) and B (workspace, one project). */
 @Composable
@@ -80,7 +82,7 @@ internal fun ThreadListScreen(v: AgentChatView) {
     fun archive(t: ChatThread, on: Boolean) {
         v.bg { v.backend.archive(t.id, on) }
         scope.launch {
-            if (snack.showSnackbar(if (on) "Archived" else "Restored", "Undo", duration = SnackbarDuration.Short) == SnackbarResult.ActionPerformed)
+            if (snack.showSnackbar(if (on) tr(R.string.chat_archived) else tr(R.string.chat_restored), tr(R.string.chat_undo), duration = SnackbarDuration.Short) == SnackbarResult.ActionPerformed)
                 v.bg { v.backend.archive(t.id, !on) }
         }
     }
@@ -92,14 +94,14 @@ internal fun ThreadListScreen(v: AgentChatView) {
             val waiting = rows.count { it.status == ThreadStatus.APPROVAL || it.status == ThreadStatus.INPUT }
             Row(Modifier.fillMaxWidth().background(C.lowest).heightIn(min = 56.dp).padding(start = S.l, end = S.xs), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (v.isWorkspace) "Threads" else "Agent threads", color = C.on, style = T.title)
+                    Text(if (v.isWorkspace) tr(R.string.chat_threads) else tr(R.string.chat_agent_threads), color = C.on, style = T.title)
                     Text(
                         listOfNotNull("$active thread${if (active == 1) "" else "s"}", "$working working".takeIf { working > 0 }, "$waiting waiting".takeIf { waiting > 0 })
                             .joinToString(" · "),
                         color = C.outline, style = T.meta,
                     )
                 }
-                IconBtn(Ic.Terminal, "Open terminal page", tint = C.onVar) { v.host.showTerminal(v.isWorkspace) }
+                IconBtn(Ic.Terminal, tr(R.string.chat_open_terminal_page), tint = C.onVar) { v.host.showTerminal(v.isWorkspace) }
                 SessionsChip(v)
             }
             Hairline()
@@ -108,10 +110,10 @@ internal fun ThreadListScreen(v: AgentChatView) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = FAB_CLEAR)) {
                 if (!v.loaded.value) item("loading") { LoadingRows() }
                 if (tabs.isNotEmpty()) {
-                    item("term-h") { GroupHeader("Terminals", tabs.size, !termOpen, Ic.Terminal) { termOpen = !termOpen } }
+                    item("term-h") { GroupHeader(tr(R.string.chat_terminals), tabs.size, !termOpen, Ic.Terminal) { termOpen = !termOpen } }
                     if (termOpen) items(tabs, key = { "tab" + it.index }) { tab ->
                         Row(
-                            Modifier.fillMaxWidth().combinedClickable(onClickLabel = "Open terminal tab") { v.host.openTerminalTab(tab.index, v.isWorkspace) }
+                            Modifier.fillMaxWidth().combinedClickable(onClickLabel = tr(R.string.chat_open_terminal_tab)) { v.host.openTerminalTab(tab.index, v.isWorkspace) }
                                 .heightIn(min = 48.dp).padding(horizontal = S.l),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -136,12 +138,12 @@ internal fun ThreadListScreen(v: AgentChatView) {
         }
         Row(
             Modifier.align(Alignment.BottomEnd).padding(S.l).brutal(4.dp, C.shadowGreen).background(C.primary)
-                .combinedClickable(onClickLabel = "New thread") { v.sheet.value = true }
+                .combinedClickable(onClickLabel = tr(R.string.chat_new_thread)) { v.sheet.value = true }
                 .heightIn(min = 48.dp).padding(horizontal = S.l),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NcIcon(Ic.SquarePen, null, tint = C.onPrimary, size = 18.dp)
-            Text("NEW THREAD", Modifier.padding(start = S.s), color = C.onPrimary, style = T.overline)
+            Text(tr(R.string.chat_new_thread_2), Modifier.padding(start = S.s), color = C.onPrimary, style = T.overline)
         }
         SnackbarHost(snack, Modifier.align(Alignment.BottomCenter).padding(bottom = FAB_CLEAR)) { d ->
             Snackbar(d, shape = Square, containerColor = C.high, contentColor = C.on, actionColor = C.primary)
@@ -168,11 +170,11 @@ private fun GroupHeader(title: String, count: Int, collapsed: Boolean, icon: Ima
 }
 
 internal fun statusLabel(s: ThreadStatus): Pair<String, Color>? = when (s) {
-    ThreadStatus.APPROVAL -> "Approval" to C.tertiary
-    ThreadStatus.INPUT -> "Input needed" to C.tertiary
-    ThreadStatus.WORKING -> "Working" to C.primary
-    ThreadStatus.FAILED -> "Failed" to C.error
-    ThreadStatus.DONE -> "Done" to C.primary
+    ThreadStatus.APPROVAL -> tr(R.string.chat_approval) to C.tertiary
+    ThreadStatus.INPUT -> tr(R.string.chat_input_needed) to C.tertiary
+    ThreadStatus.WORKING -> tr(R.string.chat_working) to C.primary
+    ThreadStatus.FAILED -> tr(R.string.chat_failed) to C.error
+    ThreadStatus.DONE -> tr(R.string.chat_done) to C.primary
     ThreadStatus.IDLE -> null
 }
 
@@ -201,13 +203,13 @@ private fun ThreadRowView(v: AgentChatView, r: ThreadRow, now: Long, onArchive: 
     ) {
         Row(Modifier.align(Alignment.CenterEnd).padding(end = S.xl), verticalAlignment = Alignment.CenterVertically) {
             NcIcon(Ic.Archive, null, tint = C.tertiary, size = 18.dp)
-            Overline(if (archived) "Restore" else "Archive", Modifier.padding(start = S.s), color = C.tertiary)
+            Overline(if (archived) tr(R.string.chat_restore) else tr(R.string.chat_archive), Modifier.padding(start = S.s), color = C.tertiary)
         }
         Column(
             Modifier.offset { IntOffset((if (dragging) dx else shown).roundToInt(), 0) }.fillMaxWidth().background(C.bg)
-                .combinedClickable(onClick = { v.push(Route.Chat(t.id)) }, onLongClick = { menu = true }, onLongClickLabel = "Thread actions")
+                .combinedClickable(onClick = { v.push(Route.Chat(t.id)) }, onLongClick = { menu = true }, onLongClickLabel = tr(R.string.chat_thread_actions))
                 .semantics {
-                    customActions = listOf(CustomAccessibilityAction(if (archived) "Restore" else "Archive") { onArchive(!archived); true })
+                    customActions = listOf(CustomAccessibilityAction(if (archived) tr(R.string.chat_restore) else tr(R.string.chat_archive)) { onArchive(!archived); true })
                 },
         ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = S.l, vertical = S.m), verticalAlignment = Alignment.Top) {
@@ -221,7 +223,7 @@ private fun ThreadRowView(v: AgentChatView, r: ThreadRow, now: Long, onArchive: 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (t.pinnedAt != null) NcIcon(Ic.Pin, "Pinned", Modifier.padding(end = S.xs), tint = C.primary, size = 12.dp)
                         Text(
-                            t.title.ifBlank { "New thread" }, Modifier.weight(1f), color = C.on,
+                            t.title.ifBlank { tr(R.string.chat_new_thread) }, Modifier.weight(1f), color = C.on,
                             style = T.heading.copy(fontWeight = if (r.status == ThreadStatus.DONE) FontWeight.Bold else FontWeight.Medium),
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -243,13 +245,13 @@ private fun ThreadRowView(v: AgentChatView, r: ThreadRow, now: Long, onArchive: 
             Hairline(Modifier.padding(start = S.edge + ROW_LOGO + S.m), color = C.borderVar) // under the text column
         }
         DropdownMenu(menu, { menu = false }, containerColor = C.low) {
-            MItem("Rename", Ic.Pencil) { menu = false; rename = true }
+            MItem(tr(R.string.term_rename), Ic.Pencil) { menu = false; rename = true }
             MItem(if (t.pinnedAt != null) "Unpin" else "Pin", Ic.Pin) { menu = false; v.bg { v.backend.pin(t.id, t.pinnedAt == null) } }
-            MItem("Continue in terminal", Ic.Terminal) { menu = false; openInTerminal(v, t) }
-            MItem("Open terminal here", Ic.Terminal) { menu = false; v.host.openShellHere(t.cwd, v.isWorkspace) }
-            MItem("Copy path", Ic.Copy) { menu = false; copyText(ctx, t.cwd) }
-            MItem(if (archived) "Unarchive" else "Archive", Ic.Archive) { menu = false; onArchive(!archived) }
-            MItem("Delete", Ic.Trash, danger = true) { menu = false; delete = true }
+            MItem(tr(R.string.chat_continue_in_terminal), Ic.Terminal) { menu = false; openInTerminal(v, t) }
+            MItem(tr(R.string.chat_open_terminal_here), Ic.Terminal) { menu = false; v.host.openShellHere(t.cwd, v.isWorkspace) }
+            MItem(tr(R.string.chat_copy_path), Ic.Copy) { menu = false; copyText(ctx, t.cwd) }
+            MItem(if (archived) tr(R.string.chat_unarchive) else tr(R.string.chat_archive), Ic.Archive) { menu = false; onArchive(!archived) }
+            MItem(tr(R.string.chat_delete), Ic.Trash, danger = true) { menu = false; delete = true }
         }
     }
     if (rename) RenameDialog(t.title, { rename = false }) { n -> v.bg { v.backend.rename(t.id, n) } }
@@ -267,15 +269,15 @@ internal fun RenameDialog(current: String, dismiss: () -> Unit, ok: (String) -> 
     var text by remember { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = dismiss, containerColor = C.low, shape = Square,
-        title = { Text("Rename thread", style = T.title, color = C.on) },
+        title = { Text(tr(R.string.chat_rename_thread), style = T.title, color = C.on) },
         text = {
             OutlinedTextField(
                 text, { text = it.take(120) }, singleLine = true, shape = Square, textStyle = T.body.copy(color = C.on),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = C.primary, unfocusedBorderColor = C.border, cursorColor = C.primary),
             )
         },
-        confirmButton = { NcButton("Save", primary = true, enabled = text.isNotBlank()) { ok(text.trim()); dismiss() } },
-        dismissButton = { NcButton("Cancel") { dismiss() } },
+        confirmButton = { NcButton(tr(R.string.chat_save), primary = true, enabled = text.isNotBlank()) { ok(text.trim()); dismiss() } },
+        dismissButton = { NcButton(tr(R.string.git_cancel)) { dismiss() } },
     )
 }
 
@@ -284,10 +286,10 @@ internal fun DeleteDialog(title: String, dismiss: () -> Unit, ok: () -> Unit) {
     AlertDialog(
         onDismissRequest = dismiss, containerColor = C.low, shape = Square,
         icon = { NcIcon(Ic.Trash, null, tint = C.error, size = 24.dp) },
-        title = { Text("Delete \"$title\"?", style = T.title, color = C.on) },
-        text = { Text("Stops the agent, deletes the history and this thread's change checkpoints. Files in the project are not touched.", style = T.bodySm, color = C.onVar) },
-        confirmButton = { NcButton("Delete", danger = true, icon = Ic.Trash) { ok(); dismiss() } },
-        dismissButton = { NcButton("Cancel") { dismiss() } },
+        title = { Text(tr(R.string.chat_delete_2, title), style = T.title, color = C.on) },
+        text = { Text(tr(R.string.chat_stops_the_agent_deletes_the), style = T.bodySm, color = C.onVar) },
+        confirmButton = { NcButton(tr(R.string.chat_delete), danger = true, icon = Ic.Trash) { ok(); dismiss() } },
+        dismissButton = { NcButton(tr(R.string.git_cancel)) { dismiss() } },
     )
 }
 
@@ -303,26 +305,26 @@ private fun SessionsChip(v: AgentChatView) {
     Box(Modifier.padding(end = S.s)) {
         Row(
             Modifier.heightIn(min = 36.dp).card(if (used > 0) C.primary.copy(alpha = 0.1f) else C.low, if (full) C.tertiary else if (used > 0) C.primary else C.border)
-                .combinedClickable(onClickLabel = "Live sessions") { open = true }
+                .combinedClickable(onClickLabel = tr(R.string.chat_live_sessions)) { open = true }
                 .semantics(mergeDescendants = true) { contentDescription = "$used of $max AI sessions in use" + if (!v.host.isPro()) ", Free plan" else "" }
                 .padding(horizontal = S.inset),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             StatusDot(if (full) C.tertiary else if (used > 0) C.primary else C.outline, size = 6.dp, pulse = used > 0)
             Label("$used/$max", Modifier.padding(start = S.gap), color = C.on, size = 12, bold = true)
-            if (!v.host.isPro()) Label("FREE", Modifier.padding(start = S.gap), color = C.tertiary, size = 10, bold = true)
+            if (!v.host.isPro()) Label(tr(R.string.chat_free), Modifier.padding(start = S.gap), color = C.tertiary, size = 10, bold = true)
         }
         DropdownMenu(open, { open = false }, containerColor = C.low) {
             val live = v.backend.liveThreadIds()
             val titles = v.rows.value.associate { it.thread.id to it.thread.title }
-            if (live.isEmpty()) DropdownMenuItem({ Text("No live chats · $used/$max sessions in use", style = T.bodySm, color = C.onVar) }, { open = false })
+            if (live.isEmpty()) DropdownMenuItem({ Text(tr(R.string.chat_no_live_chats_sessions_in, used, max), style = T.bodySm, color = C.onVar) }, { open = false })
             live.forEach { id ->
                 DropdownMenuItem(
                     {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(titles[id] ?: "Chat", Modifier.width(180.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = T.bodySm, color = C.on)
+                            Text(titles[id] ?: tr(R.string.chat_chat), Modifier.width(180.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = T.bodySm, color = C.on)
                             NcIcon(Ic.Stop, null, tint = C.error, size = 12.dp)
-                            Label("STOP", Modifier.padding(start = S.xs), color = C.error, bold = true)
+                            Label(tr(R.string.chat_stop), Modifier.padding(start = S.xs), color = C.error, bold = true)
                         }
                     },
                     { open = false; v.bg { v.backend.stop(id) } },
@@ -339,10 +341,10 @@ private fun EmptyState(v: AgentChatView) {
         Box(Modifier.size(48.dp).brutal(3.dp, C.shadowGreen).border(1.dp, C.primary).background(C.low), contentAlignment = Alignment.Center) {
             NcIcon(Ic.Message, null, tint = C.primary, size = 22.dp)
         }
-        Text("Start an agent thread", Modifier.padding(top = S.l), color = C.on, style = T.title)
-        Text("Chat with a CLI agent here. The terminal icon above opens the raw terminal.", Modifier.padding(top = S.xs, bottom = S.l), color = C.onVar, style = T.bodySm)
+        Text(tr(R.string.chat_start_an_agent_thread), Modifier.padding(top = S.l), color = C.on, style = T.title)
+        Text(tr(R.string.chat_chat_with_a_cli_agent), Modifier.padding(top = S.xs, bottom = S.l), color = C.onVar, style = T.bodySm)
         if (!v.host.aiToolsInstalled()) {
-            NcButton("Install AI tools", primary = true, icon = Ic.Download) { v.host.openInstallTools() }
+            NcButton(tr(R.string.chat_install_ai_tools), primary = true, icon = Ic.Download) { v.host.openInstallTools() }
         } else ToolCards(v, v.projectPath)
     }
 }

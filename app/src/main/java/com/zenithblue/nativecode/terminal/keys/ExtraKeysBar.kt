@@ -13,6 +13,8 @@ import android.view.View
 import android.view.ViewGroup
 import com.zenithblue.nativecode.NC
 import com.zenithblue.nativecode.terminal.ui.TerminalModifierState
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * NativeCode's own terminal extra-keys bar (not Termux ExtraKeysView).
@@ -48,7 +50,7 @@ class ExtraKeysBar(
 
     // Must precede init: reloadPreset() builds KeyViews that read these.
     private val isModifier: (Key) -> Boolean = { it.kind == KeyKind.CTRL || it.kind == KeyKind.ALT || it.kind == KeyKind.SHIFT }
-    private val navKeys = setOf("UP", "DOWN", "LEFT", "RIGHT", "HOME", "END", "PGUP", "PGDN")
+    private val navKeys = setOf("UP", tr(R.string.term_down), tr(R.string.term_left), tr(R.string.term_right), tr(R.string.onb_home), "END", "PGUP", "PGDN")
 
     init {
         setBackgroundColor(NC.SURFACE_LOWEST)

@@ -21,6 +21,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.zenithblue.nativecode.NC
 import com.zenithblue.nativecode.R
+import com.zenithblue.nativecode.tr
 
 private fun Context.dp(v: Int): Int =
     TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
@@ -95,7 +96,7 @@ internal class SkillsPickerSheet(
             setPadding(0, 0, 0, ctx.dp(10))
         }
         row.addView(TextView(ctx).apply {
-            text = "COPY SKILL"
+            text = tr(R.string.skills_copy_skill)
             textSize = 16f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -130,7 +131,7 @@ internal class SkillsPickerSheet(
             layoutParams = LinearLayout.LayoutParams(ctx.dp(16), ctx.dp(16)).apply { rightMargin = ctx.dp(8) }
         })
         row.addView(EditText(ctx).apply {
-            hint = "SEARCH"
+            hint = tr(R.string.git_search)
             setHintTextColor(NC.OUTLINE)
             setTextColor(Color.WHITE)
             textSize = 13f
@@ -211,7 +212,7 @@ internal class SkillsPickerSheet(
         })
         if (skills.isEmpty()) {
             listHost.addView(TextView(ctx).apply {
-                text = "No match."
+                text = tr(R.string.skills_no_match)
                 textSize = 12f
                 setTextColor(NC.ON_SURF_VAR)
                 setPadding(0, ctx.dp(12), 0, ctx.dp(12))
@@ -260,7 +261,7 @@ internal class SkillsPickerSheet(
                 })
             })
             addView(TextView(ctx).apply {
-                text = "COPY"
+                text = tr(R.string.skills_copy)
                 textSize = 11f
                 setTextColor(Color.parseColor("#0A0A0A"))
                 typeface = Typeface.MONOSPACE

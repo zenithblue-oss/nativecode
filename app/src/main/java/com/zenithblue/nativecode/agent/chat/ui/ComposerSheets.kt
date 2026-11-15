@@ -49,6 +49,8 @@ import com.zenithblue.nativecode.skills.SkillsCatalog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Composer bottom sheets (t3code mobile composer pickers). */
 internal enum class ComposerSheet { MODEL, PLUS, SKILLS, FILES }
@@ -83,15 +85,15 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
     Column(Modifier.width(300.dp).padding(horizontal = S.m, vertical = S.xs), verticalArrangement = Arrangement.spacedBy(S.xs)) {
         Overline("Model · ${t.tool}", color = C.outline)
         if (models.isEmpty()) {
-            Text(current ?: "Default model", color = C.on, style = T.codeSm)
+            Text(current ?: tr(R.string.chat_default_model), color = C.on, style = T.codeSm)
             if (live?.alive == true) Text("Loading models…", color = C.outline, style = T.meta)
             else {
-                Text("Start the session to load the model list (uses an AI session slot).", color = C.outline, style = T.meta)
-                NcButton("Load models", icon = Ic.Retry) { v.bg { v.backend.resume(t.id) } }
+                Text(tr(R.string.chat_start_the_session_to_load), color = C.outline, style = T.meta)
+                NcButton(tr(R.string.chat_load_models), icon = Ic.Retry) { v.bg { v.backend.resume(t.id) } }
             }
             return@Column
         }
-        if (models.size > 8) SearchField(q, { q = it }, "Search ${models.size} models")
+        if (models.size > 8) SearchField(q, { q = it }, tr(R.string.chat_search_models, models.size))
         val hits = models.filter { q.isBlank() || it.name.contains(q, true) || it.id.contains(q, true) }
         hits.take(60).forEach { m ->
             val on = m.id == current
@@ -110,13 +112,13 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
             }
         }
         if (hits.size > 60) Text("${hits.size - 60} more · search to narrow", color = C.outline, style = T.meta)
-        if (hits.isEmpty()) Text("No model matches.", color = C.outline, style = T.bodySm)
+        if (hits.isEmpty()) Text(tr(R.string.chat_no_model_matches), color = C.outline, style = T.bodySm)
     }
 }
 
 @Composable
 internal fun FreeBadge() = Box(Modifier.background(C.primary.copy(alpha = 0.14f)).padding(horizontal = S.s, vertical = S.xs)) {
-    Label("FREE", color = C.primary, size = 10, bold = true)
+    Label(tr(R.string.chat_free), color = C.primary, size = 10, bold = true)
 }
 
 /** "+": labeled actions; rows the CLI cannot use are hidden. */
@@ -126,16 +128,16 @@ private fun PlusSheet(v: AgentChatView, t: ChatThread, s: ComposerState, onSlash
     val caps = v.live.value?.caps
     val cm = remember { ctx.getSystemService(ClipboardManager::class.java) }
     val clipImage = remember { runCatching { cm?.primaryClipDescription?.hasMimeType("image/*") == true }.getOrDefault(false) }
-    Text("Add to message", color = C.on, style = T.title)
+    Text(tr(R.string.chat_add_to_message), color = C.on, style = T.title)
     if (caps?.images != false) SheetRow(Ic.Image, "Photo", "Attach an image from the gallery") { s.sheet = null; v.host.pickImage { s.add(v, t, it, true) } }
     if (clipImage && caps?.images != false) SheetRow(Ic.ClipboardList, "Clipboard image", "Attach the image you copied") {
         s.sheet = null
         runCatching { cm?.primaryClip?.getItemAt(0)?.uri }.getOrNull()?.let { s.add(v, t, it, true) }
     }
-    SheetRow(Ic.FileText, "File or document", "Copy a file into the project and attach it") { s.sheet = null; v.host.pickFile { s.add(v, t, it, false) } }
-    SheetRow(Ic.AtSign, "Mention project file", "Search the workspace, insert @path") { s.sheet = ComposerSheet.FILES }
-    SheetRow(Ic.SquareSlash, "Slash command", "Browse ${t.tool} commands") { s.sheet = null; onSlash() }
-    SheetRow(Ic.BookOpen, "NativeCode skills", "Attach a skill guide to this message") { s.sheet = ComposerSheet.SKILLS }
+    SheetRow(Ic.FileText, tr(R.string.chat_file_or_document), tr(R.string.chat_copy_a_file_into_the)) { s.sheet = null; v.host.pickFile { s.add(v, t, it, false) } }
+    SheetRow(Ic.AtSign, tr(R.string.chat_mention_project_file), tr(R.string.chat_search_the_workspace_insert_path)) { s.sheet = ComposerSheet.FILES }
+    SheetRow(Ic.SquareSlash, tr(R.string.chat_slash_command), "Browse ${t.tool} commands") { s.sheet = null; onSlash() }
+    SheetRow(Ic.BookOpen, tr(R.string.chat_nativecode_skills), tr(R.string.chat_attach_a_skill_guide_to)) { s.sheet = ComposerSheet.SKILLS }
 }
 
 @Composable
@@ -143,16 +145,16 @@ private fun SkillSheet(s: ComposerState, close: () -> Unit) {
     val byCat = remember { SkillCategory.entries.associateWith { SkillsCatalog.skills(it) } }
     var cat by remember { mutableStateOf<SkillCategory?>(null) }
     var q by remember { mutableStateOf("") }
-    Text("NativeCode skills", color = C.on, style = T.title)
-    SearchField(q, { q = it }, "Search skills")
+    Text(tr(R.string.chat_nativecode_skills), color = C.on, style = T.title)
+    SearchField(q, { q = it }, tr(R.string.chat_search_skills))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.s)) {
-        Chip("All", on = cat == null) { cat = null }
+        Chip(tr(R.string.chat_all), on = cat == null) { cat = null }
         SkillCategory.entries.forEach { c -> Chip(c.title, on = cat == c, icon = skillIcon(c)) { cat = c } }
     }
     val pool = cat?.let { byCat.getValue(it).map { sk -> it to sk } } ?: byCat.flatMap { (c, l) -> l.map { c to it } }
     val hits = SkillsCatalog.matching(q, pool.map { it.second }).toSet()
     val shown = pool.filter { it.second in hits }
-    if (shown.isEmpty()) Text("No skill matches.", color = C.outline, style = T.bodySm)
+    if (shown.isEmpty()) Text(tr(R.string.chat_no_skill_matches), color = C.outline, style = T.bodySm)
     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp)) {
         items(shown, key = { it.second.id }) { (c, sk) ->
             val ctx = LocalContext.current
@@ -184,13 +186,13 @@ private fun FileSheet(v: AgentChatView, t: ChatThread, s: ComposerState, close: 
     val root = remember(t.cwd) { File(v.host.guestHome().path.removeSuffix(AgentChatView.HOME) + t.cwd) }
     val files by produceState<List<String>?>(null, root) { value = withContext(Dispatchers.IO) { workspaceFiles(root) } }
     var q by remember { mutableStateOf("") }
-    Text("Mention project file", color = C.on, style = T.title)
+    Text(tr(R.string.chat_mention_project_file), color = C.on, style = T.title)
     SearchField(q, { q = it }, "Search files in ${ChatLogic.baseName(t.cwd).ifEmpty { "~" }}")
     val all = files
     if (all == null) { Spinner(18.dp); return }
     val hits = all.filter { q.isBlank() || it.contains(q.trim(), true) }
         .sortedWith(compareBy({ !it.substringAfterLast('/').startsWith(q.trim(), true) }, { it.length })).take(100)
-    if (hits.isEmpty()) Text(if (all.isEmpty()) "No files in this folder." else "No file matches.", color = C.outline, style = T.bodySm)
+    if (hits.isEmpty()) Text(if (all.isEmpty()) tr(R.string.chat_no_files_in_this_folder) else tr(R.string.chat_no_file_matches), color = C.outline, style = T.bodySm)
     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp)) {
         items(hits, key = { it }) { p ->
             SheetRow(Ic.FileText, p.substringAfterLast('/'), p.substringBeforeLast('/', "./")) {
@@ -216,7 +218,7 @@ private fun SheetRow(icon: ImageVector, title: String, subtitle: String, on: Boo
             Text(title, color = C.on, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (on) NcIcon(Ic.Check, "Added", tint = C.primary, size = 16.dp)
+        if (on) NcIcon(Ic.Check, tr(R.string.chat_added), tint = C.primary, size = 16.dp)
     }
 }
 
@@ -227,7 +229,7 @@ private fun SearchField(q: String, onQ: (String) -> Unit, hint: String) {
         BasicTextField(q, onQ, Modifier.weight(1f).padding(start = S.s), singleLine = true, textStyle = T.body.copy(color = C.on),
             cursorBrush = SolidColor(C.primary),
             decorationBox = { inner -> Box { if (q.isEmpty()) Text(hint, color = C.outline, style = T.body); inner() } })
-        if (q.isNotEmpty()) IconBtn(Ic.Close, "Clear search", tint = C.onVar, size = 14.dp, box = 36.dp) { onQ("") }
+        if (q.isNotEmpty()) IconBtn(Ic.Close, tr(R.string.chat_clear_search), tint = C.onVar, size = 14.dp, box = 36.dp) { onQ("") }
     }
 }
 
@@ -240,18 +242,18 @@ internal fun modeIcon(m: RuntimeMode): ImageVector = when (m) {
 }
 
 internal fun modeHint(m: RuntimeMode) = when (m) {
-    RuntimeMode.APPROVAL_REQUIRED -> "Asks before edits and commands"
-    RuntimeMode.AUTO_ACCEPT_EDITS -> "Edits freely, asks before commands"
-    RuntimeMode.AUTO -> "Asks only for risky actions"
-    RuntimeMode.FULL_ACCESS -> "Never asks: runs every command and edit"
+    RuntimeMode.APPROVAL_REQUIRED -> tr(R.string.chat_asks_before_edits_and_commands)
+    RuntimeMode.AUTO_ACCEPT_EDITS -> tr(R.string.chat_edits_freely_asks_before_commands)
+    RuntimeMode.AUTO -> tr(R.string.chat_asks_only_for_risky_actions)
+    RuntimeMode.FULL_ACCESS -> tr(R.string.chat_never_asks_runs_every_command)
 }
 
 @Composable
 internal fun FullAccessDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) = AlertDialog(
     onDismissRequest = onDismiss, containerColor = C.low, shape = Square,
     icon = { NcIcon(Ic.ShieldAlert, null, tint = C.tertiary, size = 24.dp) },
-    title = { Text("Full access?", style = T.title, color = C.on) },
-    text = { Text("The agent runs every command and edit without asking. Use only in a project you can restore.", style = T.bodySm, color = C.onVar) },
-    confirmButton = { NcButton("Allow full access", danger = true) { onConfirm(); onDismiss() } },
-    dismissButton = { NcButton("Cancel", onClick = onDismiss) },
+    title = { Text(tr(R.string.chat_full_access), style = T.title, color = C.on) },
+    text = { Text(tr(R.string.chat_the_agent_runs_every_command), style = T.bodySm, color = C.onVar) },
+    confirmButton = { NcButton(tr(R.string.chat_allow_full_access), danger = true) { onConfirm(); onDismiss() } },
+    dismissButton = { NcButton(tr(R.string.git_cancel), onClick = onDismiss) },
 )

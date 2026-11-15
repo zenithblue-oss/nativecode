@@ -17,6 +17,8 @@ import android.widget.Toast
 import com.termux.terminal.TerminalSession
 import com.zenithblue.nativecode.NC
 import com.zenithblue.nativecode.onboarding.OnboardingUiKit
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * Decoupled helper providing a dedicated native Android ScrollView & transcript viewer
@@ -41,12 +43,12 @@ object TerminalScrollViewHelper {
     fun copyTranscript(context: Context, session: TerminalSession?, label: String = "Terminal Transcript"): Boolean {
         val text = transcriptOf(session)
         if (text.isEmpty()) {
-            Toast.makeText(context, "Nothing to copy yet", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, tr(R.string.term_nothing_to_copy_yet), Toast.LENGTH_SHORT).show()
             return false
         }
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-        Toast.makeText(context, "Copied transcript (${text.length} chars)", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, tr(R.string.term_copied_transcript_chars, text.length), Toast.LENGTH_SHORT).show()
         return true
     }
 
@@ -58,7 +60,7 @@ object TerminalScrollViewHelper {
         context: Context,
         session: TerminalSession?,
         customTypeface: Typeface? = null,
-        title: String = "Transcript (read-only)"
+        title: String = tr(R.string.term_transcript_read_only)
     ) {
         val transcript = transcriptOf(session)
         val density = context.resources.displayMetrics.density
@@ -91,7 +93,7 @@ object TerminalScrollViewHelper {
         }
 
         val copyBtn = TextView(context).apply {
-            text = "COPY ALL"
+            text = tr(R.string.term_copy_all)
             setTextColor(Color.BLACK)
             textSize = 12f
             paint.isFakeBoldText = true
@@ -110,7 +112,7 @@ object TerminalScrollViewHelper {
         }
 
         val closeBtn = TextView(context).apply {
-            text = "CLOSE"
+            text = tr(R.string.term_close)
             setTextColor(NC.ON_SURF_VAR)
             textSize = 12f
             paint.isFakeBoldText = true

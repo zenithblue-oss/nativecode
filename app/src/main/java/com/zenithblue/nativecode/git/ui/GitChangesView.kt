@@ -29,6 +29,8 @@ import com.zenithblue.nativecode.git.GitRepoService
 import com.zenithblue.nativecode.git.RepoStatus
 import com.zenithblue.nativecode.git.RepoStatusResult
 import java.util.concurrent.Executor
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * CHANGES tab of the project Git page, VS Code Source Control style: branch / upstream /
@@ -66,13 +68,13 @@ internal class GitChangesView(
     private val lastTv = label(11f, NC.ON_SURFACE).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
     private val fetchBtn = chip("FETCH")
     private val pullBtn = chip("PULL")
-    private val pushBtn = chip("PUSH")
-    private val stashBtn = chip("STASH 0")
-    private val refreshBtn = chip("REFRESH")
+    private val pushBtn = chip(tr(R.string.git_push))
+    private val stashBtn = chip(tr(R.string.git_stash_0))
+    private val refreshBtn = chip(tr(R.string.git_refresh))
 
     // commit box
     private val msg = EditText(context).apply {
-        hint = "Message (commits staged changes)"
+        hint = tr(R.string.git_message_commits_staged_changes)
         textSize = 13f; typeface = Typeface.MONOSPACE
         setTextColor(NC.ON_SURFACE); setHintTextColor(NC.OUTLINE)
         inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
@@ -82,12 +84,12 @@ internal class GitChangesView(
     }
     private val countTv = label(10f, NC.ON_SURF_VAR)
     private val amend = CheckBox(context).apply {
-        text = "AMEND"; textSize = 11f; typeface = Typeface.MONOSPACE; setTextColor(NC.ON_SURF_VAR)
+        text = tr(R.string.git_amend); textSize = 11f; typeface = Typeface.MONOSPACE; setTextColor(NC.ON_SURF_VAR)
         buttonTintList = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
         minHeight = dp(44)
     }
     private val commitBtn = TextView(context).apply {
-        text = "COMMIT"; textSize = 12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NC.ON_PRIMARY)
+        text = tr(R.string.git_commit); textSize = 12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NC.ON_PRIMARY)
         gravity = Gravity.CENTER; setPadding(dp(18), 0, dp(18), 0); minHeight = dp(44)
         setBackgroundColor(NC.PRIMARY); isClickable = true; isFocusable = true
     }
@@ -134,7 +136,7 @@ internal class GitChangesView(
         pullBtn.setOnClickListener { network("PULL", "pull --ff-only") }
         pushBtn.setOnClickListener {
             val s = status ?: return@setOnClickListener
-            confirm("Push", "Push ${s.branch ?: "HEAD"} to ${s.upstream ?: "its upstream"}?", "PUSH") { network("PUSH", "push") }
+            confirm(tr(R.string.git_push_2), "Push ${s.branch ?: "HEAD"} to ${s.upstream ?: "its upstream"}?", tr(R.string.git_push)) { network(tr(R.string.git_push), "push") }
         }
         refreshBtn.setOnClickListener { refresh() }
         stashBtn.setOnClickListener { showStashes() }
@@ -206,7 +208,7 @@ internal class GitChangesView(
             }
             post {
                 if (g != gen) return@post
-                refreshBtn.text = "REFRESH"
+                refreshBtn.text = tr(R.string.git_refresh)
                 if (res is RepoStatusResult.Ok && res.status.oid != knownOid) { lastOid = res.status.oid; lastCommit = last }
                 render(res)
             }
@@ -269,10 +271,10 @@ internal class GitChangesView(
     }
 
     private fun title(g: ChangeGroup) = when (g) {
-        ChangeGroup.CONFLICT -> "MERGE CONFLICTS"
-        ChangeGroup.STAGED -> "STAGED CHANGES"
-        ChangeGroup.UNSTAGED -> "CHANGES"
-        ChangeGroup.UNTRACKED -> "UNTRACKED"
+        ChangeGroup.CONFLICT -> tr(R.string.git_merge_conflicts)
+        ChangeGroup.STAGED -> tr(R.string.git_staged_changes)
+        ChangeGroup.UNSTAGED -> tr(R.string.git_changes)
+        ChangeGroup.UNTRACKED -> tr(R.string.git_untracked)
     }
 
     private fun addSection(g: ChangeGroup, files: List<ChangeFile>) {
@@ -292,9 +294,9 @@ internal class GitChangesView(
         }, LayoutParams(-2, -2).apply { leftMargin = dp(8) })
         header.addView(View(context), LayoutParams(0, 1, 1f))
         when (g) {
-            ChangeGroup.STAGED -> header.addView(chip("UNSTAGE ALL").apply { setOnClickListener { git("reset -q") } })
-            ChangeGroup.UNSTAGED -> header.addView(chip("STAGE ALL").apply { setOnClickListener { git("add -u") } })
-            ChangeGroup.UNTRACKED -> header.addView(chip("STAGE ALL").apply {
+            ChangeGroup.STAGED -> header.addView(chip(tr(R.string.git_unstage_all)).apply { setOnClickListener { git("reset -q") } })
+            ChangeGroup.UNSTAGED -> header.addView(chip(tr(R.string.git_stage_all)).apply { setOnClickListener { git("add -u") } })
+            ChangeGroup.UNTRACKED -> header.addView(chip(tr(R.string.git_stage_all)).apply {
                 setOnClickListener { gitScript(GitGuestCommands.inProject(project, "ls-files -z -o --exclude-standard :/") +
                     " | xargs -0 -r " + GitGuestCommands.gitCommand(project, "--literal-pathspecs add --")) }
             })
@@ -364,7 +366,7 @@ internal class GitChangesView(
             }
             ChangeGroup.UNSTAGED -> {
                 r.addView(iconBtn("↶", "Discard changes in ${f.path}", NC.ERROR) {
-                    confirm("Discard changes", "Discard changes in ${f.path}? This cannot be undone.", "DISCARD") {
+                    confirm(tr(R.string.git_discard_changes), tr(R.string.git_discard_changes_in_this_cannot, f.path), tr(R.string.git_discard)) {
                         git("checkout -q -- $spec")
                     }
                 })
@@ -372,13 +374,13 @@ internal class GitChangesView(
             }
             ChangeGroup.UNTRACKED -> {
                 r.addView(iconBtn("↶", "Delete untracked ${f.path}", NC.ERROR) {
-                    confirm("Delete file", "Delete untracked ${f.path}? This cannot be undone.", "DELETE") {
+                    confirm(tr(R.string.git_delete_file), tr(R.string.git_delete_untracked_this_cannot_be, f.path), tr(R.string.git_delete)) {
                         git("clean -f -q -- $spec")
                     }
                 })
                 r.addView(iconBtn("+", "Stage ${f.path}", NC.PRIMARY) { git("add -- $spec") })
             }
-            ChangeGroup.CONFLICT -> r.addView(iconBtn("+", "Mark ${f.path} resolved", NC.PRIMARY) { git("add -- $spec") })
+            ChangeGroup.CONFLICT -> r.addView(iconBtn("+", tr(R.string.git_mark_resolved, f.path), NC.PRIMARY) { git("add -- $spec") })
         }
         r.contentDescription = "${title(f.group)}: ${f.path}, status ${f.status}" +
             (if (f.added >= 0) ", ${f.added} added, ${f.deleted} removed" else "")
@@ -390,7 +392,7 @@ internal class GitChangesView(
     private fun confirm(title: String, message: String, ok: String, onOk: () -> Unit) {
         AlertDialog.Builder(context).setTitle(title).setMessage(message)
             .setPositiveButton(ok) { _, _ -> onOk() }
-            .setNegativeButton("Cancel", null).show()
+            .setNegativeButton(tr(R.string.git_cancel), null).show()
     }
 
     private fun git(args: String, done: ((Boolean) -> Unit)? = null) =
@@ -431,7 +433,7 @@ internal class GitChangesView(
         val s = status ?: return
         val text = msg.text.toString().trim()
         val isAmend = amend.isChecked
-        if (text.isEmpty() && !isAmend) { Toast.makeText(context, "Commit message is empty", Toast.LENGTH_SHORT).show(); return }
+        if (text.isEmpty() && !isAmend) { Toast.makeText(context, tr(R.string.git_commit_message_is_empty), Toast.LENGTH_SHORT).show(); return }
         // Message via stdin (one printf arg per line): the one-line guest script must not carry raw newlines.
         val body = if (text.isEmpty()) "--no-edit" else "-F -"
         val pipe = if (text.isEmpty()) "" else "printf '%s\\n' " + text.lines().joinToString(" ") { GitGuestCommands.shellQuote(it) } + " | "
@@ -440,14 +442,14 @@ internal class GitChangesView(
             val args = "commit " + (if (isAmend) "--amend " else "") + (if (all) "-a " else "") + body
             val script = "cd ${GitGuestCommands.shellQuote(project)} && $pipe${GitGuestCommands.gitCommand(project, args)}"
             gitScript(script) { ok ->
-                if (ok) { msg.setText(""); amend.isChecked = false; Toast.makeText(context, if (isAmend) "Amended" else "Committed", Toast.LENGTH_SHORT).show() }
+                if (ok) { msg.setText(""); amend.isChecked = false; Toast.makeText(context, if (isAmend) tr(R.string.git_amended) else tr(R.string.git_committed), Toast.LENGTH_SHORT).show() }
             }
         }
         val tracked = s.files.any { it.group == ChangeGroup.UNSTAGED }
         when {
             staged || isAmend -> run(false)
-            tracked -> confirm("Nothing staged", "Stage all tracked changes and commit?", "COMMIT ALL") { run(true) }
-            else -> Toast.makeText(context, "Nothing to commit", Toast.LENGTH_SHORT).show()
+            tracked -> confirm(tr(R.string.git_nothing_staged), tr(R.string.git_stage_all_tracked_changes_and), tr(R.string.git_commit_all)) { run(true) }
+            else -> Toast.makeText(context, tr(R.string.git_nothing_to_commit), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -460,7 +462,7 @@ internal class GitChangesView(
                 val col = LinearLayout(context).apply {
                     orientation = VERTICAL; setBackgroundColor(NC.BG); setPadding(dp(20), dp(20), dp(20), dp(24))
                 }
-                col.addView(label(16f, NC.PRIMARY, bold = true).apply { text = "STASHES"; setPadding(0, 0, 0, dp(8)) })
+                col.addView(label(16f, NC.PRIMARY, bold = true).apply { text = tr(R.string.git_stashes); setPadding(0, 0, 0, dp(8)) })
                 for (l in out.lines().filter { it.isNotBlank() }) col.addView(label(12f, NC.ON_SURFACE).apply {
                     text = l; setPadding(0, dp(8), 0, dp(8)); setTextIsSelectable(true)
                 })

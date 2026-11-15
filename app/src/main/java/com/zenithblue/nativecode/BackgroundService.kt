@@ -92,8 +92,8 @@ class BackgroundService : Service() {
                 val stop = Intent(this@BackgroundService, MainActivity::class.java)
                     .setAction(ACTION_DESKTOP_STOP)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                addAction(0, "Open", PendingIntent.getActivity(this@BackgroundService, 2, open, immutable))
-                addAction(0, "Stop", PendingIntent.getActivity(this@BackgroundService, 3, stop, immutable))
+                addAction(0, tr(R.string.chat_open), PendingIntent.getActivity(this@BackgroundService, 2, open, immutable))
+                addAction(0, tr(R.string.quick_stop), PendingIntent.getActivity(this@BackgroundService, 3, stop, immutable))
             }
             .setContentTitle(lastTitle)
             .setContentText(lastText)
@@ -114,7 +114,7 @@ class BackgroundService : Service() {
         mgr.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "NativeCode Desktop Session",
+                tr(R.string.app_nativecode_desktop_session),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Shows while Phosh / graphical desktop is running"
@@ -124,7 +124,7 @@ class BackgroundService : Service() {
         mgr.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID_SETUP,
-                "NativeCode Environment Setup",
+                tr(R.string.app_nativecode_environment_setup),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Shows while Alpaquita Linux installation and setup run"

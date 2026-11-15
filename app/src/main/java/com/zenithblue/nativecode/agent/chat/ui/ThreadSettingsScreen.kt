@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import com.zenithblue.nativecode.agent.chat.core.ConfigChange
 import com.zenithblue.nativecode.agent.chat.core.InteractionMode
 import com.zenithblue.nativecode.agent.chat.core.RuntimeMode
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Screen H: full page (has a search field). */
 @Composable
@@ -50,26 +52,26 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
     fun cfg(c: ConfigChange) = v.bg { v.backend.configure(threadId, c) }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().background(C.lowest).heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBtn(Ic.Back, "Back") { v.pop() }
-            Text("Thread settings", Modifier.weight(1f), color = C.on, style = T.title)
+            IconBtn(Ic.Back, tr(R.string.onb_back)) { v.pop() }
+            Text(tr(R.string.chat_thread_settings), Modifier.weight(1f), color = C.on, style = T.title)
             t?.let { ProviderLogo(it.tool, Modifier.padding(end = S.l), size = 28.dp) }
         }
         Hairline()
         if (t == null) { LoadingRows(); return@Column }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(S.l), verticalArrangement = Arrangement.spacedBy(S.l)) {
-            Section("Agent", Ic.Bot) {
+            Section(tr(R.string.quick_widget_agent), Ic.Bot) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(t.tool, Modifier.weight(1f), color = C.on, style = T.heading)
                     if (d.runs.isNotEmpty()) {
                         NcIcon(Ic.Lock, null, tint = C.outline, size = 12.dp)
-                        Text("locked after the first message", Modifier.padding(start = S.xs), color = C.outline, style = T.meta)
+                        Text(tr(R.string.chat_locked_after_the_first_message), Modifier.padding(start = S.xs), color = C.outline, style = T.meta)
                     }
                 }
                 live?.account?.let { Text(it, color = C.onVar, style = T.meta) }
             }
 
             val current = t.model ?: live?.defaultModel
-            Section("Model", Ic.Sparkles) {
+            Section(tr(R.string.chat_model), Ic.Sparkles) {
                 val models = live?.models.orEmpty()
                 // No cached list (first use of this tool): warm the session up once, through the gate (Pro, session cap).
                 var warmed by remember { mutableStateOf(false) }
@@ -77,21 +79,21 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
                     if (live != null && live.models.isEmpty() && !live.alive && !warmed) { warmed = true; v.bg { v.backend.resume(threadId) } }
                 }
                 if (models.isEmpty()) {
-                    Text(current ?: "Default", color = C.on, style = T.codeSm)
+                    Text(current ?: tr(R.string.chat_default), color = C.on, style = T.codeSm)
                     if (live?.alive == true) {
-                        Text("Loading models…", color = C.outline, style = T.meta)
+                        Text(tr(R.string.chat_loading_models), color = C.outline, style = T.meta)
                         LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = C.primary, trackColor = C.border)
                     } else {
-                        Text("Start the session to load the model list (uses an AI session slot).", color = C.outline, style = T.meta)
-                        NcButton("Load models", icon = Ic.Retry) { v.bg { v.backend.resume(threadId) } }
+                        Text(tr(R.string.chat_start_the_session_to_load), color = C.outline, style = T.meta)
+                        NcButton(tr(R.string.chat_load_models), icon = Ic.Retry) { v.bg { v.backend.resume(threadId) } }
                     }
                 } else {
                     Row(Modifier.fillMaxWidth().card(C.lowest).heightIn(min = 44.dp).padding(horizontal = S.m), verticalAlignment = Alignment.CenterVertically) {
                         NcIcon(Ic.Search, null, tint = C.outline, size = 16.dp)
                         BasicTextField(q, { q = it }, Modifier.weight(1f).padding(start = S.s), singleLine = true, textStyle = T.body.copy(color = C.on),
                             cursorBrush = SolidColor(C.primary),
-                            decorationBox = { inner -> Box { if (q.isEmpty()) Text("Search ${models.size} models", color = C.outline, style = T.body); inner() } })
-                        if (q.isNotEmpty()) IconBtn(Ic.Close, "Clear search", tint = C.onVar, size = 14.dp, box = 36.dp) { q = "" }
+                            decorationBox = { inner -> Box { if (q.isEmpty()) Text(tr(R.string.chat_search_models, models.size), color = C.outline, style = T.body); inner() } })
+                        if (q.isNotEmpty()) IconBtn(Ic.Close, tr(R.string.chat_clear_search), tint = C.onVar, size = 14.dp, box = 36.dp) { q = "" }
                     }
                     Column {
                         models.filter { q.isBlank() || it.name.contains(q, true) || it.id.contains(q, true) }.take(200).forEach { m ->
@@ -108,7 +110,7 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
                                         color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                                 if (m.free) Box(Modifier.background(C.primary.copy(alpha = 0.14f)).padding(horizontal = S.s, vertical = S.xs)) {
-                                    Label("FREE", color = C.primary, size = 10, bold = true)
+                                    Label(tr(R.string.chat_free), color = C.primary, size = 10, bold = true)
                                 }
                             }
                         }
@@ -132,7 +134,7 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
                 }
             }
 
-            Section("Approval mode", Ic.ShieldCheck) {
+            Section(tr(R.string.chat_approval_mode), Ic.ShieldCheck) {
                 val modes = live?.caps?.modes ?: listOf(t.runtimeMode)
                 modes.forEach { m ->
                     val on = m == t.runtimeMode
@@ -161,15 +163,15 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (on) "On" else "Off", color = C.on, style = T.body)
-                        Text("The agent proposes a plan before it edits.", color = C.outline, style = T.meta)
+                        Text(if (on) "On" else tr(R.string.chat_off), color = C.on, style = T.body)
+                        Text(tr(R.string.chat_the_agent_proposes_a_plan), color = C.outline, style = T.meta)
                     }
                     Switch(on)
                 }
             }
 
-            Section("Workspace", Ic.Folder) {
-                Text(t.projectPath?.let { ChatLogic.baseName(it) } ?: "No project", color = C.on, style = T.heading)
+            Section(tr(R.string.chat_workspace), Ic.Folder) {
+                Text(t.projectPath?.let { ChatLogic.baseName(it) } ?: tr(R.string.chat_no_project), color = C.on, style = T.heading)
                 Text(t.cwd, color = C.outline, style = T.meta)
             }
 
@@ -181,7 +183,7 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
             if (frac != null || runs.isNotEmpty()) Section("Usage", Ic.Gauge) {
                 if (frac != null && used != null && size != null) {
                     Row {
-                        Text("Context", Modifier.weight(1f), color = C.onVar, style = T.label)
+                        Text(tr(R.string.chat_context), Modifier.weight(1f), color = C.onVar, style = T.label)
                         Text("${ChatLogic.tokens(used)} / ${ChatLogic.tokens(size)} · ${(frac * 100).toInt()}%", color = C.on, style = T.codeSm)
                     }
                     LinearProgressIndicator(
@@ -202,15 +204,15 @@ internal fun ThreadSettingsScreen(v: AgentChatView, threadId: String) {
                 }
             }
 
-            Section("Session", Ic.Terminal) {
+            Section(tr(R.string.chat_session), Ic.Terminal) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (live?.alive == true) {
                         StatusDot(C.primary, size = 8.dp, pulse = live.runStartedAt != null)
                         Text("Live" + (live.runStartedAt?.let { " · working" } ?: ""), Modifier.weight(1f).padding(start = S.s), color = C.primary, style = T.label)
-                        NcButton("Stop", danger = true, icon = Ic.Stop) { v.bg { v.backend.stop(threadId) } }
+                        NcButton(tr(R.string.quick_stop), danger = true, icon = Ic.Stop) { v.bg { v.backend.stop(threadId) } }
                     } else {
                         Ring(C.outline, size = 10.dp)
-                        Text("Idle: no process. The next message starts it.", Modifier.padding(start = S.s), color = C.onVar, style = T.label)
+                        Text(tr(R.string.chat_idle_no_process_the_next), Modifier.padding(start = S.s), color = C.onVar, style = T.label)
                     }
                 }
                 if (!v.host.isPro()) {

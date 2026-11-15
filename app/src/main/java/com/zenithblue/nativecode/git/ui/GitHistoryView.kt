@@ -45,6 +45,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executor
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * HISTORY tab of the project Git page: commit graph over all branches/tags/remotes.
@@ -74,13 +76,13 @@ internal class GitHistoryView(
     private var tFull = 0L
     private var startedSkip = 0
 
-    private val filterBtn = chip("ALL REFS  v")
+    private val filterBtn = chip(tr(R.string.git_all_refs_v))
     private val statusTv = TextView(context).apply {
         textSize = 10f; typeface = Typeface.MONOSPACE; setTextColor(NC.ON_SURF_VAR)
         gravity = Gravity.END or Gravity.CENTER_VERTICAL
         maxLines = 1; ellipsize = TextUtils.TruncateAt.START
     }
-    private val moreBtn = chip("LOAD MORE").apply { visibility = View.GONE }
+    private val moreBtn = chip(tr(R.string.git_load_more)).apply { visibility = View.GONE }
     private val msgTv = TextView(context).apply {
         textSize = 13f; setTextColor(NC.ON_SURF_VAR); gravity = Gravity.CENTER
         typeface = Typeface.MONOSPACE; setPadding(dp(24), dp(24), dp(24), dp(24))
@@ -131,14 +133,14 @@ internal class GitHistoryView(
             setPadding(dp(12), dp(6), dp(12), dp(6))
         }
         bar.addView(filterBtn)
-        val search = chip("SEARCH").apply {
+        val search = chip(tr(R.string.git_search)).apply {
             contentDescription = "Search branches, tags and commits"
             setOnClickListener { openSearch() }
         }
         bar.addView(search, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
         bar.addView(statusTv, LinearLayout.LayoutParams(0, dp(30), 1f).apply { leftMargin = dp(10); rightMargin = dp(8) })
         bar.addView(moreBtn)
-        val reload = chip("RELOAD")
+        val reload = chip(tr(R.string.git_reload))
         bar.addView(reload)
         col.addView(bar)
         col.addView(View(context).apply { setBackgroundColor(NC.OUTLINE_VAR) }, LinearLayout.LayoutParams(-1, dp(1)))
@@ -167,7 +169,7 @@ internal class GitHistoryView(
             return
         }
         project = projectPath; method = projectMethod; ref = null
-        filterBtn.text = "ALL REFS  v"
+        filterBtn.text = tr(R.string.git_all_refs_v)
         restart()
     }
 
@@ -178,13 +180,13 @@ internal class GitHistoryView(
         topFab.visibility = View.GONE
         adapter.notifyDataSetChanged()
         moreBtn.visibility = View.GONE
-        showMsg("LOADING HISTORY...")
+        showMsg(tr(R.string.git_loading_history))
         updateStatus()
         begin(0)
     }
 
     private fun begin(skip: Int) {
-        if (project.isBlank()) { showMsg("NO ACTIVE PROJECT"); return }
+        if (project.isBlank()) { showMsg(tr(R.string.git_no_active_project)); return }
         startedSkip = skip
         t0 = System.nanoTime()
         // Resume overlaps one row: git must return the last shown commit first, else history moved.
@@ -304,7 +306,7 @@ internal class GitHistoryView(
             post {
                 val sheet = BottomSheetDialog(context)
                 val col = sheetColumn()
-                col.addView(sheetTitle("FILTER BY BRANCH"))
+                col.addView(sheetTitle(tr(R.string.git_filter_by_branch)))
                 fun item(label: String, value: String?) {
                     col.addView(TextView(context).apply {
                         text = label; textSize = 13f; typeface = Typeface.MONOSPACE
@@ -313,7 +315,7 @@ internal class GitHistoryView(
                         setOnClickListener { sheet.dismiss(); applyFilter(value) }
                     })
                 }
-                item("ALL REFS", null)
+                item(tr(R.string.git_all_refs), null)
                 info.localBranches.forEach { item(it, it) }
                 // short name of refs/remotes/<remote>/HEAD is the bare remote name ("origin"): skip it
                 info.remoteBranches.filter { it.contains('/') && !it.endsWith("/HEAD") }.forEach { item(it, it) }
@@ -325,7 +327,7 @@ internal class GitHistoryView(
 
     private fun applyFilter(value: String?) {
         ref = value
-        filterBtn.text = (value ?: "ALL REFS").take(24) + "  v"
+        filterBtn.text = (value ?: tr(R.string.git_all_refs)).take(24) + "  v"
         restart()
     }
 
@@ -339,9 +341,9 @@ internal class GitHistoryView(
     private fun openSearch() {
         val sheet = BottomSheetDialog(context)
         val col = sheetColumn()
-        col.addView(sheetTitle("SEARCH REFS + COMMITS"))
+        col.addView(sheetTitle(tr(R.string.git_search_refs_commits)))
         val input = EditText(context).apply {
-            hint = "branch, tag, subject, author or hash"
+            hint = tr(R.string.git_branch_tag_subject_author_or)
             textSize = 14f; typeface = Typeface.MONOSPACE
             setTextColor(NC.ON_SURFACE); setHintTextColor(NC.OUTLINE)
             isSingleLine = true
@@ -439,7 +441,7 @@ internal class GitHistoryView(
             maxLines = 1; ellipsize = TextUtils.TruncateAt.MIDDLE
             setPadding(dp(10), dp(10), dp(8), dp(10))
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        addView(chip("FILTER").apply {
+        addView(chip(tr(R.string.git_filter)).apply {
             contentDescription = "Filter history by ${r.name}"
             setOnClickListener { onFilter() }
         })
@@ -487,11 +489,11 @@ internal class GitHistoryView(
         col.addView(body)
         val files = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         col.addView(files)
-        col.addView(chip("COPY HASH").apply {
+        col.addView(chip(tr(R.string.git_copy_hash)).apply {
             setOnClickListener {
                 (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
                     .setPrimaryClip(ClipData.newPlainText("commit", c.hash))
-                Toast.makeText(context, "Hash copied", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, tr(R.string.git_hash_copied), Toast.LENGTH_SHORT).show()
             }
         }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(12) })
         sheet.setContentView(ScrollView(context).apply { addView(col) })

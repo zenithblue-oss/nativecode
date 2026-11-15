@@ -34,6 +34,8 @@ import com.zenithblue.nativecode.agent.chat.tools.NcTasks
 import com.zenithblue.nativecode.agent.chat.tools.NcToolSpec
 import com.zenithblue.nativecode.agent.chat.tools.NcTools
 import kotlinx.coroutines.delay
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /*
  * Item 12 M7 UI (t3code V2LifecycleRow / SubagentNotificationLink / thread links): delegated tasks on the parent
@@ -61,7 +63,7 @@ private fun statusColor(s: String): Color = when (s) {
 }
 
 private fun statusLabel(t: NcTasks.Task): String = when {
-    t.gateDenied -> "Needs Pro"
+    t.gateDenied -> tr(R.string.chat_needs_pro)
     t.status == "waiting" -> "Needs you"
     else -> t.status.replaceFirstChar { it.uppercase() }
 }
@@ -99,7 +101,7 @@ private fun ChildBackLink(v: AgentChatView, t: NcTasks.Task, now: Long) {
     ) {
         NcIcon(Ic.Back, null, tint = C.primary, size = 14.dp)
         Column(Modifier.weight(1f).padding(start = S.s)) {
-            Overline("Delegated task", color = C.outline)
+            Overline(tr(R.string.chat_delegated_task), color = C.outline)
             Text(parent, color = C.on, style = T.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         StatusChip(statusLabel(t) + elapsed(t, now), statusColor(t.status), pulse = !t.terminal)
@@ -114,12 +116,12 @@ private fun TaskList(v: AgentChatView, tasks: List<NcTasks.Task>, now: Long) {
     var open by rememberSaveable(active > 0) { mutableStateOf(active > 0) }
     Column(Modifier.fillMaxWidth().background(C.lowest)) {
         Row(
-            Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "Collapse delegated tasks" else "Expand delegated tasks") { open = !open }
+            Modifier.fillMaxWidth().clickable(onClickLabel = if (open) tr(R.string.chat_collapse_delegated_tasks) else tr(R.string.chat_expand_delegated_tasks)) { open = !open }
                 .heightIn(min = 40.dp).padding(horizontal = S.edge),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NcIcon(Ic.Bot, null, tint = if (active > 0) C.primary else C.onVar, size = 14.dp)
-            Overline(if (active > 0) "Delegated · $active running" else "Delegated · ${tasks.size}", Modifier.weight(1f).padding(start = S.s),
+            Overline(if (active > 0) tr(R.string.chat_delegated_running, active) else "Delegated · ${tasks.size}", Modifier.weight(1f).padding(start = S.s),
                 color = if (active > 0) C.primary else C.onVar)
             NcIcon(if (open) Ic.ChevronDown else Ic.ChevronRight, null, tint = C.outline, size = 16.dp)
         }
@@ -136,7 +138,7 @@ private fun TaskCard(v: AgentChatView, t: NcTasks.Task, now: Long) {
     val color = statusColor(t.status)
     Row(
         Modifier.fillMaxWidth().card(C.low, if (t.terminal) C.border else color.copy(alpha = 0.6f))
-            .clickable(role = Role.Button, onClickLabel = "Open delegated thread") { v.goTo(t.childThreadId) }
+            .clickable(role = Role.Button, onClickLabel = tr(R.string.chat_open_delegated_thread)) { v.goTo(t.childThreadId) }
             .semantics(mergeDescendants = true) { contentDescription = "Delegated to ${t.tool}: ${t.title}, ${statusLabel(t)}" }
             .padding(S.inset),
         verticalAlignment = Alignment.Top,
@@ -151,11 +153,11 @@ private fun TaskCard(v: AgentChatView, t: NcTasks.Task, now: Long) {
             val result = (if (t.terminal) t.summary ?: t.failure else null)?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()
             if (result != null) Text(Md.inline(result.trimStart('#', '>', '-', '*', ' ').take(200)).text, Modifier.padding(top = S.xs),
                 color = if (t.status == "failed") C.error else C.onVar, style = T.bodySm, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (t.gateDenied) NcButton("Upgrade", Modifier.padding(top = S.s), primary = true, icon = Ic.Lock) {
-                v.host.showUpgradeSheet("Delegating to ${t.tool} needs NativeCode Pro")
+            if (t.gateDenied) NcButton(tr(R.string.quick_upgrade), Modifier.padding(top = S.s), primary = true, icon = Ic.Lock) {
+                v.host.showUpgradeSheet(tr(R.string.chat_delegating_to_needs_nativecode_pro, t.tool))
             }
         }
-        if (!t.terminal) IconBtn(Ic.Stop, "Stop delegated task", tint = C.error, size = 16.dp, box = 40.dp) { v.bg { NcTools.cancel(t.id) } }
+        if (!t.terminal) IconBtn(Ic.Stop, tr(R.string.chat_stop_delegated_task), tint = C.error, size = 16.dp, box = 40.dp) { v.bg { NcTools.cancel(t.id) } }
         else Box(Modifier.width(S.xs))
         NcIcon(Ic.ChevronRight, null, Modifier.align(Alignment.CenterVertically), tint = C.outline, size = 16.dp)
     }
@@ -196,7 +198,7 @@ internal fun CrossThreadCard(v: AgentChatView, inc: NcToolSpec.Incoming, modifie
             ) {
                 NcIcon(if (task) Ic.Bot else Ic.Message, null, tint = accent, size = 14.dp)
                 Column(Modifier.weight(1f).padding(start = S.s)) {
-                    Overline(if (task) "Task result · ${inc.label}" else "Message from thread", color = accent)
+                    Overline(if (task) "Task result · ${inc.label}" else tr(R.string.chat_message_from_thread), color = accent)
                     Text(from, color = C.onVar, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 inc.status?.let { StatusChip(it.replaceFirstChar { c -> c.uppercase() }, accent) }

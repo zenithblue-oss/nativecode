@@ -74,6 +74,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** Screen D. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -113,7 +115,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
         side = live?.caps?.fork == true,
         sideBlocked = when {
             t.nativeId == null -> "Side chats start after the first message."
-            running -> "Side chats start when the thread is idle."
+            running -> tr(R.string.chat_side_chats_start_when_the)
             else -> null
         },
         fresh = pending == null && !running && items.any { it.payload is ItemPayload.UserMessage },
@@ -213,10 +215,10 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
             if (items.isEmpty() && live?.phase != AgentEvent.Phase.STARTING) EmptyThread(t, Modifier.align(Alignment.Center))
             LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = androidx.compose.foundation.layout.PaddingValues(top = S.s)) {
                 if (d.hasMore) item("earlier") {
-                    Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Load earlier messages") { v.loadEarlier() }.heightIn(min = 44.dp),
+                    Row(Modifier.fillMaxWidth().clickable(onClickLabel = tr(R.string.chat_load_earlier_messages)) { v.loadEarlier() }.heightIn(min = 44.dp),
                         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                         NcIcon(Ic.ArrowUp, null, tint = C.primary, size = 14.dp)
-                        Text("Load earlier", Modifier.padding(start = S.s), color = C.primary, style = T.label)
+                        Text(tr(R.string.chat_load_earlier), Modifier.padding(start = S.s), color = C.primary, style = T.label)
                     }
                 }
                 items(rows, key = { it.key }, contentType = { it::class }) { r ->
@@ -255,10 +257,10 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
 
         // Banner slot (one): reconnecting > live banner > held queue > session ended.
         val alive = live?.alive == true
-        val banner = (if (freshArmed) Banner("fresh", "Fresh session armed · the next message starts a new session", "Cancel") else null)
+        val banner = (if (freshArmed) Banner("fresh", tr(R.string.chat_fresh_session_armed_the_next), tr(R.string.git_cancel)) else null)
             ?: (if (live?.reconnecting == true) Banner("reconnecting", "Reconnecting to ${t.tool}") else null)
             ?: live?.banner
-            ?: (if (queued.isNotEmpty() && !running && !alive) Banner("queue", "${queued.size} queued", "Resume queue") else null)
+            ?: (if (queued.isNotEmpty() && !running && !alive) Banner("queue", "${queued.size} queued", tr(R.string.chat_resume_queue)) else null)
             ?: (if (!alive && lastRun?.status == RunStatus.INTERRUPTED && live == null) Banner("ended", "Session ended", "Resume") else null)
         banner?.let { b ->
             BannerRow(b) {
@@ -273,12 +275,12 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
             }
         }
         if (queued.isNotEmpty()) Row(
-            Modifier.fillMaxWidth().background(C.low).clickable(onClickLabel = "Manage queued messages") { queueSheet = true }
+            Modifier.fillMaxWidth().background(C.low).clickable(onClickLabel = tr(R.string.chat_manage_queued_messages)) { queueSheet = true }
                 .heightIn(min = 40.dp).padding(horizontal = S.l),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NcIcon(Ic.Clock, null, tint = C.tertiary, size = 14.dp)
-            Text("Queued (${queued.size})", Modifier.weight(1f).padding(start = S.s), color = C.on, style = T.label)
+            Text(tr(R.string.chat_queued, queued.size), Modifier.weight(1f).padding(start = S.s), color = C.on, style = T.label)
             NcIcon(Ic.ChevronRight, null, tint = C.onVar, size = 16.dp)
         }
 
@@ -294,7 +296,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
             placeholder = when {
                 pending != null && inputDraft != null -> "Type a custom answer"
                 pending != null -> "Reply to deny with feedback"
-                else -> "Ask ${t.tool}  ·  / for commands"
+                else -> tr(R.string.chat_ask_for_commands, t.tool)
             },
             commands = live?.commands.orEmpty(),
             slashCtx = slashCtx,
@@ -326,16 +328,16 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
 
     if (queueSheet) ModalBottomSheet({ queueSheet = false }, containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
         Column(Modifier.fillMaxWidth().padding(horizontal = S.l).padding(bottom = S.l).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(S.m)) {
-            Text("Queued messages", color = C.on, style = T.title)
+            Text(tr(R.string.chat_queued_messages), color = C.on, style = T.title)
             queued.forEachIndexed { i, r ->
                 val msg = items.firstOrNull { it.runId == r.id && it.payload is ItemPayload.UserMessage }?.payload as? ItemPayload.UserMessage
                 Column(Modifier.fillMaxWidth().card(C.low).padding(S.m)) {
                     Overline("${i + 1} of ${queued.size}", color = C.outline)
                     Text(msg?.text ?: "", Modifier.padding(vertical = S.s), color = C.on, style = T.body, maxLines = 3, overflow = TextOverflow.Ellipsis)
                     Row(horizontalArrangement = Arrangement.spacedBy(S.s)) {
-                        NcButton("Send now", primary = true, icon = Ic.ArrowUp) { queueSheet = false; v.bg { v.backend.queueSendNow(threadId, r.id) } }
-                        NcButton("Edit", icon = Ic.Pencil) { queueSheet = false; composer.load(msg?.text.orEmpty()); v.bg { v.backend.queueRemove(threadId, r.id) } }
-                        NcButton("Remove", danger = true, icon = Ic.Trash) { v.bg { v.backend.queueRemove(threadId, r.id) } }
+                        NcButton(tr(R.string.chat_send_now), primary = true, icon = Ic.ArrowUp) { queueSheet = false; v.bg { v.backend.queueSendNow(threadId, r.id) } }
+                        NcButton(tr(R.string.chat_edit), icon = Ic.Pencil) { queueSheet = false; composer.load(msg?.text.orEmpty()); v.bg { v.backend.queueRemove(threadId, r.id) } }
+                        NcButton(tr(R.string.chat_remove), danger = true, icon = Ic.Trash) { v.bg { v.backend.queueRemove(threadId, r.id) } }
                     }
                 }
             }
@@ -349,11 +351,11 @@ private data class HeaderStatus(val text: String, val color: Color, val pulse: B
 private fun headerStatus(live: LiveState?, pending: Boolean, running: Boolean, last: RunStatus?): HeaderStatus = when {
     live?.reconnecting == true -> HeaderStatus("Reconnecting", C.tertiary, true)
     live?.phase == AgentEvent.Phase.STARTING -> HeaderStatus("Starting", C.primary, true)
-    pending -> HeaderStatus("Waiting for approval", C.tertiary, true)
-    running -> HeaderStatus("Working", C.primary, true)
+    pending -> HeaderStatus(tr(R.string.chat_waiting_for_approval), C.tertiary, true)
+    running -> HeaderStatus(tr(R.string.chat_working), C.primary, true)
     last == RunStatus.FAILED -> HeaderStatus("Error", C.error, false)
     live?.alive == true -> HeaderStatus("Ready", C.primary, false)
-    else -> HeaderStatus("Idle", C.outline, false)
+    else -> HeaderStatus(tr(R.string.chat_idle), C.outline, false)
 }
 
 /** Row 1: back, provider logo, title + status, terminal page, menu. Row 2 (hidden with the IME): model, project, branch, cost, sessions. */
@@ -365,27 +367,27 @@ private fun ChatTopBar(v: AgentChatView, t: ChatThread, status: HeaderStatus, ru
     val branch by produceState<String?>(null, t.cwd, runs.size) { value = withContext(Dispatchers.IO) { gitBranch(v, t.cwd) } }
     Column(Modifier.fillMaxWidth().background(C.lowest).animateContentSize()) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(end = S.xs), verticalAlignment = Alignment.CenterVertically) {
-            IconBtn(Ic.Back, "Back to threads") { v.pop() }
+            IconBtn(Ic.Back, tr(R.string.chat_back_to_threads)) { v.pop() }
             ProviderLogo(t.tool, size = 32.dp)
             Column(Modifier.weight(1f).padding(horizontal = S.m)) {
-                Text(t.title.ifBlank { "New thread" }, color = C.on, style = T.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(t.title.ifBlank { tr(R.string.chat_new_thread) }, color = C.on, style = T.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(Modifier.semantics(mergeDescendants = true) { contentDescription = "Status: ${status.text}" }, verticalAlignment = Alignment.CenterVertically) {
                     StatusDot(status.color, size = 6.dp, pulse = status.pulse)
                     Text(status.text, Modifier.padding(start = S.gap), color = status.color, style = T.meta, maxLines = 1)
                 }
             }
-            IconBtn(Ic.Terminal, "Open terminal page", tint = C.onVar) { v.host.showTerminal(v.isWorkspace) }
+            IconBtn(Ic.Terminal, tr(R.string.chat_open_terminal_page), tint = C.onVar) { v.host.showTerminal(v.isWorkspace) }
             Box {
-                IconBtn(Ic.More, "More actions", tint = C.onVar) { menu = true }
+                IconBtn(Ic.More, tr(R.string.chat_more_actions), tint = C.onVar) { menu = true }
                 DropdownMenu(menu, { menu = false }, containerColor = C.low) {
-                    MItem("Changes", Ic.Compare) { menu = false; v.push(Route.Diff(t.id)) }
-                    MItem("Thread settings", Ic.Sliders) { menu = false; v.push(Route.Settings(t.id)) }
-                    MItem("Agent bridge history", Ic.History) { menu = false; v.push(Route.Bridge(t.id)) }
-                    MItem("Preview dev server", Ic.Globe) { menu = false; v.host.openPreview(null) }
-                    MItem("Open terminal here", Ic.Terminal) { menu = false; v.host.openShellHere(t.cwd, v.isWorkspace) }
-                    MItem("Continue in terminal", Ic.Terminal) { menu = false; openInTerminal(v, t) }
-                    MItem("Rename", Ic.Pencil) { menu = false; rename = true }
-                    MItem("Delete", Ic.Trash, danger = true) { menu = false; delete = true }
+                    MItem(tr(R.string.chat_changes), Ic.Compare) { menu = false; v.push(Route.Diff(t.id)) }
+                    MItem(tr(R.string.chat_thread_settings), Ic.Sliders) { menu = false; v.push(Route.Settings(t.id)) }
+                    MItem(tr(R.string.chat_agent_bridge_history), Ic.History) { menu = false; v.push(Route.Bridge(t.id)) }
+                    MItem(tr(R.string.chat_preview_dev_server), Ic.Globe) { menu = false; v.host.openPreview(null) }
+                    MItem(tr(R.string.chat_open_terminal_here), Ic.Terminal) { menu = false; v.host.openShellHere(t.cwd, v.isWorkspace) }
+                    MItem(tr(R.string.chat_continue_in_terminal), Ic.Terminal) { menu = false; openInTerminal(v, t) }
+                    MItem(tr(R.string.term_rename), Ic.Pencil) { menu = false; rename = true }
+                    MItem(tr(R.string.chat_delete), Ic.Trash, danger = true) { menu = false; delete = true }
                 }
             }
         }
@@ -438,7 +440,7 @@ private fun EmptyThread(t: ChatThread, modifier: Modifier) {
         ProviderLogo(t.tool, size = 56.dp)
         Text("What should ${t.tool} do in ${t.projectPath?.let { ChatLogic.baseName(it) } ?: "~"}?",
             Modifier.padding(top = S.l), color = C.on, style = T.title, textAlign = TextAlign.Center)
-        Text("Type / for commands, attach files with +. Approvals show up above the composer.",
+        Text(tr(R.string.chat_type_for_commands_attach_files),
             Modifier.padding(top = S.s), color = C.onVar, style = T.bodySm, textAlign = TextAlign.Center)
     }
 }
@@ -476,7 +478,7 @@ private fun WorkingPill(elapsed: Long, activity: String?, queued: Int, forceStop
     ) {
         StatusDot(accent, size = 8.dp, pulse = !forceStop)
         Column(Modifier.padding(start = S.s).widthIn(max = 260.dp).semantics(mergeDescendants = true) {}) {
-            Text(when { forceStop -> "Agent not responding · tap Force stop"; stopping -> "Stopping…"; else -> "Working ${ChatLogic.timer(elapsed)}" } +
+            Text(when { forceStop -> tr(R.string.chat_agent_not_responding_tap_force); stopping -> tr(R.string.chat_stopping); else -> "Working ${ChatLogic.timer(elapsed)}" } +
                 if (queued > 0) " · $queued queued" else "",
                 color = if (forceStop) C.error else C.on, style = T.label, maxLines = 1)
             if (!forceStop && activity != null) Text(activity, color = C.onVar, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -508,15 +510,15 @@ private fun BannerRow(b: Banner, onAction: () -> Unit) {
 @Composable
 private fun UsageLimitsSheet(tool: String, r: AgentEvent.RateLimit?, usage: com.zenithblue.nativecode.agent.chat.core.Usage?, ctxSize: Long?, runs: List<com.zenithblue.nativecode.agent.chat.core.Run>) {
     Column(Modifier.fillMaxWidth().padding(horizontal = S.l).padding(bottom = S.l).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(S.s)) {
-        Text("Usage limits", color = C.on, style = T.title)
+        Text(tr(R.string.chat_usage_limits), color = C.on, style = T.title)
         Overline(tool, color = C.outline)
         if (r == null) {
-            Text("Not reported: $tool has not sent quota or rate-limit information in this session.", color = C.onVar, style = T.body)
+            Text(tr(R.string.chat_not_reported_has_not_sent, tool), color = C.onVar, style = T.body)
         } else {
             val limited = r.status !in setOf("ok", "allowed", "allowed_warning")
-            Text(if (limited) "Limit reached" else "Within limits", color = if (limited) C.error else C.primary, style = T.label)
+            Text(if (limited) tr(R.string.chat_limit_reached) else tr(R.string.chat_within_limits), color = if (limited) C.error else C.primary, style = T.label)
             r.detail?.let { Text(it, color = C.on, style = T.codeSm) }
-            r.resetAt?.let { Text("Resets " + java.text.SimpleDateFormat("MMM d, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(it)), color = C.onVar, style = T.meta) }
+            r.resetAt?.let { Text("Resets " + java.text.SimpleDateFormat(tr(R.string.chat_mmm_d_hh_mm), java.util.Locale.getDefault()).format(java.util.Date(it)), color = C.onVar, style = T.meta) }
         }
         val used = usage?.contextUsed
         if (used != null && ctxSize != null) Text("Context ${ChatLogic.tokens(used)} / ${ChatLogic.tokens(ctxSize)} tokens", color = C.onVar, style = T.meta)
@@ -545,11 +547,11 @@ private fun TodoStrip(todo: ItemPayload.TodoList) {
     val cur = todo.steps.firstOrNull { it.status == "in_progress" } ?: todo.steps.firstOrNull { it.status != "completed" }
     Column(Modifier.fillMaxWidth().background(C.low).animateContentSize()) {
         Row(
-            Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "Hide tasks" else "Show tasks") { open = !open }.heightIn(min = 44.dp).padding(horizontal = S.l),
+            Modifier.fillMaxWidth().clickable(onClickLabel = if (open) tr(R.string.chat_hide_tasks) else tr(R.string.chat_show_tasks)) { open = !open }.heightIn(min = 44.dp).padding(horizontal = S.l),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NcIcon(Ic.ListTodo, null, tint = C.primary, size = 16.dp)
-            Text("Tasks $done/${todo.steps.size}", Modifier.padding(start = S.s), color = C.on, style = T.label)
+            Text(tr(R.string.chat_tasks, done, todo.steps.size), Modifier.padding(start = S.s), color = C.on, style = T.label)
             Text(cur?.text?.let { " · $it" } ?: "", Modifier.weight(1f), color = C.onVar, style = T.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Chevron(open)
         }
@@ -561,7 +563,7 @@ private fun TodoStrip(todo: ItemPayload.TodoList) {
             todo.steps.forEach { s ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     when (s.status) {
-                        "completed" -> NcIcon(Ic.CircleCheck, "Done", tint = C.primary, size = 14.dp)
+                        "completed" -> NcIcon(Ic.CircleCheck, tr(R.string.chat_done), tint = C.primary, size = 14.dp)
                         "in_progress" -> Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) { StatusDot(C.primary, size = 6.dp, pulse = true) }
                         else -> Ring(C.outline)
                     }

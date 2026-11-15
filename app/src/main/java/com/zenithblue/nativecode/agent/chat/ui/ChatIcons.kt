@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 internal object Ic {
     val Back = lucide("m12 19-7-7 7-7", "M19 12H5")
@@ -109,7 +111,7 @@ private fun dot(cx: Float, cy: Float) = circle(cx, cy, 1f)
 /** SVG `<rect x y width height rx>` as a path. */
 private fun rect(x: Float, y: Float, w: Float, h: Float, r: Float) =
     if (r == 0f) "M$x ${y}h${w}v${h}h${-w}z"
-    else "M${x + r} ${y}h${w - 2 * r}a$r $r 0 0 1 $r ${r}v${h - 2 * r}a$r $r 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a$r $r 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a$r $r 0 0 1 $r ${-r}z"
+    else tr(R.string.chat_m_h_a_0_0, x + r, y, w - 2 * r, r, r, r, r, h - 2 * r, r, r, -r, r, -(w - 2 * r), r, r, -r, -r, -(h - 2 * r), r, r, r, -r)
 
 private fun lucide(vararg paths: String): ImageVector =
     ImageVector.Builder(defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {

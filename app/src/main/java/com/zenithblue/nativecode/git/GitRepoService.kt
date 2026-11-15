@@ -4,6 +4,8 @@ import android.content.Context
 import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
 import com.zenithblue.nativecode.terminal.ProjectManager
 import com.zenithblue.nativecode.terminal.ShellCommandRunner
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /**
  * Project-scoped git queries via guest shell (proot | chroot).
@@ -52,7 +54,7 @@ object GitRepoService {
 
     /** Blocking — call from bg thread. CHANGES page status (3 git calls). */
     fun loadChanges(ctx: Context, projectPath: String, method: String): RepoStatusResult {
-        if (projectPath.isBlank()) return RepoStatusResult.NotGit("No active project")
+        if (projectPath.isBlank()) return RepoStatusResult.NotGit(tr(R.string.git_no_active_project_2))
         return try {
             val (exit, out) = run(ctx, projectPath, method, GitGuestCommands.changesBundle(projectPath))
             if (exit == 2) RepoStatusResult.NotGit("Project path not found")

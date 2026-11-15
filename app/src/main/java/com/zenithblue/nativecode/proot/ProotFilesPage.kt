@@ -22,6 +22,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.zenithblue.nativecode.tr
 
 /**
  * In-app file navigation page for PRoot home directory (/home/flux).
@@ -44,7 +45,7 @@ class ProotFilesPage(
     private var currentDir: File = ProjectPathResolver.guestHomeDir(ctx, "proot").also {
         if (!it.exists()) it.mkdirs()
     }
-    private val dateFormat = SimpleDateFormat("MMM d, yyyy HH:mm", Locale.US)
+    private val dateFormat = SimpleDateFormat(tr(R.string.proot_mmm_d_yyyy_hh_mm), Locale.US)
 
     val view: ScrollView = ScrollView(ctx).apply {
         layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
@@ -101,7 +102,7 @@ class ProotFilesPage(
             layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { rightMargin = dp(10) }
         }
         val titleTv = TextView(ctx).apply {
-            text = "HOME FILES"
+            text = tr(R.string.proot_home_files)
             textSize = 20f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -196,7 +197,7 @@ class ProotFilesPage(
 
         if (entries.isEmpty()) {
             val emptyTv = TextView(ctx).apply {
-                text = "Folder is empty"
+                text = tr(R.string.proot_folder_is_empty)
                 textSize = 13f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE

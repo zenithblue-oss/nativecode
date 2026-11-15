@@ -19,6 +19,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.zenithblue.nativecode.MainActivity
 import com.zenithblue.nativecode.R
+import com.zenithblue.nativecode.tr
 
 /**
  * Keeps the app process alive with a visible notification (and a Stop action) while the SSH server runs.
@@ -72,7 +73,7 @@ class SshService : Service() {
         val st = SshServerController.status
         val text = when (st.state) {
             SshState.RUNNING -> SshModel.connectCommand(st.address ?: "?")
-            else -> "Starting..."
+            else -> tr(R.string.ssh_starting)
         }
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
@@ -87,7 +88,7 @@ class SshService : Service() {
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat_terminal)
             .setContentIntent(open)
-            .addAction(0, "Stop", stop)
+            .addAction(0, tr(R.string.quick_stop), stop)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -98,7 +99,7 @@ class SshService : Service() {
 
     private fun channel() {
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "NativeCode SSH server", NotificationManager.IMPORTANCE_LOW).apply {
+            NotificationChannel(CHANNEL_ID, tr(R.string.ssh_nativecode_ssh_server), NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Shows while the SSH server is running"
                 setShowBadge(false)
             }

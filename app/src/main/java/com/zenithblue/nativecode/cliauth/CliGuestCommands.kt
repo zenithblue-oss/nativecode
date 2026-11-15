@@ -1,5 +1,8 @@
 package com.zenithblue.nativecode.cliauth
 
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
+
 /**
  * Pure guest shell snippets for AI CLI auth. No Android UI.
  * Always run as flux with NVM/PATH bootstrap matching setup_cli_tools.sh.
@@ -15,7 +18,7 @@ object CliGuestCommands {
         "NO_COLOR" to "1",
         "CI" to "1",
         "TERM" to "dumb",
-        "BROWSER" to "echo",
+        tr(R.string.cliauth_browser) to "echo",
         "GH_BROWSER" to "echo"
     )
 

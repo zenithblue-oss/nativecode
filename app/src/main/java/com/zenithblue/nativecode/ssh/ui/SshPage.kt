@@ -27,6 +27,8 @@ import com.zenithblue.nativecode.ssh.SshModel
 import com.zenithblue.nativecode.ssh.SshServerController
 import com.zenithblue.nativecode.ssh.SshState
 import java.util.concurrent.Executors
+import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.R
 
 /** What the page needs from the activity. */
 internal interface SshHostApi {
@@ -89,25 +91,25 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
 
     private fun clip(label: String, value: String) {
         (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(label, value))
-        Toast.makeText(ctx, "Copied", Toast.LENGTH_SHORT).show()
+        Toast.makeText(ctx, tr(R.string.chat_copied), Toast.LENGTH_SHORT).show()
     }
 
     // Banner
     private val bannerCard = card()
     private val bannerTv = text(12f, NC.ON_SURFACE)
-    private val installBtn = button("INSTALL OPENSSH", true)
+    private val installBtn = button(tr(R.string.ssh_install_openssh), true)
 
     // Server
     private val serverCard = card()
     private val statusTv = text(14f, NC.PRIMARY, bold = true, mono = true)
     private val addrTv = text(13f, NC.ON_SURFACE, mono = true).apply { setTextIsSelectable(true) }
-    private val copyCmdBtn = button("COPY COMMAND", false)
+    private val copyCmdBtn = button(tr(R.string.ssh_copy_command), false)
     private val fpTv = text(11f, NC.ON_SURF_VAR, mono = true).apply { setTextIsSelectable(true) }
     private val errTv = text(12f, NC.ERROR)
     private val logTv = text(10f, NC.ON_SURF_VAR, mono = true)
-    private val toggleBtn = button("START SERVER", true)
+    private val toggleBtn = button(tr(R.string.ssh_start_server), true)
     private val keepCb = CheckBox(ctx).apply {
-        text = "Keep running when Wi-Fi is lost"
+        text = tr(R.string.ssh_keep_running_when_wi_fi)
         setTextColor(NC.ON_SURF_VAR)
         textSize = 12f
         minHeight = dp(48)
@@ -116,7 +118,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
     // Keys / hosts / client keys
     private val authList = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
     private val keyInput = EditText(ctx).apply {
-        hint = "ssh-ed25519 AAAA... name"
+        hint = tr(R.string.ssh_ssh_ed25519_aaaa_name)
         setHintTextColor(NC.OUTLINE)
         setTextColor(NC.ON_SURFACE)
         textSize = 12f
@@ -135,7 +137,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
             override fun onViewDetachedFromWindow(v: View) { SshServerController.removeListener(onServer) }
         })
 
-        bannerCard.addView(text(15f, NC.TERTIARY, bold = true, mono = true).apply { text = "OPENSSH NOT INSTALLED" })
+        bannerCard.addView(text(15f, NC.TERTIARY, bold = true, mono = true).apply { text = tr(R.string.ssh_openssh_not_installed) })
         bannerTv.text = "The SSH server, the ssh client and key generation need OpenSSH in your Linux. It is installed with apk (a few MB, needs internet)."
         bannerTv.setPadding(0, dp(4), 0, dp(12))
         bannerCard.addView(bannerTv)
@@ -143,9 +145,9 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         content.addView(bannerCard)
         installBtn.setOnClickListener { install() }
 
-        serverCard.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = "SSH SERVER  ·  PRO" })
+        serverCard.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(R.string.ssh_ssh_server_pro) })
         serverCard.addView(text(12f, NC.ON_SURF_VAR).apply {
-            text = "Log in to this phone's Linux from another computer on the same Wi-Fi. Key login only: password login is off. Off by default and never started at boot."
+            text = tr(R.string.ssh_log_in_to_this_phone)
             setPadding(0, dp(4), 0, dp(12))
         })
         serverCard.addView(statusTv)
@@ -162,16 +164,16 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         keepCb.setOnCheckedChangeListener { _, on -> SshServerController.setKeepRunning(ctx, on) }
 
         val auth = card()
-        auth.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = "AUTHORIZED KEYS" })
+        auth.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(R.string.ssh_authorized_keys) })
         auth.addView(text(12f, NC.ON_SURF_VAR).apply {
-            text = "Only these public keys can log in (~/.ssh/authorized_keys). Paste the contents of the other computer's id_ed25519.pub or import the file. Private keys are refused."
+            text = tr(R.string.ssh_only_these_public_keys_can)
             setPadding(0, dp(4), 0, dp(8))
         })
         auth.addView(authList)
         auth.addView(keyInput, lp(10))
         val authBtns = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        val addKey = button("ADD KEY", true)
-        val importKey = button("IMPORT FILE", false)
+        val addKey = button(tr(R.string.ssh_add_key), true)
+        val importKey = button(tr(R.string.ssh_import_file), false)
         authBtns.addView(addKey, LinearLayout.LayoutParams(0, -2, 1f).apply { rightMargin = dp(8) })
         authBtns.addView(importKey, LinearLayout.LayoutParams(0, -2, 1f))
         auth.addView(authBtns, lp(8))
@@ -180,25 +182,25 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         importKey.setOnClickListener { importKeyFile() }
 
         val hosts = card()
-        hosts.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = "REMOTE HOSTS" })
+        hosts.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(R.string.ssh_remote_hosts) })
         hosts.addView(text(12f, NC.ON_SURF_VAR).apply {
-            text = "Saved SSH destinations. CONNECT opens a terminal tab running ssh. No passwords are stored: type it in the tab, or use a key."
+            text = tr(R.string.ssh_saved_ssh_destinations_connect_opens)
             setPadding(0, dp(4), 0, dp(8))
         })
         hosts.addView(hostsList)
-        val addHost = button("ADD HOST", false)
+        val addHost = button(tr(R.string.ssh_add_host), false)
         hosts.addView(addHost, lp(8))
         content.addView(hosts)
         addHost.setOnClickListener { editHost(null) }
 
         val keys = card()
-        keys.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = "MY KEYS" })
+        keys.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(R.string.ssh_my_keys) })
         keys.addView(text(12f, NC.ON_SURF_VAR).apply {
-            text = "ed25519 keypairs in ~/.ssh. Copy the public key to the remote's authorized_keys. The private key never leaves this phone."
+            text = tr(R.string.ssh_ed25519_keypairs_in_ssh_copy)
             setPadding(0, dp(4), 0, dp(8))
         })
         keys.addView(myKeysList)
-        val gen = button("GENERATE ED25519 KEY", false)
+        val gen = button(tr(R.string.ssh_generate_ed25519_key), false)
         keys.addView(gen, lp(8))
         content.addView(keys)
         gen.setOnClickListener { generateKey() }
@@ -221,10 +223,10 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         val st = SshServerController.status
         val ip = st.address ?: SshServerController.lanAddress()
         statusTv.text = when (st.state) {
-            SshState.STOPPED -> "STOPPED"
-            SshState.STARTING -> "STARTING..."
+            SshState.STOPPED -> tr(R.string.ssh_stopped)
+            SshState.STARTING -> tr(R.string.ssh_starting_2)
             SshState.RUNNING -> "RUNNING on port ${SshModel.PORT}"
-            SshState.ERROR -> "FAILED"
+            SshState.ERROR -> tr(R.string.ssh_failed)
         }
         statusTv.setTextColor(if (st.state == SshState.ERROR) NC.ERROR else if (st.state == SshState.RUNNING) NC.PRIMARY else NC.ON_SURF_VAR)
         addrTv.text = if (ip != null) SshModel.connectCommand(ip) else "No Wi-Fi address. Connect to Wi-Fi or turn on the hotspot."
@@ -237,7 +239,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         logTv.text = tail.joinToString("\n")
         logTv.visibility = if (tail.isEmpty()) View.GONE else View.VISIBLE
         val running = st.state == SshState.RUNNING || st.state == SshState.STARTING
-        toggleBtn.text = if (running) "STOP SERVER" else "START SERVER"
+        toggleBtn.text = if (running) tr(R.string.ssh_stop_server) else tr(R.string.ssh_start_server)
         toggleBtn.isEnabled = installed && !busy && (running || ip != null)
         toggleBtn.alpha = if (toggleBtn.isEnabled) 1f else 0.5f
         keepCb.setOnCheckedChangeListener(null)
@@ -255,23 +257,23 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         }
         if (SshServerController.warned(ctx)) go()
         else AlertDialog.Builder(ctx)
-            .setTitle("Open an SSH port?")
-            .setMessage("This opens port ${SshModel.PORT} on your current Wi-Fi network. Only computers holding a key you add under Authorized keys can log in; passwords are refused. Do not use it on a network you do not trust. A notification shows while it runs.")
-            .setPositiveButton("START") { _, _ -> SshServerController.setWarned(ctx); go() }
-            .setNegativeButton("CANCEL", null)
+            .setTitle(tr(R.string.ssh_open_an_ssh_port))
+            .setMessage(tr(R.string.ssh_this_opens_port_on_your, SshModel.PORT))
+            .setPositiveButton(tr(R.string.ssh_start)) { _, _ -> SshServerController.setWarned(ctx); go() }
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(ctx)
     }
 
     private fun install() {
         if (busy) return
         busy = true
-        installBtn.text = "INSTALLING..."
+        installBtn.text = tr(R.string.ssh_installing)
         renderServer()
         bg.execute {
             val err = SshServerController.install(ctx)
             ui.post {
                 busy = false
-                installBtn.text = "INSTALL OPENSSH"
+                installBtn.text = tr(R.string.ssh_install_openssh)
                 if (err != null) Toast.makeText(ctx, err, Toast.LENGTH_LONG).show()
                 renderAll()
             }
@@ -286,7 +288,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         authList.removeAllViews()
         val keys = SshServerController.authorizedKeys(ctx)
         if (keys.isEmpty()) {
-            authList.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = "No keys yet. Nobody can log in." })
+            authList.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = tr(R.string.ssh_no_keys_yet_nobody_can) })
             return
         }
         for (k in keys) {
@@ -295,13 +297,13 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
             info.addView(text(13f, NC.ON_SURFACE, bold = true, mono = true).apply { text = k.comment.ifEmpty { "(no name)" } })
             info.addView(text(11f, NC.ON_SURF_VAR, mono = true).apply { text = "${k.type}\n${k.fingerprint}" })
             row.addView(info, LinearLayout.LayoutParams(0, -2, 1f))
-            val rm = button("REMOVE", false, danger = true)
+            val rm = button(tr(R.string.ssh_remove), false, danger = true)
             rm.contentDescription = "Remove key ${k.comment}"
             rm.setOnClickListener {
-                AlertDialog.Builder(ctx).setTitle("Remove this key?")
+                AlertDialog.Builder(ctx).setTitle(tr(R.string.ssh_remove_this_key))
                     .setMessage("${k.comment.ifEmpty { k.type }}\n${k.fingerprint}\n\nThat computer can no longer log in.")
-                    .setPositiveButton("REMOVE") { _, _ -> SshServerController.removeAuthorizedKey(ctx, k.fingerprint); renderAuthorized() }
-                    .setNegativeButton("CANCEL", null)
+                    .setPositiveButton(tr(R.string.ssh_remove)) { _, _ -> SshServerController.removeAuthorizedKey(ctx, k.fingerprint); renderAuthorized() }
+                    .setNegativeButton(tr(R.string.x11_cancel), null)
                     .create().showThemed(ctx, setOf(AlertDialog.BUTTON_POSITIVE))
             }
             row.addView(rm, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
@@ -343,7 +345,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
     private fun renderHosts() {
         hostsList.removeAllViews()
         val hosts = RemoteHosts.load(ctx)
-        if (hosts.isEmpty()) hostsList.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = "No saved hosts." })
+        if (hosts.isEmpty()) hostsList.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = tr(R.string.ssh_no_saved_hosts) })
         for (h in hosts) {
             val box = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8)) }
             box.addView(text(14f, NC.ON_SURFACE, bold = true, mono = true).apply { text = h.name })
@@ -351,9 +353,9 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
                 text = h.target + if (h.keyFile.isNotEmpty()) "  key: ${h.keyFile}" else ""
             })
             val btns = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-            val connect = button("CONNECT", true)
-            val edit = button("EDIT", false)
-            val del = button("DELETE", false, danger = true)
+            val connect = button(tr(R.string.ssh_connect), true)
+            val edit = button(tr(R.string.ssh_edit), false)
+            val del = button(tr(R.string.git_delete), false, danger = true)
             btns.addView(connect, LinearLayout.LayoutParams(0, -2, 1.3f).apply { rightMargin = dp(6) })
             btns.addView(edit, LinearLayout.LayoutParams(0, -2, 1f).apply { rightMargin = dp(6) })
             btns.addView(del, LinearLayout.LayoutParams(0, -2, 1f))
@@ -361,9 +363,9 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
             connect.setOnClickListener { host.connect(h.name, RemoteHosts.command(h)) }
             edit.setOnClickListener { editHost(h) }
             del.setOnClickListener {
-                AlertDialog.Builder(ctx).setTitle("Delete ${h.name}?").setMessage("Only the saved entry is removed.")
-                    .setPositiveButton("DELETE") { _, _ -> RemoteHosts.save(ctx, RemoteHosts.load(ctx).filterNot { it.id == h.id }); renderHosts() }
-                    .setNegativeButton("CANCEL", null)
+                AlertDialog.Builder(ctx).setTitle(tr(R.string.ssh_delete, h.name)).setMessage(tr(R.string.ssh_only_the_saved_entry_is))
+                    .setPositiveButton(tr(R.string.git_delete)) { _, _ -> RemoteHosts.save(ctx, RemoteHosts.load(ctx).filterNot { it.id == h.id }); renderHosts() }
+                    .setNegativeButton(tr(R.string.x11_cancel), null)
                     .create().showThemed(ctx, setOf(AlertDialog.BUTTON_POSITIVE))
             }
             hostsList.addView(box)
@@ -389,10 +391,10 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
 
     private fun editHost(existing: SshHost?) {
         val form = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0) }
-        val (nameBox, name) = field("NAME", existing?.name.orEmpty())
-        val (userBox, user) = field("USER", existing?.user ?: "")
-        val (hostBox, hostEt) = field("HOST OR IP", existing?.host.orEmpty())
-        val (portBox, port) = field("PORT", (existing?.port ?: 22).toString(), number = true)
+        val (nameBox, name) = field(tr(R.string.ssh_name), existing?.name.orEmpty())
+        val (userBox, user) = field(tr(R.string.ssh_user), existing?.user ?: "")
+        val (hostBox, hostEt) = field(tr(R.string.ssh_host_or_ip), existing?.host.orEmpty())
+        val (portBox, port) = field(tr(R.string.ssh_port), (existing?.port ?: 22).toString(), number = true)
         val options = listOf("") + SshServerController.clientKeys(ctx)
         var pick = options.indexOf(existing?.keyFile ?: "").coerceAtLeast(0)
         val keyBtn = button("", false)
@@ -404,8 +406,8 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         val dialog = AlertDialog.Builder(ctx)
             .setTitle(if (existing == null) "Add host" else "Edit host")
             .setView(android.widget.ScrollView(ctx).apply { addView(form) })
-            .setPositiveButton("SAVE", null)
-            .setNegativeButton("CANCEL", null)
+            .setPositiveButton(tr(R.string.x11_save), null)
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(ctx)
         for (e in listOf(name, user, hostEt, port)) e.setTextColor(NC.ON_SURFACE)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -426,7 +428,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
     private fun renderMyKeys() {
         myKeysList.removeAllViews()
         val keys = SshServerController.clientKeys(ctx)
-        if (keys.isEmpty()) myKeysList.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = "No keys yet." })
+        if (keys.isEmpty()) myKeysList.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = tr(R.string.ssh_no_keys_yet) })
         for (name in keys) {
             val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)) }
             val pub = SshServerController.publicKeyText(ctx, name)?.let { SshModel.parsePublicKey(it) }
@@ -434,11 +436,11 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
             info.addView(text(13f, NC.ON_SURFACE, bold = true, mono = true).apply { text = name })
             info.addView(text(11f, NC.ON_SURF_VAR, mono = true).apply { text = pub?.fingerprint ?: "unreadable" })
             row.addView(info, LinearLayout.LayoutParams(0, -2, 1f))
-            val copy = button("COPY PUBLIC KEY", false)
+            val copy = button(tr(R.string.ssh_copy_public_key), false)
             copy.setOnClickListener {
                 val t = SshServerController.publicKeyText(ctx, name)
                 if (t != null && SshModel.parsePublicKey(t) != null) clip("public key", t)
-                else Toast.makeText(ctx, "Could not read the public key.", Toast.LENGTH_LONG).show()
+                else Toast.makeText(ctx, tr(R.string.ssh_could_not_read_the_public), Toast.LENGTH_LONG).show()
             }
             row.addView(copy, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
             myKeysList.addView(row)
@@ -446,13 +448,13 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
     }
 
     private fun generateKey() {
-        if (!SshServerController.isInstalled(ctx)) { Toast.makeText(ctx, "Install OpenSSH first.", Toast.LENGTH_LONG).show(); return }
+        if (!SshServerController.isInstalled(ctx)) { Toast.makeText(ctx, tr(R.string.ssh_install_openssh_first), Toast.LENGTH_LONG).show(); return }
         val existing = SshServerController.clientKeys(ctx).toSet()
         val suggested = if ("id_ed25519" !in existing) "id_ed25519" else generateSequence(2) { it + 1 }.map { "id_ed25519_$it" }.first { it !in existing }
-        val (box, name) = field("KEY NAME", suggested)
+        val (box, name) = field(tr(R.string.ssh_key_name), suggested)
         val form = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0); addView(box) }
-        AlertDialog.Builder(ctx).setTitle("Generate key").setView(form)
-            .setPositiveButton("GENERATE") { _, _ ->
+        AlertDialog.Builder(ctx).setTitle(tr(R.string.ssh_generate_key)).setView(form)
+            .setPositiveButton(tr(R.string.ssh_generate)) { _, _ ->
                 val n = name.text.toString().trim()
                 bg.execute {
                     val err = SshServerController.generateClientKey(ctx, n)
@@ -462,7 +464,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
                     }
                 }
             }
-            .setNegativeButton("CANCEL", null)
+            .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(ctx)
         name.setTextColor(NC.ON_SURFACE)
     }
