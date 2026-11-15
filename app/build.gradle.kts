@@ -143,6 +143,10 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.2.2")
     implementation("androidx.core:core-splashscreen:1.2.0")
 
+    // Built-in code editor (plan §16): Sora Editor, LGPL-2.1, unmodified Maven AARs (dynamic link).
+    implementation("io.github.rosemoe:editor:0.24.7")
+    implementation("io.github.rosemoe:language-textmate:0.24.7")
+
     // Compose dependencies
     implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.ui:ui")

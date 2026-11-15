@@ -93,6 +93,22 @@ object OpenSourceLicenses {
             licenseSummary = "Open-source SDK parts are Apache License 2.0; the Analytics service is used under the Firebase Terms of Service. Off until the user opts in."
         ),
         OssLicenseItem(
+            name = "Sora Editor",
+            component = "Built-in code editor (editor + language-textmate 0.24.7, with tm4e, joni, jcodings, snakeyaml-engine, Gson)",
+            licenseType = "LGPL-2.1",
+            copyright = "Copyright (C) 2020-2026 Rosemoe and Sora Editor contributors",
+            url = "https://github.com/Rosemoe/sora-editor",
+            licenseSummary = "GNU Lesser General Public License v2.1. Used unmodified as separate Maven libraries (dynamically linked); you may replace them with a modified build. Full text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt"
+        ),
+        OssLicenseItem(
+            name = "TextMate grammars",
+            component = "Syntax grammars for the editor (Kotlin, Java, JS/TS, Python, JSON, YAML, Markdown, shell, HTML/CSS, C/C++, Go, Rust, Dockerfile, INI)",
+            licenseType = "MIT",
+            copyright = "Copyright (C) Microsoft Corporation and the upstream TextMate bundle authors",
+            url = "https://github.com/microsoft/vscode/tree/main/extensions",
+            licenseSummary = "MIT License. Grammars taken from the Visual Studio Code built-in extensions and the Sora Editor sample assets."
+        ),
+        OssLicenseItem(
             name = "libsuperuser",
             component = "Root shell process management (StreamGobbler)",
             licenseType = "Apache-2.0",
