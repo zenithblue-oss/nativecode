@@ -9782,6 +9782,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             pageId = ID_USAGE,
             onSubtitle = { tv ->
                 homeUsageSubtitle = tv
+                tv.layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)   // two lines (usage, limit) plus the logo row must all show
                 (tv.parent as? LinearLayout)?.let { p ->
                     val row = LinearLayout(this).apply { layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) } }
                     p.addView(row, p.indexOfChild(tv) + 1)
