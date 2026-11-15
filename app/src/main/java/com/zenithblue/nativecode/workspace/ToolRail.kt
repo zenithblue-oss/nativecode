@@ -19,7 +19,8 @@ class ToolRail(context: Context) : LinearLayout(context) {
     private fun dp(v: Int): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
-    private class Item(val view: ImageView, val icon: () -> Int, val desc: () -> String, val active: () -> Boolean)
+    private class Item(val view: ImageView, val icon: () -> Int, val desc: () -> String, val active: () -> Boolean,
+                       val visible: () -> Boolean)
 
     private val items = ArrayList<Item>()
 
@@ -37,6 +38,7 @@ class ToolRail(context: Context) : LinearLayout(context) {
         desc: () -> String,
         active: () -> Boolean = { false },
         onLongClick: (() -> Unit)? = null,
+        visible: () -> Boolean = { true },
         onClick: () -> Unit,
     ): ImageView {
         val v = ImageView(context).apply {
@@ -47,7 +49,7 @@ class ToolRail(context: Context) : LinearLayout(context) {
             setOnClickListener { onClick(); refresh() }
             if (onLongClick != null) setOnLongClickListener { onLongClick(); true }
         }
-        items += Item(v, icon, desc, active)
+        items += Item(v, icon, desc, active, visible)
         addView(v)
         refresh()
         return v
@@ -61,6 +63,7 @@ class ToolRail(context: Context) : LinearLayout(context) {
     /** Re-read every button's icon / description / on-state. */
     fun refresh() {
         items.forEach { item ->
+            item.view.visibility = if (item.visible()) VISIBLE else GONE
             val on = item.active()
             val d = item.desc()
             item.view.setImageResource(item.icon())

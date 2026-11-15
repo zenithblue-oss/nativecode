@@ -4232,6 +4232,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             else if (::terminalView.isInitialized) terminalView else null)
         updateChatShown()
         if (!ws) refreshTermTabStrip()
+        toolRails.forEach { it.refresh() } // terminal-only rail tools follow chat/terminal
     }
 
     /** Page / position / scope → each chat view (visibleThreadId, Terminal-position snackbar). */
@@ -4333,16 +4334,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val toolRails = ArrayList<ToolRail>()
 
     private fun fillToolRail(rail: ToolRail, workspace: Boolean) {
+        // Terminal-only tools hide while the chat is shown (its composer has its own + sheet).
+        val termOnly = { !isChatMode(workspace) }
         rail.add(
             icon = { R.drawable.ic_keyboard },
             desc = { if (showExtraKeys) "Extra keys: on" else "Extra keys: off" },
             active = { showExtraKeys },
+            visible = termOnly,
         ) { setExtraKeysEnabled(!showExtraKeys) }
         // Attach lives here now (was two keys in the extra-keys row). Hold = how it works.
         rail.add(
             icon = { R.drawable.ic_attach_image },
             desc = { "Attach image to Linux" },
             onLongClick = { showAttachmentTutorial() },
+            visible = termOnly,
         ) {
             pickAttachmentWithTutorial {
                 (if (workspace) wsImagePickerLauncher else termImagePickerLauncher).launch("image/*")
@@ -4352,6 +4357,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             icon = { R.drawable.ic_attach_file },
             desc = { "Attach file to Linux" },
             onLongClick = { showAttachmentTutorial() },
+            visible = termOnly,
         ) {
             pickAttachmentWithTutorial {
                 (if (workspace) wsDocumentPickerLauncher else termDocumentPickerLauncher).launch(arrayOf("*/*"))
@@ -4360,6 +4366,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         rail.add(
             icon = { R.drawable.ic_smart_toy },
             desc = { "Copy skill" },
+            visible = termOnly,
         ) { showSkillsPicker() }
         rail.add(
             icon = { if (keepAwake) R.drawable.ic_visibility else R.drawable.ic_visibility_off },
