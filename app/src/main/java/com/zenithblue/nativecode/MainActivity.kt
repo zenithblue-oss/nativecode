@@ -7990,17 +7990,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun openDownloadsUi() {
+        // DocumentsUI Downloads root first: ACTION_VIEW_DOWNLOADS has no handler on some ROMs
+        // (HyperOS) and then fails silently (START_CLASS_NOT_FOUND, no exception).
+        val root = Intent(Intent.ACTION_VIEW).setDataAndType(
+            android.provider.DocumentsContract.buildRootUri("com.android.providers.downloads.documents", "downloads"),
+            android.provider.DocumentsContract.Root.MIME_TYPE_ITEM
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
-            startActivity(
-                Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        } catch (e: Exception) {
-            Toast.makeText(
-                this,
-                "Open Files → Downloads and tap the APK to install.",
-                Toast.LENGTH_LONG
-            ).show()
+            startActivity(root)
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (e: Exception) {
+                Toast.makeText(this, "Open Files → Downloads and tap the APK to install.", Toast.LENGTH_LONG).show()
+            }
         }
     }
 

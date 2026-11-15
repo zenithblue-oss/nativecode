@@ -230,7 +230,7 @@ class AgentBridgeServer(
                         val progress = request.optInt("progress", -1)
                         val id = key.hashCode()
 
-                        if (toChat(ItemPayload.Bridge("status", "Task status", text, detail = progress.toString(),
+                        if (toChat(ItemPayload.Bridge("status", text.ifBlank { key }, "", detail = progress.toString(),
                                 state = if (progress >= 100) ItemPayload.Bridge.DONE else ItemPayload.Bridge.PENDING, key = key))) {
                             response.put("ok", true)
                             response.put("chat_card", true)
@@ -248,7 +248,7 @@ class AgentBridgeServer(
                             response.put("error", "Rate limit exceeded for toasts (max 1 per 2 sec)")
                         } else {
                             val text = request.optString("text", "")
-                            if (toChat(ItemPayload.Bridge("toast", "Message", text, state = ItemPayload.Bridge.DONE))) response.put("chat_card", true)
+                            if (toChat(ItemPayload.Bridge("toast", text, "", state = ItemPayload.Bridge.DONE))) response.put("chat_card", true)
                             else showToast(text)
                             response.put("ok", true)
                         }

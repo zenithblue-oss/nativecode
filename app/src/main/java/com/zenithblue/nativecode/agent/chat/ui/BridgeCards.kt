@@ -101,7 +101,7 @@ internal fun BridgeCard(v: AgentChatView, threadId: String, item: TurnItem, p: B
                 NcIcon(lk.icon, null, tint = lk.accent, size = 18.dp)
             }
             Column(Modifier.weight(1f).padding(horizontal = S.m)) {
-                Overline(lk.label + " · from agent", color = C.outline)
+                Overline(lk.label + " · " + (if (full) FULL else TIME).format(Date(at)), color = C.outline)
                 Text(p.title.ifBlank { lk.label }, color = C.on, style = T.heading, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             StatusChip(stateLabel, stateColor, pulse = p.action == "status" && p.state == Bridge.PENDING)
@@ -139,9 +139,6 @@ internal fun BridgeCard(v: AgentChatView, threadId: String, item: TurnItem, p: B
                 else -> NcButton("Copy", icon = Ic.Copy) { copy(ctx, p.title, listOf(p.title, p.body).filter { it.isNotBlank() }.joinToString("\n")) }
             }
             if (pending) NcButton("Dismiss", kind = BtnKind.GHOST, icon = Ic.Close) { mark(Bridge.DISMISSED) }
-            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                Text((if (full) FULL else TIME).format(Date(at)), color = C.outline, style = T.meta, maxLines = 1)
-            }
         }
     }
 }

@@ -206,7 +206,8 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
     }
 
     private fun startTurn(r: AcpRpc, tid: String, input: JSONArray, after: ((String) -> Unit)? = null) {
-        val model = pickModel()
+        // collaborationMode.settings.model is required by app-server ("missing field `model`" on a thread with no pick).
+        val model = pickModel() ?: defaultModel
         val params = CodexWire.turnParams(tid, input, cfg, model, pickEffort(model))
         val myGen = synchronized(lock) { mapper.beginTurn(); gen }
         r.request("turn/start", params).whenComplete { res, err ->
