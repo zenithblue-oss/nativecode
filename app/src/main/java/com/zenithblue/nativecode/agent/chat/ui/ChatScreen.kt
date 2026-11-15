@@ -381,6 +381,7 @@ private fun ChatTopBar(v: AgentChatView, t: ChatThread, status: HeaderStatus, ru
                     MItem("Changes", Ic.Compare) { menu = false; v.push(Route.Diff(t.id)) }
                     MItem("Thread settings", Ic.Sliders) { menu = false; v.push(Route.Settings(t.id)) }
                     MItem("Agent bridge history", Ic.History) { menu = false; v.push(Route.Bridge(t.id)) }
+                    MItem("Preview dev server", Ic.Globe) { menu = false; v.host.openPreview(null) }
                     MItem("Open terminal here", Ic.Terminal) { menu = false; v.host.openShellHere(t.cwd, v.isWorkspace) }
                     MItem("Continue in terminal", Ic.Terminal) { menu = false; openInTerminal(v, t) }
                     MItem("Rename", Ic.Pencil) { menu = false; rename = true }

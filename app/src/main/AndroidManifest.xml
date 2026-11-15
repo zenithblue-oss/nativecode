@@ -58,6 +58,13 @@
             android:launchMode="singleTask"
             android:exported="false" />
 
+        <!-- Dev-server preview (plan 12): loopback-only WebView, opened from chat cards / terminal. -->
+        <activity
+            android:name=".preview.PreviewActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:windowSoftInputMode="adjustResize|stateHidden"
+            android:exported="false" />
+
         <activity
             android:name=".OnboardingActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"

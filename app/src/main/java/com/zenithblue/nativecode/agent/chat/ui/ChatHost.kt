@@ -38,4 +38,6 @@ interface ChatHost {
     fun saveApk(hostPath: String)
     /** Bridge card "Share": share sheet for a host file (staged copy via FileProvider). */
     fun shareFile(hostPath: String)
+    /** Dev-server preview (loopback WebView); null = probe the common dev ports. */
+    fun openPreview(url: String?) {}
 }

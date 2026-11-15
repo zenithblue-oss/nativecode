@@ -405,7 +405,29 @@ class ChatReducer(
         if (r != null && started != null && state.firstTokenRunId != r.id &&
             (payload is ItemPayload.AssistantMessage || payload is ItemPayload.Reasoning)
         ) state = state.copy(firstTokenMs = (now() - started).coerceAtLeast(0), firstTokenRunId = r.id)
+        detectPreview(payload, e.status in OPEN_ITEM)
         publishItems()
+    }
+
+    private val previewPorts = HashSet<Int>()
+
+    /** A loopback dev-server URL in tool output or a finished agent message = one Preview card per port (plan 12). */
+    private fun detectPreview(p: ItemPayload, open: Boolean) {
+        val text = when (p) {
+            is ItemPayload.CommandExecution -> p.outputTail
+            is ItemPayload.DynamicTool -> p.output
+            is ItemPayload.AssistantMessage -> if (open) return else p.text
+            else -> return
+        }
+        // Streaming output: the last line may be cut mid-URL ("localhost:51"), scan whole lines only.
+        val scan = if (open) text.substringBeforeLast('\n', "") else text
+        if (!scan.contains("://")) return
+        for (url in com.zenithblue.nativecode.preview.PortProbe.findUrls(scan)) {
+            val port = com.zenithblue.nativecode.preview.PortProbe.portOf(url) ?: continue
+            if (!previewPorts.add(port)) continue
+            com.zenithblue.nativecode.preview.PortProbe.remember(port)
+            external(ItemPayload.Bridge("preview", "Dev server on :$port", "", target = url, state = ItemPayload.Bridge.DONE, at = now()))
+        }
     }
 
     /** Open reasoning items of this run → [status], with their duration (runtimes that send no timing). */

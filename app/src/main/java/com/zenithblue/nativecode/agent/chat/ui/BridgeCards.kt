@@ -53,6 +53,7 @@ private data class BridgeLook(val icon: ImageVector, val label: String, val acce
 
 private fun look(action: String) = when (action) {
     "open_link" -> BridgeLook(Ic.ExternalLink, "Open link", C.primary)
+    "preview" -> BridgeLook(Ic.Globe, "Preview", C.primary)
     "install_apk" -> BridgeLook(Ic.Package, "Install APK", C.primary)
     "share_file" -> BridgeLook(Ic.Share, "File for you", C.primary)
     "status" -> BridgeLook(Ic.Activity, "Task status", C.tertiary)
@@ -87,6 +88,7 @@ internal fun BridgeCard(v: AgentChatView, threadId: String, item: TurnItem, p: B
         p.action == "status" && p.state == Bridge.PENDING -> "Running" to C.tertiary
         p.state == Bridge.PENDING -> "Pending" to C.tertiary
         p.action in setOf("notify", "toast") -> "Delivered" to C.outline
+        p.action == "preview" -> "Detected" to C.primary
         else -> "Done" to C.primary
     }
     fun mark(state: String) = v.bg { v.backend.bridgeState(threadId, item.id, state) }
@@ -128,6 +130,13 @@ internal fun BridgeCard(v: AgentChatView, threadId: String, item: TurnItem, p: B
                     }
                     NcButton("Copy", icon = Ic.Copy) { copy(ctx, "URL", p.target.orEmpty()) }
                 }
+                "preview" -> {
+                    NcButton("Open", kind = BtnKind.PRIMARY, icon = Ic.Globe) { v.host.openPreview(p.target) }
+                    NcButton("Browser", icon = Ic.ExternalLink) {
+                        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(p.target.orEmpty())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }
+                    NcButton("Copy", icon = Ic.Copy) { copy(ctx, "URL", p.target.orEmpty()) }
+                }
                 "install_apk" -> {
                     NcButton("Install", kind = if (pending) BtnKind.PRIMARY else BtnKind.OUTLINE, icon = Ic.Download) { p.target?.let { v.host.saveApk(it); mark(Bridge.DONE) } }
                     NcButton("Share", icon = Ic.Share) { p.target?.let { v.host.shareFile(it); mark(Bridge.DONE) } }
@@ -145,7 +154,7 @@ internal fun BridgeCard(v: AgentChatView, threadId: String, item: TurnItem, p: B
 
 /** URL, or file name + size (+ APK label/package), shown in the mono well. */
 private fun targetLine(p: Bridge): Pair<ImageVector, String>? = when (p.action) {
-    "open_link" -> p.target?.let { Ic.Globe to it }
+    "open_link", "preview" -> p.target?.let { Ic.Globe to it }
     "install_apk" -> p.target?.let { t ->
         val parts = p.detail?.split(" · ").orEmpty()
         val size = parts.getOrNull(2)?.toLongOrNull()?.let(::bridgeSize)

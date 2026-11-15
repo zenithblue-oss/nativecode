@@ -4313,6 +4313,17 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         override fun saveApk(hostPath: String) = exportApkToDownloads(File(hostPath))
         override fun shareFile(hostPath: String) = shareApkFromProject(File(hostPath), "Share file")
+        override fun openPreview(url: String?) = com.zenithblue.nativecode.preview.PreviewActivity.open(this@MainActivity, url)
+    }
+
+    /** Terminal printed a loopback dev-server URL: a non-blocking "Preview :PORT" chip (snackbar) over the terminal. */
+    private fun showPreviewChip(url: String) {
+        if (isFinishing) return
+        val port = com.zenithblue.nativecode.preview.PortProbe.portOf(url) ?: return
+        com.google.android.material.snackbar.Snackbar.make(contentFrame, "Dev server on :$port", 8000)
+            .setAction("PREVIEW") { com.zenithblue.nativecode.preview.PreviewActivity.open(this, url) }
+            .setActionTextColor(NC.PRIMARY)
+            .show()
     }
 
     /** Notification deep link: page 3, or 10 + PROJECT_PATH (already applied by handleIntent), then the thread in Chat. */
@@ -14719,7 +14730,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         closeTerminalSession(idx)
                     }
                 }
-            }
+            },
+            onPreviewUrl = { url -> showPreviewChip(url) }
         )
 
         terminalView.setTerminalViewClient(viewClient)
@@ -20192,6 +20204,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             context = this,
             terminalViewRef = { if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null },
             activeSessionRef = { workspaceSessions.getOrNull(activeWorkspaceTabIndex) },
+            onPreviewUrl = { url -> showPreviewChip(url) },
             onSessionFinishedCallback = { session ->
                 mainHandler.post {
                     if (workspaceSessions.contains(session)) {
