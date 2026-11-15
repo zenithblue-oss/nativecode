@@ -4355,7 +4355,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         ) { setExtraKeysEnabled(!showExtraKeys) }
         // Attach lives here now (was two keys in the extra-keys row). Hold = how it works.
         rail.add(
-            icon = { R.drawable.ic_attach_image },
+            icon = { R.drawable.ic_lucide_image },
             desc = { "Attach image to Linux" },
             onLongClick = { showAttachmentTutorial() },
             visible = termOnly,
@@ -4365,7 +4365,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         rail.add(
-            icon = { R.drawable.ic_attach_file },
+            icon = { R.drawable.ic_lucide_file_text },
             desc = { "Attach file to Linux" },
             onLongClick = { showAttachmentTutorial() },
             visible = termOnly,
@@ -4375,12 +4375,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         }
         rail.add(
-            icon = { R.drawable.ic_smart_toy },
+            icon = { R.drawable.ic_lucide_bot },
             desc = { "Copy skill" },
             visible = termOnly,
         ) { showSkillsPicker() }
         rail.add(
-            icon = { if (keepAwake) R.drawable.ic_visibility else R.drawable.ic_visibility_off },
+            icon = { if (keepAwake) R.drawable.ic_lucide_eye else R.drawable.ic_lucide_eye_off },
             desc = { if (keepAwake) "Keep awake: on" else "Keep awake: off" },
             active = { keepAwake },
         ) { toggleKeepAwake() }

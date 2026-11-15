@@ -27,10 +27,11 @@ class WorkspaceTopBar(context: Context, onBack: () -> Unit) : ViewGroup(context)
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 
     val backBtn = ImageView(context).apply {
-        setImageResource(R.drawable.ic_arrow_back)
-        setColorFilter(NC.ON_SURFACE)
+        setImageResource(R.drawable.ic_lucide_arrow_left)
+        setColorFilter(ToolRail.ICON_TINT)
         contentDescription = "Back"
-        setPadding(dp(6), dp(6), dp(6), dp(6))
+        val p = dp((36 - ToolRail.ICON_DP) / 2)
+        setPadding(p, p, p, p)
         setOnClickListener { onBack() }
     }
     val iconView = ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }

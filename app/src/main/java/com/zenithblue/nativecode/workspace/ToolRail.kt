@@ -43,7 +43,8 @@ class ToolRail(context: Context) : LinearLayout(context) {
     ): ImageView {
         val v = ImageView(context).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(dp(9), dp(8), dp(9), dp(8))
+            val px = dp((CELL_W_DP - ICON_DP) / 2); val py = dp((CELL_H_DP - ICON_DP) / 2)
+            setPadding(px, py, px, py)
             layoutParams = LayoutParams(dp(CELL_W_DP), dp(CELL_H_DP))
             isFocusable = true
             setOnClickListener { onClick(); refresh() }
@@ -67,7 +68,7 @@ class ToolRail(context: Context) : LinearLayout(context) {
             val on = item.active()
             val d = item.desc()
             item.view.setImageResource(item.icon())
-            item.view.setColorFilter(if (on) NC.PRIMARY else NC.ON_SURF_VAR)
+            item.view.setColorFilter(if (on) NC.PRIMARY else ICON_TINT)
             item.view.background = if (!on) null else InsetDrawable(
                 GradientDrawable().apply {
                     setColor((NC.PRIMARY and 0x00FFFFFF) or 0x33000000)
@@ -84,5 +85,9 @@ class ToolRail(context: Context) : LinearLayout(context) {
     companion object {
         const val CELL_W_DP = 38
         const val CELL_H_DP = 36
+        /** One optical size for every top bar / rail icon: 24-unit Lucide viewport (2-unit margin) drawn at 20 dp. */
+        const val ICON_DP = 20
+        /** One idle tint for every top bar / rail icon; "on" uses NC.PRIMARY. */
+        val ICON_TINT get() = NC.ON_SURF_VAR
     }
 }
