@@ -13,7 +13,9 @@
     <string name="quick_widget_description">ابدأ وكيل ذكاء اصطناعي أو سطح مكتب Linux</string>
     <string name="quick_shortcut_terminal">terminal جديد</string>
     <string name="quick_shortcut_project">آخر مشروع</string>
-    <string name="language_restart">تم تغيير اللغة. أعد تشغيل NativeCode لتطبيقها في كل مكان.</string>
+    <string name="language_general">عام</string>
+    <string name="language_title">اللغة</string>
+    <string name="language_system_default">افتراضي النظام</string>
     <string name="onb_privacy">الخصوصية</string>
     <string name="onb_01_no_nativecode_cloud">01 · لا سحابة NativeCode</string>
     <string name="onb_no_ads_and_no_nativecode">لا إعلانات ولا خوادم NativeCode. تقارير الأعطال وإحصاءات الاستخدام المجهولة (Google Firebase) متوقفة ما لم تفعّلها في الخطوة التالية أو من الإعدادات.</string>

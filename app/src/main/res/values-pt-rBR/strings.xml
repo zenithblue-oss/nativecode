@@ -13,7 +13,9 @@
     <string name="quick_widget_description">Inicie um agente de IA ou o desktop Linux</string>
     <string name="quick_shortcut_terminal">Novo terminal</string>
     <string name="quick_shortcut_project">Último projeto</string>
-    <string name="language_restart">Idioma alterado. Reinicie o NativeCode para aplicá-lo em todo o app.</string>
+    <string name="language_general">Geral</string>
+    <string name="language_title">Idioma</string>
+    <string name="language_system_default">Padrão do sistema</string>
     <string name="onb_privacy">PRIVACIDADE</string>
     <string name="onb_01_no_nativecode_cloud">01 · SEM NUVEM DO NATIVECODE</string>
     <string name="onb_no_ads_and_no_nativecode">Sem anúncios e sem servidores do NativeCode. Relatórios de falhas e estatísticas de uso anônimas (Google Firebase) ficam desativados, a menos que você os ative na próxima etapa ou em Configurações.</string>

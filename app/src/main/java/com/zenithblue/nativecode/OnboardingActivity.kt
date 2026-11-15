@@ -60,6 +60,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     private lateinit var rootLayout: FrameLayout
     private lateinit var pageContainer: FrameLayout
+    private lateinit var languageChip: View
 
     // 0 privacy → 1 intro → 2 slideshow → 3 requirements → 4 notifications → 5 plan → 6 setup → 7 complete
     private var currentPageIndex = 0
@@ -163,6 +164,16 @@ class OnboardingActivity : AppCompatActivity() {
 
         setContentView(rootLayout)
 
+        // Language drop-down in the top-end corner of the first screens: pick before reading anything else.
+        languageChip = com.zenithblue.nativecode.ui.LanguagePicker.chip(this) {
+            com.zenithblue.nativecode.ui.LanguagePicker.showMenu(this, it)
+        }.apply {
+            layoutParams = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(8); marginEnd = dp(12)
+            }
+        }
+        rootLayout.addView(languageChip)
+
         deployScripts()
 
         // Optional deep-link from Settings → Chroot install
@@ -175,7 +186,9 @@ class OnboardingActivity : AppCompatActivity() {
         }
         val privacyOk = getSharedPreferences("nativecode_prefs", MODE_PRIVATE)
             .getBoolean("privacy_accepted", false)
-        var startPage = intent.getIntExtra("target_page", if (privacyOk) 1 else 0)
+        // A language change recreates this Activity: come back to the same page (only the pre-setup pages 0-5).
+        val savedPage = savedInstanceState?.getInt("onb_page", -1)?.takeIf { it in 0..5 }
+        var startPage = savedPage ?: intent.getIntExtra("target_page", if (privacyOk) 1 else 0)
         // 0 = privacy; force privacy first until accepted
         if (!privacyOk) startPage = 0
         else if (startPage == 0) startPage = 1
@@ -190,8 +203,14 @@ class OnboardingActivity : AppCompatActivity() {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt("onb_page", currentPageIndex)
+    }
+
     private fun showPage(index: Int) {
         currentPageIndex = index
+        if (::languageChip.isInitialized) languageChip.visibility = if (index <= 1) View.VISIBLE else View.GONE
         pageContainer.removeAllViews()
 
         val view = when (index) {

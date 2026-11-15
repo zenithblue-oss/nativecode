@@ -13,7 +13,9 @@
     <string name="quick_widget_description">Запуск ИИ-агента или рабочего стола Linux</string>
     <string name="quick_shortcut_terminal">Новый terminal</string>
     <string name="quick_shortcut_project">Последний проект</string>
-    <string name="language_restart">Язык изменён. Перезапустите NativeCode, чтобы применить его везде.</string>
+    <string name="language_general">Основные</string>
+    <string name="language_title">Язык</string>
+    <string name="language_system_default">Как в системе</string>
     <string name="onb_privacy">КОНФИДЕНЦИАЛЬНОСТЬ</string>
     <string name="onb_01_no_nativecode_cloud">01 · БЕЗ ОБЛАКА NATIVECODE</string>
     <string name="onb_no_ads_and_no_nativecode">Без рекламы и без серверов NativeCode. Отчёты о сбоях и анонимная статистика использования (Google Firebase) выключены, пока вы не включите их на следующем шаге или в настройках.</string>

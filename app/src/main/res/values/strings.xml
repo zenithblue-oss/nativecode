@@ -15,7 +15,35 @@
     <string name="quick_shortcut_project">Last project</string>
 
     <!-- Language -->
-    <string name="language_restart">Language changed. Restart NativeCode to apply it everywhere.</string>
+    <string name="language_general">General</string>
+    <string name="language_title">Language</string>
+    <string name="language_system_default">System default</string>
+    <string name="lang_en" translatable="false">English</string>
+    <string name="lang_en_english" translatable="false">English</string>
+    <string name="lang_es" translatable="false">Español</string>
+    <string name="lang_es_english" translatable="false">Spanish</string>
+    <string name="lang_pt_br" translatable="false">Português (Brasil)</string>
+    <string name="lang_pt_br_english" translatable="false">Portuguese (Brazil)</string>
+    <string name="lang_fr" translatable="false">Français</string>
+    <string name="lang_fr_english" translatable="false">French</string>
+    <string name="lang_de" translatable="false">Deutsch</string>
+    <string name="lang_de_english" translatable="false">German</string>
+    <string name="lang_it" translatable="false">Italiano</string>
+    <string name="lang_it_english" translatable="false">Italian</string>
+    <string name="lang_ru" translatable="false">Русский</string>
+    <string name="lang_ru_english" translatable="false">Russian</string>
+    <string name="lang_id" translatable="false">Bahasa Indonesia</string>
+    <string name="lang_id_english" translatable="false">Indonesian</string>
+    <string name="lang_tr" translatable="false">Türkçe</string>
+    <string name="lang_tr_english" translatable="false">Turkish</string>
+    <string name="lang_ja" translatable="false">日本語</string>
+    <string name="lang_ja_english" translatable="false">Japanese</string>
+    <string name="lang_ko" translatable="false">한국어</string>
+    <string name="lang_ko_english" translatable="false">Korean</string>
+    <string name="lang_zh_cn" translatable="false">简体中文</string>
+    <string name="lang_zh_cn_english" translatable="false">Chinese (Simplified)</string>
+    <string name="lang_ar" translatable="false">العربية</string>
+    <string name="lang_ar_english" translatable="false">Arabic</string>
 
     <!-- onb -->
     <string name="onb_privacy">PRIVACY</string>

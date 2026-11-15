@@ -77,6 +77,7 @@ import android.view.KeyEvent
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
 import com.zenithblue.nativecode.terminal.*
+import com.zenithblue.nativecode.ui.LanguagePicker
 import com.zenithblue.nativecode.terminal.ui.*
 import com.zenithblue.nativecode.terminal.keys.ExtraKeysBar
 import com.zenithblue.nativecode.terminal.keys.KeyLayouts
@@ -126,7 +127,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var drawerLayout: androidx.drawerlayout.widget.DrawerLayout
     /** TERMINAL page tab strip (replaces the old terminal-list drawer; item 12 M1). */
     private var termTabStrip: TermTabStrip? = null
-    private val termTabTitles = HashMap<TerminalSession, String>()
+    // Tab state lives in TerminalStore so a recreate (language change) keeps the shells running.
+    private val termTabTitles get() = TerminalStore.titles
     private val cliIconCache = HashMap<String, android.graphics.Bitmap?>()
 
     private lateinit var addTerminalBtn: ImageView
@@ -134,12 +136,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var scriptInstallBackBtn: ImageView
     private lateinit var scriptInstallTitleTv: TextView
 
-    private val sessionsList = ArrayList<TerminalSession>()
-    private val terminalSessionTypes = ArrayList<String>()
+    private val sessionsList get() = TerminalStore.sessions
+    private val terminalSessionTypes get() = TerminalStore.sessionTypes
     private lateinit var terminalToolSelectorScrollView: ScrollView
     private var keepAwake = false
     private var skillsPicker: com.zenithblue.nativecode.skills.SkillsPickerSheet? = null
-    private var activeSessionIndex = -1
+    private var activeSessionIndex by TerminalStore::activeIndex
 
     private var termFontSize = 40
     private var workspaceFontSize = 40
@@ -681,9 +683,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let { handleFileAttachment(it, isWorkspace = true) } }
 
-    private val projectSessionsMap = HashMap<String, ArrayList<TerminalSession>>()
-    private val projectTabNamesMap = HashMap<String, ArrayList<String>>()
-    private val projectActiveTabIndexMap = HashMap<String, Int>()
+    private val projectSessionsMap get() = TerminalStore.projectSessions
+    private val projectTabNamesMap get() = TerminalStore.projectTabNames
+    private val projectActiveTabIndexMap get() = TerminalStore.projectActiveTab
 
     // History tracking for back button support
     private val pageStack = java.util.Stack<Int>()
@@ -764,6 +766,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         buildRootLayout()
         setContentView(drawerLayout)
+        adoptTerminals()
         applyKeepAwake()
         ensurePostNotificationsPermission()
         Telemetry.apply(this)
@@ -857,6 +860,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         } else {
             showHome()
         }
+        TerminalStore.restorePage.also { TerminalStore.restorePage = 0 }
+            .takeIf { it == ID_SETTINGS || it == ID_TERMINAL }
+            ?.let { pageStack.push(it); navigateToPage(it) }
         onSetupComplete()
         handleIntent(intent)
         InAppReportService.retryQueued(applicationContext)
@@ -868,20 +874,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         handleIntent(intent)
     }
 
-    /** Per-app language (plan 20). Views are built once, so a change applies after a restart; terminals are not recreated. */
-    private var uiLocaleTag: String? = null
-
-    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
-        super.onConfigurationChanged(newConfig)
-        val tag = newConfig.locales.toLanguageTags()
-        val old = uiLocaleTag
-        uiLocaleTag = tag
-        if (old != null && old != tag) Toast.makeText(this, tr(R.string.language_restart), Toast.LENGTH_LONG).show()
-    }
-
     override fun onResume() {
         super.onResume()
-        if (uiLocaleTag == null) uiLocaleTag = resources.configuration.locales.toLanguageTags()
         chatResumed = true
         updateChatShown()
         NativeCodeBridge.agentUiDelegate = this
@@ -4566,6 +4560,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         headerCol.addView(divider)
         settingsHubLayout.addView(headerCol)
 
+        // General: app language (drop-down; applies at once)
+        settingsHubLayout.addView(sectionHeader(R.drawable.ic_tune_thick, tr(R.string.language_general), NC.PRIMARY))
+        settingsHubLayout.addView(buildLanguageRow())
+        settingsHubLayout.addView(spacer(16))
+
         // NativeCode Pro — status + Upgrade / Restore / Manage sheet
         settingsHubLayout.addView(buildProCard())
         settingsHubLayout.addView(spacer(16))
@@ -4693,6 +4692,42 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         // App version code + commit from gradle BuildConfig
         settingsHubLayout.addView(buildSettingsVersionFooter())
+    }
+
+    private fun buildLanguageRow(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = cyberBrutalistBg(
+            fillColor = NC.SURFACE_LOW, strokeColor = NC.OUTLINE_VAR, shadowColor = NC.SHADOW_DARK,
+            offsetDp = 6, cornerRadiusDp = 0
+        )
+        setPadding(dp(16), dp(16), dp(16), dp(16))
+        isClickable = true
+        contentDescription = tr(R.string.language_title)
+        addView(ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_lucide_globe)
+            setColorFilter(NC.PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(12) }
+        })
+        addView(TextView(this@MainActivity).apply {
+            text = tr(R.string.language_title)
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+        })
+        addView(TextView(this@MainActivity).apply {
+            text = LanguagePicker.currentName(this@MainActivity)
+            textSize = 13f
+            setTextColor(NC.ON_SURF_VAR)
+            maxLines = 1
+        })
+        addView(ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_lucide_chevron_down)
+            setColorFilter(NC.PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { marginStart = dp(8) }
+        })
+        setOnClickListener { LanguagePicker.showMenu(this@MainActivity, this) }
     }
 
     private var sdkStatusTv: TextView? = null
@@ -14965,6 +15000,22 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         navigateToPage(ID_SCRIPT_INSTALL)
     }
 
+    /** After a recreate (language change): shells and tabs are still in [TerminalStore]; re-point their clients here and re-attach. */
+    private fun adoptTerminals() {
+        val st = TerminalStore
+        if (st.sessions.isEmpty() && st.projectSessions.isEmpty()) return
+        val oldApp = st.appClient
+        if (st.sessions.isNotEmpty() || oldApp != null) {
+            initTerminalView()
+            val fresh = sessionClient as NativeCodeTerminalSessionClient
+            if (oldApp != null) { oldApp.rebindFrom(fresh); sessionClient = oldApp }
+            st.appClient = sessionClient as NativeCodeTerminalSessionClient
+            sessionsList.getOrNull(activeSessionIndex)?.let { switchTerminalSession(activeSessionIndex) }
+        }
+        val freshWs = newWsClient()
+        st.wsClients.forEach { it.rebindFrom(freshWs) }
+    }
+
     private fun initTerminalView() {
         terminalView.setTextSize(termFontSize)
         try {
@@ -14998,6 +15049,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             },
             onPreviewUrl = { url -> showPreviewChip(url) }
         )
+        TerminalStore.appClient = sessionClient as NativeCodeTerminalSessionClient
 
         terminalView.setTerminalViewClient(viewClient)
     }
@@ -15014,16 +15066,21 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         desktop.onHostDestroyed(isChangingConfigurations)
         if (AgentChats.onChanged === chatsChanged) AgentChats.onChanged = null
         if (AgentChats.gate === chatGate) AgentChats.gate = null
-        // Terminal tabs are Activity-owned (views, session clients), so they end with it; the manifest's
-        // configChanges keeps theme, font scale, density and locale changes from recreating it at all.
-        // Workspace and background-project tabs too, or they run on uncounted (R4 B5). Chats are
-        // process-scoped: a recreate keeps them, a real finish (back, swipe-away) stops them.
-        for (session in (sessionsList + workspaceSessions + projectSessionsMap.values.flatten()).distinct()) {
-            session.finishIfRunning()
-        }
-        if (!isChangingConfigurations) AgentChats.stopAll()
-        if (AgentChats.liveCount() + AgentChats.startingCount() == 0) {
-            stopService(Intent(this, TerminalService::class.java))
+        // A recreate (language change) keeps shells, tab state and the service: the new Activity adopts them from
+        // TerminalStore. A real finish (back, swipe-away) ends every tab, workspace and background-project ones too,
+        // or they run on uncounted (R4 B5), and stops chats (process-scoped: a recreate keeps them).
+        if (isChangingConfigurations) {
+            saveActiveProjectSessions()
+            TerminalStore.restorePage = currentPageId
+        } else {
+            for (session in (sessionsList + workspaceSessions + projectSessionsMap.values.flatten()).distinct()) {
+                session.finishIfRunning()
+            }
+            TerminalStore.clear()
+            AgentChats.stopAll()
+            if (AgentChats.liveCount() + AgentChats.startingCount() == 0) {
+                stopService(Intent(this, TerminalService::class.java))
+            }
         }
         scriptInstallSession?.finishIfRunning()
         mpInstallerSession?.finishIfRunning()
@@ -20130,15 +20187,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
-    private fun attachWorkspaceSession(
-        type: String,
-        args: Array<String>,
-        envMap: HashMap<String, String>,
-        method: String
-    ) {
-        val cwd = File(filesDir, "home").absolutePath
-        val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
-        val sessionClient = NativeCodeTerminalSessionClient(
+    /** Workspace tab client; every workspace session gets its own (callbacks resolve the tab at call time). */
+    private fun newWsClient() = NativeCodeTerminalSessionClient(
             context = this,
             terminalViewRef = { if (::workspaceTerminalView.isInitialized) workspaceTerminalView else null },
             activeSessionRef = { workspaceSessions.getOrNull(activeWorkspaceTabIndex) },
@@ -20163,6 +20213,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
             }
         )
+
+    private fun attachWorkspaceSession(
+        type: String,
+        args: Array<String>,
+        envMap: HashMap<String, String>,
+        method: String
+    ) {
+        val cwd = File(filesDir, "home").absolutePath
+        val env = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
+        val sessionClient = newWsClient().also { TerminalStore.wsClients.add(it) }
 
         val sessionExec = LinuxCommandBuilder.sessionExec(this, args, method = method)
         val sessionArgs = LinuxCommandBuilder.sessionArgs(this, args, method = method)

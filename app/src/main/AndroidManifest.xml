@@ -78,7 +78,7 @@
 
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode|fontScale|density|locale|layoutDirection|keyboard|navigation|colorMode|fontWeightAdjustment"
+            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|smallestScreenSize|uiMode|fontScale|density|keyboard|navigation|colorMode|fontWeightAdjustment"
             android:windowSoftInputMode="adjustResize|stateHidden"
             android:launchMode="singleTask"
             android:exported="false" />
@@ -128,6 +128,16 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps the user-started SSH server (key authentication only, off by default) alive with a visible notification that has a Stop action." />
+        </service>
+
+        <!-- In-app language (AppCompatDelegate.setApplicationLocales): persists the choice on API < 33. -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
         </service>
 
     </application>

@@ -13,7 +13,9 @@
     <string name="quick_widget_description">Mulai agen AI atau desktop Linux</string>
     <string name="quick_shortcut_terminal">Terminal baru</string>
     <string name="quick_shortcut_project">Proyek terakhir</string>
-    <string name="language_restart">Bahasa diubah. Mulai ulang NativeCode agar berlaku di semua tempat.</string>
+    <string name="language_general">Umum</string>
+    <string name="language_title">Bahasa</string>
+    <string name="language_system_default">Default sistem</string>
     <string name="onb_privacy">PRIVASI</string>
     <string name="onb_01_no_nativecode_cloud">01 · TANPA CLOUD NATIVECODE</string>
     <string name="onb_no_ads_and_no_nativecode">Tanpa iklan dan tanpa server NativeCode. Laporan error dan statistik penggunaan anonim (Google Firebase) nonaktif kecuali Anda mengaktifkannya di langkah berikutnya atau di Pengaturan.</string>

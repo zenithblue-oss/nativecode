@@ -16,13 +16,19 @@ import com.zenithblue.nativecode.R
  * Encapsulates text updates, session finishing lifecycle, clipboard copy/paste, and cursor styling.
  */
 class NativeCodeTerminalSessionClient(
-    private val context: Context,
-    private val terminalViewRef: () -> TerminalView?,
-    private val activeSessionRef: () -> TerminalSession?,
-    private val onSessionFinishedCallback: ((TerminalSession) -> Unit)? = null,
+    private var context: Context,
+    private var terminalViewRef: () -> TerminalView?,
+    private var activeSessionRef: () -> TerminalSession?,
+    private var onSessionFinishedCallback: ((TerminalSession) -> Unit)? = null,
     /** A loopback dev-server URL newly printed on screen (plan 12 preview chip). Main thread. */
-    private val onPreviewUrl: ((String) -> Unit)? = null,
+    private var onPreviewUrl: ((String) -> Unit)? = null,
 ) : TerminalSessionClient {
+
+    /** Points a surviving session's client at a new Activity (language change recreates MainActivity; sessions live on). */
+    fun rebindFrom(o: NativeCodeTerminalSessionClient) {
+        context = o.context; terminalViewRef = o.terminalViewRef; activeSessionRef = o.activeSessionRef
+        onSessionFinishedCallback = o.onSessionFinishedCallback; onPreviewUrl = o.onPreviewUrl
+    }
 
     /** Last output time per session (tab strip running/idle dot), shared by every client. Main thread only. */
     val lastOutputAt get() = SHARED_LAST_OUTPUT
@@ -35,14 +41,15 @@ class NativeCodeTerminalSessionClient(
             terminalViewRef()?.onScreenUpdated()
         }
         // ponytail: scans the visible screen at most every 700 ms; a URL scrolled away within that window is missed.
-        if (onPreviewUrl != null && now - lastScanAt > 700) {
+        val onUrl = onPreviewUrl
+        if (onUrl != null && now - lastScanAt > 700) {
             lastScanAt = now
             val emu = session.emulator ?: return
             val text = runCatching { emu.screen.getSelectedText(0, 0, emu.mColumns, emu.mRows - 1) }.getOrNull() ?: return
             if (!text.contains("://")) return
             com.zenithblue.nativecode.preview.PortProbe.findUrls(text).forEach { url ->
                 val port = com.zenithblue.nativecode.preview.PortProbe.portOf(url) ?: return@forEach
-                if (com.zenithblue.nativecode.preview.PortProbe.remember(port)) onPreviewUrl.invoke(url)
+                if (com.zenithblue.nativecode.preview.PortProbe.remember(port)) onUrl.invoke(url)
             }
         }
     }

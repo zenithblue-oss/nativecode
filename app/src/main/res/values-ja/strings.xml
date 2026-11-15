@@ -13,7 +13,9 @@
     <string name="quick_widget_description">AIエージェントまたはLinuxデスクトップを起動</string>
     <string name="quick_shortcut_terminal">新規terminal</string>
     <string name="quick_shortcut_project">前回のプロジェクト</string>
-    <string name="language_restart">言語を変更しました。すべての画面に反映するにはNativeCodeを再起動してください。</string>
+    <string name="language_general">一般</string>
+    <string name="language_title">言語</string>
+    <string name="language_system_default">システムのデフォルト</string>
     <string name="onb_privacy">プライバシー</string>
     <string name="onb_01_no_nativecode_cloud">01 · NativeCodeクラウドなし</string>
     <string name="onb_no_ads_and_no_nativecode">広告はなく、NativeCodeのサーバーもありません。クラッシュレポートと匿名の利用統計（Google Firebase）は、次のステップまたは設定でオンにしない限りオフです。</string>

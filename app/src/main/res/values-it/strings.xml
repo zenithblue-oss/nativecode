@@ -13,7 +13,9 @@
     <string name="quick_widget_description">Avvia un agente AI o il desktop Linux</string>
     <string name="quick_shortcut_terminal">Nuovo terminal</string>
     <string name="quick_shortcut_project">Ultimo progetto</string>
-    <string name="language_restart">Lingua cambiata. Riavvia NativeCode per applicarla ovunque.</string>
+    <string name="language_general">Generale</string>
+    <string name="language_title">Lingua</string>
+    <string name="language_system_default">Predefinita di sistema</string>
     <string name="onb_privacy">PRIVACY</string>
     <string name="onb_01_no_nativecode_cloud">01 · NESSUN CLOUD NATIVECODE</string>
     <string name="onb_no_ads_and_no_nativecode">Niente pubblicità e nessun server NativeCode. Report dei crash e statistiche d\'uso anonime (Google Firebase) sono disattivati finché non li attivi nel prossimo passaggio o nelle Impostazioni.</string>

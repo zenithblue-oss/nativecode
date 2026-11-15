@@ -13,7 +13,9 @@
     <string name="quick_widget_description">Bir yapay zeka ajanı veya Linux masaüstünü başlatın</string>
     <string name="quick_shortcut_terminal">Yeni terminal</string>
     <string name="quick_shortcut_project">Son proje</string>
-    <string name="language_restart">Dil değiştirildi. Her yerde uygulanması için NativeCode\'u yeniden başlatın.</string>
+    <string name="language_general">Genel</string>
+    <string name="language_title">Dil</string>
+    <string name="language_system_default">Sistem varsayılanı</string>
     <string name="onb_privacy">GİZLİLİK</string>
     <string name="onb_01_no_nativecode_cloud">01 · NATIVECODE BULUTU YOK</string>
     <string name="onb_no_ads_and_no_nativecode">Reklam yok, NativeCode sunucusu yok. Çökme raporları ve anonim kullanım istatistikleri (Google Firebase), sonraki adımda veya Ayarlar\'da açmadıkça kapalıdır.</string>

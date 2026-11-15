@@ -13,7 +13,9 @@
     <string name="quick_widget_description">KI-Agent oder Linux-Desktop starten</string>
     <string name="quick_shortcut_terminal">Neues Terminal</string>
     <string name="quick_shortcut_project">Letztes Projekt</string>
-    <string name="language_restart">Sprache geändert. Starten Sie NativeCode neu, um sie überall zu übernehmen.</string>
+    <string name="language_general">Allgemein</string>
+    <string name="language_title">Sprache</string>
+    <string name="language_system_default">Systemstandard</string>
     <string name="onb_privacy">DATENSCHUTZ</string>
     <string name="onb_01_no_nativecode_cloud">01 · KEINE NATIVECODE-CLOUD</string>
     <string name="onb_no_ads_and_no_nativecode">Keine Werbung und keine NativeCode-Server. Absturzberichte und anonyme Nutzungsstatistiken (Google Firebase) sind deaktiviert, sofern Sie sie nicht im nächsten Schritt oder in den Einstellungen aktivieren.</string>
