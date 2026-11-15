@@ -175,10 +175,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private val projectIconCache =
         object : android.util.LruCache<String, android.graphics.Bitmap>(48) {}
     private lateinit var fileViewerRootContainer: LinearLayout
-    private lateinit var fileViewerTopBar: LinearLayout
-    private lateinit var projectDirTreeTopBar: LinearLayout
-    private lateinit var projectSettingsTopBar: LinearLayout
-    private lateinit var projectGitDiffTopBar: LinearLayout
+    private lateinit var fileViewerTopBar: WorkspaceTopBar
+    private lateinit var projectDirTreeTopBar: WorkspaceTopBar
+    private lateinit var projectSettingsTopBar: WorkspaceTopBar
+    private lateinit var projectGitDiffTopBar: WorkspaceTopBar
     /** Sticky FILE VIEWER title + path (outside scroll). */
     private lateinit var fileViewerStickyHeader: LinearLayout
     private var fileViewerPathTv: TextView? = null
@@ -188,7 +188,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var fileViewerContainer: LinearLayout
     private var dirSearchQuery: String = ""
     private lateinit var diffViewerRootContainer: LinearLayout
-    private lateinit var diffViewerTopBar: LinearLayout
+    private lateinit var diffViewerTopBar: WorkspaceTopBar
     private lateinit var diffViewerScrollView: ScrollView
     private lateinit var diffViewerContainer: LinearLayout
     private lateinit var scriptsScrollView: ScrollView
@@ -753,9 +753,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             if (::projectSettingsLayout.isInitialized) {
                 val settingsTopBar = projectSettingsLayout.getChildAt(0) as? LinearLayout
                 settingsTopBar?.setPadding(dp(12), dp(10), dp(12), dp(10))
-            }
-            if (::projectDirTreeTopBar.isInitialized) {
-                projectDirTreeTopBar.setPadding(dp(12), dp(10), dp(12), dp(10))
             }
             if (::projectGitDiffLayout.isInitialized) {
                 val gitDiffTopBar = projectGitDiffLayout.getChildAt(0) as? LinearLayout
@@ -4271,9 +4268,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Tool rails (terminal + project workspace top bars); same tools, all visible, no popup. */
     private val toolRails = ArrayList<ToolRail>()
 
-    private fun fillToolRail(rail: ToolRail, workspace: Boolean) {
+    /** @param terminalTools false on workspace sub-pages: only keep-awake + desktop pill (page actions go after them). */
+    private fun fillToolRail(rail: ToolRail, workspace: Boolean, terminalTools: Boolean = true) {
         // Terminal-only tools hide while the chat is shown (its composer has its own + sheet).
-        val termOnly = { !isChatMode(workspace) }
+        val termOnly = { terminalTools && !isChatMode(workspace) }
         rail.add(
             icon = { R.drawable.ic_keyboard },
             desc = { if (showExtraKeys) "Extra keys: on" else "Extra keys: off" },
@@ -20787,56 +20785,20 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         projectSettingsContainer.addView(col)
     }
 
-    private fun createProjectSubpageTopBar(): LinearLayout {
-        val topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(NC.SURFACE_LOWEST)
-                setStroke(dp(1), NC.OUTLINE_VAR)
-            }
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+    /** Workspace sub-pages (directory, diff, config, file / diff viewers) share the workspace top bar. */
+    private fun createProjectSubpageTopBar(): WorkspaceTopBar {
+        val topBar = WorkspaceTopBar(this) { onBackPressed() }.apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         }
-        val backBtn = ImageView(this).apply {
-            setImageResource(R.drawable.ic_arrow_back)
-            setColorFilter(NC.ON_SURFACE)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
-            setOnClickListener {
-                onBackPressed()
-            }
-        }
-        val workspaceIconIv = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { rightMargin = dp(8) }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            visibility = View.GONE
-        }
-        val titleTv = TextView(this).apply {
-            text = activeProjectName
-            textSize = 16f
-            setTextColor(NC.ON_SURFACE)
-            typeface = Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        }
-        topBar.addView(backBtn)
-        topBar.addView(workspaceIconIv)
-        topBar.addView(titleTv)
-
+        topBar.stats.onCustomize = { openTopBarPage() }
+        fillToolRail(topBar.rail, workspace = true, terminalTools = false)
         updateProjectSubpageTopBar(topBar)
         return topBar
     }
 
-    private fun updateProjectSubpageTopBar(topBar: LinearLayout) {
-        val workspaceIconIv = topBar.getChildAt(1) as? ImageView
-        val titleTv = topBar.getChildAt(2) as? TextView
-        titleTv?.text = activeProjectName
-
-        val iconStr = getProjects().find { it.path == activeProjectPath }?.icon ?: ""
-        if (workspaceIconIv != null) {
-            bindWorkspaceProjectIcon(workspaceIconIv, iconStr)
-        }
+    private fun updateProjectSubpageTopBar(topBar: WorkspaceTopBar) {
+        topBar.setTitle(activeProjectName)
+        bindWorkspaceProjectIcon(topBar.iconView, getProjects().find { it.path == activeProjectPath }?.icon ?: "")
     }
 
     private fun bindProjectGitBranchesCard(host: LinearLayout) {
