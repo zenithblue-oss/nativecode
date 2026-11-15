@@ -1,0 +1,16 @@
+NativeCode 将您的手机或平板变成便携式 Linux 工作站和 AI 开发环境，无需电脑。
+
+主要功能：
+
+- Alpaquita Linux 容器 — 原生 glibc 用户空间，带 apk 和完整的开发环境
+- 两种隔离模式 — PRoot（无需 root，推荐）和 Chroot（内核空间，适用于已 root 设备）
+- XFCE4 桌面图形界面 — 集成 Termux-X11 显示服务，支持 VirGL GPU 加速
+- AI CLI 引擎 — 在原生终端中运行 Claude Code、Codex、OpenCode、Agy、Grok、Qwen 和 Kiro
+- 软件市场 — 从应用内目录浏览并安装精选软件包
+- Git 工作区 — 多仓库项目树、实时状态、可视化差异查看、分支切换、GitHub CLI 集成
+- 预配置运行时 — Node.js 26 LTS、Python 3.12、GCC 和常用包管理器
+- CLI 配置 — 引导式安装和凭据管理，支持各 AI 厂商工具
+
+首次设置由引导向导带您完成：设备检查，并一键安装无 root 的 Alpaquita PRoot 环境，实时显示进度。
+
+把您的手机或平板变成便携式 Linux 与 AI 工作站，随时编程和开发软件。

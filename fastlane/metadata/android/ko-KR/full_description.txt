@@ -1,0 +1,16 @@
+NativeCode는 휴대폰이나 태블릿을 PC 없이도 쓸 수 있는 휴대용 Linux 워크스테이션이자 AI 개발 환경으로 바꿔 줍니다.
+
+주요 기능:
+
+- Alpaquita Linux 컨테이너 — apk를 지원하는 네이티브 glibc 유저랜드와 완전한 개발 환경
+- 두 가지 격리 모드 — PRoot(루트 불필요, 권장)와 Chroot(커널 공간, 루팅된 기기용)
+- XFCE4 데스크톱 GUI — VirGL GPU 가속을 지원하는 내장 Termux-X11 디스플레이 서버
+- AI CLI 엔진 — Claude Code, Codex, OpenCode, Agy, Grok, Qwen, Kiro를 네이티브 terminal에서 실행
+- 소프트웨어 마켓플레이스 — 앱 내 카탈로그에서 엄선된 패키지를 찾아 설치
+- Git 워크스페이스 — 멀티 저장소 프로젝트 트리, 실시간 상태, 시각적 diff 검사기, 브랜치 전환, GitHub CLI 연동
+- 사전 구성된 런타임 — Node.js 26 LTS, Python 3.12, GCC 및 표준 패키지 관리자
+- CLI 프로비저닝 — AI 업체 도구의 안내식 설치 및 자격 증명 관리
+
+온보딩 마법사가 처음 설정을 안내합니다. 기기를 점검하고, 루트가 필요 없는 Alpaquita PRoot 환경을 진행 상황을 실시간으로 보며 한 번의 탭으로 설치합니다.
+
+휴대폰이나 태블릿을 코딩과 소프트웨어 개발을 위한 휴대용 Linux & AI 워크스테이션으로 만들어 보세요.

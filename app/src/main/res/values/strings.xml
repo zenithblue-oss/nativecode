@@ -614,7 +614,7 @@
     <string name="chat_terminal">Terminal</string>
     <string name="chat_raw_shell">Raw shell</string>
     <string name="chat_shell">Shell</string>
-    <string name="chat_m_h_a_0_0">M%1$s %2$sh%3$sa%4$s %5$s 0 0 1 %6$s %7$sv%8$sa%9$s %10$s 0 0 1 %11$s %12$sh%13$sa%14$s %15$s 0 0 1 %16$s %17$sv%18$sa%19$s %20$s 0 0 1 %21$s %22$sz</string>
+    <string name="chat_m_h_a_0_0" translatable="false">M%1$s %2$sh%3$sa%4$s %5$s 0 0 1 %6$s %7$sv%8$sa%9$s %10$s 0 0 1 %11$s %12$sh%13$sa%14$s %15$s 0 0 1 %16$s %17$sv%18$sa%19$s %20$s 0 0 1 %21$s %22$sz</string>
     <string name="chat_this_turn">This turn</string>
     <string name="chat_whole_thread">Whole thread</string>
     <string name="chat_uncommitted">Uncommitted</string>
@@ -622,7 +622,7 @@
     <string name="chat_could_not_start_a_side">Could not start a side chat</string>
     <string name="chat_waiting">Waiting</string>
     <string name="chat_answered">Answered</string>
-    <string name="chat_eee_d_mmm_yyyy_hh">EEE d MMM yyyy, HH:mm:ss</string>
+    <string name="chat_eee_d_mmm_yyyy_hh" translatable="false">EEE d MMM yyyy, HH:mm:ss</string>
     <string name="chat_show_time">Show time</string>
     <string name="chat_show_less">Show less</string>
     <string name="chat_show_more">Show more</string>
@@ -670,7 +670,7 @@
     <string name="chat_task_status">Task status</string>
     <string name="chat_message">Message</string>
     <string name="chat_notification">Notification</string>
-    <string name="chat_eee_d_mmm_hh_mm">EEE d MMM, HH:mm:ss</string>
+    <string name="chat_eee_d_mmm_hh_mm" translatable="false">EEE d MMM, HH:mm:ss</string>
     <string name="chat_delivered">Delivered</string>
     <string name="chat_open">Open</string>
     <string name="chat_no_app_can_open_this">No app can open this link</string>
@@ -706,11 +706,11 @@
     <string name="chat_not_reported_has_not_sent">Not reported: %1$s has not sent quota or rate-limit information in this session.</string>
     <string name="chat_limit_reached">Limit reached</string>
     <string name="chat_within_limits">Within limits</string>
-    <string name="chat_mmm_d_hh_mm">MMM d, HH:mm</string>
+    <string name="chat_mmm_d_hh_mm" translatable="false">MMM d, HH:mm</string>
     <string name="chat_hide_tasks">Hide tasks</string>
     <string name="chat_show_tasks">Show tasks</string>
     <string name="chat_tasks">Tasks %1$s/%2$s</string>
-    <string name="proot_mmm_d_yyyy_hh_mm">MMM d, yyyy HH:mm</string>
+    <string name="proot_mmm_d_yyyy_hh_mm" translatable="false">MMM d, yyyy HH:mm</string>
     <string name="proot_home_files">HOME FILES</string>
     <string name="proot_folder_is_empty">Folder is empty</string>
     <string name="app_rootshell_error_no_working_su">[RootShell] ERROR: no working su binary</string>

@@ -1,0 +1,16 @@
+NativeCode verwandelt Ihr Smartphone oder Tablet in eine portable Linux-Workstation und KI-Entwicklungsumgebung — ganz ohne PC.
+
+Hauptfunktionen:
+
+- Alpaquita-Linux-Container — natives glibc-Userland mit apk und einer vollständigen Entwicklungsumgebung
+- Zwei Isolationsmodi — PRoot (ohne Root, empfohlen) und Chroot (Kernel-Ebene, für gerootete Geräte)
+- XFCE4-Desktopoberfläche — integrierter Termux-X11-Anzeigeserver mit VirGL-GPU-Beschleunigung
+- KI-CLI-Engine — Claude Code, Codex, OpenCode, Agy, Grok, Qwen und Kiro im nativen Terminal ausführen
+- Software-Marktplatz — kuratierte Pakete aus einem In-App-Katalog durchsuchen und installieren
+- Git-Workspace — Projektbaum für mehrere Repos, Echtzeit-Status, visueller Diff-Inspektor, Branch-Wechsel, GitHub-CLI-Integration
+- Vorkonfigurierte Laufzeiten — Node.js 26 LTS, Python 3.12, GCC und gängige Paketmanager
+- CLI-Bereitstellung — geführte Installation und Verwaltung der Zugangsdaten für KI-Anbieter-Tools
+
+Ein Onboarding-Assistent führt durch die Ersteinrichtung: Gerätechecks und Ein-Tipp-Installation der rootlosen Alpaquita-PRoot-Umgebung mit Live-Fortschritt.
+
+Machen Sie aus Ihrem Smartphone oder Tablet eine portable Linux- und KI-Workstation für Coding und Softwareentwicklung.

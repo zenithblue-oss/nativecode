@@ -1,0 +1,16 @@
+NativeCode, telefonunuzu veya tabletinizi taşınabilir bir Linux iş istasyonuna ve yapay zeka geliştirme ortamına dönüştürür — bilgisayara gerek yok.
+
+Öne Çıkan Özellikler:
+
+- Alpaquita Linux kapsayıcısı — apk ve eksiksiz bir geliştirme ortamı içeren yerel glibc kullanıcı alanı
+- İki yalıtım modu — PRoot (root gerekmez, önerilir) ve Chroot (çekirdek alanı, root'lu cihazlar için)
+- XFCE4 masaüstü arayüzü — VirGL GPU hızlandırmalı entegre Termux-X11 ekran sunucusu
+- Yapay zeka CLI motoru — Claude Code, Codex, OpenCode, Agy, Grok, Qwen ve Kiro'yu yerel terminalde çalıştırın
+- Yazılım pazar yeri — uygulama içi katalogdan seçilmiş paketlere göz atın ve kurun
+- Git çalışma alanı — çoklu depo proje ağacı, gerçek zamanlı durum, görsel diff denetçisi, dal değiştirme, GitHub CLI entegrasyonu
+- Önceden yapılandırılmış çalışma zamanları — Node.js 26 LTS, Python 3.12, GCC ve standart paket yöneticileri
+- CLI hazırlama — yapay zeka sağlayıcı araçları için rehberli kurulum ve kimlik bilgisi yönetimi
+
+Bir karşılama sihirbazı ilk kurulumda size rehberlik eder: cihaz denetimleri ve rootsuz Alpaquita PRoot ortamının canlı ilerlemeyle tek dokunuşla kurulumu.
+
+Telefonunuzu veya tabletinizi kodlama ve yazılım geliştirme için taşınabilir bir Linux ve yapay zeka iş istasyonuna dönüştürün.

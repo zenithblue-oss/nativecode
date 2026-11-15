@@ -8,6 +8,7 @@ RES = os.path.join(os.path.dirname(__file__), '..', '..', 'app', 'src', 'main', 
 def load(path):
     out = {}
     for el in ET.parse(path).getroot().iter('string'):
+        if el.get('translatable') == 'false': continue
         out[el.get('name')] = ''.join(el.itertext())
     return out
 def raw_ok(path):

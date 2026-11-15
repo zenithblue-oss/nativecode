@@ -1,0 +1,16 @@
+O NativeCode transforma seu celular ou tablet em uma estação de trabalho Linux portátil e em um ambiente de desenvolvimento com IA — sem precisar de PC.
+
+Principais recursos:
+
+- Contêiner Alpaquita Linux — userland glibc nativo com apk e um ambiente de desenvolvimento completo
+- Dois modos de isolamento — PRoot (não requer root, recomendado) e Chroot (espaço de kernel, para dispositivos com root)
+- Interface gráfica do desktop XFCE4 — servidor de vídeo Termux-X11 integrado com aceleração de GPU VirGL
+- Motor de CLI de IA — execute Claude Code, Codex, OpenCode, Agy, Grok, Qwen e Kiro no terminal nativo
+- Marketplace de software — navegue e instale pacotes selecionados de um catálogo dentro do app
+- Workspace Git — árvore de projetos com vários repositórios, status em tempo real, inspetor visual de diffs, troca de branches e integração com o GitHub CLI
+- Runtimes pré-configurados — Node.js 26 LTS, Python 3.12, GCC e gerenciadores de pacotes padrão
+- Provisionamento de CLIs — instalação guiada e gerenciamento de credenciais das ferramentas dos fornecedores de IA
+
+Um assistente de introdução orienta a primeira configuração: verificações do dispositivo e instalação com um toque do ambiente Alpaquita PRoot sem root, com progresso em tempo real.
+
+Transforme seu celular ou tablet em uma estação de trabalho portátil de Linux e IA para programar e desenvolver software.
