@@ -1,0 +1,6 @@
+<!-- Lucide "git-branch" -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M6,3L6,15 M15,6A3,3 0,1 0,21 6A3,3 0,1 0,15 6Z M3,18A3,3 0,1 0,9 18A3,3 0,1 0,3 18Z M18,9A9,9 0,0 1,9 18" />
+</vector>

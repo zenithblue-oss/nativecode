@@ -3418,79 +3418,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
     }
 
-    private fun createHoveringNewProjectFab(): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            
-            background = cyberBrutalistBg(
-                fillColor = NC.PRIMARY_CON,
-                strokeColor = Color.parseColor("#3c4a3f"),
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 6,
-                cornerRadiusDp = 0,
-                rightFaceColor = Color.parseColor("#3c4a3f")
-            )
-            setPadding(dp(16), dp(12), dp(18), dp(12))
-            elevation = dp(8).toFloat()
-
-            val iconIv = ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.ic_add)
-                setColorFilter(NC.ON_PRIMARY)
-                layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply { rightMargin = dp(6) }
-            }
-
-            val textTv = TextView(this@MainActivity).apply {
-                text = "NEW PROJECT"
-                textSize = 13f
-                setTextColor(NC.ON_PRIMARY)
-                typeface = Typeface.MONOSPACE
-                paint.isFakeBoldText = true
-                if (proLocked()) markProLocked()
-            }
-
-            addView(iconIv)
-            addView(textTv)
-
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.translationX = dp(4).toFloat()
-                        v.translationY = dp(4).toFloat()
-                        v.background = cyberBrutalistBg(
-                            fillColor = Color.parseColor("#49E48F"),
-                            strokeColor = Color.parseColor("#3c4a3f"),
-                            shadowColor = NC.SHADOW_DARK,
-                            offsetDp = 2,
-                            cornerRadiusDp = 0,
-                            rightFaceColor = Color.parseColor("#3c4a3f")
-                        )
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.translationX = 0f
-                        v.translationY = 0f
-                        v.background = cyberBrutalistBg(
-                            fillColor = NC.PRIMARY_CON,
-                            strokeColor = Color.parseColor("#3c4a3f"),
-                            shadowColor = NC.SHADOW_DARK,
-                            offsetDp = 6,
-                            cornerRadiusDp = 0,
-                            rightFaceColor = Color.parseColor("#3c4a3f")
-                        )
-                    }
-                }
-                false
-            }
-
-            setOnClickListener {
-                if (pageStack.isEmpty() || pageStack.peek() != ID_PROJECT_CREATE) {
-                    pageStack.push(ID_PROJECT_CREATE)
-                }
-                navigateToPage(ID_PROJECT_CREATE)
-            }
-        }
-    }
-
     private fun buildSystemTelemetryCards(): View {
         return androidx.compose.ui.platform.ComposeView(this).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
@@ -11799,8 +11726,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         confirmLabel: String,
         cancelLabel: String = "CANCEL",
         destructive: Boolean = false,
+        body: View? = null,
         onConfirm: () -> Unit
-    ) {
+    ): android.app.Dialog {
         val dialog = android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar)
         dialog.setCancelable(true)
 
@@ -11963,6 +11891,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         btnRow.addView(cancelBtn)
         btnRow.addView(confirmBtn)
+        if (body != null) card.addView(body, LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(16) })
         card.addView(btnRow)
 
         scrim.addView(card)
@@ -11973,8 +11902,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             // keep status bar readable
             statusBarColor = Color.TRANSPARENT
             navigationBarColor = Color.TRANSPARENT
+            if (body != null) setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
         dialog.show()
+        return dialog
     }
 
     private fun onChrootUninstalled(fromCallback: Boolean) {
@@ -15138,156 +15069,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             addView(iconContainer)
             addView(infoCol)
             addView(actionIcon)
-
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.translationX = dp(4).toFloat()
-                        v.translationY = dp(4).toFloat()
-                        v.background = cyberBrutalistBg(
-                            fillColor = NC.SURFACE_LOW,
-                            strokeColor = Color.parseColor("#3c4a3f"),
-                            shadowColor = NC.SHADOW_DARK,
-                            offsetDp = 2,
-                            cornerRadiusDp = 0,
-                            rightFaceColor = Color.parseColor("#3c4a3f")
-                        )
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.translationX = 0f
-                        v.translationY = 0f
-                        v.background = cyberBrutalistBg(
-                            fillColor = NC.SURFACE_LOW,
-                            strokeColor = Color.parseColor("#3c4a3f"),
-                            shadowColor = NC.SHADOW_DARK,
-                            offsetDp = 6,
-                            cornerRadiusDp = 0,
-                            rightFaceColor = Color.parseColor("#3c4a3f")
-                        )
-                    }
-                }
-                false
-            }
-        }
-    }
-
-    private fun projectGridCard(name: String, path: String, time: String, iconStr: String = "", method: String = "proot"): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = Color.parseColor("#3c4a3f"),
-                shadowColor = NC.SHADOW_DARK,
-                offsetDp = 6,
-                cornerRadiusDp = 0,
-                rightFaceColor = Color.parseColor("#3c4a3f")
-            )
-            setPadding(dp(16), dp(24), dp(16), dp(20))
-
-            val iconContainer = FrameLayout(this@MainActivity).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(56), dp(56)).apply {
-                    bottomMargin = dp(16)
-                    gravity = Gravity.CENTER_HORIZONTAL
-                }
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    setColor(NC.SURFACE_LOWEST)
-                    setStroke(dp(1), Color.parseColor("#3360F99E"))
-                    cornerRadius = 0f
-                }
-            }
-            bindProjectIconContainer(iconContainer, iconStr, glyphSizeDp = 30)
-
-            val titleTv = TextView(this@MainActivity).apply {
-                text = name.uppercase()
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
-                gravity = Gravity.CENTER
-                maxLines = 2
-                ellipsize = android.text.TextUtils.TruncateAt.END
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(6) }
-            }
-
-            val timeTv = TextView(this@MainActivity).apply {
-                text = if (time.startsWith("UPDATED:", ignoreCase = true)) time.uppercase() else "UPDATED: ${time.uppercase()}"
-                textSize = 11f
-                setTextColor(Color.parseColor("#869587"))
-                typeface = Typeface.MONOSPACE
-                gravity = Gravity.CENTER
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            }
-
-            val tagsRow = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
-                    topMargin = dp(8)
-                    gravity = Gravity.CENTER_HORIZONTAL
-                }
-            }
-
-            if (method == "chroot") {
-                val methodTag = TextView(this@MainActivity).apply {
-                    text = "CHROOT"
-                    textSize = 10f
-                    setTextColor(NC.TERTIARY)
-                    typeface = Typeface.MONOSPACE
-                    gravity = Gravity.CENTER
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.RECTANGLE
-                        setColor(NC.SURFACE_LOWEST)
-                        setStroke(dp(1), NC.TERTIARY)
-                    }
-                    setPadding(dp(6), dp(2), dp(6), dp(2))
-                }
-                tagsRow.addView(methodTag)
-            }
-            if (FeatureGate.canUse(isPro(), ProFeature.WORKSPACE) is GateResult.Deny) tagsRow.addView(TextView(this@MainActivity).apply { text = "LOCKED · PRO"; textSize = 10f; setTextColor(NC.ERROR); typeface = Typeface.MONOSPACE; setPadding(dp(6), dp(2), dp(6), dp(2)); markProLocked() })
-
-            val openCount = projectSessionsMap[path]?.count { it.isRunning } ?: 0
-            if (openCount > 0) {
-                val activeBadge = LinearLayout(this@MainActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.RECTANGLE
-                        setColor(NC.SURFACE_LOWEST)
-                        setStroke(dp(1), NC.PRIMARY)
-                    }
-                    setPadding(dp(6), dp(2), dp(6), dp(2))
-                    layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
-                        if (tagsRow.childCount > 0) leftMargin = dp(6)
-                    }
-
-                    val termIcon = ImageView(this@MainActivity).apply {
-                        setImageResource(R.drawable.ic_terminal)
-                        setColorFilter(NC.PRIMARY)
-                        layoutParams = LinearLayout.LayoutParams(dp(12), dp(12)).apply {
-                            rightMargin = dp(4)
-                        }
-                    }
-                    val countTv = TextView(this@MainActivity).apply {
-                        text = "$openCount"
-                        textSize = 10f
-                        setTextColor(NC.PRIMARY)
-                        typeface = Typeface.MONOSPACE
-                        gravity = Gravity.CENTER
-                    }
-                    addView(termIcon)
-                    addView(countTv)
-                }
-                tagsRow.addView(activeBadge)
-            }
-
-            addView(iconContainer)
-            addView(titleTv)
-            addView(timeTv)
-            if (tagsRow.childCount > 0) {
-                addView(tagsRow)
-            }
 
             setOnTouchListener { v, event ->
                 when (event.action) {
@@ -19398,7 +19179,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         projectsListScrollView = ScrollView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
             clipToPadding = false
-            setPadding(0, 0, 0, dp(100))
+            setPadding(0, 0, 0, dp(24))
         }
         projectsListLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -19406,183 +19187,476 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         projectsListScrollView.addView(projectsListLayout)
         projectsListContainer.addView(projectsListScrollView)
-
-        val fab = createHoveringNewProjectFab()
-        val fabParams = FrameLayout.LayoutParams(WRAP, WRAP).apply {
-            gravity = Gravity.BOTTOM or Gravity.END
-            rightMargin = dp(20)
-            bottomMargin = dp(24)
-        }
-        projectsListContainer.addView(fab, fabParams)
     }
+
+    // ── Projects list (cards, search/sort, New / Clone / Import, per-project actions) ──
+
+    private var projectsQuery = ""
+    private var projectsSortByName = false
+    private var projectsCardsHost: LinearLayout? = null
 
     private fun populateProjectsList() {
         projectsListLayout.removeAllViews()
-
-        val headerCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dp(16))
-        }
+        val list = getProjects()
 
         val topRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         }
-
-        val titleTv = TextView(this).apply {
-            text = "ALL PROJECTS"
-            textSize = 24f
+        topRow.addView(TextView(this).apply {
+            text = "PROJECTS"
+            textSize = 22f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        }
-
-        val count = getProjects().size
-        val countBadge = TextView(this).apply {
-            text = "$count PROJECTS"
-            textSize = 11f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.MONOSPACE
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(NC.SURFACE_LOWEST)
-                setStroke(dp(1), Color.parseColor("#3360F99E"))
-            }
-            setPadding(dp(8), dp(4), dp(8), dp(4))
-        }
-
-        topRow.addView(titleTv)
-        topRow.addView(countBadge)
-
-        val subTitleTv = TextView(this).apply {
-            text = "// ALPAQUITA LINUX REPOSITORY • DEPLOYMENT HOST"
+        })
+        topRow.addView(TextView(this).apply {
+            text = if (list.size == 1) "1 PROJECT" else "${list.size} PROJECTS"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
-            setPadding(0, dp(4), 0, dp(12))
+            background = GradientDrawable().apply {
+                setColor(NC.SURFACE_LOWEST)
+                setStroke(dp(1), NC.OUTLINE_VAR)
+            }
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+        })
+        projectsListLayout.addView(topRow)
+
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(16) }
         }
+        fun action(label: String, icon: Int, primary: Boolean, last: Boolean, onClick: () -> Unit) =
+            actions.addView(projectsActionButton(label, icon, primary, onClick),
+                LinearLayout.LayoutParams(0, WRAP, 1f).apply { if (!last) rightMargin = dp(10) })
+        action("NEW", R.drawable.ic_lucide_plus, true, false) { openProjectCreate(clone = false) }
+        action("CLONE", R.drawable.ic_lucide_download, false, false) { openProjectCreate(clone = true) }
+        action("IMPORT", R.drawable.ic_lucide_folder_input, false, true) { showImportProjectDialog() }
+        projectsListLayout.addView(actions)
 
-        val divider = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, dp(1)).apply { bottomMargin = dp(16) }
-            setBackgroundColor(NC.OUTLINE_VAR)
-        }
-
-        headerCol.addView(topRow)
-        headerCol.addView(subTitleTv)
-        headerCol.addView(divider)
-
-        projectsListLayout.addView(headerCol)
-
-        val list = getProjects()
         if (list.isEmpty()) {
-            val emptyCard = LinearLayout(this).apply {
+            projectsCardsHost = null
+            projectsListLayout.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_LOW,
-                    strokeColor = NC.OUTLINE_VAR,
-                    shadowColor = NC.SHADOW_DARK,
-                    offsetDp = 6,
-                    cornerRadiusDp = 0
-                )
-                setPadding(dp(24), dp(32), dp(24), dp(32))
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(16) }
-            }
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(dp(24), dp(40), dp(24), dp(24))
+                addView(ImageView(this@MainActivity).apply {
+                    setImageResource(R.drawable.ill_projects_empty)
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    layoutParams = LinearLayout.LayoutParams(dp(150), dp(120)).apply { bottomMargin = dp(20) }
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = "No projects yet"
+                    textSize = 18f
+                    setTextColor(NC.ON_SURFACE)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = "Create a blank project, clone a Git repository, or import a folder that already lives in /home/flux/repos."
+                    textSize = 13f
+                    setTextColor(NC.ON_SURF_VAR)
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(8), 0, 0)
+                })
+            })
+            return
+        }
 
-            val emptyTitle = TextView(this).apply {
-                text = "NO PROJECTS INITIALIZED"
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.MONOSPACE
-                gravity = Gravity.CENTER
+        val tools = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(20) }
+        }
+        val search = EditText(this).apply {
+            hint = "Search projects"
+            setText(projectsQuery)
+            setHintTextColor(NC.OUTLINE)
+            setTextColor(NC.ON_SURFACE)
+            textSize = 14f
+            isSingleLine = true
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            background = GradientDrawable().apply {
+                setColor(NC.SURFACE_LOWEST)
+                setStroke(dp(1), NC.OUTLINE_VAR)
             }
-
-            val emptyDesc = TextView(this).apply {
-                text = "No projects created in the Alpaquita rootfs yet.\nTap the '+ NEW PROJECT' button to initialize your first project repository."
-                textSize = 12f
-                setTextColor(NC.ON_SURF_VAR)
-                typeface = Typeface.MONOSPACE
-                gravity = Gravity.CENTER
-                setPadding(0, dp(8), 0, dp(16))
-            }
-
-            val createBtn = primaryButton(" + INITIALIZE FIRST PROJECT") {
-                if (pageStack.isEmpty() || pageStack.peek() != ID_PROJECT_CREATE) {
-                    pageStack.push(ID_PROJECT_CREATE)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            val d = androidx.core.content.ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_lucide_search)?.mutate()
+            d?.setBounds(0, 0, dp(18), dp(18)); d?.setTint(ToolRail.ICON_TINT)
+            setCompoundDrawablesRelative(d, null, null, null)
+            compoundDrawablePadding = dp(8)
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(10) }
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: android.text.Editable?) {
+                    projectsQuery = s?.toString().orEmpty()
+                    renderProjectCards()
                 }
-                navigateToPage(ID_PROJECT_CREATE)
+            })
+        }
+        val sort = TextView(this).apply {
+            fun paint() {
+                text = if (projectsSortByName) "NAME" else "RECENT"
+                contentDescription = "Sort by ${if (projectsSortByName) "name" else "last opened"}. Tap to change."
             }
-
-            emptyCard.addView(emptyTitle)
-            emptyCard.addView(emptyDesc)
-            if (proLocked()) createBtn.markProLocked()
-            emptyCard.addView(createBtn)
-
-            projectsListLayout.addView(emptyCard)
-        } else {
-            for (i in list.indices step 2) {
-                val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
-                        bottomMargin = dp(16)
-                    }
-                }
-
-                val p1 = list[i]
-                val card1 = projectGridCard(p1.name, p1.path, "Tap to open", p1.icon, p1.linuxMethod).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply {
-                        rightMargin = dp(8)
-                    }
-                    setOnClickListener {
-                        if (!projectGateAllows()) return@setOnClickListener
-                        markProjectOpened(p1.path)
-                        activeProjectName = p1.name
-                        activeProjectPath = p1.path
-                        applyProjectIsolation(p1.path, p1.linuxMethod)
-                        Toast.makeText(this@MainActivity, "Project opened: ${p1.name}", Toast.LENGTH_SHORT).show()
-                        if (pageStack.isEmpty() || pageStack.peek() != ID_PROJECT_WORKSPACE) {
-                            pageStack.push(ID_PROJECT_WORKSPACE)
-                        }
-                        navigateToPage(ID_PROJECT_WORKSPACE)
-                    }
-                }
-                row.addView(card1)
-
-                if (i + 1 < list.size) {
-                    val p2 = list[i + 1]
-                    val card2 = projectGridCard(p2.name, p2.path, "Tap to open", p2.icon, p2.linuxMethod).apply {
-                        layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply {
-                            leftMargin = dp(8)
-                        }
-                        setOnClickListener {
-                            if (!projectGateAllows()) return@setOnClickListener
-                            markProjectOpened(p2.path)
-                            activeProjectName = p2.name
-                            activeProjectPath = p2.path
-                            applyProjectIsolation(p2.path, p2.linuxMethod)
-                            Toast.makeText(this@MainActivity, "Project opened: ${p2.name}", Toast.LENGTH_SHORT).show()
-                            if (pageStack.isEmpty() || pageStack.peek() != ID_PROJECT_WORKSPACE) {
-                                pageStack.push(ID_PROJECT_WORKSPACE)
-                            }
-                            navigateToPage(ID_PROJECT_WORKSPACE)
-                        }
-                    }
-                    row.addView(card2)
-                } else {
-                    val dummySpacer = View(this).apply {
-                        layoutParams = LinearLayout.LayoutParams(0, MATCH, 1f).apply {
-                            leftMargin = dp(8)
-                        }
-                    }
-                    row.addView(dummySpacer)
-                }
-
-                projectsListLayout.addView(row)
+            paint()
+            textSize = 12f
+            setTextColor(NC.PRIMARY)
+            typeface = Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            minWidth = dp(76)
+            background = GradientDrawable().apply {
+                setColor(NC.SURFACE_LOWEST)
+                setStroke(dp(1), NC.PRIMARY)
             }
+            setPadding(dp(10), dp(12), dp(10), dp(12))
+            setOnClickListener { projectsSortByName = !projectsSortByName; paint(); renderProjectCards() }
+        }
+        tools.addView(search)
+        tools.addView(sort)
+        projectsListLayout.addView(tools)
+
+        val host = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) }
+        }
+        projectsCardsHost = host
+        projectsListLayout.addView(host)
+        renderProjectCards()
+    }
+
+    private fun projectsActionButton(label: String, icon: Int, primary: Boolean, onClick: () -> Unit) = TextView(this).apply {
+        text = label
+        textSize = 13f
+        typeface = Typeface.MONOSPACE
+        paint.isFakeBoldText = true
+        gravity = Gravity.CENTER
+        val fg = if (primary) NC.ON_PRIMARY else NC.PRIMARY
+        setTextColor(fg)
+        background = cyberBrutalistBg(
+            fillColor = if (primary) NC.PRIMARY_CON else NC.SURFACE_LOW,
+            strokeColor = if (primary) NC.PRIMARY_CON else NC.OUTLINE_VAR,
+            shadowColor = NC.SHADOW_DARK,
+            offsetDp = 3,
+            cornerRadiusDp = 0,
+            rightFaceColor = Color.parseColor("#3c4a3f")
+        )
+        val d = androidx.core.content.ContextCompat.getDrawable(this@MainActivity, icon)?.mutate()
+        d?.setBounds(0, 0, dp(18), dp(18)); d?.setTint(fg)
+        setCompoundDrawablesRelative(d, null, null, null)
+        compoundDrawablePadding = dp(6)
+        setPadding(dp(10), dp(12), dp(10), dp(12))
+        minHeight = dp(48)
+        if (primary && proLocked()) markProLocked()
+        setOnClickListener { onClick() }
+    }
+
+    private fun openProjectCreate(clone: Boolean) {
+        if (pageStack.isEmpty() || pageStack.peek() != ID_PROJECT_CREATE) pageStack.push(ID_PROJECT_CREATE)
+        navigateToPage(ID_PROJECT_CREATE)
+        if (clone && ::projectGithubInput.isInitialized) projectGithubInput.post {
+            projectGithubInput.requestFocus()
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+                .showSoftInput(projectGithubInput, 0)
         }
     }
 
+    private fun renderProjectCards() {
+        val host = projectsCardsHost ?: return
+        host.removeAllViews()
+        val q = projectsQuery.trim()
+        val shown = getProjects()
+            .filter { q.isEmpty() || it.name.contains(q, true) || it.path.contains(q, true) }
+            .let { l -> if (projectsSortByName) l.sortedBy { it.name.lowercase() } else l.sortedByDescending { it.lastOpened } }
+        if (shown.isEmpty()) {
+            host.addView(TextView(this).apply {
+                text = "No project matches \"$q\""
+                textSize = 13f
+                setTextColor(NC.ON_SURF_VAR)
+                gravity = Gravity.CENTER
+                setPadding(0, dp(32), 0, dp(32))
+            })
+            return
+        }
+        val cols = if (resources.configuration.screenWidthDp >= 600) 2 else 1
+        shown.chunked(cols).forEach { items ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(12) }
+            }
+            items.forEachIndexed { i, p ->
+                row.addView(projectListCard(p), LinearLayout.LayoutParams(0, WRAP, 1f).apply { if (i > 0) leftMargin = dp(12) })
+            }
+            if (items.size < cols) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { leftMargin = dp(12) })
+            host.addView(row)
+        }
+    }
+
+    /** Branch from .git/HEAD (no git process); null when not a repo or unreadable. */
+    private fun projectGitBranch(dir: File): String? = runCatching {
+        val head = File(dir, ".git/HEAD").takeIf { it.isFile }?.readText()?.trim() ?: return null
+        if (head.startsWith("ref: ")) head.substringAfterLast("refs/heads/") else head.take(7)
+    }.getOrNull()
+
+    // ponytail: marker-file lookup only (root dir); monorepos / nested apps show the root's kind or none.
+    private fun projectKind(dir: File): String? = runCatching {
+        listOf(
+            "package.json" to "NODE", "Cargo.toml" to "RUST", "go.mod" to "GO", "pyproject.toml" to "PYTHON",
+            "requirements.txt" to "PYTHON", "CMakeLists.txt" to "C/C++", "build.gradle.kts" to "GRADLE",
+            "build.gradle" to "GRADLE", "pom.xml" to "MAVEN", "pubspec.yaml" to "FLUTTER", "Gemfile" to "RUBY",
+            "composer.json" to "PHP", "index.html" to "WEB",
+        ).firstOrNull { File(dir, it.first).exists() }?.second
+    }.getOrNull()
+
+    private fun projectChip(label: String, icon: Int?, color: Int) = TextView(this).apply {
+        text = label
+        textSize = 11f
+        setTextColor(color)
+        typeface = Typeface.MONOSPACE
+        maxLines = 1
+        maxWidth = dp(240)
+        ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+        gravity = Gravity.CENTER_VERTICAL
+        background = GradientDrawable().apply {
+            setColor(NC.SURFACE_LOWEST)
+            setStroke(dp(1), NC.OUTLINE_VAR)
+        }
+        if (icon != null) {
+            val d = androidx.core.content.ContextCompat.getDrawable(this@MainActivity, icon)?.mutate()
+            d?.setBounds(0, 0, dp(13), dp(13)); d?.setTint(color)
+            setCompoundDrawablesRelative(d, null, null, null)
+            compoundDrawablePadding = dp(4)
+        }
+        setPadding(dp(6), dp(3), dp(6), dp(3))
+        layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(6) }
+    }
+
+    private fun projectListCard(p: Project): View {
+        val dir = runCatching { ProjectPathResolver.resolve(this, p.path, p.linuxMethod) }.getOrNull()
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOW,
+                strokeColor = NC.OUTLINE_VAR,
+                shadowColor = NC.SHADOW_DARK,
+                offsetDp = 4,
+                cornerRadiusDp = 0,
+                rightFaceColor = Color.parseColor("#3c4a3f")
+            )
+            setPadding(dp(14), dp(12), dp(10), dp(14))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Project ${p.name}, ${p.path}"
+        }
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val iconBox = FrameLayout(this).apply {
+            background = GradientDrawable().apply {
+                setColor(NC.SURFACE_LOWEST)
+                setStroke(dp(1), Color.parseColor("#3360F99E"))
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+        }
+        bindProjectIconContainer(iconBox, p.icon, glyphSizeDp = 22)
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = dp(12) }
+        }
+        col.addView(TextView(this).apply {
+            text = p.name
+            textSize = 16f
+            setTextColor(NC.ON_SURFACE)
+            typeface = Typeface.DEFAULT_BOLD
+            isSingleLine = true
+            ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+        })
+        col.addView(TextView(this).apply {
+            text = p.path
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            isSingleLine = true
+            ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+        })
+        val more = ImageView(this).apply {
+            setImageResource(R.drawable.ic_lucide_more_vertical)
+            setColorFilter(ToolRail.ICON_TINT)
+            val pad = dp((44 - ToolRail.ICON_DP) / 2)
+            setPadding(pad, pad, pad, pad)
+            contentDescription = "Actions for ${p.name}"
+            tooltipText = "Actions"
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+        }
+        more.setOnClickListener { showProjectActions(more, p) }
+        top.addView(iconBox); top.addView(col); top.addView(more)
+        card.addView(top)
+
+        val chips = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        dir?.let { projectGitBranch(it) }?.let { chips.addView(projectChip(it, R.drawable.ic_lucide_git_branch, NC.PRIMARY)) }
+        dir?.let { projectKind(it) }?.let { chips.addView(projectChip(it, null, NC.ON_SURF_VAR)) }
+        if (p.linuxMethod == "chroot") chips.addView(projectChip("CHROOT", null, NC.TERTIARY))
+        val running = projectSessionsMap[p.path]?.count { it.isRunning } ?: 0
+        if (running > 0) chips.addView(projectChip("$running RUNNING", null, NC.PRIMARY))
+        if (FeatureGate.canUse(isPro(), ProFeature.WORKSPACE) is GateResult.Deny) chips.addView(projectChip("PRO", R.drawable.ic_lock, NC.ERROR))
+        val opened = if (p.lastOpened <= 0L) "Never opened"
+            else if (System.currentTimeMillis() - p.lastOpened < 60_000L) "Opened just now" else "Opened " +
+            android.text.format.DateUtils.getRelativeTimeSpanString(p.lastOpened, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS)
+        chips.addView(projectChip(opened, R.drawable.ic_lucide_clock, NC.ON_SURF_VAR))
+        card.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10); leftMargin = dp(52) }
+            addView(chips)
+        })
+
+        card.setOnClickListener { openProjectFromList(p) }
+        card.setOnLongClickListener { showProjectActions(more, p); true }
+        return card
+    }
+
+    private fun showProjectActions(anchor: View, p: Project) {
+        val menu = android.widget.PopupMenu(this, anchor)
+        menu.menu.add(0, 1, 0, "Open")
+        menu.menu.add(0, 2, 1, "Open terminal here")
+        menu.menu.add(0, 3, 2, "Rename")
+        menu.menu.add(0, 4, 3, "Remove project")
+        menu.setOnMenuItemClickListener {
+            when (it.itemId) {
+                1 -> openProjectFromList(p)
+                2 -> openProjectFromList(p, terminal = true)
+                3 -> showRenameProjectDialog(p)
+                4 -> showBrutalistConfirmDialog(
+                    title = "REMOVE PROJECT",
+                    message = "Remove ${p.name} from NativeCode? Its sessions stop and its chat threads are deleted. Files in ${p.path} stay on disk.",
+                    confirmLabel = "REMOVE",
+                    destructive = true,
+                ) { removeProject(p.path); populateProjectsList() }
+            }
+            true
+        }
+        menu.show()
+    }
+
+    private fun openProjectFromList(p: Project, terminal: Boolean = false) {
+        if (!projectGateAllows()) return
+        markProjectOpened(p.path)
+        activeProjectName = p.name
+        activeProjectPath = p.path
+        applyProjectIsolation(p.path, p.linuxMethod)
+        Toast.makeText(this, "Project opened: ${p.name}", Toast.LENGTH_SHORT).show()
+        if (pageStack.isEmpty() || pageStack.peek() != ID_PROJECT_WORKSPACE) pageStack.push(ID_PROJECT_WORKSPACE)
+        navigateToPage(ID_PROJECT_WORKSPACE)
+        if (terminal) createWorkspaceTerminalTab("shell")
+    }
+
+    private fun showRenameProjectDialog(p: Project) {
+        val input = EditText(this).apply {
+            setText(p.name)
+            setSelection(p.name.length)
+            isSingleLine = true
+            setTextColor(NC.ON_SURFACE)
+            typeface = Typeface.MONOSPACE
+            background = GradientDrawable().apply {
+                setColor(NC.SURFACE_LOWEST)
+                setStroke(dp(1), NC.OUTLINE_VAR)
+            }
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+        }
+        showBrutalistConfirmDialog(
+            title = "RENAME PROJECT",
+            message = "Display name only; the folder ${p.path} is not moved.",
+            confirmLabel = "SAVE",
+            body = input,
+        ) {
+            val name = input.text.toString().trim()
+            if (name.isEmpty()) return@showBrutalistConfirmDialog
+            val list = getProjects().toMutableList()
+            val idx = list.indexOfFirst { it.path == p.path }
+            if (idx < 0) return@showBrutalistConfirmDialog
+            list[idx] = list[idx].copy(name = name)
+            saveProjects(list)
+            if (activeProjectPath == p.path) {
+                activeProjectName = name
+                getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit().putString("active_project_name", name).apply()
+                if (::workspaceProjectNameTv.isInitialized) workspaceProjectNameTv.text = name
+            }
+            populateProjectsList()
+        }
+        input.requestFocus()
+    }
+
+    private fun showImportProjectDialog() {
+        val method = LinuxCommandBuilder.currentMethod
+        val reposPath = "/home/flux/repos"
+        val known = getProjects().map { it.path.trimEnd('/') }.toSet()
+        val dirs = (ProjectPathResolver.resolve(this, reposPath, method).listFiles() ?: emptyArray())
+            .filter { it.isDirectory && !it.name.startsWith(".") && "$reposPath/${it.name}" !in known }
+            .sortedBy { it.name.lowercase() }
+        if (dirs.isEmpty()) {
+            showBrutalistConfirmDialog(
+                title = "NOTHING TO IMPORT",
+                message = "Every folder in $reposPath is already a project. Clone a repository or create a new project instead.",
+                confirmLabel = "NEW PROJECT",
+            ) { openProjectCreate(clone = false) }
+            return
+        }
+        var dialog: android.app.Dialog? = null
+        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        dirs.forEach { d ->
+            rows.addView(TextView(this).apply {
+                text = d.name
+                textSize = 14f
+                setTextColor(NC.ON_SURFACE)
+                typeface = Typeface.MONOSPACE
+                isSingleLine = true
+                ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+                gravity = Gravity.CENTER_VERTICAL
+                minHeight = dp(48)
+                val ic = androidx.core.content.ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_lucide_folder_input)?.mutate()
+                ic?.setBounds(0, 0, dp(18), dp(18)); ic?.setTint(NC.PRIMARY)
+                setCompoundDrawablesRelative(ic, null, null, null)
+                compoundDrawablePadding = dp(10)
+                setPadding(dp(8), 0, dp(8), 0)
+                setOnClickListener {
+                    dialog?.dismiss()
+                    if (projectGateAllows()) {
+                        addAndOpenProject(d.name, "", "$reposPath/${d.name}", method, skipEnsureDir = true)
+                        markProjectOpened("$reposPath/${d.name}")
+                    }
+                }
+            })
+        }
+        val scroll = ScrollView(this).apply {
+            addView(rows)
+            layoutParams = LinearLayout.LayoutParams(MATCH, dp(minOf(dirs.size * 48, 288)))
+        }
+        dialog = showBrutalistConfirmDialog(
+            title = "IMPORT FOLDER",
+            message = "Open a folder from $reposPath as a project.",
+            confirmLabel = "NEW PROJECT",
+            body = scroll,
+        ) { openProjectCreate(clone = false) }
+    }
+
+    /** Unregister a project: list entry, its sessions and chat threads. Files on disk stay. */
+    private fun removeProject(path: String) {
+        val list = getProjects().toMutableList()
+        if (!list.removeAll { it.path == path }) return
+        saveProjects(list)
+        stopProjectSessions(path) // else they run on, counted, with no tab to close (R4 B20)
+        deleteProjectThreads(path) // its chat threads + checkpoint refs go with it (plan 9.2.8)
+        if (activeProjectPath == path) {
+            activeProjectName = ""
+            activeProjectPath = ""
+        }
+        Toast.makeText(this, "Project removed.", Toast.LENGTH_SHORT).show()
+    }
 
     private fun refreshWorkspaceDirTree() {
         if (!::workspaceDirTreeLayout.isInitialized) return
@@ -21445,16 +21519,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         settingsContentLayout.addView(spacer(16))
         val removeBtn = dangerButton("REMOVE PROJECT") {
-            val list = getProjects().toMutableList()
-            val idx = list.indexOfFirst { it.path == activeProjectPath }
-            if (idx >= 0) {
-                list.removeAt(idx)
-                saveProjects(list)
-                Toast.makeText(this@MainActivity, "Project removed.", Toast.LENGTH_SHORT).show()
-                stopProjectSessions(activeProjectPath) // else they run on, counted, with no tab to close (R4 B20)
-                deleteProjectThreads(activeProjectPath) // its chat threads + checkpoint refs go with it (plan 9.2.8)
-                activeProjectName = ""
-                activeProjectPath = ""
+            if (getProjects().any { it.path == activeProjectPath }) {
+                removeProject(activeProjectPath)
                 while (pageStack.isNotEmpty() && (
                     pageStack.peek() == ID_PROJECT_WORKSPACE ||
                     pageStack.peek() == ID_PROJECT_SETTINGS ||

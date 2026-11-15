@@ -1,0 +1,14 @@
+<!-- Empty projects illustration: open folder with a spark, obsidian palette -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp" android:height="96dp" android:viewportWidth="120" android:viewportHeight="96">
+    <path android:fillColor="#FF1C201D" android:strokeColor="#FF3C4A3F" android:strokeWidth="2" android:strokeLineJoin="round"
+        android:pathData="M18,26L18,78A4,4 0,0 0,22 82L98,82A4,4 0,0 0,102 78L102,36A4,4 0,0 0,98 32L60,32L52,22L22,22A4,4 0,0 0,18 26Z" />
+    <path android:fillColor="#FF242A25" android:strokeColor="#FF3C4A3F" android:strokeWidth="2" android:strokeLineJoin="round"
+        android:pathData="M18,44L102,44L96,82L24,82Z" />
+    <path android:strokeColor="#FF60F99E" android:strokeWidth="3" android:strokeLineCap="round"
+        android:pathData="M60,54L60,72 M51,63L69,63" />
+    <path android:strokeColor="#FF60F99E" android:strokeWidth="2" android:strokeLineCap="round"
+        android:pathData="M100,8L100,16 M96,12L104,12 M10,40L10,46 M7,43L13,43" />
+    <path android:strokeColor="#FF3C4A3F" android:strokeWidth="2" android:strokeLineCap="round"
+        android:pathData="M30,90L90,90" />
+</vector>
