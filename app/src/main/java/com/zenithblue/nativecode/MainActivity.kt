@@ -609,8 +609,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var projectWorkspaceContainer: FrameLayout
     private lateinit var projectWorkspaceLayout: LinearLayout
     private lateinit var workspaceTerminalView: TerminalView
-    private lateinit var workspaceTabBar: LinearLayout
-    private lateinit var workspaceTabBarScroll: HorizontalScrollView
+    /** Shared tab strip (same component as the TERMINAL page, [termTabStrip]). */
+    private var wsTabStrip: TermTabStrip? = null
     private lateinit var workspaceHubLayout: View
     /** Host for workspace hub AI tool cards; rebuilt on linux_method change. */
     private var workspaceHubToolsHost: LinearLayout? = null
@@ -2558,9 +2558,36 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val chat = if (chatBetaOn()) listOf(TermTabStrip.Tab("", "CHAT", null, live = false, selected = false, home = true)) else emptyList()
         strip.submit(chat + sessionsList.mapIndexed { i, s ->
             val type = terminalSessionTypes.getOrNull(i) ?: "shell"
-            val name = termTabTitles[s] ?: when (type) { "shell" -> "shell"; "shell-root" -> "root shell"; else -> type }
+            val name = termTabTitles[s] ?: termTabLabel(type)
             TermTabStrip.Tab(i.toString(), name, cliIcon(type), live = now - (out?.get(s) ?: 0L) < 2000, selected = i == activeSessionIndex)
         })
+    }
+
+    private fun termTabLabel(type: String) = when (type) { "shell" -> "shell"; "shell-root" -> "root shell"; else -> type }
+
+    /** Workspace page: same strip, same tabs model as [refreshTermTabStrip], over [workspaceSessions]. */
+    private fun refreshWsTabStrip() {
+        val strip = wsTabStrip ?: return
+        val out = NativeCodeTerminalSessionClient.SHARED_LAST_OUTPUT
+        val now = android.os.SystemClock.uptimeMillis()
+        strip.submit(workspaceSessions.mapIndexed { i, s ->
+            val type = workspaceTabNames.getOrNull(i) ?: "shell"
+            TermTabStrip.Tab(i.toString(), termTabTitles[s] ?: termTabLabel(type), cliIcon(type), live = now - (out[s] ?: 0L) < 2000, selected = i == activeWorkspaceTabIndex)
+        })
+    }
+
+    private fun buildWsTabStrip() = TermTabStrip(this) { anchor -> showNewTerminalDropdown(anchor) }.apply {
+        layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
+        onTick = { refreshWsTabStrip() }
+        onTap = { t -> t.key.toIntOrNull()?.let { setTerminalMode(ws = true, chat = false); switchWorkspaceTab(it) } }
+        onClose = { t -> t.key.toIntOrNull()?.let { closeWorkspaceTab(it) } }
+        onRename = { t, name -> t.key.toIntOrNull()?.let { workspaceSessions.getOrNull(it) }?.let { termTabTitles[it] = name; refreshWsTabStrip() } }
+        onCloseOthers = { t ->
+            t.key.toIntOrNull()?.let { workspaceSessions.getOrNull(it) }?.let { keep ->
+                for (j in workspaceSessions.indices.reversed()) if (workspaceSessions[j] !== keep) closeWorkspaceTab(j)
+                switchWorkspaceTab(workspaceSessions.indexOf(keep))
+            }
+        }
     }
 
     private fun cliIcon(type: String) = cliIconCache.getOrPut(type) {
@@ -20004,6 +20031,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         session.finishIfRunning()
         workspaceSessions.removeAt(index)
         workspaceTabNames.removeAt(index)
+        termTabTitles.remove(session)
+        // Closing a tab left of the active one shifts it (strip x on a background tab).
+        if (index < activeWorkspaceTabIndex) activeWorkspaceTabIndex--
 
         if (workspaceSessions.isEmpty()) {
             activeWorkspaceTabIndex = -1
@@ -20136,129 +20166,12 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun rebuildWorkspaceTabs() {
-        workspaceTabBar.removeAllViews()
-        
-        if (workspaceSessions.isEmpty()) {
-            workspaceTabBarScroll.visibility = View.GONE
-            if (::workspaceTerminalContainer.isInitialized) {
-                workspaceTerminalContainer.visibility = View.GONE
-            }
-            workspaceHubLayout.visibility = View.VISIBLE
-            return
-        }
-        
-        workspaceTabBarScroll.visibility = View.VISIBLE
+        val empty = workspaceSessions.isEmpty()
         if (::workspaceTerminalContainer.isInitialized) {
-            workspaceTerminalContainer.visibility = View.VISIBLE
+            workspaceTerminalContainer.visibility = if (empty) View.GONE else View.VISIBLE
         }
-        workspaceHubLayout.visibility = View.GONE
-
-        for (i in 0 until workspaceSessions.size) {
-            val isSelected = (i == activeWorkspaceTabIndex)
-            val tabName = workspaceTabNames[i]
-            
-            val tab = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(10), dp(6), dp(10), dp(6))
-                background = cyberBrutalistBg(
-                    fillColor = if (isSelected) NC.SURFACE_CONTAINER else NC.SURFACE_LOW,
-                    strokeColor = if (isSelected) NC.PRIMARY else NC.OUTLINE_VAR,
-                    shadowColor = NC.SHADOW_DARK,
-                    offsetDp = if (isSelected) 3 else 2,
-                    cornerRadiusDp = 0,
-                    rightFaceColor = NC.OUTLINE_VAR
-                )
-                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
-                    rightMargin = dp(6)
-                    topMargin = dp(2)
-                    bottomMargin = dp(4)
-                }
-                setOnClickListener {
-                    setTerminalMode(ws = true, chat = false)
-                    switchWorkspaceTab(i)
-                }
-            }
-
-            val iconView = ImageView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(16), dp(16)).apply {
-                    rightMargin = dp(6)
-                    gravity = Gravity.CENTER_VERTICAL
-                }
-                scaleType = ImageView.ScaleType.FIT_CENTER
-            }
-            val filename = cliToolAssetFilename(tabName)
-            try {
-                assets.open("images/cli/$filename").use { input ->
-                    val bmp = android.graphics.BitmapFactory.decodeStream(input)
-                    if (bmp != null) {
-                        iconView.setImageBitmap(bmp)
-                    } else {
-                        iconView.setImageResource(R.drawable.ic_terminal_thick)
-                        iconView.setColorFilter(if (isSelected) NC.PRIMARY else NC.ON_SURF_VAR)
-                    }
-                }
-            } catch (_: Exception) {
-                iconView.setImageResource(R.drawable.ic_terminal_thick)
-                iconView.setColorFilter(if (isSelected) NC.PRIMARY else NC.ON_SURF_VAR)
-            }
-            
-            val titleTv = TextView(this).apply {
-                val displayName = when (tabName) {
-                    "shell-root" -> "Rooted Linux Shell"
-                    "shell" -> "Linux Shell"
-                    else -> tabName
-                }
-                text = "${i + 1}. $displayName"
-                textSize = 12f
-                setTextColor(if (isSelected) NC.PRIMARY else NC.ON_SURFACE)
-                typeface = Typeface.MONOSPACE
-            }
-            
-            val closeTv = ImageView(this).apply {
-                setImageResource(R.drawable.ic_close)
-                setColorFilter(if (isSelected) NC.PRIMARY else NC.ON_SURF_VAR)
-                setPadding(dp(2), dp(2), dp(2), dp(2))
-                layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply {
-                    leftMargin = dp(6)
-                    gravity = Gravity.CENTER_VERTICAL
-                }
-                setOnClickListener {
-                    closeWorkspaceTab(i)
-                }
-            }
-            
-            tab.addView(iconView)
-            tab.addView(titleTv)
-            tab.addView(closeTv)
-            workspaceTabBar.addView(tab)
-        }
-        
-        if (workspaceSessions.size < 10) {
-            val addTabBtn = ImageView(this).apply {
-                setImageResource(R.drawable.ic_add)
-                setColorFilter(NC.PRIMARY)
-                setPadding(dp(6), dp(6), dp(6), dp(6))
-                background = cyberBrutalistBg(
-                    fillColor = NC.SURFACE_CONTAINER,
-                    strokeColor = NC.PRIMARY,
-                    shadowColor = NC.SHADOW_DARK,
-                    offsetDp = 3,
-                    cornerRadiusDp = 0,
-                    rightFaceColor = NC.OUTLINE_VAR
-                )
-                layoutParams = LinearLayout.LayoutParams(dp(30), dp(30)).apply {
-                    leftMargin = dp(4)
-                    topMargin = dp(2)
-                    bottomMargin = dp(4)
-                    gravity = Gravity.CENTER_VERTICAL
-                }
-                setOnClickListener {
-                    showNewTerminalDropdown(this)
-                }
-            }
-            workspaceTabBar.addView(addTabBtn)
-        }
+        workspaceHubLayout.visibility = if (empty) View.VISIBLE else View.GONE
+        refreshWsTabStrip()
     }
 
     private fun buildProjectWorkspaceLayout() {
@@ -20284,29 +20197,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         topBar.rail.addView(buildWsBackToChat(), 0)
         projectWorkspaceLayout.addView(topBar)
 
-        workspaceTabBarScroll = HorizontalScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(NC.SURFACE_LOWEST)
-                setStroke(dp(1), NC.OUTLINE_VAR)
-            }
-            setPadding(dp(8), dp(4), dp(8), dp(4))
-            visibility = View.GONE
-        }
-        workspaceTabBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = FrameLayout.LayoutParams(WRAP, MATCH)
-        }
-        workspaceTabBarScroll.addView(workspaceTabBar)
+        wsTabStrip = buildWsTabStrip()
         // Raw terminal area = tab bar + main area: hidden as one while the chat shows (the tab bar must not leak above it).
         val wsTermStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(MATCH, 0, 1f)
         }
         projectWorkspaceLayout.addView(wsTermStack)
-        wsTermStack.addView(workspaceTabBarScroll)
+        wsTermStack.addView(wsTabStrip ?: buildWsTabStrip().also { wsTabStrip = it })
 
         val mainArea = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL

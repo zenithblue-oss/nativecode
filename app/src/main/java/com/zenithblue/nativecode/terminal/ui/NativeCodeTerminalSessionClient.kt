@@ -22,8 +22,8 @@ class NativeCodeTerminalSessionClient(
     private val onPreviewUrl: ((String) -> Unit)? = null,
 ) : TerminalSessionClient {
 
-    /** Last output time per session (tab strip running/idle dot). Main thread only. */
-    val lastOutputAt = java.util.WeakHashMap<TerminalSession, Long>()
+    /** Last output time per session (tab strip running/idle dot), shared by every client. Main thread only. */
+    val lastOutputAt get() = SHARED_LAST_OUTPUT
     private var lastScanAt = 0L
 
     override fun onTextChanged(session: TerminalSession) {
@@ -68,8 +68,9 @@ class NativeCodeTerminalSessionClient(
         PASTE.execute { session.emulator?.paste(text) ?: session.write(text) }
     }
 
-    private companion object {
-        val PASTE: java.util.concurrent.ExecutorService = Executors.newSingleThreadExecutor()
+    companion object {
+        private val PASTE: java.util.concurrent.ExecutorService = Executors.newSingleThreadExecutor()
+        val SHARED_LAST_OUTPUT = java.util.WeakHashMap<TerminalSession, Long>()
     }
 
     override fun onBell(session: TerminalSession) {}
