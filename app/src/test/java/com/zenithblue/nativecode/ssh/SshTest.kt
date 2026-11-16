@@ -87,6 +87,35 @@ class SshTest {
         assertNull(SshModel.pickAddress(listOf("wlan0" to "999.1.1.1")))
     }
 
+    @Test fun ipv6OnlyWifiAcceptsClatAndGlobalV6() {
+        // IPv6-only Wi-Fi (NAT64): wlan0 has only IPv6, the clat interface v4-wlan0 carries a private IPv4.
+        val l = listOf(
+            "rmnet_data2" to "2402:3a80:1::5", "lo" to "::1", "wlan0" to "fe80::1c2b:3dff:fe44:5566",
+            "wlan0" to "2401:4900:1c2b:3d::7", "v4-wlan0" to "192.0.0.4", "wlan0" to "2401:4900:1c2b:3d:aaaa:bbbb:cccc:dddd",
+        )
+        assertEquals(listOf("2401:4900:1c2b:3d::7", "2401:4900:1c2b:3d:aaaa:bbbb:cccc:dddd", "192.0.0.4"), SshModel.pickAddresses(l))
+        assertEquals("2401:4900:1c2b:3d::7", SshModel.pickAddress(l)) // the clat IPv4 is not reachable from other devices
+        assertEquals("192.0.0.4", SshModel.pickAddress(listOf("v4-wlan0" to "192.0.0.4"))) // still enough to enable the button
+        // No clat address: the global IPv6 is still enough, so the server can start.
+        assertEquals("2401:4900:1c2b:3d::7", SshModel.pickAddress(l.filter { it.first != "v4-wlan0" }))
+        // Mobile data, VPN, loopback and link-local never count.
+        assertNull(SshModel.pickAddress(listOf("rmnet_data2" to "2402:3a80:1::5", "v4-rmnet_data2" to "192.0.0.4", "tun0" to "fd00::2", "wlan0" to "fe80::1")))
+        assertNull(SshModel.pickAddress(listOf("wlan0" to "::1", "wlan0" to "ff02::1", "wlan0" to "2401:zz::1", "wlan0" to "fe80::1%wlan0")))
+        // Wi-Fi beats hotspot even when only the hotspot has IPv4.
+        assertEquals(listOf("2401::7"), SshModel.pickAddresses(listOf("ap0" to "192.168.43.1", "wlan0" to "2401::7")))
+    }
+
+    @Test fun ipv6ConfigAndConnectCommand() {
+        val c = SshModel.sshdConfig(listOf("192.0.0.4", "2401:4900::7"))
+        assertTrue(c.contains("ListenAddress 192.0.0.4\n"))
+        assertTrue(c.contains("ListenAddress 2401:4900::7\n"))
+        assertFalse(c.contains("ListenAddress ::"))
+        assertEquals("ssh -p 8022 flux@[2401:4900::7]", SshModel.connectCommand("2401:4900::7"))
+        assertTrue(SshModel.isIpv6("2401:4900::7"))
+        assertFalse(SshModel.isIpv6("1.2.3.4"))
+        assertFalse(SshModel.isIpv6("::1; rm -rf /"))
+    }
+
     @Test fun ttyGroupRenamedOnlyWhenPresent() {
         val g = "root:x:0:root\ntty:x:5:flux\nattty:x:9:\n"
         assertEquals("root:x:0:root\ntty_:x:5:flux\nattty:x:9:\n", SshModel.renameTtyGroup(g))

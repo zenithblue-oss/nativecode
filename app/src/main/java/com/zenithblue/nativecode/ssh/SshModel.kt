@@ -69,11 +69,13 @@ object SshModel {
         file.lineSequence().filter { l -> parsePublicKey(l)?.fingerprint != fingerprint }.joinToString("\n")
             .let { if (it.isNotEmpty() && !it.endsWith("\n")) it + "\n" else it }
 
-    /** sshd_config: key auth only, one user, one address, no forwarding extras. */
-    fun sshdConfig(listenAddress: String, port: Int = PORT): String = """
+    /** sshd_config: key auth only, one user, the LAN addresses (IPv4 and IPv6), no forwarding extras. */
+    fun sshdConfig(listenAddress: String, port: Int = PORT): String = sshdConfig(listOf(listenAddress), port)
+
+    fun sshdConfig(listenAddresses: List<String>, port: Int = PORT): String = """
         # NativeCode SSH server. Rewritten on every start.
         Port $port
-        ListenAddress $listenAddress
+        ${listenAddresses.joinToString("\n        ") { "ListenAddress $it" }}
         HostKey $HOST_KEY
         PidFile $HOST_KEY_DIR/sshd.pid
         AuthorizedKeysFile .ssh/authorized_keys
@@ -102,28 +104,52 @@ object SshModel {
 
     fun sshdCommand(): String = "exec /usr/sbin/sshd -D -e -f ${ShellQuoting.singleQuote(SSHD_CONFIG)}"
 
-    fun connectCommand(ip: String, port: Int = PORT): String = "ssh -p $port $USER@$ip"
+    /** IPv6 literals are bracketed so the host part reads unambiguously next to the port. */
+    fun connectCommand(ip: String, port: Int = PORT): String = "ssh -p $port $USER@${if (ip.contains(':')) "[$ip]" else ip}"
 
     /** Valid IPv4 literal only (the ListenAddress is written into a config file). */
     fun isIpv4(s: String): Boolean = Regex("""(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})""").matchEntire(s)
         ?.groupValues?.drop(1)?.all { it.toInt() in 0..255 } == true
 
-    /**
-     * Chooses the LAN address from (interface name, IPv4) pairs: Wi-Fi first, then hotspot, then ethernet.
-     * Cellular, VPN, loopback and link-local addresses are never offered.
-     */
-    fun pickAddress(candidates: List<Pair<String, String>>): String? {
-        fun rank(name: String): Int = when {
+    /** Valid IPv6 literal only (it is written into a config file); zone ids and the like are rejected. */
+    fun isIpv6(s: String): Boolean = s.count { it == ':' } >= 2 && Regex("""[0-9a-fA-F:]+""").matches(s)
+
+    /** Link-local, loopback, unspecified and multicast IPv6 addresses are never offered. */
+    private fun usableIpv6(ip: String): Boolean {
+        val l = ip.lowercase()
+        return isIpv6(l) && l != "::" && l != "::1" && !l.startsWith("fe8") && !l.startsWith("fe9") &&
+            !l.startsWith("fea") && !l.startsWith("feb") && !l.startsWith("ff")
+    }
+
+    private fun usable(ip: String): Boolean =
+        if (ip.contains(':')) usableIpv6(ip) else isIpv4(ip) && !ip.startsWith("127.") && !ip.startsWith("169.254.")
+
+    /** Wi-Fi first, then hotspot, then ethernet; 9 = never (cellular, VPN, loopback). `v4-wlan0` is the 464XLAT (clat) side of wlan0. */
+    private fun rank(rawName: String): Int {
+        val name = rawName.removePrefix("v4-")
+        return when {
             name.startsWith("wlan") -> 0
             name.startsWith("swlan") || name.startsWith("ap") -> 1
             name.startsWith("eth") || name.startsWith("usb") -> 2
             else -> 9
         }
-        return candidates
-            .filter { (_, ip) -> isIpv4(ip) && !ip.startsWith("127.") && !ip.startsWith("169.254.") }
-            .filter { (name, _) -> rank(name) < 9 }
-            .minByOrNull { rank(it.first) }?.second
     }
+
+    /**
+     * Every address sshd should listen on, from (interface name, address) pairs: all usable IPv4 and IPv6 addresses of the
+     * best interface class present (Wi-Fi, else hotspot, else ethernet). Reachable IPv4 first, then IPv6, then the clat IPv4. Cellular, VPN, loopback and
+     * link-local addresses are never offered, so an IPv6-only Wi-Fi (clat `v4-wlan0` plus global IPv6) works too.
+     */
+    fun pickAddresses(candidates: List<Pair<String, String>>): List<String> {
+        val ok = candidates.filter { (n, ip) -> rank(n) < 9 && usable(ip) }
+        val best = ok.minOfOrNull { rank(it.first) } ?: return emptyList()
+        return ok.filter { rank(it.first) == best }.map { it.second }.distinct()
+            // 192.0.0.0/29 is the clat (464XLAT) address: local to the phone, not reachable from other devices, so it goes last.
+            .sortedBy { if (it.contains(':')) 1 else if (it.startsWith("192.0.0.")) 2 else 0 }
+    }
+
+    /** The one address shown to the user: the first of [pickAddresses] (a reachable IPv4, else IPv6, else the clat IPv4). */
+    fun pickAddress(candidates: List<Pair<String, String>>): String? = pickAddresses(candidates).firstOrNull()
 
     /** Parent pid from a /proc/<pid>/stat line (the command is in parentheses and may hold spaces). */
     fun parentOf(stat: String): Int? {

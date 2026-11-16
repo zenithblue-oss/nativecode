@@ -14,7 +14,7 @@ enum class SshState { STOPPED, STARTING, RUNNING, ERROR }
 data class SshStatus(val state: SshState, val address: String? = null, val message: String? = null)
 
 /**
- * Runs `sshd` as the guest user `flux` inside PRoot (plan 17): key auth only, one LAN address, port 8022.
+ * Runs `sshd` as the guest user `flux` inside PRoot (plan 17): key auth only, the Wi-Fi/hotspot/ethernet addresses (IPv4 and IPv6), port 8022.
  * OpenSSH itself is bundled in the Linux runtime update pack (RuntimeUpdatePack); nothing is installed here.
  * Files are written straight into the guest home (Kotlin I/O, no guest scripts); only `ssh-keygen`
  * and `sshd` itself run in the guest. Private keys are never read, logged or copied by this class.
@@ -53,11 +53,14 @@ object SshServerController {
     fun isInstalled(ctx: Context): Boolean =
         findBinary(ctx, "sshd") != null && findBinary(ctx, "ssh-keygen") != null && findBinary(ctx, "ssh") != null
 
-    /** LAN IPv4 of this device (Wi-Fi, then hotspot, then ethernet), or null. */
-    fun lanAddress(): String? = try {
-        SshModel.pickAddress(NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp }
-            .flatMap { ni -> ni.inetAddresses.toList().filter { it is java.net.Inet4Address }.map { ni.name to (it.hostAddress ?: "") } })
-    } catch (_: Exception) { null }
+    /** LAN addresses (IPv4 and IPv6) of this device: Wi-Fi, else hotspot, else ethernet. Empty when there are none. */
+    fun lanAddresses(): List<String> = try {
+        SshModel.pickAddresses(NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp }
+            .flatMap { ni -> ni.inetAddresses.toList().map { ni.name to (it.hostAddress ?: "").substringBefore('%') } })
+    } catch (_: Exception) { emptyList() }
+
+    /** The address to show: the first of [lanAddresses], or null. */
+    fun lanAddress(): String? = lanAddresses().firstOrNull()
 
     private fun guest(ctx: Context, cmd: String, user: String = "flux"): Pair<Int, String> {
         val (args, env) = LinuxCommandBuilder.build(ctx, cmd, user, method = METHOD)
@@ -110,7 +113,8 @@ object SshServerController {
         Thread {
             val fail = { m: String -> set(SshStatus(SshState.ERROR, message = m)) }
             try {
-                val ip = lanAddress() ?: return@Thread fail("No Wi-Fi address. Connect to Wi-Fi or turn on the hotspot, then try again.")
+                val ips = lanAddresses()
+                val ip = ips.firstOrNull() ?: return@Thread fail("No Wi-Fi address. Connect to Wi-Fi or turn on the hotspot, then try again.")
                 val sshd = findBinary(app, "sshd") ?: return@Thread fail("OpenSSH is not installed.")
                 val keygen = findBinary(app, "ssh-keygen") ?: return@Thread fail("OpenSSH is not installed.")
                 runCatching {
@@ -126,7 +130,7 @@ object SshServerController {
                 }
                 chmod600(key)
                 val cfg = File(h, SshModel.SSHD_CONFIG.removePrefix(SshModel.GUEST_HOME + "/"))
-                cfg.writeText(SshModel.sshdConfig(ip))
+                cfg.writeText(SshModel.sshdConfig(ips))
                 chmod600(cfg)
                 authorizedKeysFile(app).takeIf { it.exists() }?.let { chmod600(it) }
 
