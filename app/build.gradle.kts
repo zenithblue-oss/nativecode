@@ -1,17 +1,12 @@
 import java.util.Properties
 import java.io.FileInputStream
 
-fun getGitCommitHash(): String {
-    return try {
-        val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
-            .directory(rootDir)
-            .redirectError(ProcessBuilder.Redirect.DISCARD)
-            .start()
-        process.inputStream.bufferedReader().readText().trim().ifEmpty { "unknown" }
-    } catch (e: Exception) {
-        "unknown"
-    }
-}
+// Read when the BuildConfig task runs (lazy provider), never frozen at configuration time.
+val gitCommit = providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+    workingDir = rootDir
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim().ifEmpty { "unknown" } }
 
 val nativeCodeReportUrl = providers.gradleProperty("nativecode.report.url")
     .orElse("https://api.nativecode.app/v1/report")
@@ -32,6 +27,14 @@ if (file("google-services.json").exists()) {
     apply(plugin = "com.google.firebase.crashlytics")
 }
 
+androidComponents {
+    onVariants { v ->
+        v.buildConfigFields?.put("GIT_COMMIT", gitCommit.map {
+            com.android.build.api.variant.BuildConfigField("String", "\"$it\"", "git short hash at build time")
+        })
+    }
+}
+
 android {
     namespace = "com.zenithblue.nativecode"
     compileSdk = 37
@@ -40,12 +43,11 @@ android {
         applicationId = "com.zenithblue.nativecode"
         minSdk = 26
         targetSdk = 37
-        versionCode = 19
+        versionCode = 20
         versionName = "1.8.0"
         buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
         // Freemium gates (docs/monetisation/plan.md). On with Play Billing (PR5).
         buildConfigField("boolean", "MONETISATION_ENFORCE", "true")
-        buildConfigField("String", "GIT_COMMIT", "\"${getGitCommitHash()}\"")
         buildConfigField("String", "REPORT_ENDPOINT", "\"$nativeCodeReportUrl\"")
         // 16 KB page-size devices (Android 15+): never ship 32-bit or extra-ABI JNI.
         ndk {
