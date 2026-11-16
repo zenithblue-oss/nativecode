@@ -102,8 +102,40 @@ class CodexMapper(private val nonce: String, private val sink: (AgentEvent) -> U
 
     private var retryText: String? = null
 
-    /** One server notification. False = not consumed (protocol log only). */
+    /** The conversation's own codex thread; notifications of any other thread are its subagents' (set by the runtime). */
+    var mainThreadId: String? = null
+    /** Child thread id -> ref of the spawnAgent row it belongs to. */
+    private val childParent = HashMap<String, String>()
+    private var lastSpawnRef: String? = null
+    /** Non-null while a child thread's notification is mapped: every item it emits nests under this row. */
+    private var parent: String? = null
+
+    /**
+     * One server notification. False = not consumed (protocol log only). A subagent's thread streams its own turn,
+     * items and token counts on the same pipe: those nest under the spawnAgent row and never touch the main run
+     * (a child `turn/started` used to overwrite the main turn id, so the main turn never ended).
+     */
     fun notification(method: String, p: JSONObject): Boolean {
+        val tid = p.optString("threadId")
+        val main = mainThreadId
+        if (main != null && tid.isNotEmpty() && tid != main) return child(method, tid, p)
+        return mainNotification(method, p)
+    }
+
+    private fun child(method: String, tid: String, p: JSONObject): Boolean {
+        val ref = childParent[tid] ?: lastSpawnRef ?: return true // no row to nest under: keep it out of the main thread
+        parent = ref
+        try {
+            when (method) {
+                "item/started", "item/completed", "item/agentMessage/delta", "item/plan/delta", "item/reasoning/summaryTextDelta",
+                "item/reasoning/textDelta", "item/commandExecution/outputDelta" -> mainNotification(method, p)
+                else -> Unit // turn lifecycle, usage, plan, errors of the child: not the main run's
+            }
+        } finally { parent = null }
+        return true
+    }
+
+    private fun mainNotification(method: String, p: JSONObject): Boolean {
         when (method) {
             "turn/started" -> p.optJSONObject("turn")?.optString("id")?.ifEmpty { null }?.let { id ->
                 if (!active) beginTurn() // codex started it itself (goal continuation): adopt it as a run
@@ -147,13 +179,16 @@ class CodexMapper(private val nonce: String, private val sink: (AgentEvent) -> U
 
     private fun ref(p: JSONObject, itemId: String = p.optString("itemId")) = "${p.optString("turnId")}:$itemId"
 
-    private fun emit(e: AgentEvent.ItemUpsert) {
-        if (e.status == ItemStatus.RUNNING || e.status == ItemStatus.PENDING) running[e.nativeRef] = e else running.remove(e.nativeRef)
+    private fun emit(e0: AgentEvent.ItemUpsert) {
+        val par = parent
+        val e = if (par != null) e0.copy(parentRef = par) else e0
+        // A child's rows are not the main run's: they must not be cut to "interrupted" when the main turn ends first.
+        if (par == null) { if (e.status == ItemStatus.RUNNING || e.status == ItemStatus.PENDING) running[e.nativeRef] = e else running.remove(e.nativeRef) }
         sink(e)
     }
 
     private fun delta(p: JSONObject, payload: (String) -> ItemPayload) {
-        if (!active) return
+        if (!active && parent == null) return
         val ref = ref(p)
         texts.getOrPut(ref) { StringBuilder() }.append(p.optString("delta"))
         emit(AgentEvent.ItemUpsert(ref, ItemStatus.RUNNING, payload(ref)))
@@ -181,7 +216,7 @@ class CodexMapper(private val nonce: String, private val sink: (AgentEvent) -> U
     }
 
     private fun item(p: JSONObject, completed: Boolean) {
-        if (!active) return
+        if (!active && parent == null) return
         val it = p.optJSONObject("item") ?: return
         val id = it.optString("id")
         val ref = ref(p, id)
@@ -242,6 +277,8 @@ class CodexMapper(private val nonce: String, private val sink: (AgentEvent) -> U
                 it.optString("revisedPrompt"), it.optString("savedPath"))))
             "contextCompaction" -> emit(AgentEvent.ItemUpsert(ref, if (completed) ItemStatus.COMPLETED else ItemStatus.RUNNING, ItemPayload.Compaction(null)))
             "collabAgentToolCall" -> if (it.optString("tool") == "spawnAgent") {
+                lastSpawnRef = ref
+                it.optJSONArray("receiverThreadIds")?.let { a -> for (i in 0 until a.length()) childParent[a.optString(i)] = ref }
                 val states = it.optJSONObject("agentsStates")
                 val result = states?.keys()?.asSequence()?.mapNotNull { k -> states.optJSONObject(k)?.optString("message")?.ifEmpty { null } }?.joinToString("\n\n")?.ifEmpty { null }
                 emit(AgentEvent.ItemUpsert(ref, status, ItemPayload.Subagent(it.optString("prompt").lineSequence().firstOrNull()?.take(120)?.ifEmpty { null } ?: "Subagent",

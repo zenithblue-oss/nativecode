@@ -384,6 +384,7 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
     private fun onNotification(myGen: Int, method: String, params: JSONObject) {
         synchronized(lock) {
             if (myGen != gen) return
+            mapper.mainThreadId = threadId
             if (!mapper.notification(method, params)) sink(AgentEvent.Unknown("$method ${params.toString().take(300)}"))
         }
     }
