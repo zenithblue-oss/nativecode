@@ -129,7 +129,7 @@ class ClaudeStreamRuntime(private val host: RuntimeHost) : AgentRuntime {
         sink(AgentEvent.NativeId(sid))
         val version = init.optString("claude_code_version")
         if (!ClaudeWire.versionOk(version)) throw IOException("Chat not available for Claude Code $version (needs ${ClaudeWire.MIN_VERSION}+)")
-        models = ClaudeWire.parseModels(init.optJSONArray("models"))
+        models = ClaudeModels.merge(ClaudeWire.parseModels(init.optJSONArray("models")))
         commands = ClaudeWire.parseCommands(init.optJSONArray("commands"))
         account = ClaudeWire.account(init.optJSONObject("account"))
         val modes = ClaudeWire.modesOf(init.optString("current_permission_mode"))
@@ -192,7 +192,7 @@ class ClaudeStreamRuntime(private val host: RuntimeHost) : AgentRuntime {
         if (r == null) { sink(AgentEvent.SessionState(AgentEvent.Phase.ERROR, message = "Claude Code did not restart")); return }
         sessionId = r.first
         sink(AgentEvent.NativeId(r.first))
-        models = ClaudeWire.parseModels(r.second.optJSONArray("models")).ifEmpty { models }
+        models = ClaudeModels.merge(ClaudeWire.parseModels(r.second.optJSONArray("models"))).ifEmpty { models }
         account = ClaudeWire.account(r.second.optJSONObject("account")) ?: account
         mapper.ready = true
         sink(AgentEvent.SessionState(AgentEvent.Phase.READY, caps, models, ClaudeWire.DEFAULT_MODEL, commands, account))

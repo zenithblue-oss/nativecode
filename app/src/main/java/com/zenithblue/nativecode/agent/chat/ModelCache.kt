@@ -20,7 +20,9 @@ object ModelCache {
 
     private fun file(ctx: Context, tool: String) = File(ctx.filesDir, "agent/models-${tool.replace(Regex("[^A-Za-z0-9._-]"), "_")}.json")
 
+    /** claude: a list cached from a signed-out or older CLI (bare "Opus", no previous models) is completed on load. */
     fun load(ctx: Context, tool: String): Entry? = runCatching { decode(file(ctx, tool).readText()) }.getOrNull()
+        ?.let { e -> if (tool.startsWith("claude")) e.copy(models = com.zenithblue.nativecode.agent.chat.claude.ClaudeModels.merge(e.models)) else e }
 
     fun save(ctx: Context, tool: String, e: Entry) {
         if (e.models.isEmpty()) return
@@ -37,7 +39,7 @@ object ModelCache {
         .put("default", e.defaultModel)
         .put("models", JSONArray(e.models.map { m ->
             JSONObject().put("id", m.id).put("name", m.name).put("provider", m.providerId).put("free", m.free)
-                .put("variants", JSONArray(m.variants)).put("ctx", m.contextLimit)
+                .put("variants", JSONArray(m.variants)).put("ctx", m.contextLimit).put("detail", m.detail)
         }))
         .put("caps", e.caps?.let { c ->
             JSONObject().put("steer", c.steer).put("images", c.images).put("pdf", c.pdf).put("userInput", c.userInput)
@@ -60,6 +62,7 @@ object ModelCache {
                 providerId = m.optString("provider").ifEmpty { null }, free = m.optBoolean("free"),
                 variants = (0 until (v?.length() ?: 0)).map { v!!.getString(it) },
                 contextLimit = if (m.has("ctx")) m.optLong("ctx") else null,
+                detail = m.optString("detail").ifEmpty { null },
             )
         }
         if (models.isEmpty()) return null

@@ -140,8 +140,11 @@ internal object ClaudeWire {
     /** `initialize.models[]`: value is the id the CLI takes back; effort levels become the variants. */
     fun parseModels(a: JSONArray?): List<ModelInfo> = objects(a).mapNotNull { m ->
         val id = m.optString("value").ifBlank { return@mapNotNull null }
-        ModelInfo(id, m.optString("displayName").ifBlank { id }, "anthropic",
-            variants = if (m.optBoolean("supportsEffort")) strings(m.optJSONArray("supportedEffortLevels")) else emptyList())
+        val full = m.optString("resolvedModel").ifBlank { null }?.takeIf { it != id }
+        // Bare "Opus" (signed-out CLI) becomes "Opus 5.5" from the resolved id; "default" keeps its own label.
+        val shown = m.optString("displayName").ifBlank { id }.let { n -> if (n.any { it.isDigit() } || id == "default") n else ClaudeModels.nameOf(full ?: id) ?: n }
+        ModelInfo(id, shown, "anthropic",
+            variants = if (m.optBoolean("supportsEffort")) strings(m.optJSONArray("supportedEffortLevels")) else emptyList(), detail = full)
     }
 
     /**

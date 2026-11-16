@@ -220,6 +220,8 @@ data class ModelInfo(
     val free: Boolean = false,
     val variants: List<String> = emptyList(),   // effort levels
     val contextLimit: Long? = null,
+    /** Shown under the name instead of [id] when set (claude: the full model id an alias resolves to). */
+    val detail: String? = null,
 )
 
 /**

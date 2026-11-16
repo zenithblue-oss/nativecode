@@ -105,7 +105,7 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
                 Ring(if (on) C.primary else C.outline, size = 14.dp, filled = on)
                 Column(Modifier.weight(1f).padding(horizontal = S.s)) {
                     Text(m.name.ifBlank { m.id }, color = C.on, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(listOfNotNull(m.id, m.contextLimit?.let { "${ChatLogic.tokens(it)} ctx" }).joinToString(" · "),
+                    Text(listOfNotNull(m.detail ?: m.id, m.contextLimit?.let { "${ChatLogic.tokens(it)} ctx" }).joinToString(" · "),
                         color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (m.free) FreeBadge()
