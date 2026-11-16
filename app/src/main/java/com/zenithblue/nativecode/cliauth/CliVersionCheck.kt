@@ -8,6 +8,7 @@ import com.zenithblue.nativecode.agent.chat.core.ChatFailures
 import com.zenithblue.nativecode.onboarding.RuntimeUpdatePack
 import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
 import com.zenithblue.nativecode.terminal.ShellCommandRunner
+import com.zenithblue.nativecode.terminal.ShellQuoting
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -35,7 +36,7 @@ object CliVersionCheck {
         val d = def(id) ?: return null
         if (!force) cache[d.id]?.let { return it }
         val out = try {
-            val (args, env) = LinuxCommandBuilder.build(ctx, "${d.bin} --version 2>&1 | head -n 5", "flux", method = "proot")
+            val (args, env) = LinuxCommandBuilder.build(ctx, login("${d.bin} --version 2>&1 | head -n 5"), "flux", method = "proot")
             ShellCommandRunner.runCaptureExit(ctx, args, env).second
         } catch (_: Exception) { "" }
         val v = if (out.contains("NativeCode:")) null else ChatFailures.parseVersion(out)
@@ -43,6 +44,9 @@ object CliVersionCheck {
         cache[d.id] = r
         return r
     }
+
+    /** A login shell re-applies the CLI PATH (~/.local/bin, ~/.opencode/bin): a plain `sh -c` does not find the CLIs. */
+    private fun login(cmd: String) = "bash -lc " + ShellQuoting.singleQuote(cmd)
 
     private fun canUpdate(ctx: Context, d: CliToolDef) =
         d.updateCmd != null || (d.id == "opencode" && RuntimeUpdatePack.isNeeded(ctx))
@@ -69,7 +73,7 @@ object CliVersionCheck {
         onState(State.Running("Updating ${d.displayName}…"))
         Thread {
             try {
-                val (args, env) = LinuxCommandBuilder.build(app, "$cmd 2>&1 | tail -n 5", "flux", method = "proot")
+                val (args, env) = LinuxCommandBuilder.build(app, login("$cmd 2>&1 | tail -n 5"), "flux", method = "proot")
                 val out = ShellCommandRunner.runCaptureExit(app, args, env).second.trim()
                 cache.remove(d.id)
                 val now = check(app, d.id, force = true)
