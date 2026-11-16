@@ -40,4 +40,6 @@ interface ChatHost {
     fun shareFile(hostPath: String)
     /** Dev-server preview (loopback WebView); null = probe the common dev ports. */
     fun openPreview(url: String?) {}
+    /** A tapped link in assistant markdown: http(s) browser or preview, guest file in the editor, else copy. See [ChatLinks]. */
+    fun openLink(raw: String, cwd: String, workspace: Boolean) {}
 }

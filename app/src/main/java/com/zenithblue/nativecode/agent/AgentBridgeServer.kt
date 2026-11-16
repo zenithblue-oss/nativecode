@@ -298,6 +298,9 @@ class AgentBridgeServer(
                             if (url.isEmpty()) {
                                 response.put("ok", false)
                                 response.put("error", "Missing or empty 'url' parameter")
+                            } else if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) {
+                                response.put("ok", false) // a file: URI must never reach startActivity (FileUriExposedException)
+                                response.put("error", "Only http(s) URLs can be opened")
                             } else {
                                 val title = request.optString("title", "Agent Web Link").ifBlank { "Agent Web Link" }
                                 val message = request.optString("message", "")

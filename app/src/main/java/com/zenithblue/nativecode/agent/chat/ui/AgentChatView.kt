@@ -17,7 +17,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import com.zenithblue.nativecode.agent.chat.core.ChatRequest
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.ItemPayload
@@ -102,7 +105,13 @@ class AgentChatView(
     init {
         addView(ComposeView(context).apply {
             setContent {
-                CompositionLocalProvider(LocalOnBackPressedDispatcherOwner provides (context as ComponentActivity)) {
+                // Every link in assistant markdown routes here (never a raw Intent: a file: URI crashes with FileUriExposedException).
+                val links = remember {
+                    object : UriHandler {
+                        override fun openUri(uri: String) = host.openLink(uri, open.value?.thread?.cwd ?: projectPath ?: HOME, workspace)
+                    }
+                }
+                CompositionLocalProvider(LocalOnBackPressedDispatcherOwner provides (context as ComponentActivity), LocalUriHandler provides links) {
                     ChatTheme {
                         BackHandler(enabled = chatPosition.value && pageShownState.value && stack.size > 1) { pop() }
                         // No imePadding: MA pads contentFrame by the IME inset (the composer rises with it).

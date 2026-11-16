@@ -4386,6 +4386,34 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun saveApk(hostPath: String) = exportApkToDownloads(File(hostPath))
         override fun shareFile(hostPath: String) = shareApkFromProject(File(hostPath), "Share file")
         override fun openPreview(url: String?) = com.zenithblue.nativecode.preview.PreviewActivity.open(this@MainActivity, url)
+        override fun openLink(raw: String, cwd: String, workspace: Boolean) = this@MainActivity.openChatLink(raw, cwd, workspace)
+    }
+
+    /**
+     * Single exit for every link tapped in assistant markdown (ChatLinks.classify). A file: URI is never handed to
+     * startActivity (FileUriExposedException): guest files open in the in-app editor, anything else is guarded.
+     */
+    private fun openChatLink(raw: String, cwd: String, workspace: Boolean) {
+        fun toast(msg: String) = com.google.android.material.snackbar.Snackbar.make(contentFrame, msg, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+        when (val link = com.zenithblue.nativecode.agent.chat.ui.ChatLinks.classify(raw, cwd)) {
+            is com.zenithblue.nativecode.agent.chat.ui.ChatLink.Web -> com.zenithblue.nativecode.preview.PreviewActivity.openExternal(this, link.url)
+            is com.zenithblue.nativecode.agent.chat.ui.ChatLink.Preview -> com.zenithblue.nativecode.preview.PreviewActivity.open(this, link.url)
+            is com.zenithblue.nativecode.agent.chat.ui.ChatLink.GuestFile -> {
+                val rootfs = rootfsFor(LinuxCommandBuilder.currentMethod)
+                val guest = ProjectLocation.resolve(rootfs, link.path) // symlinks resolved; null = leaves the home
+                val f = guest?.let { ProjectLocation.hostFile(rootfs, it) }
+                if (f == null || !f.isFile) toast(tr(R.string.main_file_not_found))
+                else showFileViewer(f.absolutePath, if (workspace) ID_PROJECT_WORKSPACE else ID_TERMINAL)
+            }
+            is com.zenithblue.nativecode.agent.chat.ui.ChatLink.Other -> try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: Exception) { // ActivityNotFoundException, SecurityException, FileUriExposedException
+                (getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager)
+                    ?.setPrimaryClip(android.content.ClipData.newPlainText("link", link.url))
+                toast(tr(R.string.chat_no_app_can_open_this) + " · " + tr(R.string.main_link_copied))
+            }
+            com.zenithblue.nativecode.agent.chat.ui.ChatLink.Rejected -> toast(tr(R.string.main_file_not_found))
+        }
     }
 
     /** Terminal printed a loopback dev-server URL: a non-blocking "Preview :PORT" chip (snackbar) over the terminal. */
@@ -7141,6 +7169,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             ID_PROJECT_GIT_DIFF,
             ID_PROJECT_SETTINGS,
             ID_PROOT_FILES,
+            ID_TERMINAL, // a file link tapped in the Terminal tab's chat
             ID_FILES -> fileViewerBackPage
             else -> ID_PROJECT_DIR_TREE
         }
