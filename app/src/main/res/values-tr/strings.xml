@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">Gizlilik politikası</string>
     <string name="cons_allow">Seçilenlere izin ver</string>
     <string name="cons_not_now">Şimdi değil</string>
+    <string name="chat_err_cli_missing">CLI yüklü değil</string>
+    <string name="chat_err_signed_out">Oturum açılmadı</string>
+    <string name="chat_err_version_old">Sürüm çok eski</string>
+    <string name="chat_err_pro">Pro gerekli</string>
+    <string name="chat_err_limit">Oturum sınırına ulaşıldı</string>
+    <string name="chat_err_crashed">İşlem çöktü</string>
+    <string name="chat_err_protocol">Protokol hatası</string>
+    <string name="chat_err_network">Ağ hatası</string>
+    <string name="chat_err_too_old">%1$s %2$s sohbet için çok eski (en az ≥ %3$s gerekir)</string>
+    <string name="chat_err_update">Güncelle</string>
+    <string name="chat_err_updating">Güncelleniyor…</string>
+    <string name="chat_err_update_failed">Güncelleme başarısız: %1$s</string>
+    <string name="chat_copy_details">Ayrıntıları kopyala</string>
 </resources>

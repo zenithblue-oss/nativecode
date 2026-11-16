@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">سياسة الخصوصية</string>
     <string name="cons_allow">السماح بالمحدد</string>
     <string name="cons_not_now">ليس الآن</string>
+    <string name="chat_err_cli_missing">واجهة سطر الأوامر غير مثبّتة</string>
+    <string name="chat_err_signed_out">لم يتم تسجيل الدخول</string>
+    <string name="chat_err_version_old">الإصدار قديم جدًا</string>
+    <string name="chat_err_pro">يتطلب Pro</string>
+    <string name="chat_err_limit">تم بلوغ حد الجلسة</string>
+    <string name="chat_err_crashed">تعطلت العملية</string>
+    <string name="chat_err_protocol">خطأ في البروتوكول</string>
+    <string name="chat_err_network">خطأ في الشبكة</string>
+    <string name="chat_err_too_old">%1$s %2$s قديم جدًا للدردشة (يتطلب ≥ %3$s)</string>
+    <string name="chat_err_update">تحديث</string>
+    <string name="chat_err_updating">جارٍ التحديث…</string>
+    <string name="chat_err_update_failed">فشل التحديث: %1$s</string>
+    <string name="chat_copy_details">نسخ التفاصيل</string>
 </resources>

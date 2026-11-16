@@ -28,6 +28,7 @@ class PipeProcess(
     private var stdin: OutputStream? = null // guarded by this
     private var err = ByteArray(0) // guarded by errLock
     private val errLock = Any()
+    private val outTail = ArrayDeque<String>() // guarded by errLock: last non-protocol stdout lines, for the exit tail
 
     val isAlive: Boolean get() = proc?.isAlive == true
 
@@ -119,7 +120,14 @@ class PipeProcess(
         return out.toList()
     }
 
-    fun stderrTail(): String = synchronized(errLock) { String(err, Charsets.UTF_8) }
+    /**
+     * stderr, then the last few stdout lines that are not plain protocol frames. A CLI that is signed out prints
+     * `Not logged in · Please run /login` on stdout and exits 0, so stderr alone cannot say why it ended.
+     */
+    fun stderrTail(): String = synchronized(errLock) {
+        val e = String(err, Charsets.UTF_8)
+        if (outTail.isEmpty()) e else e + (if (e.isEmpty() || e.endsWith("\n")) "" else "\n") + outTail.joinToString("\n")
+    }
 
     private fun readStdout(p: Process) {
         val buf = ByteArray(32 * 1024)
@@ -148,8 +156,17 @@ class PipeProcess(
         var s = line.toString(Charsets.UTF_8.name())
         line.reset()
         if (s.endsWith("\r")) s = s.dropLast(1)
-        if (s.isNotEmpty()) runCatching { onLine(s) }
+        if (s.isEmpty()) return
+        if (keepForTail(s)) synchronized(errLock) {
+            outTail.addLast(s.take(300))
+            while (outTail.size > TAIL_LINES) outTail.removeFirst()
+        }
+        runCatching { onLine(s) }
     }
+
+    /** Non-JSON output (launcher, CLI banners, `Not logged in`) and JSON frames that carry an error. */
+    private fun keepForTail(s: String) =
+        !s.startsWith("{") || s.contains("\"error\"") || s.contains("authentication_failed") || s.contains("is_api_error")
 
     private fun drainStderr(p: Process) {
         val buf = ByteArray(8 * 1024)
@@ -169,6 +186,7 @@ class PipeProcess(
 
     companion object {
         const val STDERR_CAP = 64 * 1024
+        private const val TAIL_LINES = 8
         private const val GRACE_MS = 2_000L
         private const val TERM = "TERM"
         private const val KILL = "KILL"

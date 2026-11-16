@@ -52,6 +52,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.zenithblue.nativecode.agent.chat.core.ChatAttachment
+import com.zenithblue.nativecode.agent.chat.core.ChatFailures
+import com.zenithblue.nativecode.agent.chat.core.Failure
+import com.zenithblue.nativecode.agent.chat.core.FailureClass
+import com.zenithblue.nativecode.cliauth.CliVersionCheck
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.ConfigChange
 import com.zenithblue.nativecode.agent.chat.core.InteractionMode
@@ -440,22 +444,71 @@ private fun PlanCard(v: AgentChatView, t: ChatThread, md: String, modifier: Modi
     }
 }
 
+/** Icon and title of an error card by failure class (the eight cases of [ChatFailures] plus the generic fallback). */
+private fun errorLook(cls: FailureClass): Pair<ImageVector, String> = when (cls) {
+    FailureClass.CLI_MISSING -> Ic.Package to tr(R.string.chat_err_cli_missing)
+    FailureClass.PERMISSION_ERROR -> Ic.Lock to tr(R.string.chat_err_signed_out)
+    FailureClass.VERSION_OLD -> Ic.Download to tr(R.string.chat_err_version_old)
+    FailureClass.GATE_DENIED -> Ic.ShieldAlert to tr(R.string.chat_err_pro)
+    FailureClass.USAGE_LIMIT -> Ic.Gauge to tr(R.string.chat_err_limit)
+    FailureClass.CRASHED -> Ic.Alert to tr(R.string.chat_err_crashed)
+    FailureClass.PROTOCOL_ERROR -> Ic.Activity to tr(R.string.chat_err_protocol)
+    FailureClass.NETWORK_ERROR -> Ic.Globe to tr(R.string.chat_err_network)
+    else -> Ic.CircleX to cls.wire.replace('_', ' ').replaceFirstChar { it.uppercase() }
+}
+
+/**
+ * Error card: icon, plain title, a short reason, and Retry / Terminal / Sign in / Update / Copy details. A version-related
+ * failure (unknown flag, missing method, protocol mismatch) checks `<cli> --version` once (cached) and, when it is below the
+ * catalog minimum, says so with an Update button that runs the CLI's update path and then retries.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ErrorRow(v: AgentChatView, t: ChatThread, item: TurnItem, p: ItemPayload.Error, modifier: Modifier) {
+    val ctx = LocalContext.current
     var details by remember { mutableStateOf(false) }
+    var upd by remember { mutableStateOf<CliVersionCheck.State?>(null) }
+    val versionLike = remember(p) { ChatFailures.versionRelated(Failure(p.cls, p.message, p.retryAt, p.details)) }
+    val ver by produceState<CliVersionCheck.Result?>(null, p.cls, t.tool) {
+        if (versionLike) value = withContext(Dispatchers.IO) { CliVersionCheck.check(ctx, t.tool) }
+    }
+    val old = ver?.takeIf { it.tooOld && it.installed != null && it.min != null }
+    val (icon, title) = errorLook(if (old != null) FailureClass.VERSION_OLD else p.cls)
+    val reason = old?.let { tr(R.string.chat_err_too_old, it.name, it.installed.orEmpty(), it.min.orEmpty()) } ?: ChatFailures.reason(p.message)
+    val updating = upd is CliVersionCheck.State.Running
     Column(modifier) {
         Column(Modifier.fillMaxWidth().card(C.errorCon.copy(alpha = 0.14f), C.error.copy(alpha = 0.6f)).padding(S.m)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                NcIcon(Ic.CircleX, null, tint = C.error, size = 16.dp)
-                Text(p.cls.wire.replace('_', ' ').replaceFirstChar { it.uppercase() }, Modifier.weight(1f).padding(start = S.s),
-                    color = C.error, style = T.heading.copy(fontWeight = FontWeight.SemiBold))
+                NcIcon(icon, null, tint = C.error, size = 16.dp)
+                Text(title, Modifier.weight(1f).padding(start = S.s), color = C.error, style = T.heading.copy(fontWeight = FontWeight.SemiBold))
                 p.retryAt?.let { Label("retry " + TIME.format(Date(it)), color = C.error) }
             }
-            Text(p.message, Modifier.padding(vertical = S.s), color = C.on, style = T.bodySm)
+            Text(reason, Modifier.padding(vertical = S.s), color = C.on, style = T.bodySm)
+            (upd as? CliVersionCheck.State.Running)?.let {
+                Row(Modifier.padding(bottom = S.s), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(14.dp), color = C.primary, strokeWidth = 2.dp)
+                    Text(it.text, Modifier.padding(start = S.s), color = C.onVar, style = T.bodySm)
+                }
+            }
+            (upd as? CliVersionCheck.State.Done)?.takeIf { !it.ok }?.let {
+                Text(tr(R.string.chat_err_update_failed, ChatFailures.reason(it.message)), Modifier.padding(bottom = S.s), color = C.error, style = T.bodySm)
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
-                NcButton(tr(R.string.chat_retry), icon = Ic.Retry) { v.retry(t, item.runId) }
+                if (old != null && old.canUpdate && !updating) NcButton(tr(R.string.chat_err_update), icon = Ic.Download, primary = true) {
+                    upd = CliVersionCheck.State.Running(tr(R.string.chat_err_updating))
+                    v.host.updateCli(t.tool) { st ->
+                        upd = st
+                        if (st is CliVersionCheck.State.Done && st.ok) v.retry(t, item.runId)
+                    }
+                }
+                if (!updating) NcButton(tr(R.string.chat_retry), icon = Ic.Retry) { v.retry(t, item.runId) }
+                if (p.cls == FailureClass.PERMISSION_ERROR) NcButton(tr(R.string.chat_sign_in), icon = Ic.Lock, primary = true) {
+                    v.host.openCliLoginPage(CliVersionCheck.def(t.tool)?.id ?: t.tool)
+                }
                 NcButton(tr(R.string.chat_terminal), icon = Ic.Terminal) { openInTerminal(v, t) }
+                NcButton(tr(R.string.chat_copy_details), icon = Ic.Copy) {
+                    copyText(ctx, listOfNotNull(title, reason, p.message.takeIf { it != reason }, p.details).joinToString("\n"))
+                }
                 if (!p.details.isNullOrBlank()) NcButton(tr(R.string.chat_details), icon = Ic.FileText) { details = true }
             }
         }

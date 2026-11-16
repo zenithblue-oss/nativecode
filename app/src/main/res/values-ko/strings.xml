@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">개인정보 처리방침</string>
     <string name="cons_allow">선택 항목 허용</string>
     <string name="cons_not_now">나중에</string>
+    <string name="chat_err_cli_missing">CLI가 설치되어 있지 않음</string>
+    <string name="chat_err_signed_out">로그인되어 있지 않음</string>
+    <string name="chat_err_version_old">버전이 너무 오래됨</string>
+    <string name="chat_err_pro">Pro 필요</string>
+    <string name="chat_err_limit">세션 한도에 도달함</string>
+    <string name="chat_err_crashed">프로세스가 중단됨</string>
+    <string name="chat_err_protocol">프로토콜 오류</string>
+    <string name="chat_err_network">네트워크 오류</string>
+    <string name="chat_err_too_old">%1$s %2$s은(는) 채팅에 너무 오래되었습니다(≥ %3$s 필요)</string>
+    <string name="chat_err_update">업데이트</string>
+    <string name="chat_err_updating">업데이트 중…</string>
+    <string name="chat_err_update_failed">업데이트 실패: %1$s</string>
+    <string name="chat_copy_details">세부 정보 복사</string>
 </resources>

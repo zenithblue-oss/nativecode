@@ -1570,4 +1570,17 @@
     <string name="cons_privacy">Privacy policy</string>
     <string name="cons_allow">Allow selected</string>
     <string name="cons_not_now">Not now</string>
+    <string name="chat_err_cli_missing">CLI not installed</string>
+    <string name="chat_err_signed_out">Not signed in</string>
+    <string name="chat_err_version_old">Version too old</string>
+    <string name="chat_err_pro">Pro required</string>
+    <string name="chat_err_limit">Session limit reached</string>
+    <string name="chat_err_crashed">Process crashed</string>
+    <string name="chat_err_protocol">Protocol error</string>
+    <string name="chat_err_network">Network error</string>
+    <string name="chat_err_too_old">%1$s %2$s is too old for chat (needs ≥ %3$s)</string>
+    <string name="chat_err_update">Update</string>
+    <string name="chat_err_updating">Updating…</string>
+    <string name="chat_err_update_failed">Update failed: %1$s</string>
+    <string name="chat_copy_details">Copy details</string>
 </resources>

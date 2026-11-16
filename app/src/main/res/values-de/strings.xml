@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">Datenschutzerklärung</string>
     <string name="cons_allow">Auswahl erlauben</string>
     <string name="cons_not_now">Jetzt nicht</string>
+    <string name="chat_err_cli_missing">CLI nicht installiert</string>
+    <string name="chat_err_signed_out">Nicht angemeldet</string>
+    <string name="chat_err_version_old">Version zu alt</string>
+    <string name="chat_err_pro">Pro erforderlich</string>
+    <string name="chat_err_limit">Sitzungslimit erreicht</string>
+    <string name="chat_err_crashed">Prozess abgestürzt</string>
+    <string name="chat_err_protocol">Protokollfehler</string>
+    <string name="chat_err_network">Netzwerkfehler</string>
+    <string name="chat_err_too_old">%1$s %2$s ist zu alt für den Chat (benötigt ≥ %3$s)</string>
+    <string name="chat_err_update">Aktualisieren</string>
+    <string name="chat_err_updating">Wird aktualisiert…</string>
+    <string name="chat_err_update_failed">Aktualisierung fehlgeschlagen: %1$s</string>
+    <string name="chat_copy_details">Details kopieren</string>
 </resources>

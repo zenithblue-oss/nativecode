@@ -37,7 +37,14 @@ data class CliToolDef(
     /** Agent chat wire protocol (item 12); null = terminal only until that runtime ships. */
     val chat: ChatProtocol? = null,
     /** [ChatProtocol.ACP] profile id (argv, env, mode map) when [chat] is ACP. */
-    val acpProfile: String? = null
+    val acpProfile: String? = null,
+    /**
+     * Lowest CLI version the chat runtime is known to work with (dotted). Only consulted after a version-related chat
+     * failure (unknown flag, missing app-server method, protocol mismatch, missing endpoint); never on a healthy start.
+     */
+    val minChatVersion: String? = null,
+    /** Guest shell command that updates this CLI itself (null = delivered by the Components update pack). */
+    val updateCmd: String? = null
 )
 
 enum class ChatProtocol { OPENCODE_HTTP, CLAUDE_STREAM, CODEX_APP_SERVER, ACP }
@@ -54,7 +61,9 @@ object CliToolCatalog {
             consoleUrl = "https://claude.ai/login",
             envKey = "CLAUDE_CODE_OAUTH_TOKEN",
             subtitle = tr(R.string.cli_claude_auth_login_browser_oauth),
-            chat = ChatProtocol.CLAUDE_STREAM
+            chat = ChatProtocol.CLAUDE_STREAM,
+            minChatVersion = "2.1.0",
+            updateCmd = "claude update"
         ),
         CliToolDef(
             id = "codex",
@@ -65,7 +74,9 @@ object CliToolCatalog {
             hideOnChroot = true,
             consoleUrl = "https://auth.openai.com/codex/device",
             subtitle = tr(R.string.cli_codex_login_device_auth),
-            chat = ChatProtocol.CODEX_APP_SERVER
+            chat = ChatProtocol.CODEX_APP_SERVER,
+            minChatVersion = "0.130.0",
+            updateCmd = "npm install -g @openai/codex@latest"
         ),
         CliToolDef(
             id = "qwen",
@@ -86,7 +97,8 @@ object CliToolCatalog {
             consoleUrl = "https://opencode.ai/auth",
             subtitle = tr(R.string.cli_opencode_auth_login_providers),
             loginOptional = true,
-            chat = ChatProtocol.OPENCODE_HTTP
+            chat = ChatProtocol.OPENCODE_HTTP,
+            minChatVersion = "2.0.0"
         ),
         CliToolDef(
             id = "agy",
@@ -97,7 +109,8 @@ object CliToolCatalog {
             consoleUrl = "https://accounts.google.com",
             subtitle = tr(R.string.cli_agy_acp_login_google_oauth),
             chat = ChatProtocol.ACP,
-            acpProfile = "agy"
+            acpProfile = "agy",
+            minChatVersion = "1.4.0"
         ),
         CliToolDef(
             id = "grok",
@@ -109,7 +122,9 @@ object CliToolCatalog {
             envKey = "XAI_API_KEY",
             subtitle = tr(R.string.cli_grok_login_or_xai_api),
             chat = ChatProtocol.ACP,
-            acpProfile = "grok"
+            acpProfile = "grok",
+            minChatVersion = "1.0.50",
+            updateCmd = "grok update"
         ),
         CliToolDef(
             id = "kiro",

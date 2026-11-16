@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">Política de privacidad</string>
     <string name="cons_allow">Permitir lo elegido</string>
     <string name="cons_not_now">Ahora no</string>
+    <string name="chat_err_cli_missing">CLI no instalada</string>
+    <string name="chat_err_signed_out">Sesión no iniciada</string>
+    <string name="chat_err_version_old">Versión demasiado antigua</string>
+    <string name="chat_err_pro">Requiere Pro</string>
+    <string name="chat_err_limit">Límite de sesión alcanzado</string>
+    <string name="chat_err_crashed">El proceso falló</string>
+    <string name="chat_err_protocol">Error de protocolo</string>
+    <string name="chat_err_network">Error de red</string>
+    <string name="chat_err_too_old">%1$s %2$s es demasiado antigua para el chat (requiere ≥ %3$s)</string>
+    <string name="chat_err_update">Actualizar</string>
+    <string name="chat_err_updating">Actualizando…</string>
+    <string name="chat_err_update_failed">Error al actualizar: %1$s</string>
+    <string name="chat_copy_details">Copiar detalles</string>
 </resources>

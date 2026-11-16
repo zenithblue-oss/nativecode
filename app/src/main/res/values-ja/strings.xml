@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">プライバシーポリシー</string>
     <string name="cons_allow">選択した項目を許可</string>
     <string name="cons_not_now">今はしない</string>
+    <string name="chat_err_cli_missing">CLI がインストールされていません</string>
+    <string name="chat_err_signed_out">サインインしていません</string>
+    <string name="chat_err_version_old">バージョンが古すぎます</string>
+    <string name="chat_err_pro">Pro が必要です</string>
+    <string name="chat_err_limit">セッション上限に達しました</string>
+    <string name="chat_err_crashed">プロセスがクラッシュしました</string>
+    <string name="chat_err_protocol">プロトコルエラー</string>
+    <string name="chat_err_network">ネットワークエラー</string>
+    <string name="chat_err_too_old">%1$s %2$s はチャットには古すぎます（≥ %3$s が必要）</string>
+    <string name="chat_err_update">更新</string>
+    <string name="chat_err_updating">更新中…</string>
+    <string name="chat_err_update_failed">更新に失敗しました: %1$s</string>
+    <string name="chat_copy_details">詳細をコピー</string>
 </resources>

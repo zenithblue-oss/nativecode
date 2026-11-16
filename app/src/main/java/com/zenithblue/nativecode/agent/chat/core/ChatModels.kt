@@ -57,6 +57,8 @@ enum class InteractionMode(val wire: String) {
 enum class FailureClass(val wire: String) {
     USAGE_LIMIT("usage_limit"), PROVIDER_ERROR("provider_error"), TRANSPORT_ERROR("transport_error"),
     PERMISSION_ERROR("permission_error"), VALIDATION_ERROR("validation_error"), GATE_DENIED("gate_denied"),
+    /** Error-card classes (see [ChatFailures]): CLI missing, version too old, process crashed, wire protocol, network. */
+    CLI_MISSING("cli_missing"), VERSION_OLD("version_old"), CRASHED("crashed"), PROTOCOL_ERROR("protocol_error"), NETWORK_ERROR("network_error"),
     UNKNOWN("unknown");
 
     companion object { fun of(w: String?) = entries.firstOrNull { it.wire == w } ?: UNKNOWN }

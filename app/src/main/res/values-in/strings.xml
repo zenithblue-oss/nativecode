@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">Kebijakan privasi</string>
     <string name="cons_allow">Izinkan yang dipilih</string>
     <string name="cons_not_now">Nanti saja</string>
+    <string name="chat_err_cli_missing">CLI belum terpasang</string>
+    <string name="chat_err_signed_out">Belum masuk</string>
+    <string name="chat_err_version_old">Versi terlalu lama</string>
+    <string name="chat_err_pro">Perlu Pro</string>
+    <string name="chat_err_limit">Batas sesi tercapai</string>
+    <string name="chat_err_crashed">Proses crash</string>
+    <string name="chat_err_protocol">Kesalahan protokol</string>
+    <string name="chat_err_network">Kesalahan jaringan</string>
+    <string name="chat_err_too_old">%1$s %2$s terlalu lama untuk chat (butuh ≥ %3$s)</string>
+    <string name="chat_err_update">Perbarui</string>
+    <string name="chat_err_updating">Memperbarui…</string>
+    <string name="chat_err_update_failed">Gagal memperbarui: %1$s</string>
+    <string name="chat_copy_details">Salin detail</string>
 </resources>

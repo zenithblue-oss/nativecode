@@ -6,6 +6,7 @@ import com.zenithblue.nativecode.agent.chat.core.ChatRequest
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.ConfigChange
 import com.zenithblue.nativecode.agent.chat.core.Failure
+import com.zenithblue.nativecode.agent.chat.core.ChatFailures
 import com.zenithblue.nativecode.agent.chat.core.FailureClass
 import com.zenithblue.nativecode.agent.chat.core.ItemPayload
 import com.zenithblue.nativecode.agent.chat.core.ItemStatus
@@ -276,8 +277,9 @@ class ChatReducer(
             }
             !expected -> {
                 holdQueue(true)
-                endSession(RunStatus.FAILED, Failure(FailureClass.TRANSPORT_ERROR, "Session ended unexpectedly (exit $code)",
-                    details = stderrTail.takeLast(4096).ifBlank { null }))
+                // The tail may hold why it ended (claude prints "Not logged in · Please run /login" and exits 0); so may the start error.
+                endSession(RunStatus.FAILED, ChatFailures.refine(Failure(FailureClass.TRANSPORT_ERROR, "Session ended unexpectedly (exit $code)",
+                    details = stderrTail.takeLast(4096).ifBlank { null }), raw = state.lastError))
                 state = state.copy(phase = LivePhase.ENDED, banner = ChatBanner(BannerKind.SESSION_ENDED, "Session ended · Resume"))
                 effects += Effect.SessionLost
             }
@@ -493,8 +495,9 @@ class ChatReducer(
         else expireLive(true)
     }
 
-    private fun endTurn(status: RunStatus, failure: Failure?, expireUserInput: Boolean) {
+    private fun endTurn(status: RunStatus, rawFailure: Failure?, expireUserInput: Boolean) {
         val r = run ?: return
+        val failure = rawFailure?.let { ChatFailures.refine(it) }
         val itemStatus = when (status) {
             RunStatus.COMPLETED -> ItemStatus.COMPLETED
             RunStatus.FAILED -> ItemStatus.FAILED

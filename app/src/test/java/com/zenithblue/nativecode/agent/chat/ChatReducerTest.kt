@@ -205,6 +205,31 @@ class ChatReducerTest {
         assertEquals(LivePhase.IDLE, r.state.phase)
     }
 
+    @Test fun signedOutExitBecomesNotSignedInCard() {
+        // claude prints "Not logged in · Please run /login" on stdout and exits 0 before any result frame.
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        val run = r.beginRun("c1", "hi", emptyList())
+        r.step(rows, AgentEvent.SessionState(AgentEvent.Phase.READY))
+        r.step(rows, AgentEvent.TurnStarted(null))
+        r.exited(0, "Not logged in \u00b7 Please run /login", expected = false)
+        rows.apply(r.drain().first)
+        val f = rows.runs[run.id]!!.failure!!
+        assertEquals(FailureClass.PERMISSION_ERROR, f.cls)
+        assertTrue(f.details!!.contains("Please run /login"))
+        val card = rows.items.values.map { it.payload }.filterIsInstance<ItemPayload.Error>().single()
+        assertEquals(FailureClass.PERMISSION_ERROR, card.cls)
+    }
+
+    @Test fun startErrorFeedsTheExitClassification() {
+        // The runtime reported "needs 2.1+" as a session error, then the process closed: the card is a version-related protocol error.
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        val run = r.beginRun("c1", "hi", emptyList())
+        r.step(rows, AgentEvent.SessionState(AgentEvent.Phase.ERROR, message = "Chat not available for Claude Code 2.0.1 (needs 2.1+)"))
+        r.exited(0, "", expected = false)
+        rows.apply(r.drain().first)
+        assertEquals(FailureClass.PROTOCOL_ERROR, rows.runs[run.id]!!.failure!!.cls)
+    }
+
     @Test fun unexpectedExitFailsRunAndExpiresRequests() {
         val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
         val run = r.beginRun("c1", "hi", emptyList())
@@ -219,7 +244,7 @@ class ChatReducerTest {
         assertTrue(ChatReducer.Effect.SessionLost in fx)
         val failed = rows.runs[run.id]!!
         assertEquals(RunStatus.FAILED, failed.status)
-        assertEquals(FailureClass.TRANSPORT_ERROR, failed.failure!!.cls)
+        assertEquals(FailureClass.CRASHED, failed.failure!!.cls)
         assertEquals("killed", failed.failure!!.details)
         assertTrue(rows.requests.values.all { it.status == RequestStatus.EXPIRED })
         assertEquals(ItemStatus.FAILED, rows.items.values.single { it.nativeRef == "m1" }.status)

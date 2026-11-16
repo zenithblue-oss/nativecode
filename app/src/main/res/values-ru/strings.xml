@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">Политика конфиденциальности</string>
     <string name="cons_allow">Разрешить выбранное</string>
     <string name="cons_not_now">Не сейчас</string>
+    <string name="chat_err_cli_missing">CLI не установлен</string>
+    <string name="chat_err_signed_out">Вход не выполнен</string>
+    <string name="chat_err_version_old">Версия слишком старая</string>
+    <string name="chat_err_pro">Нужен Pro</string>
+    <string name="chat_err_limit">Достигнут лимит сеанса</string>
+    <string name="chat_err_crashed">Процесс аварийно завершился</string>
+    <string name="chat_err_protocol">Ошибка протокола</string>
+    <string name="chat_err_network">Ошибка сети</string>
+    <string name="chat_err_too_old">%1$s %2$s слишком старая для чата (нужна ≥ %3$s)</string>
+    <string name="chat_err_update">Обновить</string>
+    <string name="chat_err_updating">Обновление…</string>
+    <string name="chat_err_update_failed">Не удалось обновить: %1$s</string>
+    <string name="chat_copy_details">Копировать детали</string>
 </resources>

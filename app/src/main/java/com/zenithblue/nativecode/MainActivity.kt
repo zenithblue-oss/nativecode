@@ -4352,6 +4352,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun canUseTool(tool: String) = !aiToolLocked(tool)
         override fun showUpgradeSheet(reason: String?) = this@MainActivity.showUpgradeSheet(reason)
         override fun openCliLoginPage(id: String) = this@MainActivity.openCliLoginPage(id)
+        override fun updateCli(id: String, onState: (CliVersionCheck.State) -> Unit) = CliVersionCheck.update(this@MainActivity, id, onState)
         override fun openTerminal(tool: String, args: List<String>, cwd: String?, workspace: Boolean) {
             // ponytail: resume flags unverified for opencode/agy/grok → [args] unused, fresh start (plan 9.2.8).
             if (workspace) { createWorkspaceTerminalTab(tool); return }

@@ -44,8 +44,19 @@ class PipeProcessTest {
         spawn("head -c 3000000 /dev/zero | tr '\\0' e >&2; echo NativeCode: denied >&2; echo done")
         awaitExit()
         assertEquals(listOf("done"), lines.toList())
-        assertEquals(PipeProcess.STDERR_CAP, tail.length)
-        assertTrue(tail.trimEnd().endsWith("NativeCode: denied"))
+        // stderr is capped; the plain stdout line ("done") follows it in the exit tail
+        assertEquals(PipeProcess.STDERR_CAP + "done".length, tail.length)
+        assertTrue(tail.endsWith("NativeCode: denied\ndone"))
+    }
+
+    @Test fun exitTailKeepsPlainStdoutButNotProtocolFrames() {
+        // claude, signed out: prints this on stdout and exits 0; protocol frames (stream-json) stay out of the tail.
+        spawn("echo '{\"type\":\"stream_event\",\"x\":1}'; echo 'Not logged in - Please run /login'; echo '{\"type\":\"assistant\",\"error\":\"authentication_failed\"}'")
+        awaitExit()
+        assertEquals(0, code)
+        assertFalse(tail, tail.contains("stream_event"))
+        assertTrue(tail, tail.contains("Not logged in - Please run /login"))
+        assertTrue(tail, tail.contains("authentication_failed"))
     }
 
     @Test fun exitCodeAndStderrTail() {

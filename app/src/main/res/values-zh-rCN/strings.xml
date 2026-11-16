@@ -1527,4 +1527,17 @@
     <string name="cons_privacy">隐私政策</string>
     <string name="cons_allow">允许所选项</string>
     <string name="cons_not_now">暂不</string>
+    <string name="chat_err_cli_missing">未安装 CLI</string>
+    <string name="chat_err_signed_out">未登录</string>
+    <string name="chat_err_version_old">版本过旧</string>
+    <string name="chat_err_pro">需要 Pro</string>
+    <string name="chat_err_limit">已达会话上限</string>
+    <string name="chat_err_crashed">进程崩溃</string>
+    <string name="chat_err_protocol">协议错误</string>
+    <string name="chat_err_network">网络错误</string>
+    <string name="chat_err_too_old">%1$s %2$s 对聊天来说版本过旧（需要 ≥ %3$s）</string>
+    <string name="chat_err_update">更新</string>
+    <string name="chat_err_updating">正在更新…</string>
+    <string name="chat_err_update_failed">更新失败：%1$s</string>
+    <string name="chat_copy_details">复制详情</string>
 </resources>
