@@ -122,8 +122,19 @@ class CodexMapper(private val nonce: String, private val sink: (AgentEvent) -> U
         return mainNotification(method, p)
     }
 
+    /** Top-level Subagent row of a child thread (sunk directly: a still-running subagent is not cut when the main turn ends). */
+    private fun subagentRow(tid: String, name: String?, status: ItemStatus): String {
+        val ref = childParent.getOrPut(tid) { "agent:$tid" }
+        val old = subagentTitles[ref]
+        val title = name ?: old ?: "Subagent"
+        subagentTitles[ref] = title
+        sink(AgentEvent.ItemUpsert(ref, status, ItemPayload.Subagent(title, 1, null)))
+        return ref
+    }
+    private val subagentTitles = HashMap<String, String>()
+
     private fun child(method: String, tid: String, p: JSONObject): Boolean {
-        val ref = childParent[tid] ?: lastSpawnRef ?: return true // no row to nest under: keep it out of the main thread
+        val ref = childParent[tid] ?: lastSpawnRef ?: subagentRow(tid, null, ItemStatus.RUNNING)
         parent = ref
         try {
             when (method) {
@@ -284,6 +295,9 @@ class CodexMapper(private val nonce: String, private val sink: (AgentEvent) -> U
                 emit(AgentEvent.ItemUpsert(ref, status, ItemPayload.Subagent(it.optString("prompt").lineSequence().firstOrNull()?.take(120)?.ifEmpty { null } ?: "Subagent",
                     it.optJSONArray("receiverThreadIds")?.length() ?: 0, result)))
             }
+            // multi-agent v2 (spawn_agent tool): lifecycle items instead of collabAgentToolCall; one row per child thread
+            "subAgentActivity" -> subagentRow(it.optString("agentThreadId"), it.optString("agentPath").substringAfterLast('/').ifEmpty { null },
+                if (it.optString("kind") == "completed" || it.optString("kind") == "interrupted") ItemStatus.COMPLETED else ItemStatus.RUNNING)
             "exitedReviewMode" -> if (completed) emit(AgentEvent.ItemUpsert(ref, ItemStatus.COMPLETED, ItemPayload.AssistantMessage(it.optString("review"))))
             else -> Unit // userMessage (the client owns user rows), hookPrompt, functionCallOutput, sleep, subAgentActivity, enteredReviewMode
         }

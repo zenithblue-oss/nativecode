@@ -34,6 +34,31 @@ class CodexSubagentTest {
         assertEquals(RunStatus.COMPLETED, ev.filterIsInstance<AgentEvent.TurnTerminal>().single().status)
     }
 
+    @Test fun multiAgentV2ActivityItemMakesTheSubagentRowAndChildNestsUnderIt() {
+        val ev = ArrayList<AgentEvent>()
+        val m = CodexMapper("n") { ev += it }
+        m.mainThreadId = "main"
+        m.beginTurn()
+        m.notification("item/started", n("""{"threadId":"main","turnId":"t1","item":{"id":"a1","type":"subAgentActivity","agentPath":"root/worker_1","agentThreadId":"kid","kind":"started"}}"""))
+        m.notification("item/started", n("""{"threadId":"kid","turnId":"kt","item":{"id":"x1","type":"commandExecution","command":"pwd","status":"inProgress"}}"""))
+        val ups = ev.filterIsInstance<ItemUpsert>()
+        val row = ups.first { it.payload is ItemPayload.Subagent }
+        assertEquals("worker_1", (row.payload as ItemPayload.Subagent).title)
+        assertEquals(row.nativeRef, ups.first { it.payload is ItemPayload.CommandExecution }.parentRef)
+        m.notification("turn/completed", n("""{"threadId":"main","turn":{"id":"t1","status":"completed"}}"""))
+        assertTrue(ev.filterIsInstance<ItemUpsert>().none { it.nativeRef == row.nativeRef && it.status == com.zenithblue.nativecode.agent.chat.core.ItemStatus.INTERRUPTED })
+    }
+
+    @Test fun childWithoutAnyRowGetsALazySubagentRow() {
+        val ev = ArrayList<AgentEvent>()
+        val m = CodexMapper("n") { ev += it }
+        m.mainThreadId = "main"
+        m.beginTurn()
+        m.notification("item/started", n("""{"threadId":"kid","turnId":"kt","item":{"id":"x1","type":"commandExecution","command":"ls","status":"inProgress"}}"""))
+        val ups = ev.filterIsInstance<ItemUpsert>()
+        assertEquals(ups.first { it.payload is ItemPayload.Subagent }.nativeRef, ups.first { it.payload is ItemPayload.CommandExecution }.parentRef)
+    }
+
     @Test fun mainThreadItemsStayTopLevel() {
         val ev = ArrayList<AgentEvent>()
         val m = CodexMapper("n") { ev += it }
