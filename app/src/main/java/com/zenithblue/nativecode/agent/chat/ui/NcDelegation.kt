@@ -126,7 +126,7 @@ private fun TaskList(v: AgentChatView, tasks: List<NcTasks.Task>, now: Long) {
             NcIcon(if (open) Ic.ChevronDown else Ic.ChevronRight, null, tint = C.outline, size = 16.dp)
         }
         if (open) Column(Modifier.padding(start = S.edge, end = S.edge, bottom = S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
-            tasks.take(MAX_SHOWN).forEach { TaskCard(v, it, now) }
+            tasks.take(MAX_SHOWN).forEach { androidx.compose.runtime.key(it.id) { TaskCard(v, it, now) } }
             if (tasks.size > MAX_SHOWN) Label("+${tasks.size - MAX_SHOWN} earlier", color = C.outline)
         }
         Hairline(color = C.borderVar)

@@ -347,7 +347,9 @@ internal fun RowScope.AddDel(add: Int, del: Int, size: Int = 11) {
 internal fun ProviderLogo(tool: String, modifier: Modifier = Modifier, size: Dp = 28.dp) {
     val ctx = LocalContext.current
     val logo by produceState(Logos.cache[tool], tool) {
-        if (value == null) value = withContext(Dispatchers.IO) { Logos.load(ctx, tool) }
+        // produceState keeps its value when the key changes (only the effect restarts): always assign, or a row that
+        // is reused for another tool (a new task shifts the list) keeps the previous tool's logo.
+        value = Logos.cache[tool] ?: withContext(Dispatchers.IO) { Logos.load(ctx, tool) }
     }
     // A dark logo (grok, opencode) sits on a light tile so it keeps >= 3:1 contrast (WCAG non-text).
     val tile = if (logo?.second == true) C.on else C.lowest
