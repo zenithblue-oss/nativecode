@@ -60,6 +60,7 @@ import com.zenithblue.nativecode.entitlements.ProFeature
 import com.zenithblue.nativecode.desktop.DesktopController
 import com.zenithblue.nativecode.desktop.DesktopPill
 import com.zenithblue.nativecode.quick.QuickActions
+import com.zenithblue.nativecode.workspace.FolderPicker
 import com.zenithblue.nativecode.workspace.StatStrip
 import com.zenithblue.nativecode.workspace.StatsEditor
 import com.zenithblue.nativecode.workspace.ToolRail
@@ -19122,10 +19123,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         iconCard.addView(iconRow)
         projectCreateLayout.addView(iconCard)
 
-        // Dummy/hidden projectPathInput initialized for backward compatibility
-        projectPathInput = EditText(this).apply {
-            setText("/home/flux/repos/")
-        }
+        // --- Card 2a: Location (parent folder inside the guest home; New and Clone create <location>/<name>) ---
+        projectCreateLayout.addView(buildProjectLocationCard())
 
         // --- Card 2b: Your repositories (visible when logged in) ---
         projectCreateLayout.addView(buildCreateGithubRepoCard())
@@ -19314,13 +19313,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 return@primaryButton
             }
 
-            val path = if (gitUrl.isNotEmpty()) {
-                val repoName = ProjectManager.repoNameFromUrl(gitUrl)
-                "/home/flux/repos/$repoName"
-            } else {
-                val slug = name.trim().lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
-                "/home/flux/repos/$slug"
-            }
+            // Location field + folder name; shows the inline error and stops on any validation failure.
+            val path = validateProject(method, name, gitUrl) ?: return@primaryButton
 
             // Switch isolation to chip method BEFORE clone so all nested builds match
             LinuxCommandBuilder.currentMethod = method
@@ -19506,6 +19500,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     ProjectManager.cloneRepo(
                         this@MainActivity,
                         gitUrl,
+                        destPath = path,
                         method = method,
                         onProgress = { line ->
                             mainHandler.post { appendLog(line) }
@@ -19543,6 +19538,228 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         projectCreateBtn.trackProLock()
         projectCreateLayout.addView(projectCreateBtn)
+        wireLocationPreview()
+    }
+
+    // ── Project location (folder inside the guest home; see terminal/ProjectLocation.kt) ──
+
+    private lateinit var projectLocationMsgTv: TextView
+
+    private fun rootfsFor(method: String): File = ProjectPathResolver.resolve(this, "/", method)
+
+    /** Writability can only be probed where the app owns the rootfs (proot); a root-owned chroot is skipped. */
+    private fun canProbeWrite(method: String) = method != "chroot"
+
+    private fun locError(e: ProjectLocation.Error): String = tr(
+        when (e) {
+            ProjectLocation.Error.EMPTY -> R.string.loc_err_empty
+            ProjectLocation.Error.TRAVERSAL -> R.string.loc_err_traversal
+            ProjectLocation.Error.OUTSIDE_HOME -> R.string.loc_err_outside
+            ProjectLocation.Error.NOT_FOUND -> R.string.loc_err_not_found
+            ProjectLocation.Error.NOT_DIR -> R.string.loc_err_not_dir
+            ProjectLocation.Error.NOT_WRITABLE -> R.string.loc_err_not_writable
+            ProjectLocation.Error.DUPLICATE -> R.string.loc_err_duplicate
+            ProjectLocation.Error.NOT_EMPTY -> R.string.loc_err_not_empty
+            ProjectLocation.Error.BAD_NAME -> R.string.loc_err_bad_name
+            ProjectLocation.Error.IS_HOME -> R.string.loc_err_home
+        }
+    )
+
+    private fun projectLeaf(name: String, gitUrl: String): String =
+        if (gitUrl.isNotEmpty()) ProjectManager.repoNameFromUrl(gitUrl)
+        else name.trim().lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+
+    private fun showLocationMsg(error: String?, preview: String? = null) {
+        if (!::projectLocationMsgTv.isInitialized) return
+        projectLocationMsgTv.text = error ?: preview.orEmpty()
+        projectLocationMsgTv.setTextColor(if (error != null) NC.ERROR else NC.ON_SURF_VAR)
+        projectLocationMsgTv.visibility = if (projectLocationMsgTv.text.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    /** "Open project in this folder" (ON): the Location folder itself is the project, no subfolder. */
+    private var projectUseFolder = false
+    /** Set once the user types in the name field; auto-fill from the folder name only runs while false. */
+    private var projectNameTouched = false
+    private var projectNameAuto = false
+
+    /** Checks the Location (+ folder name when OFF). Shows the inline error and returns null, else the canonical project path. */
+    private fun validateProject(method: String, name: String, gitUrl: String): String? {
+        val c = checkProjectLocation(method, name, gitUrl)
+        if (!c.ok) { showLocationMsg(locError(c.error!!)); return null }
+        showLocationMsg(null, tr(R.string.loc_project_folder, ProjectLocation.display(c.path!!)))
+        return c.path
+    }
+
+    private fun checkProjectLocation(method: String, name: String, gitUrl: String): ProjectLocation.Check {
+        val known = getProjects().map { it.path }.toSet()
+        val rootfs = rootfsFor(method)
+        val loc = projectPathInput.text.toString()
+        return if (projectUseFolder) ProjectLocation.checkFolder(rootfs, loc, known, gitUrl.isNotEmpty(), canProbeWrite(method))
+        else ProjectLocation.checkDest(rootfs, loc, projectLeaf(name, gitUrl), known, gitUrl.isNotEmpty(), canProbeWrite(method))
+    }
+
+    /** Live feedback under the Location field: the resulting folder, or the first problem. Auto-fills the name in folder mode. */
+    private fun refreshLocationPreview() {
+        val method = projectCreateSelectedMethod
+        val gitUrl = projectGithubInput.text.toString().trim()
+        val name = projectNameInput.text.toString()
+        if (projectUseFolder) {
+            val c = checkProjectLocation(method, name, gitUrl)
+            if (c.path != null && !projectNameTouched) {
+                val auto = ProjectLocation.slug(c.path.substringAfterLast('/'))
+                if (projectNameInput.text.toString() != auto) {
+                    projectNameAuto = true
+                    projectNameInput.setText(auto)
+                    projectNameAuto = false
+                }
+            }
+            showLocationMsg(c.error?.let { locError(it) }, c.path?.let { tr(R.string.loc_project_folder, ProjectLocation.display(it)) })
+        } else if (projectLeaf(name, gitUrl).isEmpty()) {
+            // no name yet: still catch a bad Location
+            val c = ProjectLocation.check(rootfsFor(method), projectPathInput.text.toString(), emptySet(), false, canProbeWrite(method))
+            showLocationMsg(c.error?.let { locError(it) })
+        } else {
+            validateProject(method, name, gitUrl)
+        }
+    }
+
+    private fun wireLocationPreview() {
+        val w = object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) { refreshLocationPreview() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        }
+        projectPathInput.addTextChangedListener(w)
+        projectNameInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
+                if (!projectNameAuto) projectNameTouched = true
+                refreshLocationPreview()
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        projectGithubInput.addTextChangedListener(w)
+    }
+
+    private fun buildProjectLocationCard(): View {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOW,
+                strokeColor = Color.parseColor("#3c4a3f"),
+                shadowColor = NC.SHADOW_DARK,
+                offsetDp = 4,
+                cornerRadiusDp = 0,
+                rightFaceColor = Color.parseColor("#3c4a3f")
+            )
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(20) }
+        }
+        card.addView(TextView(this).apply {
+            text = tr(R.string.loc_location)
+            setTextColor(NC.PRIMARY)
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            paint.isFakeBoldText = true
+            setPadding(0, 0, 0, dp(8))
+        })
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        projectPathInput = EditText(this).apply {
+            setText(ProjectLocation.DEFAULT_PARENT_DISPLAY)
+            hint = ProjectLocation.DEFAULT_PARENT_DISPLAY
+            setHintTextColor(NC.OUTLINE)
+            setTextColor(NC.ON_SURFACE)
+            typeface = Typeface.MONOSPACE
+            isSingleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOWEST,
+                strokeColor = Color.parseColor("#3c4a3f"),
+                shadowColor = Color.TRANSPARENT,
+                offsetDp = 0,
+                cornerRadiusDp = 0
+            )
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        row.addView(projectPathInput, LinearLayout.LayoutParams(0, WRAP, 1f))
+        row.addView(secondaryButton(tr(R.string.loc_choose)) { openLocationPicker() }, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dp(8) })
+        card.addView(row)
+        val toggleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        toggleRow.addView(TextView(this).apply {
+            text = tr(R.string.loc_use_folder)
+            textSize = 13f
+            setTextColor(NC.ON_SURFACE)
+            typeface = Typeface.MONOSPACE
+        }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginEnd = dp(8) })
+        toggleRow.addView(com.zenithblue.nativecode.ui.BrutalistToggle(this, projectUseFolder) { on ->
+            projectUseFolder = on
+            refreshLocationPreview()
+        }.apply { contentDescription = tr(R.string.loc_use_folder) })
+        card.addView(toggleRow)
+        card.addView(TextView(this).apply {
+            text = tr(R.string.loc_use_folder_hint)
+            textSize = 11f
+            setTextColor(NC.OUTLINE)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, dp(4), 0, 0)
+        })
+        projectLocationMsgTv = TextView(this).apply {
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            visibility = View.GONE
+            setPadding(0, dp(8), 0, 0)
+        }
+        card.addView(projectLocationMsgTv)
+        return card
+    }
+
+    private fun openLocationPicker() {
+        val method = projectCreateSelectedMethod
+        val rootfs = rootfsFor(method)
+        if (!ProjectLocation.hostFile(rootfs, ProjectLocation.HOME).isDirectory) {
+            Toast.makeText(this, tr(R.string.loc_err_not_found), Toast.LENGTH_SHORT).show()
+            return
+        }
+        FolderPicker(
+            this, rootfs, projectPathInput.text.toString(), tr(R.string.loc_picker_title),
+            validate = { g -> ProjectLocation.check(rootfs, g, emptySet(), true, canProbeWrite(method)).error?.let { locError(it) } },
+            onPick = { g -> projectPathInput.setText(ProjectLocation.display(g)) },
+        ).show()
+    }
+
+    /** Import: pick any folder inside the guest home and register it as a project in place (nothing is copied or moved). */
+    private fun showImportProjectDialog() {
+        val method = LinuxCommandBuilder.currentMethod
+        val rootfs = rootfsFor(method)
+        if (!ProjectLocation.hostFile(rootfs, ProjectLocation.HOME).isDirectory) {
+            Toast.makeText(this, tr(R.string.loc_err_not_found), Toast.LENGTH_SHORT).show()
+            return
+        }
+        fun known() = getProjects().map { it.path }.toSet()
+        FolderPicker(
+            this, rootfs, ProjectLocation.DEFAULT_PARENT, tr(R.string.loc_use_existing),
+            validate = { g -> ProjectLocation.check(rootfs, g, known(), true, canProbeWrite(method)).error?.let { locError(it) } },
+            onPick = { g ->
+                val register = {
+                    if (projectGateAllows()) {
+                        addAndOpenProject(if (g == ProjectLocation.HOME) "home" else g.substringAfterLast('/'), "", g, method, skipEnsureDir = true)
+                        markProjectOpened(g)
+                    }
+                }
+                // the whole home as one project is legal but rarely intended: ask first
+                if (g == ProjectLocation.HOME) {
+                    showBrutalistConfirmDialog(
+                        title = tr(R.string.loc_home_title),
+                        message = tr(R.string.loc_home_body),
+                        confirmLabel = tr(R.string.loc_home_confirm),
+                    ) { register() }
+                } else register()
+            },
+        ).show()
     }
 
     private fun addAndOpenProject(
@@ -20009,59 +20226,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             populateProjectsList()
         }
         input.requestFocus()
-    }
-
-    private fun showImportProjectDialog() {
-        val method = LinuxCommandBuilder.currentMethod
-        val reposPath = "/home/flux/repos"
-        val known = getProjects().map { it.path.trimEnd('/') }.toSet()
-        val dirs = (ProjectPathResolver.resolve(this, reposPath, method).listFiles() ?: emptyArray())
-            .filter { it.isDirectory && !it.name.startsWith(".") && "$reposPath/${it.name}" !in known }
-            .sortedBy { it.name.lowercase() }
-        if (dirs.isEmpty()) {
-            showBrutalistConfirmDialog(
-                title = tr(R.string.main_nothing_to_import),
-                message = tr(R.string.main_every_folder_in_is_already, reposPath),
-                confirmLabel = tr(R.string.main_new_project),
-            ) { openProjectCreate(clone = false) }
-            return
-        }
-        var dialog: android.app.Dialog? = null
-        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        dirs.forEach { d ->
-            rows.addView(TextView(this).apply {
-                text = d.name
-                textSize = 14f
-                setTextColor(NC.ON_SURFACE)
-                typeface = Typeface.MONOSPACE
-                isSingleLine = true
-                ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
-                gravity = Gravity.CENTER_VERTICAL
-                minHeight = dp(48)
-                val ic = androidx.core.content.ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_lucide_folder_input)?.mutate()
-                ic?.setBounds(0, 0, dp(18), dp(18)); ic?.setTint(NC.PRIMARY)
-                setCompoundDrawablesRelative(ic, null, null, null)
-                compoundDrawablePadding = dp(10)
-                setPadding(dp(8), 0, dp(8), 0)
-                setOnClickListener {
-                    dialog?.dismiss()
-                    if (projectGateAllows()) {
-                        addAndOpenProject(d.name, "", "$reposPath/${d.name}", method, skipEnsureDir = true)
-                        markProjectOpened("$reposPath/${d.name}")
-                    }
-                }
-            })
-        }
-        val scroll = ScrollView(this).apply {
-            addView(rows)
-            layoutParams = LinearLayout.LayoutParams(MATCH, dp(minOf(dirs.size * 48, 288)))
-        }
-        dialog = showBrutalistConfirmDialog(
-            title = tr(R.string.main_import_folder),
-            message = tr(R.string.main_open_a_folder_from_as, reposPath),
-            confirmLabel = tr(R.string.main_new_project),
-            body = scroll,
-        ) { openProjectCreate(clone = false) }
     }
 
     /** Unregister a project: list entry, its sessions and chat threads. Files on disk stay. */

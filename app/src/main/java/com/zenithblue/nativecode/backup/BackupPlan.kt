@@ -72,8 +72,18 @@ object BackupPlan {
         return out
     }
 
-    fun includes(scope: BackupScope): List<String> = when (scope) {
-        BackupScope.PROJECTS -> listOf("repos")
+    /** Registered projects outside ~/repos (custom location), relative to the guest home; nested ones are dropped. */
+    fun extraProjectDirs(projectPaths: List<String>): List<String> {
+        val rel = projectPaths.map { it.trimEnd('/') }
+            .filter { it.startsWith("$GUEST_HOME/") }
+            .map { it.removePrefix("$GUEST_HOME/") }
+            .filter { r -> r != "repos" && !r.startsWith("repos/") && r.split('/').none { it.isEmpty() || it == "." || it == ".." } }
+            .distinct().sorted()
+        return rel.filter { r -> rel.none { o -> o != r && r.startsWith("$o/") } }
+    }
+
+    fun includes(scope: BackupScope, extra: List<String> = emptyList()): List<String> = when (scope) {
+        BackupScope.PROJECTS -> listOf("repos") + extra
         BackupScope.HOME -> listOf(".")
     }
 
@@ -81,20 +91,26 @@ object BackupPlan {
 
     private fun excludeArgs(patterns: List<String>) = patterns.joinToString(" ") { "--exclude=" + q(it) }
 
+    /** Projects scope: keeps only the include folders that exist into "$@"; [onNone] runs when none does. */
+    private fun existingIncludes(inc: List<String>, onNone: String) =
+        "set --; for p in ${inc.joinToString(" ") { q(it) }}; do [ -d \"\$p\" ] && set -- \"\$@\" \"\$p\"; done; [ \$# -gt 0 ] || $onNone; "
+
     /** Guest shell: tar the scope to stdout as zstd. Exit 3 = nothing to back up. */
-    fun createCommand(scope: BackupScope, patterns: List<String>): String {
-        val inc = includes(scope)
-        val guard = if (scope == BackupScope.PROJECTS) "[ -d repos ] || exit 3; " else ""
+    fun createCommand(scope: BackupScope, patterns: List<String>, extra: List<String> = emptyList()): String {
+        val inc = includes(scope, extra)
+        val guard = if (scope == BackupScope.PROJECTS) existingIncludes(inc, "exit 3") else ""
+        val args = if (scope == BackupScope.PROJECTS) "\"\$@\"" else inc.joinToString(" ") { q(it) }
         return "cd $GUEST_HOME || exit 2; $guard" +
-            "ZSTD_NBTHREADS=0 tar --zstd -cvf - ${excludeArgs(patterns)} -- ${inc.joinToString(" ") { q(it) }}"
+            "ZSTD_NBTHREADS=0 tar --zstd -cvf - ${excludeArgs(patterns)} -- $args"
     }
 
     /** Guest shell: total size in KiB of what [createCommand] would archive. */
-    fun estimateCommand(scope: BackupScope, patterns: List<String>): String {
-        val inc = includes(scope)
-        val guard = if (scope == BackupScope.PROJECTS) "[ -d repos ] || { echo 0; exit 0; }; " else ""
+    fun estimateCommand(scope: BackupScope, patterns: List<String>, extra: List<String> = emptyList()): String {
+        val inc = includes(scope, extra)
+        val guard = if (scope == BackupScope.PROJECTS) existingIncludes(inc, "{ echo 0; exit 0; }") else ""
+        val args = if (scope == BackupScope.PROJECTS) "\"\$@\"" else inc.joinToString(" ") { q(it) }
         return "cd $GUEST_HOME || exit 2; $guard" +
-            "du -skc ${excludeArgs(patterns)} -- ${inc.joinToString(" ") { q(it) }} 2>/dev/null | tail -n 1"
+            "du -skc ${excludeArgs(patterns)} -- $args 2>/dev/null | tail -n 1"
     }
 
     /** Guest shell: list members of a zstd tar read from stdin. */

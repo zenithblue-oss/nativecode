@@ -17,21 +17,21 @@ object ProjectManager {
     fun cloneRepo(
         ctx: Context,
         gitUrl: String,
+        destPath: String,
         method: String = LinuxCommandBuilder.currentMethod,
         onProgress: (line: String) -> Unit,
         onDone: (exitCode: Int) -> Unit
     ) {
-        val repoName = repoNameFromUrl(gitUrl)
-        val dest = "/home/flux/repos/$repoName"
         val urlQ = shellQuote(gitUrl.trim())
-        val destQ = shellQuote(dest)
+        val destQ = shellQuote(destPath)
+        val parentQ = shellQuote(destPath.substringBeforeLast('/').ifEmpty { "/" })
         // Absolute dest; rmdir empty shell if present.
         // Progress uses CR — convert to NL so runStreamed (readLine) updates UI.
         // GIT_TERMINAL_PROMPT=0 avoids hung credential prompts (no TTY).
         // Leading `export` injects `$` so chroot stages script (safe quoting + noprofile).
         val gitCmd =
             "export HOME=/home/flux GIT_TERMINAL_PROMPT=0 GIT_PAGER=cat; " +
-                "mkdir -p /home/flux/repos && " +
+                "mkdir -p $parentQ && " +
                 "if [ -d $destQ ] && [ ! -d $destQ/.git ]; then rmdir $destQ 2>/dev/null || true; fi && " +
                 "git clone --progress $urlQ $destQ 2>&1 | tr '\\r' '\\n'"
         val (args, envMap) = LinuxCommandBuilder.build(ctx, gitCmd, method = method)

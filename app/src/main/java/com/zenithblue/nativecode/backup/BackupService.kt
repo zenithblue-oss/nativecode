@@ -59,9 +59,17 @@ object BackupService {
 
     private fun hex(md: MessageDigest) = md.digest().joinToString("") { "%02x".format(it) }
 
+    /** Registered projects living outside ~/repos, so the Projects scope covers a custom location too. */
+    private fun extraProjects(ctx: Context): List<String> = try {
+        val arr = org.json.JSONArray(ctx.getSharedPreferences("nativecode_prefs", Context.MODE_PRIVATE).getString("projects_json", "[]"))
+        BackupPlan.extraProjectDirs((0 until arr.length()).map { arr.getJSONObject(it).getString("path") })
+    } catch (_: Exception) {
+        emptyList()
+    }
+
     /** Size of the selection in bytes before compression, or null when it can not be estimated. */
     fun estimate(ctx: Context, scope: BackupScope, patterns: List<String>, job: BackupJob): Long? = try {
-        val p = start(ctx, BackupPlan.estimateCommand(scope, patterns), mergeStderr = false)
+        val p = start(ctx, BackupPlan.estimateCommand(scope, patterns, extraProjects(ctx)), mergeStderr = false)
         job.attach(p)
         p.outputStream.close()
         val out = p.inputStream.bufferedReader().use { it.readText() }
@@ -80,7 +88,7 @@ object BackupService {
         var total = 0L
         var drain: ErrDrain? = null
         try {
-            val p = start(ctx, BackupPlan.createCommand(scope, patterns), mergeStderr = false)
+            val p = start(ctx, BackupPlan.createCommand(scope, patterns, extraProjects(ctx)), mergeStderr = false)
             job.attach(p)
             p.outputStream.close()
             drain = ErrDrain(p.errorStream)
