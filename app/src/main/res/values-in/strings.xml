@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">Buka proyek di folder ini</string>
     <string name="loc_use_folder_hint">Aktif: proyek adalah folder yang dipilih itu sendiri dan tidak ada subfolder yang dibuat. Nonaktif: folder baru dengan nama proyek dibuat di dalamnya.</string>
     <string name="loc_err_home">Pilih folder di dalam folder home Anda, bukan folder home itu sendiri.</string>
+    <string name="cons_title">Bantu tingkatkan NativeCode</string>
+    <string name="cons_intro">Ini opsional dan nonaktif secara default. Jika Anda mengizinkan, NativeCode mengirim laporan crash dan hitungan penggunaan anonim agar masalah lebih cepat diperbaiki.</string>
+    <string name="cons_collected">Dikumpulkan: detail error saat crash, model perangkat, serta versi Android dan aplikasi. Statistik penggunaan adalah hitungan anonim fitur yang digunakan.</string>
+    <string name="cons_never">Tidak pernah dikumpulkan: kode, prompt, file, nama atau path proyek, akun, maupun data pribadi apa pun.</string>
+    <string name="cons_crash_sub">Detail error, model perangkat, versi aplikasi</string>
+    <string name="cons_usage_sub">Hitungan fitur anonim, tanpa konten</string>
+    <string name="cons_footer">Ubah kapan saja di Pengaturan. Mematikan sakelar menghentikan pengumpulan dan menghapus data yang menunggu di perangkat ini.</string>
+    <string name="cons_privacy">Kebijakan privasi</string>
+    <string name="cons_allow">Izinkan yang dipilih</string>
+    <string name="cons_not_now">Nanti saja</string>
 </resources>

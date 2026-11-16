@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">فتح المشروع في هذا المجلد</string>
     <string name="loc_use_folder_hint">مفعّل: المشروع هو المجلد المحدد نفسه ولا يُنشأ مجلد فرعي. معطّل: يُنشأ داخله مجلد جديد باسم المشروع.</string>
     <string name="loc_err_home">اختر مجلدًا داخل مجلدك الرئيسي وليس المجلد الرئيسي نفسه.</string>
+    <string name="cons_title">ساعد في تحسين NativeCode</string>
+    <string name="cons_intro">هذا اختياري ومعطّل افتراضيًا. إذا سمحت بذلك، يرسل NativeCode تقارير الأعطال وأعداد الاستخدام المجهولة لإصلاح المشكلات بشكل أسرع.</string>
+    <string name="cons_collected">ما يُجمع: تفاصيل الخطأ عند حدوث عطل، وطراز جهازك، وإصدار أندرويد والتطبيق. إحصاءات الاستخدام هي أعداد مجهولة للميزات المستخدمة.</string>
+    <string name="cons_never">ما لا يُجمع أبدًا: الشيفرة والأوامر والملفات وأسماء المشاريع أو مساراتها والحسابات وأي بيانات شخصية.</string>
+    <string name="cons_crash_sub">تفاصيل الخطأ، طراز الجهاز، إصدار التطبيق</string>
+    <string name="cons_usage_sub">أعداد مجهولة للميزات، بدون أي محتوى</string>
+    <string name="cons_footer">يمكنك تغيير ذلك في أي وقت من الإعدادات. إيقاف أي مفتاح يوقف الجمع ويحذف البيانات المنتظرة على هذا الجهاز.</string>
+    <string name="cons_privacy">سياسة الخصوصية</string>
+    <string name="cons_allow">السماح بالمحدد</string>
+    <string name="cons_not_now">ليس الآن</string>
 </resources>

@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">Abrir o projeto nesta pasta</string>
     <string name="loc_use_folder_hint">Ativado: o projeto é a própria pasta selecionada e nenhuma subpasta é criada. Desativado: uma nova pasta com o nome do projeto é criada dentro dela.</string>
     <string name="loc_err_home">Escolha uma pasta dentro da sua pasta pessoal, não a própria pasta pessoal.</string>
+    <string name="cons_title">Ajude a melhorar o NativeCode</string>
+    <string name="cons_intro">É opcional e vem desativado. Se você permitir, o NativeCode envia relatórios de falhas e contagens de uso anônimas para corrigir problemas mais rápido.</string>
+    <string name="cons_collected">Coletado: os detalhes do erro de uma falha, o modelo do dispositivo e a versão do Android e do app. As estatísticas de uso são contagens anônimas dos recursos usados.</string>
+    <string name="cons_never">Nunca coletado: seu código, seus prompts, seus arquivos, nomes ou caminhos de projetos, contas ou qualquer dado pessoal.</string>
+    <string name="cons_crash_sub">Detalhes do erro, modelo do dispositivo, versão do app</string>
+    <string name="cons_usage_sub">Contagens anônimas de recursos, sem conteúdo</string>
+    <string name="cons_footer">Você pode mudar isso a qualquer momento em Configurações. Desativar uma chave interrompe a coleta e apaga os dados em fila neste dispositivo.</string>
+    <string name="cons_privacy">Política de privacidade</string>
+    <string name="cons_allow">Permitir selecionados</string>
+    <string name="cons_not_now">Agora não</string>
 </resources>

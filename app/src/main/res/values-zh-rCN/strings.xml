@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">在此文件夹中打开项目</string>
     <string name="loc_use_folder_hint">开启：所选文件夹本身就是项目，不会创建子文件夹。关闭：在其中创建以项目命名的新文件夹。</string>
     <string name="loc_err_home">请选择主目录内的文件夹，而不是主目录本身。</string>
+    <string name="cons_title">帮助改进 NativeCode</string>
+    <string name="cons_intro">此功能可选，默认关闭。若你允许，NativeCode 会发送崩溃报告和匿名使用次数，以便更快修复问题。</string>
+    <string name="cons_collected">收集内容：崩溃时的错误详情、设备型号以及 Android 和应用版本。使用统计是各项功能被使用次数的匿名计数。</string>
+    <string name="cons_never">绝不收集：你的代码、提示词、文件、项目名称或路径、账户，以及任何个人数据。</string>
+    <string name="cons_crash_sub">错误详情、设备型号、应用版本</string>
+    <string name="cons_usage_sub">功能使用的匿名计数，不含内容</string>
+    <string name="cons_footer">你可随时在“设置”中更改。关闭开关会停止收集，并删除此设备上待发送的数据。</string>
+    <string name="cons_privacy">隐私政策</string>
+    <string name="cons_allow">允许所选项</string>
+    <string name="cons_not_now">暂不</string>
 </resources>

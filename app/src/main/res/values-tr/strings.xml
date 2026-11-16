@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">Projeyi bu klasörde aç</string>
     <string name="loc_use_folder_hint">Açık: proje seçilen klasörün kendisidir, alt klasör oluşturulmaz. Kapalı: içinde proje adını taşıyan yeni bir klasör oluşturulur.</string>
     <string name="loc_err_home">Ana klasörün kendisini değil, içindeki bir klasörü seçin.</string>
+    <string name="cons_title">NativeCode\'u geliştirmeye yardım edin</string>
+    <string name="cons_intro">Bu isteğe bağlıdır ve varsayılan olarak kapalıdır. İzin verirseniz NativeCode, sorunlar daha hızlı çözülsün diye çökme raporları ve anonim kullanım sayıları gönderir.</string>
+    <string name="cons_collected">Toplananlar: bir çökmenin hata ayrıntıları, cihaz modeliniz ile Android ve uygulama sürümü. Kullanım istatistikleri, hangi özelliklerin kullanıldığının anonim sayılarıdır.</string>
+    <string name="cons_never">Asla toplanmayanlar: kodunuz, istemleriniz, dosyalarınız, proje adları veya yolları, hesaplarınız ya da herhangi bir kişisel veri.</string>
+    <string name="cons_crash_sub">Hata ayrıntıları, cihaz modeli, uygulama sürümü</string>
+    <string name="cons_usage_sub">Anonim özellik sayıları, içerik yok</string>
+    <string name="cons_footer">Bunu istediğiniz zaman Ayarlar\'dan değiştirebilirsiniz. Bir anahtarı kapatmak toplamayı durdurur ve bu cihazda bekleyen verileri siler.</string>
+    <string name="cons_privacy">Gizlilik politikası</string>
+    <string name="cons_allow">Seçilenlere izin ver</string>
+    <string name="cons_not_now">Şimdi değil</string>
 </resources>

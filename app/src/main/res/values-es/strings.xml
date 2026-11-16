@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">Abrir el proyecto en esta carpeta</string>
     <string name="loc_use_folder_hint">Activado: el proyecto es la propia carpeta seleccionada y no se crea ninguna subcarpeta. Desactivado: se crea dentro una carpeta nueva con el nombre del proyecto.</string>
     <string name="loc_err_home">Elige una carpeta dentro de tu carpeta personal, no la carpeta personal misma.</string>
+    <string name="cons_title">Ayuda a mejorar NativeCode</string>
+    <string name="cons_intro">Es opcional y viene desactivado. Si lo permites, NativeCode envía informes de fallos y recuentos de uso anónimos para corregir los problemas más rápido.</string>
+    <string name="cons_collected">Se recoge: los detalles del error de un fallo, el modelo del dispositivo y la versión de Android y de la app. Las estadísticas de uso son recuentos anónimos de las funciones usadas.</string>
+    <string name="cons_never">Nunca se recoge: tu código, tus prompts, tus archivos, los nombres o rutas de proyectos, cuentas ni ningún dato personal.</string>
+    <string name="cons_crash_sub">Detalles del error, modelo del dispositivo, versión de la app</string>
+    <string name="cons_usage_sub">Recuentos anónimos de funciones, sin contenido</string>
+    <string name="cons_footer">Puedes cambiarlo cuando quieras en Ajustes. Al desactivar un interruptor se detiene la recogida y se borran los datos en cola en este dispositivo.</string>
+    <string name="cons_privacy">Política de privacidad</string>
+    <string name="cons_allow">Permitir lo elegido</string>
+    <string name="cons_not_now">Ahora no</string>
 </resources>

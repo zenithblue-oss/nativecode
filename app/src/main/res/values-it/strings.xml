@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">Apri il progetto in questa cartella</string>
     <string name="loc_use_folder_hint">Attivo: il progetto è la cartella selezionata stessa e non viene creata alcuna sottocartella. Disattivo: al suo interno viene creata una nuova cartella con il nome del progetto.</string>
     <string name="loc_err_home">Scegli una cartella dentro la tua cartella home, non la cartella home stessa.</string>
+    <string name="cons_title">Aiuta a migliorare NativeCode</string>
+    <string name="cons_intro">È facoltativo e disattivato di default. Se lo consenti, NativeCode invia segnalazioni di arresto anomalo e conteggi d\'uso anonimi per risolvere i problemi più in fretta.</string>
+    <string name="cons_collected">Raccolto: i dettagli dell\'errore di un arresto anomalo, il modello del dispositivo e la versione di Android e dell\'app. Le statistiche d\'uso sono conteggi anonimi delle funzioni usate.</string>
+    <string name="cons_never">Mai raccolto: il tuo codice, i prompt, i file, i nomi o i percorsi dei progetti, gli account o qualsiasi dato personale.</string>
+    <string name="cons_crash_sub">Dettagli dell\'errore, modello del dispositivo, versione dell\'app</string>
+    <string name="cons_usage_sub">Conteggi anonimi delle funzioni, nessun contenuto</string>
+    <string name="cons_footer">Puoi cambiarlo in qualsiasi momento in Impostazioni. Disattivando un interruttore la raccolta si ferma e i dati in coda su questo dispositivo vengono eliminati.</string>
+    <string name="cons_privacy">Informativa sulla privacy</string>
+    <string name="cons_allow">Consenti selezionati</string>
+    <string name="cons_not_now">Non ora</string>
 </resources>

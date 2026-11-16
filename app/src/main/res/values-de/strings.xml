@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">Projekt in diesem Ordner öffnen</string>
     <string name="loc_use_folder_hint">An: Das Projekt ist der gewählte Ordner selbst, es wird kein Unterordner angelegt. Aus: Im gewählten Ordner wird ein neuer Ordner mit dem Projektnamen angelegt.</string>
     <string name="loc_err_home">Wähle einen Ordner in deinem Home-Ordner, nicht den Home-Ordner selbst.</string>
+    <string name="cons_title">Hilf, NativeCode zu verbessern</string>
+    <string name="cons_intro">Das ist optional und standardmäßig aus. Wenn du es erlaubst, sendet NativeCode Absturzberichte und anonyme Nutzungszahlen, damit Probleme schneller behoben werden.</string>
+    <string name="cons_collected">Erfasst werden: die Fehlerdetails eines Absturzes, dein Gerätemodell sowie die Android- und App-Version. Nutzungsstatistiken sind anonyme Zähler, welche Funktionen verwendet werden.</string>
+    <string name="cons_never">Nie erfasst werden: dein Code, deine Prompts, Dateien, Projektnamen oder -pfade, Konten oder irgendwelche personenbezogenen Daten.</string>
+    <string name="cons_crash_sub">Fehlerdetails, Gerätemodell, App-Version</string>
+    <string name="cons_usage_sub">Anonyme Funktionszähler, keine Inhalte</string>
+    <string name="cons_footer">Jederzeit in den Einstellungen änderbar. Ein ausgeschalteter Schalter stoppt die Erfassung und löscht die auf diesem Gerät wartenden Daten.</string>
+    <string name="cons_privacy">Datenschutzerklärung</string>
+    <string name="cons_allow">Auswahl erlauben</string>
+    <string name="cons_not_now">Jetzt nicht</string>
 </resources>

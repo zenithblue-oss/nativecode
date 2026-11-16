@@ -1517,4 +1517,14 @@
     <string name="loc_use_folder">このフォルダでプロジェクトを開く</string>
     <string name="loc_use_folder_hint">オン: 選択したフォルダ自体がプロジェクトになり、サブフォルダは作成されません。オフ: その中にプロジェクト名の新しいフォルダが作成されます。</string>
     <string name="loc_err_home">ホームフォルダそのものではなく、その中のフォルダを選んでください。</string>
+    <string name="cons_title">NativeCode の改善にご協力ください</string>
+    <string name="cons_intro">任意の設定で、初期状態ではオフです。許可すると、問題を早く修正できるよう、クラッシュレポートと匿名の利用回数が送信されます。</string>
+    <string name="cons_collected">収集するもの: クラッシュ時のエラー詳細、端末のモデル、Androidとアプリのバージョン。利用統計は、どの機能が使われたかを示す匿名の回数です。</string>
+    <string name="cons_never">収集しないもの: コード、プロンプト、ファイル、プロジェクト名やパス、アカウント、個人データは一切収集しません。</string>
+    <string name="cons_crash_sub">エラー詳細、端末モデル、アプリのバージョン</string>
+    <string name="cons_usage_sub">機能の匿名の回数のみ、内容は含みません</string>
+    <string name="cons_footer">設定でいつでも変更できます。スイッチをオフにすると収集が止まり、この端末に保留中のデータが削除されます。</string>
+    <string name="cons_privacy">プライバシーポリシー</string>
+    <string name="cons_allow">選択した項目を許可</string>
+    <string name="cons_not_now">今はしない</string>
 </resources>

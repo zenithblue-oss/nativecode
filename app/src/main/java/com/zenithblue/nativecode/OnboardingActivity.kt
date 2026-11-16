@@ -222,6 +222,7 @@ class OnboardingActivity : AppCompatActivity() {
             5 -> buildInstallPlanPage()
             6 -> buildDebianBasePage()
             7, 8 -> buildCompletePage() // 8 = legacy deep-link after plan insert
+            9 -> buildConsentPage()
             else -> buildIntroPage()
         }
 
@@ -365,8 +366,8 @@ class OnboardingActivity : AppCompatActivity() {
                     .edit()
                     .putBoolean("privacy_accepted", true)
                     .apply()
-                // Optional crash/usage opt-in (both off by default), then continue.
-                com.zenithblue.nativecode.telemetry.ConsentSheet.show(this) { showPage(1) }
+                // The optional crash/usage opt-in is the last onboarding step (page 9), not a popup here.
+                showPage(1)
             }
         )
 
@@ -2983,15 +2984,49 @@ class OnboardingActivity : AppCompatActivity() {
         HostServerController.ensureServers(this)
 
         val btn = primaryButton(tr(R.string.onb_launch_environment), R.drawable.ic_arrow_right) {
-            HostServerController.ensureServers(this)
-            val intent = Intent(this, MainActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-            finish()
+            // Last step before finishing: the crash/usage choice. Re-run from Settings (force_onboarding) shows it again.
+            if (!com.zenithblue.nativecode.telemetry.Telemetry.asked(this) || intent.getBooleanExtra("force_onboarding", false)) showPage(9)
+            else launchMain()
         }
         root.addView(btn)
 
         return root
+    }
+
+    private fun launchMain() {
+        HostServerController.ensureServers(this)
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    // ── Page 9: optional crash reports / anonymous usage (same content as the Settings sheet) ──
+    private fun buildConsentPage(): View {
+        val scroll = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            isFillViewport = true
+        }
+        val wrap = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        wrap.addView(
+            com.zenithblue.nativecode.telemetry.ConsentSheet.content(this) { launchMain() }.apply {
+                background = cyberBrutalistBg(
+                    fillColor = NC.SURFACE_CONTAINER,
+                    strokeColor = NC.BORDER,
+                    shadowColor = NC.SURFACE_BRIGHT,
+                    offsetDp = 6,
+                    cornerRadiusDp = 0,
+                    rightFaceColor = NC.OUTLINE_VAR
+                )
+            },
+            LinearLayout.LayoutParams(MATCH, WRAP)
+        )
+        scroll.addView(wrap)
+        return scroll
     }
 
     private fun summaryRow(iconRes: Int, labelStr: String, detailStr: String, badgeStr: String): LinearLayout {

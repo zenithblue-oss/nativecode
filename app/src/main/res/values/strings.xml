@@ -1560,4 +1560,14 @@
     <string name="loc_use_folder">Open project in this folder</string>
     <string name="loc_use_folder_hint">On: the project is the selected folder itself and no subfolder is created. Off: a new folder named after the project is created inside it.</string>
     <string name="loc_err_home">Pick a folder inside your home folder, not the home folder itself.</string>
+    <string name="cons_title">Help improve NativeCode</string>
+    <string name="cons_intro">This is optional and off by default. If you allow it, NativeCode sends crash reports and anonymous usage counts so problems get fixed faster.</string>
+    <string name="cons_collected">Collected: the error details of a crash, your device model, and the Android and app version. Usage statistics are anonymous counts of which features are used.</string>
+    <string name="cons_never">Never collected: your code, prompts, files, project names or paths, accounts, or any personal data.</string>
+    <string name="cons_crash_sub">Error details, device model, app version</string>
+    <string name="cons_usage_sub">Anonymous feature counts, no content</string>
+    <string name="cons_footer">Change this any time in Settings. Turning a switch off stops collection and deletes the data queued on this device.</string>
+    <string name="cons_privacy">Privacy policy</string>
+    <string name="cons_allow">Allow selected</string>
+    <string name="cons_not_now">Not now</string>
 </resources>
