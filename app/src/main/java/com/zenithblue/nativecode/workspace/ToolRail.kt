@@ -76,6 +76,9 @@ class ToolRail(context: Context) : LinearLayout(context) {
                 },
                 dp(3), dp(2), dp(3), dp(2)
             )
+            // setBackground copies the drawable's padding into the view (InsetDrawable: 3/2 dp) and never restores it
+            // when the background is cleared, so the icon grew after the first toggle. Pin the padding after every swap.
+            item.view.setPadding(dp((CELL_W_DP - ICON_DP) / 2), dp((CELL_H_DP - ICON_DP) / 2), dp((CELL_W_DP - ICON_DP) / 2), dp((CELL_H_DP - ICON_DP) / 2))
             item.view.contentDescription = d
             item.view.tooltipText = d
             item.view.isSelected = on
