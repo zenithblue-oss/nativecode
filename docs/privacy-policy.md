@@ -1,9 +1,9 @@
 # Privacy Policy — NativeCode
 
-**Last updated:** 2026-09-09
+**Last updated:** 2026-11-17
 **App:** NativeCode (`com.zenithblue.nativecode`)  
-**Developer:** ZenithBlue / NativeCode (GitHub: [zenithblue-oss](https://github.com/zenithblue-oss))  
-**Repository:** [zenithblue-oss/nativecode-ai](https://github.com/zenithblue-oss/nativecode-ai)
+**Developer:** ZenithBlue  
+**Contact:** [zenithblue.dev@gmail.com](mailto:zenithblue.dev@gmail.com)
 
 This Privacy Policy describes how NativeCode handles information when you use the Android app. The Google Play build runs an Alpaquita Linux PRoot guest, optional X11 desktop, terminal sessions, and optional third-party AI/developer CLIs.
 
@@ -103,6 +103,8 @@ Third-party services are independent controllers for data they receive. Review t
 - **Local app & guest data:** retained until you delete it, clear storage, or uninstall.
 - **Tokens/keys:** retained until you sign out (where supported), overwrite config, clear guest home, clear app data, or uninstall.
 - **Safety reports:** failed submissions are kept in private app storage (maximum 10) for retry. Successfully submitted reports may be retained by the configured report service for abuse review and support.
+- **Crash reports (Crashlytics):** kept up to 90 days, then deleted automatically.
+- **Usage statistics (Analytics):** kept up to 2 months, then deleted automatically.
 
 ---
 
@@ -144,6 +146,18 @@ Optional AI CLIs run as third-party tools inside the guest environment. Outputs 
 
 For account data held only by GitHub or AI vendors, manage deletion in those services’ account settings.
 
+### Data deletion
+
+**NativeCode by ZenithBlue** — how to delete your data. Hosted at `https://zenithblue-dev.github.io/nativecode-ai/privacy/#data-deletion`.
+
+- **Data on your device:** use the actions in the table above, Android App info → Clear storage, or uninstall.
+- **Crash reports & usage statistics (only if you opted in):**
+  1. Turn both off in Settings → Crash reports & usage stats. Collection stops immediately.
+  2. To delete data already sent, email **zenithblue.dev@gmail.com** with the subject "NativeCode data deletion". We delete it within 30 days.
+- **Deleted:** crash reports (Crashlytics) and usage statistics (Google Analytics for Firebase) linked to your installation.
+- **Kept:** nothing beyond automatic expiry — crash reports up to 90 days, usage statistics up to 2 months.
+- **Third-party accounts:** data held by GitHub or AI providers is deleted in those services' own account settings.
+
 ---
 
 ## 10. International users
@@ -163,7 +177,7 @@ We may update this file in the repository. The **Last updated** date at the top 
 Questions about this Privacy Policy or NativeCode data practices:
 
 - **Email:** [zenithblue.dev@gmail.com](mailto:zenithblue.dev@gmail.com) (privacy, AI report, app concerns)
-- **Developer:** zenithblue-oss (ZenithBlue / NativeCode)
+- **Developer:** ZenithBlue
 
 ---
 
