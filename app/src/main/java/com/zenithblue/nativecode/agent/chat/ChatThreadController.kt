@@ -1,6 +1,7 @@
 package com.zenithblue.nativecode.agent.chat
 
 import android.content.Context
+import com.zenithblue.nativecode.agent.chat.acp.AcpRuntime
 import com.zenithblue.nativecode.agent.chat.core.AgentEvent
 import com.zenithblue.nativecode.agent.chat.core.AgentRuntime
 import com.zenithblue.nativecode.agent.chat.core.ChatAttachment
@@ -114,18 +115,25 @@ class ChatThreadController internal constructor(
             commit()
             return@post
         }
-        runtime?.interrupt() ?: return@post
-        forceTask?.cancel(false)
-        forceTask = AgentChats.schedule(FORCE_STOP_MS) {
+        val rt = runtime ?: return@post
+        runCatching { rt.interrupt() }
+        if (forceTask?.isDone == false) return@post // second Stop: the first deadline stands
+        // ACP (agy / grok): a cancel the agent ignores must not leave the CLI running, so the deadline kills it; others offer the button.
+        val run = reducer.activeRun?.id
+        forceTask = if (rt is AcpRuntime) AgentChats.schedule(STOP_KILL_MS) { if (reducer.activeRun?.id == run) hardStop() }
+        else AgentChats.schedule(FORCE_STOP_MS) {
             if (reducer.activeRun != null) { reducer.setForceStopAvailable(true); commit() }
         }
     }
 
     /** Hung turn: kill the process now; run → interrupted, slot freed. */
-    fun forceStop() = AgentChats.post {
+    fun forceStop() = AgentChats.post { hardStop() }
+
+    /** Never throws: a failing kill must not skip the state commit (the turn still ends interrupted). */
+    private fun hardStop() {
         reducer.interruptNow()
         closing = true
-        runtime?.kill() ?: proc?.kill()
+        runCatching { runtime?.kill() ?: proc?.kill() }
         commit()
     }
 
@@ -305,6 +313,11 @@ class ChatThreadController internal constructor(
         if (e is AgentEvent.TurnTerminal) forceTask?.cancel(false)
         if (e is AgentEvent.NativeId) forkFrom = null
         reducer.reduce(e)
+        if (e is AgentEvent.TurnTerminal && e.mustCloseSession) { // the agent ignored the cancel: kill it, next send respawns + resumes
+            reducer.holdQueue(true)
+            closing = true
+            runCatching { runtime?.kill() ?: proc?.kill() }
+        }
         if (e is AgentEvent.SessionState && (!e.models.isNullOrEmpty() || e.commands != null)) reducer.state.let { s ->
             ModelCache.save(ctx, thread.tool, ModelCache.Entry(s.models, s.defaultModel, s.caps, s.commands))
         }
@@ -445,6 +458,8 @@ class ChatThreadController internal constructor(
 
     companion object {
         const val FORCE_STOP_MS = 10_000L
+        /** ACP Stop: cancel, then the AcpRuntime gives up after its own wait; this is the backstop if it never answers. */
+        const val STOP_KILL_MS = 8_000L
         /** Runtimes whose reject answer carries the feedback itself (claude deny message, opencode declined note). */
         private val FEEDBACK_NATIVE = setOf("claude-code", "opencode")
         const val ROW_FLUSH_MS = 1_000L

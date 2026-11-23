@@ -131,6 +131,32 @@ class ChatLogicTest {
         assertEquals("Ran 1 command · edited 1 file", ChatLogic.workSummary((rows[1] as Row.Work).items))
     }
 
+    @Test fun queuedMessageTypedMidTurnNeverSplitsItsRun() {
+        // crash: a message queued while r1 ran sits between r1's items; r1 then ends (Stop / Force stop) -> two "m:r1" keys.
+        fun item(id: String, ord: Int, run: String, p: ItemPayload) = TurnItem(id, "t", run, ord, null, null, ItemStatus.COMPLETED, p, 0)
+        val items = listOf(
+            item("u", 1, "r1", ItemPayload.UserMessage("go")),
+            item("a1", 2, "r1", ItemPayload.AssistantMessage("working")),
+            item("q", 3, "r2", ItemPayload.UserMessage("later", intent = "queued")),
+            item("a2", 4, "r1", ItemPayload.AssistantMessage("more")),
+        )
+        val runs = mapOf("r1" to Run("r1", "t", 1, RunStatus.INTERRUPTED), "r2" to Run("r2", "t", 2, RunStatus.QUEUED, queuePosition = 0))
+        assertEquals(listOf("u", "a1", "a2", "m:r1", "q"), ChatLogic.rows(items, runs).map { it.key })
+    }
+
+    @Test fun rowKeysAreUniqueEvenForCorruptHistory() {
+        fun item(id: String, ord: Int, run: String?, p: ItemPayload) = TurnItem(id, "t", run, ord, null, null, ItemStatus.COMPLETED, p, 0)
+        val items = listOf(
+            item("a", 1, "r1", ItemPayload.AssistantMessage("x")),
+            item("b", 2, "r2", ItemPayload.AssistantMessage("y")),
+            item("c", 3, "r1", ItemPayload.AssistantMessage("z")), // runs interleaved without a queue
+            item("c", 4, "r1", ItemPayload.AssistantMessage("z")), // repeated id
+        )
+        val runs = mapOf("r1" to Run("r1", "t", 1, RunStatus.INTERRUPTED), "r2" to Run("r2", "t", 2, RunStatus.COMPLETED))
+        val keys = ChatLogic.rows(items, runs).map { it.key }
+        assertEquals(keys.size, keys.toSet().size)
+    }
+
     @Test fun subagentActivityNestsUnderItsCard() {
         fun item(id: String, p: ItemPayload, parent: String? = null) = TurnItem(id, "t", "r1", id.hashCode(), null, parent, ItemStatus.COMPLETED, p, 0)
         val items = listOf(

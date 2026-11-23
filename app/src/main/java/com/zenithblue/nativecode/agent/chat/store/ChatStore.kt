@@ -215,7 +215,7 @@ class ChatStore(ctx: Context) {
         put("created_at", q.createdAt); put("resolved_at", q.resolvedAt)
     }
 
-    private fun <T> Cursor.list(f: (Cursor) -> T): List<T> = buildList { while (moveToNext()) add(f(this@list)) }
+    private fun <T> Cursor.list(f: (Cursor) -> T): List<T> = buildList { while (moveToNext()) runCatching { f(this@list) }.getOrNull()?.let(::add) } // a corrupt row is skipped, never fatal
     private fun Cursor.s(c: String): String? = getColumnIndexOrThrow(c).let { if (isNull(it)) null else getString(it) }
     private fun Cursor.l(c: String): Long? = getColumnIndexOrThrow(c).let { if (isNull(it)) null else getLong(it) }
 

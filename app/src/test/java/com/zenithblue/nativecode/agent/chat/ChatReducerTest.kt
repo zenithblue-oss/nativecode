@@ -323,4 +323,38 @@ class ChatReducerTest {
         assertEquals("sonnet", rows.thread!!.model)
         assertEquals(before, n)
     }
+
+    @Test fun forceStopWithQueuedMessageGivesUniqueTimelineKeys() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        r.beginRun("c1", "go", emptyList())
+        r.step(rows, AgentEvent.TurnStarted("n1"))
+        r.step(rows, AgentEvent.ItemUpsert("a1", ItemStatus.RUNNING, ItemPayload.AssistantMessage("one")))
+        r.enqueue("c2", "next", emptyList()); r.step(rows)
+        r.step(rows, AgentEvent.ItemUpsert("t1", ItemStatus.RUNNING, ItemPayload.CommandExecution("sleep 99")))
+        r.interruptNow(); r.step(rows) // Force stop
+        assertTrue(rows.runs.values.any { it.status == RunStatus.INTERRUPTED })
+        val keys = com.zenithblue.nativecode.agent.chat.ui.ChatLogic.rows(rows.items.values.sortedBy { it.ordinal }, rows.runs).map { it.key }
+        assertEquals(keys.size, keys.toSet().size)
+        assertEquals(1, keys.count { it.startsWith("m:") })
+    }
+
+    @Test fun ignoredCancelKillsTheSessionButGrokRestartAndCleanStopDoNot() {
+        // AcpRuntime ends an un-honoured cancel (and grok's Stop) with reusable=false: the controller must kill the CLI then.
+        assertTrue(AgentEvent.TurnTerminal(RunStatus.INTERRUPTED, reusable = false).mustCloseSession)
+        assertFalse(AgentEvent.TurnTerminal(RunStatus.INTERRUPTED).mustCloseSession)
+        assertFalse(AgentEvent.TurnTerminal(RunStatus.FAILED, reusable = false).mustCloseSession)
+        assertFalse(AgentEvent.TurnTerminal(RunStatus.COMPLETED).mustCloseSession)
+    }
+
+    @Test fun forceStopThenLateEventsAndExitNeverThrow() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        r.beginRun("c1", "go", emptyList())
+        r.step(rows, AgentEvent.TurnStarted("n1"))
+        r.interruptNow(); r.step(rows)
+        r.step(rows, AgentEvent.ItemUpsert("late", ItemStatus.RUNNING, ItemPayload.AssistantMessage("late"))) // runtime frame after the kill
+        r.step(rows, AgentEvent.TurnTerminal(RunStatus.INTERRUPTED, reusable = false))
+        r.exited(137, "", expected = true); r.step(rows)
+        r.interruptNow(); r.step(rows) // second Force stop
+        assertEquals(null, r.activeRun)
+    }
 }

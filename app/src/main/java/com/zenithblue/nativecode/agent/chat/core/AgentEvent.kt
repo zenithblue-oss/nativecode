@@ -53,7 +53,10 @@ sealed interface AgentEvent {
     data class CommandOutputDelta(val nativeRef: String, val chunk: String) : AgentEvent
 
     /** Run end. [reusable] false = the session is broken (controller closes it; next send respawns + resumes). */
-    data class TurnTerminal(val status: RunStatus, val failure: Failure? = null, val reusable: Boolean = true) : AgentEvent
+    data class TurnTerminal(val status: RunStatus, val failure: Failure? = null, val reusable: Boolean = true) : AgentEvent {
+        /** An interrupt the agent never honoured (or grok's restart-after-Stop): the process must be killed, not left running. */
+        val mustCloseSession: Boolean get() = !reusable && status == RunStatus.INTERRUPTED
+    }
 
     /** Compaction, retry scheduled, steer delivered, resume fell back… Stored as a system_notice / compaction item. */
     data class Notice(val kind: String, val text: String) : AgentEvent

@@ -598,7 +598,7 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
         private const val INIT_S = 60L
         private const val SETUP_S = 90L
         private const val LOAD_S = 90L
-        private const val CANCEL_WAIT_S = 15L
+        private const val CANCEL_WAIT_S = 5L
         private const val WAKE_QUIET_MS = 5_000L
         private val WAKE_KINDS = setOf("agent_message_chunk", "agent_thought_chunk", "tool_call")
         private val KEEP_WHILE_LOADING = setOf("available_commands_update", "current_mode_update", "config_option_update")

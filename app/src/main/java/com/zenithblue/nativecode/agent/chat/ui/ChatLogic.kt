@@ -203,7 +203,10 @@ object ChatLogic {
     private val WORK = setOf("command_execution", "file_change", "file_search", "web_search", "dynamic_tool", "subagent")
 
     /** Groups consecutive tool items of one run; adds a meta row after each finished run. todo_list rows are hidden (strip). */
-    fun rows(items: List<TurnItem>, runs: Map<String, Run>): List<Row> {
+    fun rows(all: List<TurnItem>, runs: Map<String, Run>): List<Row> {
+        // A queued message is stored at the ordinal it was typed (mid-turn); it belongs at the end (dequeue re-orders it there).
+        // Left in place it splits its neighbour run in two, and that run's meta row (LazyColumn key) would appear twice.
+        val items = all.sortedBy { runs[it.runId]?.status == RunStatus.QUEUED }
         val out = ArrayList<Row>()
         var work = ArrayList<TurnItem>()
         var runId: String? = null
@@ -224,7 +227,7 @@ object ChatLogic {
             }
         }
         flushWork(); endRun()
-        return out
+        return out.distinctBy { it.key } // LazyColumn throws on a repeated key: tolerate any corrupt history
     }
 
     fun workSummary(items: List<TurnItem>): String {
