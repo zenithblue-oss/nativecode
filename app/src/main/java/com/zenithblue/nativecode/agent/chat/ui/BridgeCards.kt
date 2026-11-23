@@ -117,6 +117,12 @@ internal fun BridgeCard(v: AgentChatView, threadId: String, item: TurnItem, p: B
                 Text(text, Modifier.padding(start = S.s), color = C.on, style = T.codeSm, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
         }
+        if (p.action == "share_file" && p.target != null) {
+            val f = remember(p.target) { java.io.File(p.target) }
+            // One stat per card: a file that is gone (temp cleanup) keeps the old Share/Copy-path card without a preview.
+            val here by produceState(false, f) { value = withContext(Dispatchers.IO) { f.isFile } }
+            if (here) FilePreviewCard(f, f.name, { v.openHostFile(f.absolutePath) }, Modifier.padding(top = S.s))
+        }
         if (p.action == "status") p.detail?.toIntOrNull()?.takeIf { it in 0..100 }?.let { pct ->
             LinearProgressIndicator(
                 progress = { pct / 100f }, Modifier.fillMaxWidth().padding(top = S.s).height(4.dp),

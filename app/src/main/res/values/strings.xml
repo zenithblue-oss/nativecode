@@ -1583,4 +1583,25 @@
     <string name="chat_err_updating">Updating…</string>
     <string name="chat_err_update_failed">Update failed: %1$s</string>
     <string name="chat_copy_details">Copy details</string>
+    <string name="chat_open_file">Open file</string>
+    <string name="chat_preview_failed">Can\'t preview this file</string>
+    <string name="chat_kind_image">Image</string>
+    <string name="chat_kind_svg">SVG image</string>
+    <string name="chat_kind_video">Video</string>
+    <string name="chat_kind_audio">Audio</string>
+    <string name="chat_kind_pdf">PDF</string>
+    <string name="chat_kind_markdown">Markdown</string>
+    <string name="chat_kind_html">HTML page</string>
+    <string name="chat_kind_text">Text</string>
+    <string name="chat_kind_office">Document</string>
+    <string name="chat_kind_apk">Android package</string>
+    <string name="chat_kind_file">File</string>
+    <string name="viewer_cant_open">Can\'t open this file here</string>
+    <string name="viewer_open_external">Open with another app</string>
+    <string name="viewer_pdf_unreadable">This PDF is password protected or can\'t be read</string>
+    <string name="viewer_too_large">File too large to preview (%1$s)</string>
+    <string name="viewer_play">Play</string>
+    <string name="viewer_pause">Pause</string>
+    <string name="viewer_page_of">Page %1$d of %2$d</string>
+    <string name="viewer_html_sandboxed">Scripts, network and linked files are blocked</string>
 </resources>

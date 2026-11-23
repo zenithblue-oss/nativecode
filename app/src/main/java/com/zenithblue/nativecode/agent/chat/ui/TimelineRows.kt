@@ -1,6 +1,5 @@
 package com.zenithblue.nativecode.agent.chat.ui
 
-import android.graphics.BitmapFactory
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -225,13 +224,7 @@ internal fun AttachmentThumb(a: ChatAttachment) {
     }
 }
 
-private fun decodeThumb(path: String): ImageBitmap? = runCatching {
-    val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(path, o)
-    var s = 1
-    while (o.outWidth / (s * 2) >= 128 && o.outHeight / (s * 2) >= 128) s *= 2
-    BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = s })?.asImageBitmap()
-}.getOrNull()
+private fun decodeThumb(path: String): ImageBitmap? = FileThumbs.image(java.io.File(path), 128)?.asImageBitmap()
 
 @Composable
 internal fun Spinner(size: Dp = 12.dp, color: Color = C.primary) =

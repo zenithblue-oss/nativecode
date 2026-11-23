@@ -44,4 +44,8 @@ interface ChatHost {
     fun openPreview(url: String?) {}
     /** A tapped link in assistant markdown: http(s) browser or preview, guest file in the editor, else copy. See [ChatLinks]. */
     fun openLink(raw: String, cwd: String, workspace: Boolean) {}
+    /** Path / file: URI from a message to its host file (the resolution [openLink] uses; see [ChatFiles]); null = not an existing guest file. Called off the main thread. */
+    fun resolveFile(raw: String, cwd: String): File? = null
+    /** Bridge card: a host file (the agent's `share-file`) in the in-app viewer. */
+    fun openFile(hostPath: String, workspace: Boolean) {}
 }

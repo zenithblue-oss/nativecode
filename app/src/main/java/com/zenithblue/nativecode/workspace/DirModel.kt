@@ -1,5 +1,7 @@
 package com.zenithblue.nativecode.workspace
 
+import com.zenithblue.nativecode.agent.chat.ui.FileKinds
+import com.zenithblue.nativecode.agent.chat.ui.FileType
 import java.io.File
 import java.io.IOException
 import java.nio.file.FileVisitResult
@@ -29,7 +31,6 @@ object DirModel {
         "json", "yml", "yaml", "toml", "xml", "html", "htm", "css", "scss", "sql", "gradle", "rb", "php", "swift", "lua", "cs",
     )
     private val TEXT = setOf("md", "markdown", "txt", "log", "csv", "rst", "ini", "conf", "cfg", "properties", "env", "lock", "diff", "patch")
-    private val IMAGE = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp", "ico", "svg")
     private val ARCHIVE = setOf("zip", "tar", "gz", "tgz", "xz", "zst", "bz2", "7z", "rar", "apk", "jar", "aar")
     private val SCRIPT = setOf("sh", "bash", "zsh", "fish", "bat", "cmd")
 
@@ -41,7 +42,7 @@ object DirModel {
         return when {
             ext in SCRIPT -> FileKind.SCRIPT
             ext in CODE -> FileKind.CODE
-            ext in IMAGE -> FileKind.IMAGE
+            FileKinds.kindOf(lower).let { it == FileType.IMAGE || it == FileType.SVG } -> FileKind.IMAGE
             ext in ARCHIVE -> FileKind.ARCHIVE
             ext in TEXT -> FileKind.TEXT
             else -> FileKind.OTHER

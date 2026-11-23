@@ -67,6 +67,9 @@ class AgentChatView(
 ) : FrameLayout(context) {
     private val main = Handler(Looper.getMainLooper())
 
+    /** Bridge card: open a host file in the in-app viewer (this surface is where Back returns to). */
+    internal fun openHostFile(path: String) = host.openFile(path, workspace)
+
     internal val stack = mutableStateListOf<Route>(Route.List)
     internal val rows = mutableStateOf<List<ThreadRow>>(emptyList())
     internal val loaded = mutableStateOf(false)
@@ -111,7 +114,8 @@ class AgentChatView(
                         override fun openUri(uri: String) = host.openLink(uri, open.value?.thread?.cwd ?: projectPath ?: HOME, workspace)
                     }
                 }
-                CompositionLocalProvider(LocalOnBackPressedDispatcherOwner provides (context as ComponentActivity), LocalUriHandler provides links) {
+                val resolver = remember<(String) -> java.io.File?> { { raw -> host.resolveFile(raw, open.value?.thread?.cwd ?: projectPath ?: HOME) } }
+                CompositionLocalProvider(LocalOnBackPressedDispatcherOwner provides (context as ComponentActivity), LocalUriHandler provides links, LocalFileResolver provides resolver) {
                     ChatTheme {
                         BackHandler(enabled = chatPosition.value && pageShownState.value && stack.size > 1) { pop() }
                         // No imePadding: MA pads contentFrame by the IME inset (the composer rises with it).

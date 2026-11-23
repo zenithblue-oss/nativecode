@@ -27,13 +27,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.Placeholder
@@ -51,7 +54,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.io.File
 import com.zenithblue.nativecode.tr
 import com.zenithblue.nativecode.R
 
@@ -71,8 +77,28 @@ internal object Md {
         data class Code(val lang: String, val code: String, val closed: Boolean) : Node()
         data class Quote(val text: String) : Node()
         data class Table(val header: List<String>, val rows: List<List<String>>) : Node()
+        /**
+         * A line that is only a file: `![alt](path)` ([strict], any kind), or a `[x](path)` / `path` in backticks
+         * pointing at an image, video, audio or PDF (not [strict]: shown as plain [src] when the file is missing).
+         */
+        data class FileRef(val src: String, val target: String, val strict: Boolean) : Node()
         data object Rule : Node()
         data object Empty : Node()
+    }
+
+    private val IMG_LINE = Regex("^\\s*!\\[[^\\]]*]\\(\\s*([^\\s)]+)\\s*\\)\\s*$")
+    private val LINK_LINE = Regex("^\\s*\\[[^\\]]*]\\(\\s*([^\\s)]+)\\s*\\)\\s*$")
+    private val CODE_LINE = Regex("^\\s*`([^`\\s]+)`\\s*$")
+    private val URL_SCHEME = Regex("^[A-Za-z][A-Za-z0-9+.-]+:")
+
+    /** Not http(s), data:, mailto: ...: a path or file: URI. */
+    private fun localTarget(t: String) = t.startsWith("file:", ignoreCase = true) || !URL_SCHEME.containsMatchIn(t)
+
+    internal fun fileRef(line: String): Node.FileRef? {
+        IMG_LINE.matchEntire(line)?.groupValues?.get(1)?.takeIf(::localTarget)?.let { return Node.FileRef(line.trim(), it, strict = true) }
+        val t = (LINK_LINE.matchEntire(line) ?: CODE_LINE.matchEntire(line))?.groupValues?.get(1)?.takeIf(::localTarget) ?: return null
+        val name = t.substringBefore('#').substringBefore('?').substringAfterLast('/')
+        return if (FileKinds.hasInlinePreview(FileKinds.kindOf(name))) Node.FileRef(line.trim(), t, strict = false) else null
     }
 
     private val FENCE = Regex("^ {0,3}(`{3,}|~{3,})\\s*([^`\\s]*).*$")
@@ -169,6 +195,7 @@ internal object Md {
             }
             return Node.ListBlock(items)
         }
+        if (lines.size == 1) fileRef(first)?.let { return it }
         // A table line at the end of a stream waits for its separator / row end.
         var ls = lines
         if (open) while (ls.isNotEmpty() && ls.last().trimStart().startsWith("|")) ls = ls.dropLast(1)
@@ -373,8 +400,30 @@ private fun MdBlock(n: Md.Node, open: Boolean, caret: Boolean) {
             MdTable(n)
             if (caret) BlinkCaret(Modifier.padding(top = S.xs).size(8.dp, 16.dp))
         }
+        is Md.Node.FileRef -> MdFileRef(n, open, caret)
         Md.Node.Rule -> Hairline(Modifier.padding(vertical = S.xs))
         Md.Node.Empty -> if (caret) BlinkCaret(Modifier.size(8.dp, 18.dp))
+    }
+}
+
+/** Host file for a path written in a message (guest path, file: URI, relative to the thread cwd); null = not a file. Set by AgentChatView. */
+internal val LocalFileResolver = staticCompositionLocalOf<(String) -> File?> { { null } }
+
+private class Resolved(val file: File?)
+
+/** Inline preview card for a file named in a message; a tap opens it through the link handler (same exit as every chat link). */
+@Composable
+private fun MdFileRef(n: Md.Node.FileRef, open: Boolean, caret: Boolean) {
+    val resolve = LocalFileResolver.current
+    val links = LocalUriHandler.current
+    val res by produceState<Resolved?>(null, n.target) {
+        value = withContext(Dispatchers.IO) { Resolved(runCatching { resolve(n.target) }.getOrNull()) }
+    }
+    val r = res
+    when {
+        r == null -> Box(Modifier.fillMaxWidth().height(56.dp).card(C.low))
+        r.file == null && !n.strict -> MdText(n.src, open, caret, T.body)
+        else -> FilePreviewCard(r.file, r.file?.name ?: n.target.substringBefore('#').substringAfterLast('/'), { links.openUri(n.target) })
     }
 }
 

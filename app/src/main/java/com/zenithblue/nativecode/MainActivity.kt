@@ -60,6 +60,7 @@ import com.zenithblue.nativecode.entitlements.ProFeature
 import com.zenithblue.nativecode.desktop.DesktopController
 import com.zenithblue.nativecode.desktop.DesktopPill
 import com.zenithblue.nativecode.quick.QuickActions
+import com.zenithblue.nativecode.workspace.FileViewers
 import com.zenithblue.nativecode.workspace.FolderPicker
 import com.zenithblue.nativecode.workspace.StatStrip
 import com.zenithblue.nativecode.workspace.StatsEditor
@@ -4389,6 +4390,18 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun shareFile(hostPath: String) = shareApkFromProject(File(hostPath), "Share file")
         override fun openPreview(url: String?) = com.zenithblue.nativecode.preview.PreviewActivity.open(this@MainActivity, url)
         override fun openLink(raw: String, cwd: String, workspace: Boolean) = this@MainActivity.openChatLink(raw, cwd, workspace)
+        override fun resolveFile(raw: String, cwd: String) =
+            com.zenithblue.nativecode.agent.chat.ui.ChatFiles.resolve(rootfsFor(LinuxCommandBuilder.currentMethod), raw, cwd)
+        override fun openFile(hostPath: String, workspace: Boolean) = this@MainActivity.openChatFile(File(hostPath), workspace)
+    }
+
+    /** A file from chat (tapped link, preview card, bridge card) into the Directory file viewer; Back returns to the chat surface. */
+    private fun openChatFile(f: File?, workspace: Boolean) {
+        if (f == null || !f.isFile) {
+            com.google.android.material.snackbar.Snackbar.make(contentFrame, tr(R.string.main_file_not_found), com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+        } else {
+            showFileViewer(f.absolutePath, if (workspace) ID_PROJECT_WORKSPACE else ID_TERMINAL)
+        }
     }
 
     /**
@@ -4400,13 +4413,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         when (val link = com.zenithblue.nativecode.agent.chat.ui.ChatLinks.classify(raw, cwd)) {
             is com.zenithblue.nativecode.agent.chat.ui.ChatLink.Web -> com.zenithblue.nativecode.preview.PreviewActivity.openExternal(this, link.url)
             is com.zenithblue.nativecode.agent.chat.ui.ChatLink.Preview -> com.zenithblue.nativecode.preview.PreviewActivity.open(this, link.url)
-            is com.zenithblue.nativecode.agent.chat.ui.ChatLink.GuestFile -> {
-                val rootfs = rootfsFor(LinuxCommandBuilder.currentMethod)
-                val guest = ProjectLocation.resolve(rootfs, link.path) // symlinks resolved; null = leaves the home
-                val f = guest?.let { ProjectLocation.hostFile(rootfs, it) }
-                if (f == null || !f.isFile) toast(tr(R.string.main_file_not_found))
-                else showFileViewer(f.absolutePath, if (workspace) ID_PROJECT_WORKSPACE else ID_TERMINAL)
-            }
+            // Symlinks resolved; null = leaves the home or missing. Same resolution as the inline preview cards (ChatFiles).
+            is com.zenithblue.nativecode.agent.chat.ui.ChatLink.GuestFile ->
+                openChatFile(com.zenithblue.nativecode.agent.chat.ui.ChatFiles.resolveGuest(rootfsFor(LinuxCommandBuilder.currentMethod), link.path), workspace)
             is com.zenithblue.nativecode.agent.chat.ui.ChatLink.Other -> try {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (_: Exception) { // ActivityNotFoundException, SecurityException, FileUriExposedException
@@ -7164,6 +7173,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             return
         }
         releaseFileEditor()
+        // Drop the viewer: stops audio, closes the PDF, destroys the WebView (they release on detach).
+        if (::fileViewerContentHost.isInitialized) fileViewerContentHost.removeAllViews()
         fileViewerRootContainer.visibility = View.GONE
         val target = when (fileViewerBackPage) {
             ID_PROJECT_DIR_TREE,
@@ -7230,13 +7241,27 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             return
         }
 
-        val ext = targetFile.extension.lowercase(Locale.ROOT)
+        // One type table (FileKinds) shared with the inline chat cards. Chat links, bridge cards and the Directory all land here.
+        val kind = com.zenithblue.nativecode.agent.chat.ui.FileKinds.kindOf(targetFile.name)
         val forceEditor = editFileOnce == targetFile.absolutePath
         editFileOnce = null
+        val external = { openExternalFile(targetFile, com.zenithblue.nativecode.agent.chat.ui.FileKinds.mimeOf(targetFile.name)) }
         fileViewerStickyHeader.visibility = View.VISIBLE
-        // Code + markdown fill host and scroll internally; media/binary use outer scroll
+        // Code + markdown + full-bleed viewers fill the host; small cards (audio, video, binary) use the outer scroll
+        val fullBleed: View? = when (kind) {
+            com.zenithblue.nativecode.agent.chat.ui.FileType.IMAGE -> FileViewers.image(this, targetFile, external)
+            com.zenithblue.nativecode.agent.chat.ui.FileType.SVG -> if (forceEditor) null else FileViewers.svg(this, targetFile, external)
+            com.zenithblue.nativecode.agent.chat.ui.FileType.HTML -> if (forceEditor) null else FileViewers.html(this, targetFile, external)
+            com.zenithblue.nativecode.agent.chat.ui.FileType.PDF -> FileViewers.pdf(this, targetFile, external)
+            else -> null
+        }
         when {
-            (ext == "md" || ext == "markdown") && !forceEditor -> {
+            fullBleed != null -> {
+                fileViewerContentHost.addView(fullBleed.apply { layoutParams = FrameLayout.LayoutParams(MATCH, MATCH) })
+                // Agent markup has a source: EDIT swaps the sandboxed render for the editor
+                if (kind == com.zenithblue.nativecode.agent.chat.ui.FileType.HTML || kind == com.zenithblue.nativecode.agent.chat.ui.FileType.SVG) addEditPill(targetFile, backPage)
+            }
+            kind == com.zenithblue.nativecode.agent.chat.ui.FileType.MARKDOWN && !forceEditor -> {
                 fileViewerContentHost.addView(
                     buildMarkdownViewerCard(targetFile).apply {
                         layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
@@ -7244,11 +7269,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 )
                 addEditPill(targetFile, backPage)
             }
-            isTextFile(targetFile, ext) &&
-                (forceEditor || ext !in listOf("html", "htm")) &&
-                ext !in listOf("png", "jpg", "jpeg", "webp", "gif", "bmp", "ico", "svg") &&
-                ext !in listOf("mp4", "webm", "mkv", "3gp", "avi", "mov") &&
-                ext != "apk" -> {
+            isTextFile(targetFile, kind) -> {
                 if (targetFile.length() <= com.zenithblue.nativecode.editor.EditorLimits.VIEW_MAX_BYTES) {
                     val ed = fileEditor?.takeIf { it.file.absolutePath == targetFile.absolutePath }
                         ?: run {
@@ -7278,21 +7299,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     orientation = LinearLayout.VERTICAL
                     layoutParams = FrameLayout.LayoutParams(MATCH, WRAP)
                 }
-                when {
-                    ext in listOf("png", "jpg", "jpeg", "webp", "gif", "bmp", "ico", "svg") ->
-                        wrap.addView(buildImageGifCard(targetFile))
-                    ext in listOf("mp4", "webm", "mkv", "3gp", "avi", "mov") ->
-                        wrap.addView(buildVideoCard(targetFile))
-                    ext in listOf("html", "htm") ->
-                        wrap.addView(buildHtmlCard(targetFile))
-                    ext == "apk" ->
-                        wrap.addView(buildApkCard(targetFile))
-                    else ->
-                        wrap.addView(buildBinaryFileCard(targetFile))
+                when (kind) {
+                    com.zenithblue.nativecode.agent.chat.ui.FileType.VIDEO -> wrap.addView(buildVideoCard(targetFile))
+                    com.zenithblue.nativecode.agent.chat.ui.FileType.AUDIO -> wrap.addView(FileViewers.audio(this, targetFile, external))
+                    com.zenithblue.nativecode.agent.chat.ui.FileType.APK -> wrap.addView(buildApkCard(targetFile))
+                    // Office documents have no native renderer: card with the file's own MIME so the chooser offers the right apps
+                    else -> wrap.addView(buildBinaryFileCard(targetFile, com.zenithblue.nativecode.agent.chat.ui.FileKinds.mimeOf(targetFile.name)))
                 }
                 scroll.addView(wrap)
                 fileViewerContentHost.addView(scroll)
-                if (ext in listOf("html", "htm")) addEditPill(targetFile, backPage)
             }
         }
         // Keep legacy fields in sync for any other callers
@@ -7346,82 +7361,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         fileViewerContentHost.addView(pill)
     }
 
-    private fun buildImageGifCard(file: File): View {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = roundedBg(NC.SURFACE, NC.BORDER, dp(12))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-        }
-
-        val imgArea = FrameLayout(this).apply {
-            setBackgroundColor(NC.SURFACE_HIGH)
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
-                minimumHeight = dp(180)
-            }
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-        }
-
-        var dimensionsStr = tr(R.string.main_unknown_resolution)
-        val bitmap = try {
-            BitmapFactory.decodeFile(file.absolutePath)
-        } catch (e: Exception) {
-            null
-        }
-
-        if (bitmap != null) {
-            dimensionsStr = "${bitmap.width}×${bitmap.height}"
-            val imageView = ImageView(this).apply {
-                layoutParams = FrameLayout.LayoutParams(MATCH, WRAP).apply {
-                    gravity = Gravity.CENTER
-                }
-                adjustViewBounds = true
-                maxHeight = dp(300)
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                setImageBitmap(bitmap)
-            }
-            imgArea.addView(imageView)
-        } else {
-            val placeholder = ImageView(this).apply {
-                setImageResource(R.drawable.ic_attach_image)
-                setColorFilter(NC.ON_SURF_VAR)
-                layoutParams = FrameLayout.LayoutParams(dp(64), dp(64)).apply {
-                    gravity = Gravity.CENTER
-                }
-            }
-            imgArea.addView(placeholder)
-        }
-        card.addView(imgArea)
-
-        val infoRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-        }
-
-        val infoTv = TextView(this).apply {
-            text = "  ${file.name} • $dimensionsStr • ${formatFileSize(file.length())}"
-            textSize = 12f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        }
-        infoRow.addView(infoTv)
-
-        val openExtBtn = TextView(this).apply {
-            text = "OPEN"
-            textSize = 10f
-            setTextColor(NC.PRIMARY)
-            typeface = Typeface.DEFAULT_BOLD
-            background = roundedBg(NC.SURFACE_VAR, NC.BORDER, dp(4))
-            setPadding(dp(10), dp(6), dp(10), dp(6))
-            setOnClickListener { openExternalFile(file, "image/*") }
-        }
-        infoRow.addView(openExtBtn)
-
-        card.addView(infoRow)
-        return card
-    }
-
     private fun buildVideoCard(file: File): View {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -7473,66 +7412,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         card.addView(infoRow)
         return card
-    }
-
-    private fun buildHtmlCard(file: File): View {
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
-        }
-
-        val actionCard = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = cyberBrutalistBg(
-                fillColor = NC.SURFACE_LOW,
-                strokeColor = NC.BORDER,
-                shadowColor = NC.SHADOW_GREEN,
-                offsetDp = 4,
-                cornerRadiusDp = 0,
-                rightFaceColor = NC.BORDER
-            )
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(16) }
-        }
-
-        val htmlIcon = ImageView(this).apply {
-            setImageResource(R.drawable.ic_display)
-            setColorFilter(NC.PRIMARY)
-            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { rightMargin = dp(12) }
-        }
-
-        val infoCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-        }
-        val titleTv = TextView(this).apply {
-            text = file.name
-            textSize = 14f
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        val subTv = TextView(this).apply {
-            text = "HTML Document • ${formatFileSize(file.length())}"
-            textSize = 11f
-            setTextColor(NC.ON_SURF_VAR)
-            typeface = Typeface.MONOSPACE
-        }
-        infoCol.addView(titleTv)
-        infoCol.addView(subTv)
-
-        val openBrowserBtn = primaryButton(tr(R.string.main_open_in_browser)) {
-            openHtmlFile(file)
-        }
-
-        actionCard.addView(htmlIcon)
-        actionCard.addView(infoCol)
-        actionCard.addView(openBrowserBtn)
-
-        container.addView(actionCard)
-        container.addView(buildCodeViewerCard(file))
-
-        return container
     }
 
     private fun buildApkCard(file: File): View {
@@ -7786,7 +7665,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         return card
     }
 
-    private fun buildBinaryFileCard(file: File): View {
+    private fun buildBinaryFileCard(file: File, mimeType: String = "*/*"): View {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = cyberBrutalistBg(
@@ -7832,7 +7711,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         val openExtBtn = primaryButton(tr(R.string.main_open_with_external_app)) {
-            openExternalFile(file)
+            openExternalFile(file, mimeType)
         }.apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, WRAP)
         }
@@ -7845,14 +7724,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         return card
     }
 
-    private fun isTextFile(file: File, ext: String): Boolean {
-        val knownTextExts = setOf(
-            "txt", "md", "json", "xml", "kt", "java", "py", "rs", "c", "cpp", "h", "hpp", "sh",
-            "yml", "yaml", "gradle", "kts", "properties", "conf", "ini", "js", "ts", "css", "log",
-            "env", "toml", "lock", "bat", "cmd", "diff", "patch", "sql", "go", "rb", "php", "swift",
-            "m", "mm", "cs", "lua", "zig", "asm", "dockerfile", "gitignore", "cmake"
-        )
-        if (knownTextExts.contains(ext) || file.name.startsWith(".")) return true
+    /** Editor-able: the kinds FileKinds calls text-like, plus an unknown type that is a dotfile or sniffs as text (no NUL in the head). */
+    private fun isTextFile(file: File, kind: com.zenithblue.nativecode.agent.chat.ui.FileType): Boolean {
+        when (kind) {
+            com.zenithblue.nativecode.agent.chat.ui.FileType.TEXT,
+            com.zenithblue.nativecode.agent.chat.ui.FileType.MARKDOWN,
+            com.zenithblue.nativecode.agent.chat.ui.FileType.HTML,
+            com.zenithblue.nativecode.agent.chat.ui.FileType.SVG -> return true
+            com.zenithblue.nativecode.agent.chat.ui.FileType.OTHER -> if (file.name.startsWith(".")) return true
+            else -> return false
+        }
         if (file.length() > 2 * 1024 * 1024) return false
         return try {
             file.inputStream().use { input ->
@@ -7867,19 +7748,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
         } catch (e: Exception) {
             false
-        }
-    }
-
-    private fun openHtmlFile(file: File) {
-        val uri = getFileUri(file) ?: return
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "text/html")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        try {
-            startActivity(Intent.createChooser(intent, tr(R.string.main_open_html_in_browser)))
-        } catch (e: Exception) {
-            Toast.makeText(this, tr(R.string.main_no_browser_found_to_open), Toast.LENGTH_SHORT).show()
         }
     }
 

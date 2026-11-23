@@ -2,6 +2,7 @@ package com.zenithblue.nativecode.agent.chat.ui
 
 import com.zenithblue.nativecode.preview.PortProbe
 import com.zenithblue.nativecode.terminal.ProjectLocation
+import java.io.File
 
 /** What a tapped chat link means. Nothing here ever becomes an Intent with a file: URI. */
 sealed interface ChatLink {
@@ -15,6 +16,17 @@ sealed interface ChatLink {
     data class Other(val url: String) : ChatLink
     /** Blank, malformed, or a path that leaves the guest home: "File not found". */
     object Rejected : ChatLink
+}
+
+/** Host file behind a chat path or link: the one resolver for the tap handler and the inline preview cards. */
+object ChatFiles {
+    /** [guest] (absolute, inside the guest home) to an existing regular host file under [rootfs]; symlinks are folded, one leaving the home gives null. */
+    fun resolveGuest(rootfs: File, guest: String): File? =
+        ProjectLocation.resolve(rootfs, guest)?.let { ProjectLocation.hostFile(rootfs, it) }?.takeIf { it.isFile }
+
+    /** A path / file: URI as written in a message to its host file; null for URLs, paths outside the home, or a missing file. */
+    fun resolve(rootfs: File, raw: String, cwd: String): File? =
+        (ChatLinks.classify(raw, cwd) as? ChatLink.GuestFile)?.let { resolveGuest(rootfs, it.path) }
 }
 
 /** One classifier for every link in assistant markdown (file: URIs, absolute and relative paths, URLs). */

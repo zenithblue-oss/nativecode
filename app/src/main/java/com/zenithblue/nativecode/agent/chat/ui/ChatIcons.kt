@@ -41,6 +41,8 @@ internal object Ic {
     val FileDiff = lucide("M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M9 10h6", "M12 13V7", "M9 17h6")
     val FileText = lucide("M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z", "M14 2v4a2 2 0 0 0 2 2h4", "M10 9H8", "M16 13H8", "M16 17H8")
     val Image = lucide(rect(3f, 3f, 18f, 18f, 2f), circle(9f, 9f, 2f), "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21")
+    val Play = lucide("M6 3 20 12 6 21Z")
+    val Music = lucide("M9 18V5l12-2v13", circle(6f, 18f, 3f), circle(18f, 16f, 3f))
     val Search = lucide(circle(11f, 11f, 8f), "m21 21-4.3-4.3")
     val Globe = lucide(circle(12f, 12f, 10f), "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20")
     val Wrench = lucide("M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z")
