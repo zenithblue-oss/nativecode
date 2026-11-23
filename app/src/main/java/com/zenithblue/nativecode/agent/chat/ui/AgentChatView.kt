@@ -44,7 +44,10 @@ data class ThreadData(
     val runs: List<Run>,
     val requests: List<ChatRequest>,
     val hasMore: Boolean,
-)
+) {
+    /** Same thread with its composer draft dropped (the message was just sent). */
+    fun withoutDraft() = copy(thread = thread.copy(draftJson = null))
+}
 
 sealed class Route {
     data object List : Route()
@@ -81,6 +84,8 @@ class AgentChatView(
     internal val live = mutableStateOf<LiveState?>(null)
     /** Empty-state pane: the draft thread shown in place of the list until its first send (see [promoteDraft]). */
     internal val draftId = mutableStateOf<String?>(null)
+    /** A refused first send from the empty-state pane (thread id, draft): the chat route that replaced the pane takes it back. */
+    internal val refusedDraft = mutableStateOf<Pair<String, String?>?>(null)
     internal val now = mutableStateOf(System.currentTimeMillis())
 
     /** Workspace project (guest path); null on the TERMINAL tab. */
@@ -313,6 +318,10 @@ class AgentChatView(
     internal fun promoteDraft(id: String) {
         if (draftId.value != id) return
         draftId.value = null
+        // The chat route builds its composer from this thread's draft (open copy, or the reload that follows the push), which
+        // still holds the text just sent: drop it in both. ponytail: one tiny store write on main so the reload cannot race it.
+        open.value = open.value?.let { if (it.thread.id == id) it.withoutDraft() else it }
+        runCatching { backend.setDraft(id, null) }
         push(Route.Chat(id))
     }
 

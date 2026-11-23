@@ -13,6 +13,7 @@ import com.zenithblue.nativecode.agent.chat.core.TodoStep
 import com.zenithblue.nativecode.agent.chat.core.TurnItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -194,6 +195,13 @@ class ChatLogicTest {
         val rows = ChatLogic.rows(items, emptyMap())
         assertEquals(listOf("w:s", "a"), rows.map { it.key })
         assertEquals(listOf("k1", "k2"), (rows[0] as Row.Work).kids["s"]!!.map { it.id })
+    }
+
+    @Test fun sentMessageDropsThreadDraft() {
+        val t = ChatThread("t", "/p", "/p", "opencode", "t", draftJson = """{"text":"hi"}""", createdAt = 0, updatedAt = 0)
+        val d = ThreadData(t, emptyList(), emptyList(), emptyList(), false).withoutDraft()
+        assertNull(d.thread.draftJson)
+        assertEquals("t", d.thread.id)
     }
 
     @Test fun foldLongText() {

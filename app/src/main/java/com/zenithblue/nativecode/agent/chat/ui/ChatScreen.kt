@@ -123,6 +123,12 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
 
     // Draft persists per thread (debounced, and on leave).
     LaunchedEffect(threadId, composer.text, composer.chips.size, composer.skills.size) { delay(800); v.bg { v.backend.setDraft(threadId, composer.draftJson()) } }
+    LaunchedEffect(v.refusedDraft.value) {
+        v.refusedDraft.value?.takeIf { it.first == threadId && !embedded }?.let { (_, j) ->
+            v.refusedDraft.value = null
+            if (composer.text.isEmpty() && composer.chips.isEmpty()) composer.restore(j)
+        }
+    }
     DisposableEffect(threadId) { onDispose { val j = composer.draftJson(); v.bg { v.backend.setDraft(threadId, j) } } }
 
     val tick by produceState(System.currentTimeMillis(), running) { while (running) { value = System.currentTimeMillis(); delay(1000) } }
@@ -171,7 +177,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
                 val fresh = freshArmed
                 val draft = composer.draftJson()
                 // A refused send (6th chat over the session limit, Pro gate) gives the message back instead of losing it.
-                v.bg { v.backend.send(threadId, prompt, atts, steer, fresh = fresh) { if (composer.text.isEmpty() && composer.chips.isEmpty()) composer.restore(draft) } }
+                v.bg { v.backend.send(threadId, prompt, atts, steer, fresh = fresh) { if (embedded) v.refusedDraft.value = threadId to draft else if (composer.text.isEmpty() && composer.chips.isEmpty()) composer.restore(draft) } }
                 freshArmed = false
                 v.promoteDraft(threadId)
             }
