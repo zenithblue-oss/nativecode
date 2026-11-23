@@ -634,14 +634,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">Delegating to %1$s needs NativeCode Pro</string>
     <string name="chat_stop_delegated_task">Stop delegated task</string>
     <string name="chat_message_from_thread">Message from thread</string>
-    <string name="chat_pick_an_agent_chat_opens">Pick an agent. Chat opens here; Terminal opens its TUI.</string>
-    <string name="chat_free_models_sign_in_for">Free models · sign in for more</string>
     <string name="chat_sign_in">Sign in</string>
-    <string name="chat_free_models">Free models</string>
-    <string name="chat_terminal_only">Terminal only</string>
     <string name="chat_terminal">Terminal</string>
-    <string name="chat_raw_shell">Raw shell</string>
-    <string name="chat_shell">Shell</string>
     <string name="chat_m_h_a_0_0" translatable="false">M%1$s %2$sh%3$sa%4$s %5$s 0 0 1 %6$s %7$sv%8$sa%9$s %10$s 0 0 1 %11$s %12$sh%13$sa%14$s %15$s 0 0 1 %16$s %17$sv%18$sa%19$s %20$s 0 0 1 %21$s %22$sz</string>
     <string name="chat_this_turn">This turn</string>
     <string name="chat_whole_thread">Whole thread</string>

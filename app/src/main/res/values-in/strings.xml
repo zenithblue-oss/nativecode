@@ -598,14 +598,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">Mendelegasikan ke %1$s memerlukan NativeCode Pro</string>
     <string name="chat_stop_delegated_task">Hentikan tugas yang didelegasikan</string>
     <string name="chat_message_from_thread">Pesan dari thread</string>
-    <string name="chat_pick_an_agent_chat_opens">Pilih agen. Chat terbuka di sini; Terminal membuka TUI-nya.</string>
-    <string name="chat_free_models_sign_in_for">Model gratis · masuk untuk lebih banyak</string>
     <string name="chat_sign_in">Masuk</string>
-    <string name="chat_free_models">Model gratis</string>
-    <string name="chat_terminal_only">Hanya terminal</string>
     <string name="chat_terminal">Terminal</string>
-    <string name="chat_raw_shell">Shell mentah</string>
-    <string name="chat_shell">Shell</string>
     <string name="chat_this_turn">Giliran ini</string>
     <string name="chat_whole_thread">Seluruh thread</string>
     <string name="chat_uncommitted">Belum di-commit</string>

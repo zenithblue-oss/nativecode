@@ -44,6 +44,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import com.zenithblue.nativecode.agent.chat.ModelCache
 import com.zenithblue.nativecode.agent.chat.tools.NcTasks
+import com.zenithblue.nativecode.cliauth.AuthState
+import com.zenithblue.nativecode.cliauth.CliCredentialProbe
 import com.zenithblue.nativecode.cliauth.CliToolCatalog
 import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,6 +94,11 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
     val live = v.live.value
     val canSwitch = live?.runId == null && !NcTasks.isChild(t.id)
     val defs = remember { CliToolCatalog.forMethod(LinuxCommandBuilder.currentMethod).sortedBy { it.chat == null } }
+    // Signed-out providers (login optional ones, like opencode, stay usable) show "Sign in" and open their login page instead of switching.
+    val auth by produceState(emptyMap<String, AuthState>()) {
+        val home = v.host.guestHome()
+        value = withContext(Dispatchers.IO) { defs.associate { it.terminalType to CliCredentialProbe.probe(it.id, home).state } }
+    }
     var picked by remember { mutableStateOf(t.tool) }
     val sel = if (canSwitch) picked else t.tool
     val own = sel == t.tool
@@ -109,13 +116,18 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
                 val chat = def.chat != null
                 val locked = chat && !v.host.canUseTool(def.terminalType)
                 val on = def.terminalType == sel
+                val signIn = chat && !locked && !def.loginOptional && def.terminalType != t.tool && auth[def.terminalType] == AuthState.SIGNED_OUT
                 Column(
                     Modifier.width(68.dp).alpha(if (chat) 1f else 0.4f)
                         .selectable(on, enabled = chat, role = Role.RadioButton) {
-                            if (locked) { v.host.showUpgradeSheet(tr(R.string.chat_provider_requires_pro, def.displayName)); close() } else { picked = def.terminalType; q = "" }
+                            when {
+                                locked -> { v.host.showUpgradeSheet(tr(R.string.chat_provider_requires_pro, def.displayName)); close() }
+                                signIn -> { v.host.openCliLoginPage(def.id); close() }
+                                else -> { picked = def.terminalType; q = "" }
+                            }
                         }
                         .background(if (on) C.primary.copy(alpha = 0.08f) else C.low).padding(S.xs)
-                        .semantics { if (!chat) stateDescription = tr(R.string.chat_provider_terminal_only) else if (locked) stateDescription = tr(R.string.chat_provider_requires_pro_state) },
+                        .semantics { if (!chat) stateDescription = tr(R.string.chat_provider_terminal_only) else if (locked) stateDescription = tr(R.string.chat_provider_requires_pro_state) else if (signIn) stateDescription = tr(R.string.chat_sign_in) },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box {
@@ -123,6 +135,7 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
                         if (locked) NcIcon(Ic.Lock, null, Modifier.align(Alignment.BottomEnd), tint = C.tertiary, size = 12.dp)
                     }
                     Text(def.displayName, color = if (on) C.primary else C.onVar, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (signIn) Text(tr(R.string.chat_sign_in), color = C.tertiary, style = T.meta, maxLines = 1)
                 }
             }
         }

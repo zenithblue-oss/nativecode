@@ -598,14 +598,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">Das Delegieren an %1$s erfordert NativeCode Pro</string>
     <string name="chat_stop_delegated_task">Delegierte Aufgabe stoppen</string>
     <string name="chat_message_from_thread">Nachricht aus Thread</string>
-    <string name="chat_pick_an_agent_chat_opens">Agent wählen. Chat öffnet hier; Terminal öffnet die TUI.</string>
-    <string name="chat_free_models_sign_in_for">Gratis-Modelle · für mehr anmelden</string>
     <string name="chat_sign_in">Anmelden</string>
-    <string name="chat_free_models">Gratis-Modelle</string>
-    <string name="chat_terminal_only">Nur Terminal</string>
     <string name="chat_terminal">Terminal</string>
-    <string name="chat_raw_shell">Reine Shell</string>
-    <string name="chat_shell">Shell</string>
     <string name="chat_this_turn">Dieser Zug</string>
     <string name="chat_whole_thread">Ganzer Thread</string>
     <string name="chat_uncommitted">Nicht committet</string>

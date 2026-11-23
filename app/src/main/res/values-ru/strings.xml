@@ -598,14 +598,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">Для делегирования агенту %1$s нужен NativeCode Pro</string>
     <string name="chat_stop_delegated_task">Остановить делегированную задачу</string>
     <string name="chat_message_from_thread">Сообщение из диалога</string>
-    <string name="chat_pick_an_agent_chat_opens">Выберите агента. Чат откроется здесь, Terminal откроет его TUI.</string>
-    <string name="chat_free_models_sign_in_for">Бесплатные модели · войдите, чтобы получить больше</string>
     <string name="chat_sign_in">Войти</string>
-    <string name="chat_free_models">Бесплатные модели</string>
-    <string name="chat_terminal_only">Только terminal</string>
     <string name="chat_terminal">Terminal</string>
-    <string name="chat_raw_shell">Чистый shell</string>
-    <string name="chat_shell">Shell</string>
     <string name="chat_this_turn">В этом ходе</string>
     <string name="chat_whole_thread">Весь диалог</string>
     <string name="chat_uncommitted">Без коммита</string>

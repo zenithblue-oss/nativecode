@@ -77,10 +77,10 @@ import java.io.File
 import com.zenithblue.nativecode.tr
 import com.zenithblue.nativecode.R
 
-/** Screen D. */
+/** Screen D. [embedded] = the empty Threads page's pane: no top bar, the first send opens the thread as a normal chat. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun ChatScreen(v: AgentChatView, threadId: String) {
+internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = false) {
     val d = v.open.value?.takeIf { it.thread.id == threadId }
     if (d == null) { LoadingRows(); return }
     val t = d.thread
@@ -173,6 +173,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                 // A refused send (6th chat over the session limit, Pro gate) gives the message back instead of losing it.
                 v.bg { v.backend.send(threadId, prompt, atts, steer, fresh = fresh) { if (composer.text.isEmpty() && composer.chips.isEmpty()) composer.restore(draft) } }
                 freshArmed = false
+                v.promoteDraft(threadId)
             }
         }
         composer.clear()
@@ -185,7 +186,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
     val status = headerStatus(live, pending != null, running, lastRun?.status)
 
     Column(Modifier.fillMaxSize()) {
-        ChatTopBar(v, t, status, d.runs, imeOpen = WindowInsets.isImeVisible)
+        if (!embedded) ChatTopBar(v, t, status, d.runs, imeOpen = WindowInsets.isImeVisible)
         todo?.let { TodoStrip(it) }
         DelegationStrip(v, threadId) // M7: delegated tasks / back-link to the parent
 
@@ -299,6 +300,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String) {
                 pending != null -> "Reply to deny with feedback"
                 else -> tr(R.string.chat_ask_for_commands, t.tool)
             },
+            autoFocus = !embedded && items.isEmpty(), // a fresh thread opens with the keyboard on its composer
             commands = live?.commands.orEmpty(),
             slashCtx = slashCtx,
             running = running && pending == null,
@@ -439,7 +441,7 @@ private fun gitBranch(v: AgentChatView, cwd: String): String? = runCatching {
 private fun EmptyThread(t: ChatThread, modifier: Modifier) {
     Column(modifier.padding(S.xl).widthIn(max = 420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         ProviderLogo(t.tool, size = 56.dp)
-        Text("What should ${t.tool} do in ${t.projectPath?.let { ChatLogic.baseName(it) } ?: "~"}?",
+        Text("What should ${providerName(t.tool)} do in ${t.projectPath?.let { ChatLogic.baseName(it) } ?: "~"}?",
             Modifier.padding(top = S.l), color = C.on, style = T.title, textAlign = TextAlign.Center)
         Text(tr(R.string.chat_type_for_commands_attach_files),
             Modifier.padding(top = S.s), color = C.onVar, style = T.bodySm, textAlign = TextAlign.Center)

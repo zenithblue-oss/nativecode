@@ -598,14 +598,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">%1$sへの委任にはNativeCode Proが必要です</string>
     <string name="chat_stop_delegated_task">委任タスクを停止</string>
     <string name="chat_message_from_thread">スレッドからのメッセージ</string>
-    <string name="chat_pick_an_agent_chat_opens">エージェントを選んでください。チャットはここで開き、terminalはそのTUIを開きます。</string>
-    <string name="chat_free_models_sign_in_for">無料モデル · サインインでさらに利用可能</string>
     <string name="chat_sign_in">サインイン</string>
-    <string name="chat_free_models">無料モデル</string>
-    <string name="chat_terminal_only">terminalのみ</string>
     <string name="chat_terminal">terminal</string>
-    <string name="chat_raw_shell">生のshell</string>
-    <string name="chat_shell">shell</string>
     <string name="chat_this_turn">このターン</string>
     <string name="chat_whole_thread">スレッド全体</string>
     <string name="chat_uncommitted">未コミット</string>

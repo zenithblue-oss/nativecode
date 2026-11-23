@@ -30,6 +30,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
@@ -154,6 +157,7 @@ internal fun Composer(
     running: Boolean,
     canSteer: Boolean,
     context: ContextInfo,
+    autoFocus: Boolean,
     stopping: Boolean,
     forceStop: Boolean,
     onSend: (steer: Boolean) -> Unit,
@@ -168,6 +172,8 @@ internal fun Composer(
     val haptics = LocalHapticFeedback.current
     val focus = remember { MutableInteractionSource() }
     val focused by focus.collectIsFocusedAsState()
+    val field = remember { FocusRequester() }
+    LaunchedEffect(autoFocus) { if (autoFocus) runCatching { field.requestFocus() } }
     val catalog = remember { SkillsCatalog.all() }
     val live = v.live.value
     val currentModel = t.model ?: live?.defaultModel
@@ -211,7 +217,7 @@ internal fun Composer(
             }
             BasicTextField(
                 s.input, { s.input =if (it.text.length > 120_000) TextFieldValue(it.text.take(120_000), TextRange(120_000)) else it },
-                Modifier.fillMaxWidth().heightIn(min = 44.dp, max = 168.dp).padding(horizontal = S.m, vertical = S.inset),
+                Modifier.fillMaxWidth().heightIn(min = 44.dp, max = 168.dp).focusRequester(field).padding(horizontal = S.m, vertical = S.inset),
                 textStyle = T.body.copy(color = C.on),
                 cursorBrush = SolidColor(C.primary),
                 interactionSource = focus,

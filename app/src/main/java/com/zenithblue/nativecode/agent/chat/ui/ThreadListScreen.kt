@@ -65,7 +65,7 @@ import com.zenithblue.nativecode.R
 /** Screens A (TERMINAL tab, grouped by project) and B (workspace, one project). */
 @Composable
 internal fun ThreadListScreen(v: AgentChatView) {
-    val rows = v.rows.value
+    val rows = v.rows.value.filterNot { it.draft } // unsent drafts are not threads yet
     val now = v.now.value
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -87,9 +87,11 @@ internal fun ThreadListScreen(v: AgentChatView) {
         }
     }
 
+    val active = rows.count { it.thread.archivedAt == null }
+    // No thread at all: the page is a new-thread composer (t3code), unless the AI tools are not installed yet.
+    val pane = rows.isEmpty() && v.loaded.value && v.host.aiToolsInstalled()
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            val active = rows.count { it.thread.archivedAt == null }
             val working = rows.count { it.status == ThreadStatus.WORKING }
             val waiting = rows.count { it.status == ThreadStatus.APPROVAL || it.status == ThreadStatus.INPUT }
             Row(Modifier.fillMaxWidth().background(C.lowest).heightIn(min = 56.dp).padding(start = S.l, end = S.xs), verticalAlignment = Alignment.CenterVertically) {
@@ -107,7 +109,7 @@ internal fun ThreadListScreen(v: AgentChatView) {
             Hairline()
             val groups = ChatLogic.group(rows.map { it.thread }, byProject = !v.isWorkspace)
             val byId = rows.associateBy { it.thread.id }
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = FAB_CLEAR)) {
+            if (pane) NewThreadPane(v) else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = FAB_CLEAR)) {
                 if (!v.loaded.value) item("loading") { LoadingRows() }
                 if (tabs.isNotEmpty()) {
                     item("term-h") { GroupHeader(tr(R.string.chat_terminals), tabs.size, !termOpen, Ic.Terminal) { termOpen = !termOpen } }
@@ -123,7 +125,7 @@ internal fun ThreadListScreen(v: AgentChatView) {
                         }
                     }
                 }
-                if (active == 0 && v.loaded.value) item("empty") { EmptyState(v) }
+                if (active == 0 && v.loaded.value && !v.host.aiToolsInstalled()) item("empty") { EmptyState(v) }
                 groups.forEach { g ->
                     val header = g.key == ChatLogic.ARCHIVED || !v.isWorkspace
                     val isCollapsed = collapsed[g.key] ?: false
@@ -136,9 +138,9 @@ internal fun ThreadListScreen(v: AgentChatView) {
                 }
             }
         }
-        Row(
+        if (!pane) Row(
             Modifier.align(Alignment.BottomEnd).padding(S.l).brutal(4.dp, C.shadowGreen).background(C.primary)
-                .combinedClickable(onClickLabel = tr(R.string.chat_new_thread)) { v.sheet.value = true }
+                .combinedClickable(onClickLabel = tr(R.string.chat_new_thread)) { v.newThread() }
                 .heightIn(min = 48.dp).padding(horizontal = S.l),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -334,7 +336,16 @@ private fun SessionsChip(v: AgentChatView) {
     }
 }
 
-/** No threads yet: the tool cards, or "Install AI tools". */
+/** No thread yet: the draft thread's composer (provider, model, effort, access in its chips); the first send opens the chat. */
+@Composable
+private fun NewThreadPane(v: AgentChatView) {
+    val id = v.draftId.value
+    // stack.size: while the chat route fades in the list may still compose with draftId already cleared; it must not start another draft.
+    LaunchedEffect(id, v.stack.size) { if (id == null && v.stack.size == 1) v.newThread(openChat = false) }
+    if (id == null) LoadingRows() else ChatScreen(v, id, embedded = true)
+}
+
+/** Archived-only list or AI tools missing: "Install AI tools". */
 @Composable
 private fun EmptyState(v: AgentChatView) {
     Column(Modifier.fillMaxWidth().padding(S.l)) {
@@ -343,8 +354,6 @@ private fun EmptyState(v: AgentChatView) {
         }
         Text(tr(R.string.chat_start_an_agent_thread), Modifier.padding(top = S.l), color = C.on, style = T.title)
         Text(tr(R.string.chat_chat_with_a_cli_agent), Modifier.padding(top = S.xs, bottom = S.l), color = C.onVar, style = T.bodySm)
-        if (!v.host.aiToolsInstalled()) {
-            NcButton(tr(R.string.chat_install_ai_tools), primary = true, icon = Ic.Download) { v.host.openInstallTools() }
-        } else ToolCards(v, v.projectPath)
+        NcButton(tr(R.string.chat_install_ai_tools), primary = true, icon = Ic.Download) { v.host.openInstallTools() }
     }
 }

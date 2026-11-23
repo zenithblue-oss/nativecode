@@ -598,14 +598,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">%1$s에 위임하려면 NativeCode Pro가 필요합니다</string>
     <string name="chat_stop_delegated_task">위임된 작업 중지</string>
     <string name="chat_message_from_thread">스레드에서 온 메시지</string>
-    <string name="chat_pick_an_agent_chat_opens">에이전트를 선택하세요. 채팅은 여기서 열리고, Terminal은 TUI로 열립니다.</string>
-    <string name="chat_free_models_sign_in_for">무료 모델 · 로그인하면 더 많이 사용 가능</string>
     <string name="chat_sign_in">로그인</string>
-    <string name="chat_free_models">무료 모델</string>
-    <string name="chat_terminal_only">Terminal 전용</string>
     <string name="chat_terminal">Terminal</string>
-    <string name="chat_raw_shell">원본 shell</string>
-    <string name="chat_shell">Shell</string>
     <string name="chat_this_turn">이번 턴</string>
     <string name="chat_whole_thread">전체 스레드</string>
     <string name="chat_uncommitted">커밋 안 됨</string>

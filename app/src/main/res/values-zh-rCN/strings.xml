@@ -598,14 +598,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">委派给 %1$s 需要 NativeCode Pro</string>
     <string name="chat_stop_delegated_task">停止委派任务</string>
     <string name="chat_message_from_thread">来自对话的消息</string>
-    <string name="chat_pick_an_agent_chat_opens">选择智能体。对话在此打开；终端打开其 TUI。</string>
-    <string name="chat_free_models_sign_in_for">免费模型 · 登录可用更多</string>
     <string name="chat_sign_in">登录</string>
-    <string name="chat_free_models">免费模型</string>
-    <string name="chat_terminal_only">仅终端</string>
     <string name="chat_terminal">终端</string>
-    <string name="chat_raw_shell">原始 Shell</string>
-    <string name="chat_shell">Shell</string>
     <string name="chat_this_turn">本轮</string>
     <string name="chat_whole_thread">整个对话</string>
     <string name="chat_uncommitted">未提交</string>

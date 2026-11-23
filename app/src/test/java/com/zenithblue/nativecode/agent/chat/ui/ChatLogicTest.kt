@@ -24,6 +24,22 @@ class ChatLogicTest {
     private fun req(kind: RequestKind, status: RequestStatus = RequestStatus.PENDING) =
         ChatRequest("q", "t", null, null, "n", kind, status, emptyList(), RequestDetail("x"), createdAt = 0)
 
+    @Test fun defaultToolRule() {
+        val chat = listOf("claude-code", "codex", "opencode", "agy")
+        val all = { _: String -> true }
+        val free = { t: String -> t == "opencode" }
+        val signed = setOf("codex", "agy")
+        fun pick(last: String?, canUse: (String) -> Boolean) = ChatLogic.defaultTool(last, chat, canUse) { it in signed }
+        assertEquals("agy", pick("agy", all)) // last used wins, even over an earlier signed-in tool
+        assertEquals("codex", pick(null, all)) // first signed-in Pro tool in catalog order (claude-code is signed out)
+        assertEquals("codex", pick("qwen-code", all)) // no chat runtime: ignored
+        assertEquals("codex", pick("kiro", all))
+        assertEquals("opencode", pick("claude-code", free)) // Free: a Pro last-used tool is locked
+        assertEquals("opencode", pick(null, free))
+        assertEquals("opencode", ChatLogic.defaultTool(null, chat, all) { false }) // Pro, nothing signed in
+        assertEquals("opencode", pick("opencode", free))
+    }
+
     @Test fun statusPriority() {
         val t = thread("a", visited = 10)
         assertEquals(ThreadStatus.APPROVAL, ChatLogic.status(t, run(RunStatus.RUNNING), listOf(req(RequestKind.USER_INPUT), req(RequestKind.COMMAND))))

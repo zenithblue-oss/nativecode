@@ -598,14 +598,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">التفويض إلى %1$s يتطلب NativeCode Pro</string>
     <string name="chat_stop_delegated_task">إيقاف المهمة المفوَّضة</string>
     <string name="chat_message_from_thread">رسالة من محادثة</string>
-    <string name="chat_pick_an_agent_chat_opens">اختر وكيلًا. تُفتح الدردشة هنا؛ ويفتح Terminal واجهته النصية TUI.</string>
-    <string name="chat_free_models_sign_in_for">نماذج مجانية · سجّل الدخول للمزيد</string>
     <string name="chat_sign_in">تسجيل الدخول</string>
-    <string name="chat_free_models">نماذج مجانية</string>
-    <string name="chat_terminal_only">terminal فقط</string>
     <string name="chat_terminal">terminal</string>
-    <string name="chat_raw_shell">shell خام</string>
-    <string name="chat_shell">shell</string>
     <string name="chat_this_turn">هذه الجولة</string>
     <string name="chat_whole_thread">المحادثة كاملة</string>
     <string name="chat_uncommitted">غير مودَعة</string>

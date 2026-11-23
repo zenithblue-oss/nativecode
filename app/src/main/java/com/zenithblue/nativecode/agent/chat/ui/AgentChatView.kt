@@ -26,12 +26,16 @@ import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.ItemPayload
 import com.zenithblue.nativecode.agent.chat.core.Run
 import com.zenithblue.nativecode.agent.chat.core.TurnItem
+import com.zenithblue.nativecode.cliauth.AuthState
+import com.zenithblue.nativecode.cliauth.CliCredentialProbe
+import com.zenithblue.nativecode.cliauth.CliToolCatalog
+import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
 import java.util.concurrent.Executor
 import com.zenithblue.nativecode.tr
 import com.zenithblue.nativecode.R
 
-/** One thread-list row. */
-data class ThreadRow(val thread: ChatThread, val status: ThreadStatus, val lastRun: Run?, val add: Int, val del: Int, val preview: String? = null)
+/** One thread-list row. [draft] = nothing sent yet (no run, no message): hidden from the list, reused by the next new thread. */
+data class ThreadRow(val thread: ChatThread, val status: ThreadStatus, val lastRun: Run?, val add: Int, val del: Int, val preview: String? = null, val draft: Boolean = false)
 
 /** The open thread: store rows (newest 200 + pages loaded with "Load earlier"). */
 data class ThreadData(
@@ -75,7 +79,8 @@ class AgentChatView(
     internal val loaded = mutableStateOf(false)
     internal val open = mutableStateOf<ThreadData?>(null)
     internal val live = mutableStateOf<LiveState?>(null)
-    internal val sheet = mutableStateOf(false)
+    /** Empty-state pane: the draft thread shown in place of the list until its first send (see [promoteDraft]). */
+    internal val draftId = mutableStateOf<String?>(null)
     internal val now = mutableStateOf(System.currentTimeMillis())
 
     /** Workspace project (guest path); null on the TERMINAL tab. */
@@ -129,7 +134,6 @@ class AgentChatView(
                                     is Route.Bridge -> BridgeHistoryScreen(this@AgentChatView, r.id)
                                 }
                             }
-                            if (sheet.value) NewThreadSheet(this@AgentChatView)
                         }
                     }
                 }
@@ -155,6 +159,7 @@ class AgentChatView(
     fun setScope(path: String?) {
         if (path == projectPath) return
         projectPath = path
+        draftId.value = null
         if (stack.size > 1) { stack.clear(); stack += Route.List; closeThread() }
         rows.value = emptyList(); loaded.value = false
         reloadList()
@@ -219,11 +224,12 @@ class AgentChatView(
                     val runs = backend.runs(t.id)
                     val last = runs.lastOrNull { it.status != com.zenithblue.nativecode.agent.chat.core.RunStatus.QUEUED }
                     val stat = last?.diffStat.orEmpty()
-                    val preview = backend.items(t.id, 8).lastOrNull { it.payload is ItemPayload.AssistantMessage || it.payload is ItemPayload.UserMessage }?.payload?.let { p ->
+                    val recent = backend.items(t.id, 8)
+                    val preview = recent.lastOrNull { it.payload is ItemPayload.AssistantMessage || it.payload is ItemPayload.UserMessage }?.payload?.let { p ->
                         ((p as? ItemPayload.AssistantMessage)?.text ?: com.zenithblue.nativecode.agent.chat.core.SkillBlocks.plain((p as ItemPayload.UserMessage).text)).lineSequence().firstOrNull { it.isNotBlank() }
                             ?.trim()?.trimStart('#', '>', '-', '*', ' ')?.take(200)?.let { Md.inline(it).text }
                     }?.takeUnless { it.startsWith(t.title.take(40)) } // the first prompt is already the title
-                    ThreadRow(t, ChatLogic.status(t, last, backend.openRequests(t.id)), last, stat.sumOf { it.add }, stat.sumOf { it.del }, preview)
+                    ThreadRow(t, ChatLogic.status(t, last, backend.openRequests(t.id)), last, stat.sumOf { it.add }, stat.sumOf { it.del }, preview, draft = runs.isEmpty() && recent.isEmpty())
                 }
             }.getOrDefault(emptyList())
             main.post {
@@ -251,7 +257,7 @@ class AgentChatView(
                 val merged = keep.filter { it.id !in ids && it.ordinal < (latest.firstOrNull()?.ordinal ?: Int.MAX_VALUE) } + latest
                 ThreadData(t, merged, backend.runs(id), backend.openRequests(id), hasMore = (merged.firstOrNull()?.ordinal ?: 0) > 0 && latest.size >= 200 || older)
             }.getOrNull()
-            main.post { if ((stack.lastOrNull() as? Route.Chat)?.id == id || stack.any { it is Route.Chat && it.id == id }) open.value = data }
+            main.post { if ((stack.lastOrNull() as? Route.Chat)?.id == id || stack.any { it is Route.Chat && it.id == id } || draftId.value == id) open.value = data }
         }
     }
 
@@ -274,20 +280,40 @@ class AgentChatView(
         bg { backend.send(t.id, msg.text, msg.attachments, steer = false) }
     }
 
-    /** New thread from the sheet / empty state, then open it. */
-    internal fun newThread(tool: String, project: String?) {
-        val cwd = project ?: HOME
+    /**
+     * New thread, no provider question: this scope's unsent draft is reused, else one starts on [ChatLogic.defaultTool] (the provider
+     * of the scope's latest thread, so the choice persists). Opens its chat, or only loads it for the empty-state pane ([openChat] false).
+     */
+    internal fun newThread(openChat: Boolean = true) {
+        val project = projectPath
+        val mine = rows.value.filter { it.thread.projectPath == project }
+        val reuse = mine.firstOrNull { it.draft }?.thread?.id
+        val last = mine.filter { !it.draft }.maxByOrNull { it.thread.updatedAt }?.thread?.tool
+        val tools = CliToolCatalog.forMethod(LinuxCommandBuilder.currentMethod).filter { it.chat != null }
+        val usable = tools.filter { host.canUseTool(it.terminalType) }.map { it.terminalType }.toSet() // host calls stay on main
+        val home = host.guestHome()
         io.execute {
-            val t = runCatching { backend.createThread(project, cwd, tool) }.getOrNull()
+            val id = reuse ?: runCatching {
+                val tool = ChatLogic.defaultTool(last, tools.map { it.terminalType }, { it in usable }) { tt ->
+                    CliCredentialProbe.probe(tools.first { it.terminalType == tt }.id, home).state == AuthState.SIGNED_IN
+                }
+                backend.createThread(project, project ?: HOME, tool).id
+            }.getOrNull()
             main.post {
-                sheet.value = false
-                if (t == null) {
+                if (id == null) {
                     android.widget.Toast.makeText(context, tr(R.string.chat_could_not_create_the_thread), android.widget.Toast.LENGTH_SHORT).show()
                     return@post
                 }
-                reloadList(); push(Route.Chat(t.id))
+                if (openChat) push(Route.Chat(id)) else { draftId.value = id; showThread(id) }
+                reloadList()
             }
         }
+    }
+    /** First send from the empty-state pane: the pane's draft becomes a normal thread and opens as one. */
+    internal fun promoteDraft(id: String) {
+        if (draftId.value != id) return
+        draftId.value = null
+        push(Route.Chat(id))
     }
 
     /** `/side` / `/btw`: fork into a side-chat thread and open it on top (t3code opens it as a panel tab). */

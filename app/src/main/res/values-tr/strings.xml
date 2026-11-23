@@ -598,14 +598,8 @@
     <string name="chat_delegating_to_needs_nativecode_pro">%1$s ajanına devretmek için NativeCode Pro gerekir</string>
     <string name="chat_stop_delegated_task">Devredilen görevi durdur</string>
     <string name="chat_message_from_thread">Konuşmadan mesaj</string>
-    <string name="chat_pick_an_agent_chat_opens">Bir ajan seçin. Sohbet burada açılır; Terminal kendi TUI\'sini açar.</string>
-    <string name="chat_free_models_sign_in_for">Ücretsiz modeller · daha fazlası için giriş yapın</string>
     <string name="chat_sign_in">Giriş yap</string>
-    <string name="chat_free_models">Ücretsiz modeller</string>
-    <string name="chat_terminal_only">Yalnızca terminal</string>
     <string name="chat_terminal">Terminal</string>
-    <string name="chat_raw_shell">Ham shell</string>
-    <string name="chat_shell">Shell</string>
     <string name="chat_this_turn">Bu tur</string>
     <string name="chat_whole_thread">Tüm konuşma</string>
     <string name="chat_uncommitted">Commit edilmemiş</string>

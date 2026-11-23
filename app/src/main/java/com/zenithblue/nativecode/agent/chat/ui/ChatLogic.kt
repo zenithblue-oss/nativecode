@@ -74,6 +74,16 @@ object ChatLogic {
         return out
     }
 
+    /**
+     * Provider a new thread starts on: the project's last used one (while it still has a chat runtime and the plan allows it),
+     * else the first signed-in Pro tool (Free allows none, so it ends here), else opencode. [chatTools] in catalog order;
+     * [signedIn] is probed lazily, only when [last] does not decide.
+     */
+    fun defaultTool(last: String?, chatTools: List<String>, canUse: (String) -> Boolean, signedIn: (String) -> Boolean): String =
+        last?.takeIf { it in chatTools && canUse(it) }
+            ?: chatTools.firstOrNull { it != "opencode" && canUse(it) && signedIn(it) }
+            ?: "opencode"
+
     fun baseName(path: String) = path.trimEnd('/').substringAfterLast('/').ifEmpty { path }
 
     fun relativeTime(now: Long, then: Long): String {
