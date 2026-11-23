@@ -57,6 +57,7 @@ object ChatCodec {
             is ItemPayload.Error -> o.put("class", p.cls.wire).put("message", p.message).putOpt2("retryAt", p.retryAt).putOpt2("details", p.details)
             is ItemPayload.Compaction -> o.putOpt2("tokens", p.tokens)
             is ItemPayload.SystemNotice -> o.put("text", p.text)
+            is ItemPayload.ProviderSwitch -> o.put("tool", p.tool).putOpt2("model", p.model)
             is ItemPayload.Bridge -> o.put("action", p.action).put("title", p.title).put("body", p.body).putOpt2("target", p.target)
                 .putOpt2("detail", p.detail).put("state", p.state).putOpt2("key", p.key).put("at", p.at)
         }
@@ -82,6 +83,7 @@ object ChatCodec {
             "user_input_request" -> ItemPayload.UserInputRequest(s("requestId"))
             "error" -> ItemPayload.Error(FailureClass.of(o.str("class")), s("message"), o.lng("retryAt"), o.str("details"))
             "compaction" -> ItemPayload.Compaction(o.lng("tokens"))
+            "provider_switch" -> ItemPayload.ProviderSwitch(s("tool"), o.str("model"))
             "bridge_event" -> ItemPayload.Bridge(s("action"), s("title"), s("body"), o.str("target"), o.str("detail"),
                 o.optString("state", ItemPayload.Bridge.PENDING), o.str("key"), o.optLong("at"))
             else -> ItemPayload.SystemNotice(o.optString("text", "[$type]"))

@@ -11,15 +11,27 @@ class ChatDb(ctx: Context) : SQLiteOpenHelper(ctx.applicationContext, NAME, null
 
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
 
-    override fun onCreate(db: SQLiteDatabase) { SCHEMA_V1.forEach(db::execSQL) }
+    override fun onCreate(db: SQLiteDatabase) { (SCHEMA_V1 + MIGRATE_V2).forEach(db::execSQL) }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Add `if (oldVersion < N) { ... }` steps here, in order. v1 is the first shipped schema.
+        if (oldVersion < 2) MIGRATE_V2.forEach(db::execSQL)
     }
 
     companion object {
         const val NAME = "agent_chat.db"
-        const val VERSION = 1
+        const val VERSION = 2
+
+        /**
+         * v2 (unified chat, provider switch mid-thread): nullable columns only, so old rows read as before. Until now a thread
+         * never changed tool, so every old run belongs to its thread's tool (exact); the model is unknown and stays null.
+         */
+        val MIGRATE_V2 = listOf(
+            "ALTER TABLE threads ADD COLUMN handoff_from TEXT",
+            "ALTER TABLE runs ADD COLUMN tool TEXT",
+            "ALTER TABLE runs ADD COLUMN model TEXT",
+            "UPDATE runs SET tool=(SELECT tool FROM threads WHERE threads.id=runs.thread_id)",
+        )
 
         val SCHEMA_V1 = listOf(
             """CREATE TABLE threads(

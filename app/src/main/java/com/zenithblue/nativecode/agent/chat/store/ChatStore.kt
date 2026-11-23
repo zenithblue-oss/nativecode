@@ -191,7 +191,7 @@ class ChatStore(ctx: Context) {
         put("native_id", t.nativeId); put("model", t.model); put("effort", t.effort)
         put("runtime_mode", t.runtimeMode.wire); put("interaction_mode", t.interactionMode.wire); put("draft_json", t.draftJson)
         put("pinned_at", t.pinnedAt); put("archived_at", t.archivedAt); put("last_visited_at", t.lastVisitedAt)
-        put("created_at", t.createdAt); put("updated_at", t.updatedAt)
+        put("created_at", t.createdAt); put("updated_at", t.updatedAt); put("handoff_from", t.handoffFrom)
     }
 
     private fun values(r: Run) = ContentValues().apply {
@@ -199,7 +199,7 @@ class ChatStore(ctx: Context) {
         put("queue_position", r.queuePosition); put("native_turn_id", r.nativeTurnId)
         put("failure_json", r.failure?.let(ChatCodec::failure)); put("usage_json", r.usage?.let(ChatCodec::usage))
         put("chk_base", r.chkBase); put("chk_end", r.chkEnd); put("diff_stat_json", r.diffStat?.let(ChatCodec::diffStat))
-        put("started_at", r.startedAt); put("completed_at", r.completedAt)
+        put("started_at", r.startedAt); put("completed_at", r.completedAt); put("tool", r.tool); put("model", r.model)
     }
 
     private fun values(i: TurnItem) = ContentValues().apply {
@@ -222,13 +222,13 @@ class ChatStore(ctx: Context) {
     private fun rowThread(c: Cursor) = ChatThread(
         c.s("id")!!, c.s("project_path"), c.s("cwd")!!, c.s("tool")!!, c.s("title")!!, c.s("native_id"), c.s("model"), c.s("effort"),
         RuntimeMode.of(c.s("runtime_mode")), InteractionMode.of(c.s("interaction_mode")), c.s("draft_json"),
-        c.l("pinned_at"), c.l("archived_at"), c.l("last_visited_at"), c.l("created_at") ?: 0, c.l("updated_at") ?: 0,
+        c.l("pinned_at"), c.l("archived_at"), c.l("last_visited_at"), c.l("created_at") ?: 0, c.l("updated_at") ?: 0, c.s("handoff_from"),
     )
 
     private fun rowRun(c: Cursor) = Run(
         c.s("id")!!, c.s("thread_id")!!, c.l("ordinal")!!.toInt(), RunStatus.of(c.s("status")), c.l("queue_position")?.toInt(),
         c.s("native_turn_id"), ChatCodec.failure(c.s("failure_json")), ChatCodec.usage(c.s("usage_json")),
-        c.s("chk_base"), c.s("chk_end"), ChatCodec.diffStat(c.s("diff_stat_json")), c.l("started_at"), c.l("completed_at"),
+        c.s("chk_base"), c.s("chk_end"), ChatCodec.diffStat(c.s("diff_stat_json")), c.l("started_at"), c.l("completed_at"), c.s("tool"), c.s("model"),
     )
 
     private fun rowItem(c: Cursor) = TurnItem(

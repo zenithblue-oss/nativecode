@@ -81,6 +81,8 @@ interface ChatBackend {
     fun stop(threadId: String)
     fun respond(threadId: String, requestId: String, answer: RequestAnswer)
     fun configure(threadId: String, change: ConfigChange)
+    /** Unified picker: move an idle thread to another provider ([tool]) and its [model] (null = that tool's default). The controller refuses a running turn and a Pro tool on Free (it shows the upsell). */
+    fun switchProvider(threadId: String, tool: String, model: String?, effort: String? = null)
     fun queueSendNow(threadId: String, runId: String)
     fun queueRemove(threadId: String, runId: String)
     fun queueResume(threadId: String)

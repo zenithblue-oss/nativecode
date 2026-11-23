@@ -357,4 +357,55 @@ class ChatReducerTest {
         r.interruptNow(); r.step(rows) // second Force stop
         assertEquals(null, r.activeRun)
     }
+
+    // ---- unified chat: provider switch mid-thread ----
+
+    private val resumed = thread.copy(nativeId = "n1", model = "opencode/big", effort = "high", runtimeMode = com.zenithblue.nativecode.agent.chat.core.RuntimeMode.FULL_ACCESS)
+
+    @Test fun switchProviderStartsAFreshSessionOnTheNewToolWithAHandoffFlag() {
+        val r = ChatReducer(resumed, 5, 2, now = { clock++ }, newId = { "id${n++}" }); val rows = Rows().apply { thread = resumed }
+        r.seedModels(ModelCache.Entry(listOf(com.zenithblue.nativecode.agent.chat.core.ModelInfo("opencode/big", "Big")), "opencode/big", RuntimeCaps(effort = true)))
+        r.switchProvider("codex", "gpt-x", null, listOf(com.zenithblue.nativecode.agent.chat.core.RuntimeMode.APPROVAL_REQUIRED))
+        r.step(rows)
+        for (t in listOf(r.thread, rows.thread!!)) {
+            assertEquals("codex", t.tool); assertEquals("gpt-x", t.model); assertNull(t.effort); assertNull(t.nativeId)
+            assertEquals("opencode", t.handoffFrom)
+            assertEquals(com.zenithblue.nativecode.agent.chat.core.RuntimeMode.APPROVAL_REQUIRED, t.runtimeMode) // full access is not offered by the target: steps down
+        }
+        assertTrue(r.state.models.isEmpty()); assertNull(r.state.caps); assertEquals(LivePhase.IDLE, r.state.phase) // the old provider's list must not show
+        val divider = rows.items.values.single()
+        assertEquals(ItemPayload.ProviderSwitch("codex", "gpt-x"), divider.payload)
+        assertEquals(5, divider.ordinal)
+        assertNull(r.activeRun)
+    }
+
+    @Test fun nextRunIsStampedWithTheNewToolAndModelAndTheFlagClearsOnSend() {
+        val r = ChatReducer(resumed, 0, 0, now = { clock++ }, newId = { "id${n++}" }); val rows = Rows().apply { thread = resumed }
+        r.switchProvider("agy", "gemini-x", null, null); r.step(rows)
+        val run = r.beginRun("c1", "go on", emptyList()); r.step(rows)
+        assertEquals("agy", run.tool); assertEquals("gemini-x", run.model)
+        assertEquals("agy", rows.runs[run.id]!!.tool)
+        assertEquals("opencode", r.thread.handoffFrom) // still armed until the controller sent the turn
+        r.handoffSent(); r.step(rows)
+        assertNull(r.thread.handoffFrom); assertNull(rows.thread!!.handoffFrom)
+        r.handoffSent(); assertTrue(r.drain().first.isEmpty()) // idempotent
+    }
+
+    @Test fun switchOnAnEmptyThreadHasNoDividerAndNoHandoff() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        r.switchProvider("grok", null, null, null, history = false); r.step(rows)
+        assertEquals("grok", r.thread.tool); assertNull(r.thread.handoffFrom); assertTrue(rows.items.isEmpty())
+    }
+
+    @Test fun switchToTheSameToolIsANoOp() {
+        val r = reducer(); r.switchProvider("opencode", "x", null, null)
+        assertTrue(r.drain().first.isEmpty()); assertEquals("opencode", r.thread.tool)
+    }
+
+    @Test fun switchingBackAndForthKeepsTheHandoffForTheNextTurn() {
+        val r = reducer(); val rows = Rows().apply { thread = this@ChatReducerTest.thread }
+        r.switchProvider("codex", null, null, null); r.switchProvider("agy", null, null, null); r.step(rows)
+        assertEquals("agy", r.thread.tool); assertEquals("codex", r.thread.handoffFrom)
+        assertEquals(2, rows.items.size)
+    }
 }

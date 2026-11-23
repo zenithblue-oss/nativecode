@@ -58,6 +58,7 @@ class ChatThreadController internal constructor(
     private var flushTask: Future<*>? = null
     private var idleTask: Future<*>? = null
     private var forceTask: Future<*>? = null
+    private var lingering: PipeProcess? = null // process detached by a provider switch: the next send waits for it to exit
     private var forkFrom: String? = null // side chat: parent native session, until this thread has its own
     private val coalescer = DeltaCoalescer<AgentEvent.ItemUpsert>(
         schedule = { ms, block -> AgentChats.schedule(ms) { block(); commit() } },
@@ -90,7 +91,7 @@ class ChatThreadController internal constructor(
         AgentChats.post {
             // A closing process (idle release, delegated child settled) would take the turn down with it: respawn after.
             val old = if (fresh && reducer.activeRun == null) freshSession() else proc.takeIf { closing }
-            afterExit(old, 0) { doSend(text, attachments) }
+            afterExit(old ?: lingering, 0) { lingering = null; doSend(text, attachments) }
         }
         return true
     }
@@ -102,6 +103,26 @@ class ChatThreadController internal constructor(
     private fun afterExit(p: PipeProcess?, tries: Int, then: () -> Unit) {
         val busy = p != null && (p.isAlive || p === proc)
         if (!busy || tries >= 25) then() else AgentChats.schedule(200) { afterExit(p, tries + 1, then) }
+    }
+
+    /**
+     * Move this idle thread to [tool] / [model] / [effort] (unified picker). Nothing starts now: the next send spawns [tool]'s
+     * runtime as a new session and carries the earlier conversation as a text handoff ([ChatHandoff]). The old process is
+     * closed. False = refused: same tool (use [configure]), no chat runtime (qwen, kiro), a turn running, or the Pro gate.
+     */
+    fun switchProvider(tool: String, model: String? = null, effort: String? = null): Boolean {
+        if (tool == thread.tool || ChatRuntimes.protocolOf(tool) == null || state.turnActive) return false
+        AgentChats.gate?.let { if (!it.canUseTool(tool)) { it.showUpsell(tool); return false } }
+        AgentChats.post {
+            if (reducer.activeRun != null) return@post
+            lingering = detach()
+            val cache = ModelCache.load(ctx, tool)
+            val caps = ChatRuntimes.staticCaps(tool) ?: cache?.caps
+            reducer.switchProvider(tool, model, effort, caps?.modes, history = store.items(threadId, 1).isNotEmpty())
+            cache?.let { reducer.seedModels(it.copy(caps = caps)) }
+            commit()
+        }
+        return true
     }
 
     /** Side chat (t3code `/side`): this thread's first session forks [parentNativeId] (runtime `caps.fork`). */
@@ -244,9 +265,21 @@ class ChatThreadController internal constructor(
     private fun startTurn(turn: TurnInput, run: Run) {
         idleTask?.cancel(false)
         AgentChats.turnRunning(ctx, threadId, true)
-        pendingTurn = turn
+        pendingTurn = withHandoff(turn, run)
         if (!ensureStarted()) return
         if (ready) dispatch()
+    }
+
+    /**
+     * First turn after a provider switch: the earlier conversation goes in front of the message (the stored user row keeps
+     * the plain text). A slash command goes out untouched and the handoff waits for the next turn.
+     */
+    private fun withHandoff(turn: TurnInput, run: Run): TurnInput {
+        val from = reducer.thread.handoffFrom ?: return turn
+        if (turn.text.trimStart().startsWith("/")) return turn
+        val rows = store.items(threadId, HANDOFF_ROWS).filter { it.runId != run.id }
+        val block = ChatHandoff.wrap(from, reducer.thread.tool, threadId, rows, moreBefore = rows.size >= HANDOFF_ROWS) ?: return turn
+        return turn.copy(text = block + turn.text)
     }
 
     /** Spawns the runtime if none. False = no chat runtime for this tool (run fails). */
@@ -293,6 +326,7 @@ class ChatThreadController internal constructor(
                 if (reducer.activeRun?.id != run.id) return@post
                 if (base != null) reducer.setCheckpointBase(base)
                 runtime?.send(turn, steer = false)
+                if (!turn.text.trimStart().startsWith("/")) reducer.handoffSent() // a slash command carried no handoff: it waits
                 commit()
             }
         }
@@ -342,7 +376,9 @@ class ChatThreadController internal constructor(
     }
 
     /** Detach the live runtime (it closes in the background; its exit and events are ignored) and drop the native id. */
-    private fun freshSession(): PipeProcess? {
+    private fun freshSession(): PipeProcess? = detach().also { reducer.freshSession() }
+
+    private fun detach(): PipeProcess? {
         val rt = runtime
         val old = proc
         if (rt != null) {
@@ -351,7 +387,6 @@ class ChatThreadController internal constructor(
             rt.close()
             ChatMcp.release(threadId)
         }
-        reducer.freshSession()
         return old
     }
 
@@ -463,6 +498,8 @@ class ChatThreadController internal constructor(
         /** Runtimes whose reject answer carries the feedback itself (claude deny message, opencode declined note). */
         private val FEEDBACK_NATIVE = setOf("claude-code", "opencode")
         const val ROW_FLUSH_MS = 1_000L
+        /** Newest rows read for a provider-switch handoff (messages, commands, file changes). */
+        const val HANDOFF_ROWS = 1_000
         const val IDLE_RELEASE_MS = 30 * 60 * 1000L
     }
 }

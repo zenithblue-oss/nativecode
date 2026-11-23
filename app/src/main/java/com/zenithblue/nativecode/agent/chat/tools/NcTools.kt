@@ -498,23 +498,9 @@ object NcTools : NcMcpServer.Handler {
         }
     }
 
-    /** Last messages of [t], oldest first, at most ~16k chars (t3 #33455). */
-    private fun transcript(t: ChatThread): String {
-        val msgs = store.items(t.id, 400).mapNotNull { i ->
-            when (val p = i.payload) {
-                is ItemPayload.UserMessage -> "User: ${p.text}"
-                is ItemPayload.AssistantMessage -> "Assistant: ${p.text}"
-                else -> null
-            }
-        }
-        val out = ArrayDeque<String>()
-        var size = 0
-        for (m in msgs.asReversed()) {
-            if (size + m.length > TRANSCRIPT_CHARS && out.isNotEmpty()) break
-            out.addFirst(m.take(TRANSCRIPT_CHARS)); size += m.length
-        }
-        return out.joinToString("\n\n").ifBlank { "(no messages yet)" }
-    }
+    /** Last messages of [t], oldest first, at most ~16k chars (t3 #33455). Shared with the provider-switch handoff. */
+    private fun transcript(t: ChatThread): String =
+        com.zenithblue.nativecode.agent.chat.ChatHandoff.transcript(store.items(t.id, 400), TRANSCRIPT_CHARS).text.ifBlank { "(no messages yet)" }
 
     private fun pendingRequest(c: Call, a: JSONObject): JSONObject {
         val t = a.optString("threadId").ifEmpty { null }?.let(::thread) ?: c.caller

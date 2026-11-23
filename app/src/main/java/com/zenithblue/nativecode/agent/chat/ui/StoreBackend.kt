@@ -96,6 +96,7 @@ class StoreBackend(ctx: Context) : ChatBackend {
     override fun stop(threadId: String) { AgentChats.peekController(threadId)?.stop() }
     override fun respond(threadId: String, requestId: String, answer: RequestAnswer) = cmd(threadId) { it.respond(requestId, answer) }
     override fun configure(threadId: String, change: ConfigChange) = cmd(threadId) { it.configure(change) }
+    override fun switchProvider(threadId: String, tool: String, model: String?, effort: String?) = cmd(threadId) { it.switchProvider(tool, model, effort) }
     override fun queueSendNow(threadId: String, runId: String) = cmd(threadId) { it.sendQueuedNow(runId) }
     override fun queueRemove(threadId: String, runId: String) = cmd(threadId) { it.removeQueued(runId) }
     override fun queueResume(threadId: String) = cmd(threadId) { it.resumeQueue() }

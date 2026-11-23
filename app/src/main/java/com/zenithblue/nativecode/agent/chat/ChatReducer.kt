@@ -17,12 +17,14 @@ import com.zenithblue.nativecode.agent.chat.core.RequestStatus
 import com.zenithblue.nativecode.agent.chat.core.Run
 import com.zenithblue.nativecode.agent.chat.core.RunStatus
 import com.zenithblue.nativecode.agent.chat.core.RuntimeCaps
+import com.zenithblue.nativecode.agent.chat.core.RuntimeMode
 import com.zenithblue.nativecode.agent.chat.core.SessionConfig
 import com.zenithblue.nativecode.agent.chat.core.SlashCommand
 import com.zenithblue.nativecode.agent.chat.core.TurnItem
 import com.zenithblue.nativecode.agent.chat.core.Usage
 import com.zenithblue.nativecode.agent.chat.store.ChatCodec
 import com.zenithblue.nativecode.agent.chat.store.ChatWrite
+import com.zenithblue.nativecode.agent.chat.tools.NcToolSpec
 import java.util.UUID
 
 /** Session phase the UI shows. ENDED = the process died unexpectedly ("Session ended · Resume"). */
@@ -132,7 +134,7 @@ class ChatReducer(
     /** A new turn (idle thread). Returns the run; the controller sends once the session is ready. */
     fun beginRun(clientId: String, text: String, attachments: List<ChatAttachment>): Run {
         items.clear()
-        val r = Run(newId(), thread.id, runOrd++, RunStatus.STARTING, startedAt = now())
+        val r = Run(newId(), thread.id, runOrd++, RunStatus.STARTING, startedAt = now(), tool = thread.tool, model = thread.model)
         run = r
         writes += ChatWrite.PutRun(r)
         addUserItem(clientId, text, attachments, "start")
@@ -166,7 +168,7 @@ class ChatReducer(
     fun dequeue(runId: String? = null): QueuedMessage? {
         val q = (if (runId != null) state.queued.firstOrNull { it.run.id == runId } else state.queued.firstOrNull()) ?: return null
         items.clear()
-        val r = q.run.copy(status = RunStatus.STARTING, queuePosition = null, startedAt = now())
+        val r = q.run.copy(status = RunStatus.STARTING, queuePosition = null, startedAt = now(), tool = thread.tool, model = thread.model)
         val it = q.item.copy(ordinal = itemOrd++, updatedAt = now())
         run = r
         items[it.nativeRef ?: it.id] = it
@@ -247,6 +249,34 @@ class ChatReducer(
         reduce(AgentEvent.Notice("fresh_session", "New session · earlier messages are not in the agent's context"))
     }
 
+    /**
+     * Provider switch (idle thread), modelled on [freshSession]: the next turn starts a new session on [tool] with its own
+     * [model] / [effort] (slugs never carry across tools) and carries the earlier conversation as text ([ChatHandoff], flag
+     * [ChatThread.handoffFrom]). [modes] = what the target offers; the mode steps down to the broadest one it has.
+     * Empty live models/caps: the controller re-seeds them from [ModelCache]. A divider row marks the switch.
+     * [history] false (nothing said yet, new thread): no handoff and no divider, the thread just starts on [tool].
+     */
+    fun switchProvider(tool: String, model: String?, effort: String?, modes: List<RuntimeMode>?, history: Boolean = true) {
+        val from = thread.tool
+        if (tool == from) return
+        val handoff = if (history) from else thread.handoffFrom
+        thread = thread.copy(tool = tool, model = model, effort = effort, nativeId = null, handoffFrom = handoff,
+            runtimeMode = NcToolSpec.resolveRuntimeMode(thread.runtimeMode, null, modes))
+        val t = thread
+        writes += ChatWrite.UpdateThread(t.id) { it.copy(tool = t.tool, model = t.model, effort = t.effort, nativeId = null, handoffFrom = handoff, runtimeMode = t.runtimeMode) }
+        readySeen = false
+        state = state.copy(phase = LivePhase.IDLE, usage = null, reconnecting = false, models = emptyList(), defaultModel = null,
+            commands = emptyList(), caps = null, account = null, rateLimit = null, banner = state.banner?.takeIf { it.kind == BannerKind.QUEUE_HELD })
+        if (history) external(ItemPayload.ProviderSwitch(tool, model))
+    }
+
+    /** The handoff went out with a turn: later turns of the new session are native again. */
+    fun handoffSent() {
+        if (thread.handoffFrom == null) return
+        thread = thread.copy(handoffFrom = null)
+        writes += ChatWrite.UpdateThread(thread.id) { it.copy(handoffFrom = null) }
+    }
+
     /** What the runtime starts with: the thread's persisted picks (model/effort chosen before the first send included). */
     fun sessionConfig() = thread.let { SessionConfig(it.id, it.cwd, it.projectPath, it.model, it.effort, it.runtimeMode, it.interactionMode, it.title) }
 
@@ -309,7 +339,7 @@ class ChatReducer(
                 writes += ChatWrite.UpdateThread(thread.id) { it.copy(nativeId = e.id) }
             }
             is AgentEvent.TurnStarted -> {
-                val r = (run ?: Run(newId(), thread.id, runOrd++, RunStatus.RUNNING, startedAt = now()).also { items.clear() })
+                val r = (run ?: Run(newId(), thread.id, runOrd++, RunStatus.RUNNING, startedAt = now(), tool = thread.tool, model = thread.model).also { items.clear() })
                     .copy(status = if (live.isEmpty()) RunStatus.RUNNING else RunStatus.WAITING, nativeTurnId = e.nativeTurnId ?: run?.nativeTurnId)
                 run = r
                 writes += ChatWrite.PutRun(r)

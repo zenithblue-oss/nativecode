@@ -40,6 +40,7 @@ class ChatCodecTest {
             ItemPayload.ProposedPlan("# plan"), ItemPayload.ApprovalRequest("r1"), ItemPayload.UserInputRequest("r2"),
             ItemPayload.Error(FailureClass.USAGE_LIMIT, "limit", 99, "d"), ItemPayload.Error(FailureClass.GATE_DENIED, "x"),
             ItemPayload.Compaction(4000), ItemPayload.Compaction(), ItemPayload.SystemNotice("Session ended"),
+            ItemPayload.ProviderSwitch("codex", "gpt-x"), ItemPayload.ProviderSwitch("agy", null),
         )
         for (p in all) assertEquals(p, ChatCodec.payload(p.type, ChatCodec.payload(p)))
     }

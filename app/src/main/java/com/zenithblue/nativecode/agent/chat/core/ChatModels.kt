@@ -95,6 +95,8 @@ data class ChatThread(
     val lastVisitedAt: Long? = null,
     val createdAt: Long,
     val updatedAt: Long,
+    /** Set by a provider switch: the tool the earlier messages came from. The next turn carries them as a text handoff ([ChatHandoff]), then it is cleared. */
+    val handoffFrom: String? = null,
 )
 
 data class Run(
@@ -111,6 +113,9 @@ data class Run(
     val diffStat: List<DiffStat>? = null,
     val startedAt: Long? = null,
     val completedAt: Long? = null,
+    /** Provider and model this run was sent to (null on rows from before providers could switch). */
+    val tool: String? = null,
+    val model: String? = null,
 )
 
 data class DiffStat(val path: String, val kind: String, val add: Int, val del: Int) // kind: M | A | D | R
@@ -146,6 +151,8 @@ sealed class ItemPayload(val type: String) {
     data class Error(val cls: FailureClass, val message: String, val retryAt: Long? = null, val details: String? = null) : ItemPayload("error")
     data class Compaction(val tokens: Long? = null) : ItemPayload("compaction")
     data class SystemNotice(val text: String) : ItemPayload("system_notice")
+    /** Timeline divider: the thread moved to [tool] / [model] (provider switch). */
+    data class ProviderSwitch(val tool: String, val model: String?) : ItemPayload("provider_switch")
     /**
      * A `nativecode-agent` bridge request from this thread's CLI, shown as a card instead of a popup.
      * [action]: notify | status | toast | open_link | install_apk | share_file. [target] = URL or host file path;
