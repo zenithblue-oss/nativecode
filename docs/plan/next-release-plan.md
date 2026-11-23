@@ -967,8 +967,8 @@ M = beta, ships in M1 (opencode) and with each provider M2–M5; S = M6 polish; 
 
 #### 9.2.9 Pro gating
 - **Free:** chat = opencode only; 1 AI session in total across chat, terminal tabs and nested shell-tool calls; TERMINAL tab only (the workspace is Pro via `ProFeature.WORKSPACE`). Other tool cards show the PRO lock → upsell. All opencode models the user can reach (Zen free models without login) are allowed.
-- **Pro:** every chat provider; 5 AI sessions in total.
-- **Counted unit:** a live agent process (or one starting). An idle-released thread costs nothing. Count = live + starting chats + AI terminal tabs + pending terminal slots, in the single `aiLaunchAllowed` (no parallel gate). The sessions chip shows the global count (`● 1/1`, `● 3/5`); tapping it lists live sessions with Stop.
+- **Pro:** every chat provider; unlimited parallel AI sessions (chat + terminal tabs; guest file `max_pro` = `Int.MAX_VALUE`, the shim compares numerically, so no shim change; MCP `plan.maxAiSessions` = -1).
+- **Counted unit:** a live agent process (or one starting). An idle-released thread costs nothing. Count = live + starting chats + AI terminal tabs + pending terminal slots, in the single `aiLaunchAllowed` (no parallel gate). The sessions chip shows the global count (Free `● 1/1`; Pro `● 3 live`, no cap); tapping it lists live sessions with Stop.
 - **Guest backstop:** every chat spawns through `buildToolDirect` → `launch_tool.sh`, so the item 9 shim registers the pid in `/tmp/.nc-ai-sessions` and the agent's own shell tool inherits the gate PATH. Unit test asserts the chat argv contains `/tmp/launch_tool.sh`. No separate health probes: the first real handshake is the probe (R4 G4).
 - **Downgrade (Pro → Free) with a paid chat live (owner decision Q2):** the current turn finishes; after that every send re-checks `FeatureGate.canLaunchAiTool(isPro, tool)` and is refused with the upsell. Queued messages on a paid tool stay queued and held.
 - **Open terminal here** needs a shell tab, which is Pro: Free users get the Pro upsell (owner decision Q1).

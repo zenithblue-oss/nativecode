@@ -57,7 +57,7 @@ class GuestGateTest {
     fun renderIsStableAndKeyed() {
         val a = GuestGate.render(true, 100, key)
         assertEquals(a, GuestGate.render(true, 100, key))
-        assertTrue(a.contains("pro=1\nexp=100\n") && a.contains("max_free=1") && a.contains("max_pro=5"))
+        assertTrue(a.contains("pro=1\nexp=100\n") && a.contains("max_free=1") && a.contains("max_pro=${FeatureLimits.UNLIMITED}"))
         assertFalse(a == GuestGate.render(true, 100, "other"))
         assertTrue(GuestGate.render(true, 0, key).contains("pro=0"))
     }

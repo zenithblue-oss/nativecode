@@ -543,6 +543,8 @@
     <string name="chat_stops_the_agent_deletes_the">エージェントを停止し、履歴とこのスレッドの変更チェックポイントを削除します。プロジェクト内のファイルには影響しません。</string>
     <string name="chat_live_sessions">ライブセッション</string>
     <string name="chat_free">無料</string>
+    <string name="chat_sessions_live">%1$s件ライブ</string>
+    <string name="chat_no_live_chats">ライブチャットなし</string>
     <string name="chat_no_live_chats_sessions_in">ライブチャットなし · %1$s/%2$sセッション使用中</string>
     <string name="chat_chat">チャット</string>
     <string name="chat_stop">停止</string>
@@ -1006,6 +1008,7 @@
     <string name="main_pro_active">Pro有効</string>
     <string name="main_nativecode_pro">NativeCode Pro</string>
     <string name="main_pro_is_active_on_this">このアカウントでProが有効です。</string>
+    <string name="main_pro_benefits">• すべてのAI CLI（opencodeは引き続き無料）\n• AIセッションの並列実行が無制限\n• デスクトップ無制限（無料：1日30分）\n• プロジェクト、インポート、ワークスペース\n• GitHubログイン（gh auth）</string>
     <string name="main_monthly">月額</string>
     <string name="main_yearly">年額</string>
     <string name="main_lifetime">買い切り</string>

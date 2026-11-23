@@ -61,6 +61,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import com.zenithblue.nativecode.tr
 import com.zenithblue.nativecode.R
+import com.zenithblue.nativecode.entitlements.FeatureLimits
 
 /** Screens A (TERMINAL tab, grouped by project) and B (workspace, one project). */
 @Composable
@@ -303,23 +304,24 @@ private fun SessionsChip(v: AgentChatView) {
     var usage by remember { mutableStateOf(v.host.sessionUsage()) }
     LaunchedEffect(Unit) { while (true) { usage = v.host.sessionUsage(); delay(1_000) } }
     val (used, max) = usage
-    val full = used >= max
+    val unlimited = max == FeatureLimits.UNLIMITED
+    val full = !unlimited && used >= max
     Box(Modifier.padding(end = S.s)) {
         Row(
             Modifier.heightIn(min = 36.dp).card(if (used > 0) C.primary.copy(alpha = 0.1f) else C.low, if (full) C.tertiary else if (used > 0) C.primary else C.border)
                 .combinedClickable(onClickLabel = tr(R.string.chat_live_sessions)) { open = true }
-                .semantics(mergeDescendants = true) { contentDescription = "$used of $max AI sessions in use" + if (!v.host.isPro()) ", Free plan" else "" }
+                .semantics(mergeDescendants = true) { contentDescription = (if (unlimited) "$used AI sessions in use" else "$used of $max AI sessions in use") + if (!v.host.isPro()) ", Free plan" else "" }
                 .padding(horizontal = S.inset),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             StatusDot(if (full) C.tertiary else if (used > 0) C.primary else C.outline, size = 6.dp, pulse = used > 0)
-            Label("$used/$max", Modifier.padding(start = S.gap), color = C.on, size = 12, bold = true)
+            Label(if (unlimited) tr(R.string.chat_sessions_live, used) else "$used/$max", Modifier.padding(start = S.gap), color = C.on, size = 12, bold = true)
             if (!v.host.isPro()) Label(tr(R.string.chat_free), Modifier.padding(start = S.gap), color = C.tertiary, size = 10, bold = true)
         }
         DropdownMenu(open, { open = false }, containerColor = C.low) {
             val live = v.backend.liveThreadIds()
             val titles = v.rows.value.associate { it.thread.id to it.thread.title }
-            if (live.isEmpty()) DropdownMenuItem({ Text(tr(R.string.chat_no_live_chats_sessions_in, used, max), style = T.bodySm, color = C.onVar) }, { open = false })
+            if (live.isEmpty()) DropdownMenuItem({ Text(if (unlimited) tr(R.string.chat_no_live_chats) else tr(R.string.chat_no_live_chats_sessions_in, used, max), style = T.bodySm, color = C.onVar) }, { open = false })
             live.forEach { id ->
                 DropdownMenuItem(
                     {

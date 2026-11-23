@@ -543,6 +543,8 @@
     <string name="chat_stops_the_agent_deletes_the">يوقف الوكيل ويحذف السجل ونقاط حفظ التغييرات لهذه المحادثة. ملفات المشروع لا تتأثر.</string>
     <string name="chat_live_sessions">الجلسات النشطة</string>
     <string name="chat_free">مجاني</string>
+    <string name="chat_sessions_live">%1$s نشطة</string>
+    <string name="chat_no_live_chats">لا توجد دردشات نشطة</string>
     <string name="chat_no_live_chats_sessions_in">لا توجد دردشات نشطة · %1$s/%2$s جلسات قيد الاستخدام</string>
     <string name="chat_chat">دردشة</string>
     <string name="chat_stop">إيقاف</string>
@@ -1006,6 +1008,7 @@
     <string name="main_pro_active">Pro مفعّل</string>
     <string name="main_nativecode_pro">NATIVECODE PRO</string>
     <string name="main_pro_is_active_on_this">Pro مفعّل على هذا الحساب.</string>
+    <string name="main_pro_benefits">• جميع أدوات الذكاء الاصطناعي (opencode يبقى مجانياً)\n• جلسات ذكاء اصطناعي متوازية غير محدودة\n• سطح مكتب غير محدود (المجاني: 30 دقيقة/يوم)\n• المشاريع والاستيراد ومساحة العمل\n• تسجيل الدخول إلى GitHub (gh auth)</string>
     <string name="main_monthly">شهري</string>
     <string name="main_yearly">سنوي</string>
     <string name="main_lifetime">مدى الحياة</string>

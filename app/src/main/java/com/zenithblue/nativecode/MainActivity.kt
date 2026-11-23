@@ -5952,11 +5952,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         reason?.let { col.addView(line("// $it", 12f, NC.ERROR)) }
         if (isPro()) col.addView(line(tr(R.string.main_pro_is_active_on_this), 13f, NC.ON_SURFACE))
         col.addView(
-            line(
-                "• All AI CLIs (opencode stays free)\n• Up to 5 parallel AI sessions\n" +
-                    "• Unlimited desktop (free: 30 min/day)\n• Projects, import & workspace\n• GitHub login (gh auth)",
-                12f, NC.ON_SURFACE
-            )
+            line(tr(R.string.main_pro_benefits), 12f, NC.ON_SURFACE)
         )
         fun buy(label: String, sku: String, unit: String, fallback: String) = primaryButton(
             BillingRepository.label(label, sku, unit, fallback)

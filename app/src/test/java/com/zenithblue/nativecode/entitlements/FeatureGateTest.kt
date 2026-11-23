@@ -45,7 +45,8 @@ class FeatureGateTest {
         proOnly.forEach { assertEquals(allow, FeatureGate.canUse(true, it, enforce = true)) }
         assertEquals(allow, FeatureGate.canLaunchAiTool(true, "claude", enforce = true))
         assertEquals(allow, FeatureGate.canOpenAiSession(true, 4, enforce = true))
-        assertTrue(FeatureGate.canOpenAiSession(true, 5, enforce = true) is GateResult.Deny)
+        assertEquals(allow, FeatureGate.canOpenAiSession(true, 5, enforce = true))
+        assertEquals(allow, FeatureGate.canOpenAiSession(true, 500, enforce = true))
         assertEquals(allow, FeatureGate.canStartXfce(true, Long.MAX_VALUE, enforce = true))
     }
 

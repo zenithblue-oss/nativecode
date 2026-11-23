@@ -579,6 +579,8 @@
     <string name="chat_stops_the_agent_deletes_the">Stops the agent, deletes the history and this thread\'s change checkpoints. Files in the project are not touched.</string>
     <string name="chat_live_sessions">Live sessions</string>
     <string name="chat_free">FREE</string>
+    <string name="chat_sessions_live">%1$s live</string>
+    <string name="chat_no_live_chats">No live chats</string>
     <string name="chat_no_live_chats_sessions_in">No live chats · %1$s/%2$s sessions in use</string>
     <string name="chat_chat">Chat</string>
     <string name="chat_stop">STOP</string>
@@ -1049,6 +1051,7 @@
     <string name="main_pro_active">Pro active</string>
     <string name="main_nativecode_pro">NATIVECODE PRO</string>
     <string name="main_pro_is_active_on_this">Pro is active on this account.</string>
+    <string name="main_pro_benefits">• All AI CLIs (opencode stays free)\n• Unlimited parallel AI sessions\n• Unlimited desktop (free: 30 min/day)\n• Projects, import &amp; workspace\n• GitHub login (gh auth)</string>
     <string name="main_monthly">MONTHLY</string>
     <string name="main_yearly">YEARLY</string>
     <string name="main_lifetime">LIFETIME</string>

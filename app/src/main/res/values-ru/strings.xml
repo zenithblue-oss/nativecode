@@ -543,6 +543,8 @@
     <string name="chat_stops_the_agent_deletes_the">Останавливает агента, удаляет историю и контрольные точки изменений этого диалога. Файлы проекта не затрагиваются.</string>
     <string name="chat_live_sessions">Активные сеансы</string>
     <string name="chat_free">БЕСПЛАТНО</string>
+    <string name="chat_sessions_live">активно: %1$s</string>
+    <string name="chat_no_live_chats">Нет активных чатов</string>
     <string name="chat_no_live_chats_sessions_in">Нет активных чатов · занято сеансов: %1$s/%2$s</string>
     <string name="chat_chat">Чат</string>
     <string name="chat_stop">СТОП</string>
@@ -1006,6 +1008,7 @@
     <string name="main_pro_active">Pro активен</string>
     <string name="main_nativecode_pro">NATIVECODE PRO</string>
     <string name="main_pro_is_active_on_this">Pro активен на этом аккаунте.</string>
+    <string name="main_pro_benefits">• Все ИИ-CLI (opencode остаётся бесплатным)\n• Неограниченное число параллельных ИИ-сеансов\n• Неограниченный рабочий стол (бесплатно: 30 мин/день)\n• Проекты, импорт и рабочая область\n• Вход в GitHub (gh auth)</string>
     <string name="main_monthly">МЕСЯЦ</string>
     <string name="main_yearly">ГОД</string>
     <string name="main_lifetime">НАВСЕГДА</string>

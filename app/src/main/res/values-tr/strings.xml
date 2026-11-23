@@ -543,6 +543,8 @@
     <string name="chat_stops_the_agent_deletes_the">Ajanı durdurur, geçmişi ve bu konuşmanın değişiklik denetim noktalarını siler. Projedeki dosyalara dokunulmaz.</string>
     <string name="chat_live_sessions">Canlı oturumlar</string>
     <string name="chat_free">ÜCRETSİZ</string>
+    <string name="chat_sessions_live">%1$s canlı</string>
+    <string name="chat_no_live_chats">Canlı sohbet yok</string>
     <string name="chat_no_live_chats_sessions_in">Canlı sohbet yok · %1$s/%2$s oturum kullanımda</string>
     <string name="chat_chat">Sohbet</string>
     <string name="chat_stop">DURDUR</string>
@@ -1006,6 +1008,7 @@
     <string name="main_pro_active">Pro etkin</string>
     <string name="main_nativecode_pro">NATIVECODE PRO</string>
     <string name="main_pro_is_active_on_this">Pro bu hesapta etkin.</string>
+    <string name="main_pro_benefits">• Tüm yapay zeka CLI araçları (opencode ücretsiz kalır)\n• Sınırsız paralel yapay zeka oturumu\n• Sınırsız masaüstü (ücretsiz: günde 30 dk)\n• Projeler, içe aktarma ve çalışma alanı\n• GitHub girişi (gh auth)</string>
     <string name="main_monthly">AYLIK</string>
     <string name="main_yearly">YILLIK</string>
     <string name="main_lifetime">ÖMÜR BOYU</string>

@@ -543,6 +543,8 @@
     <string name="chat_stops_the_agent_deletes_the">Menghentikan agen, menghapus riwayat dan checkpoint perubahan thread ini. File di proyek tidak disentuh.</string>
     <string name="chat_live_sessions">Sesi aktif</string>
     <string name="chat_free">GRATIS</string>
+    <string name="chat_sessions_live">%1$s aktif</string>
+    <string name="chat_no_live_chats">Tidak ada chat aktif</string>
     <string name="chat_no_live_chats_sessions_in">Tidak ada chat aktif · %1$s/%2$s sesi digunakan</string>
     <string name="chat_chat">Chat</string>
     <string name="chat_stop">HENTIKAN</string>
@@ -1006,6 +1008,7 @@
     <string name="main_pro_active">Pro aktif</string>
     <string name="main_nativecode_pro">NATIVECODE PRO</string>
     <string name="main_pro_is_active_on_this">Pro aktif di akun ini.</string>
+    <string name="main_pro_benefits">• Semua CLI AI (opencode tetap gratis)\n• Sesi AI paralel tanpa batas\n• Desktop tanpa batas (gratis: 30 menit/hari)\n• Proyek, impor &amp; ruang kerja\n• Login GitHub (gh auth)</string>
     <string name="main_monthly">BULANAN</string>
     <string name="main_yearly">TAHUNAN</string>
     <string name="main_lifetime">SEUMUR HIDUP</string>

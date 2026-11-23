@@ -181,7 +181,7 @@ object NcToolSpec {
             "Read one project: workspace path, Linux method and its chat threads.",
             obj("projectId" to str("Project path from `nc_project_list`."), required = listOf("projectId")), readOnly = true),
         Tool("nc_environment_read", "Read the NativeCode environment",
-            "This environment: the phone, the Linux guest, the plan (Free or Pro), AI session use and the chat CLIs.",
+            "This environment: the phone, the Linux guest, the plan (Free or Pro; `plan.maxAiSessions` is -1 when unlimited, as on Pro), AI session use and the chat CLIs.",
             obj(), readOnly = true),
         Tool("nc_device_list", "List devices",
             "The device this environment runs on (this phone): model, Android version, ABI, memory, storage, battery.",

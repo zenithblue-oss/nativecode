@@ -543,6 +543,8 @@
     <string name="chat_stops_the_agent_deletes_the">将停止智能体，并删除历史记录和此对话的更改检查点。项目中的文件不受影响。</string>
     <string name="chat_live_sessions">运行中的会话</string>
     <string name="chat_free">免费</string>
+    <string name="chat_sessions_live">%1$s 个运行中</string>
+    <string name="chat_no_live_chats">没有运行中的对话</string>
     <string name="chat_no_live_chats_sessions_in">没有运行中的对话 · 已使用 %1$s/%2$s 个会话</string>
     <string name="chat_chat">对话</string>
     <string name="chat_stop">停止</string>
@@ -1006,6 +1008,7 @@
     <string name="main_pro_active">Pro 已激活</string>
     <string name="main_nativecode_pro">NATIVECODE PRO</string>
     <string name="main_pro_is_active_on_this">此账号已激活 Pro。</string>
+    <string name="main_pro_benefits">• 所有 AI CLI（opencode 保持免费）\n• 不限数量的并行 AI 会话\n• 不限时桌面（免费：每天 30 分钟）\n• 项目、导入和工作区\n• GitHub 登录（gh auth）</string>
     <string name="main_monthly">月付</string>
     <string name="main_yearly">年付</string>
     <string name="main_lifetime">永久</string>

@@ -543,6 +543,8 @@
     <string name="chat_stops_the_agent_deletes_the">Arrête l\'agent, supprime l\'historique et les points de contrôle des changements de ce fil. Les fichiers du projet ne sont pas touchés.</string>
     <string name="chat_live_sessions">Sessions actives</string>
     <string name="chat_free">GRATUIT</string>
+    <string name="chat_sessions_live">%1$s actives</string>
+    <string name="chat_no_live_chats">Aucun chat actif</string>
     <string name="chat_no_live_chats_sessions_in">Aucun chat actif · %1$s/%2$s sessions utilisées</string>
     <string name="chat_chat">Chat</string>
     <string name="chat_stop">ARRÊTER</string>
@@ -1006,6 +1008,7 @@
     <string name="main_pro_active">Pro actif</string>
     <string name="main_nativecode_pro">NATIVECODE PRO</string>
     <string name="main_pro_is_active_on_this">Pro est actif sur ce compte.</string>
+    <string name="main_pro_benefits">• Toutes les CLI d’IA (opencode reste gratuit)\n• Sessions d’IA parallèles illimitées\n• Bureau illimité (gratuit : 30 min/jour)\n• Projets, import et espace de travail\n• Connexion GitHub (gh auth)</string>
     <string name="main_monthly">MENSUEL</string>
     <string name="main_yearly">ANNUEL</string>
     <string name="main_lifetime">À VIE</string>

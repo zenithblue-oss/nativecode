@@ -543,6 +543,8 @@
     <string name="chat_stops_the_agent_deletes_the">Ferma l\'agente, elimina la cronologia e i checkpoint delle modifiche di questo thread. I file del progetto non vengono toccati.</string>
     <string name="chat_live_sessions">Sessioni attive</string>
     <string name="chat_free">GRATIS</string>
+    <string name="chat_sessions_live">%1$s attive</string>
+    <string name="chat_no_live_chats">Nessuna chat attiva</string>
     <string name="chat_no_live_chats_sessions_in">Nessuna chat attiva · %1$s/%2$s sessioni in uso</string>
     <string name="chat_chat">Chat</string>
     <string name="chat_stop">FERMA</string>
@@ -1006,6 +1008,7 @@
     <string name="main_pro_active">Pro attivo</string>
     <string name="main_nativecode_pro">NATIVECODE PRO</string>
     <string name="main_pro_is_active_on_this">Pro è attivo su questo account.</string>
+    <string name="main_pro_benefits">• Tutte le CLI di IA (opencode resta gratis)\n• Sessioni IA parallele illimitate\n• Desktop illimitato (gratis: 30 min/giorno)\n• Progetti, importazione e area di lavoro\n• Accesso a GitHub (gh auth)</string>
     <string name="main_monthly">MENSILE</string>
     <string name="main_yearly">ANNUALE</string>
     <string name="main_lifetime">A VITA</string>

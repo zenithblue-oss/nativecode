@@ -183,7 +183,7 @@ object FeatureLimits {
     const val FREE_AGENT_PROJECTS = 1
     const val FREE_XFCE_SESSION_MS = 30 * 60_000L
     const val FREE_XFCE_DAILY_MS = 30 * 60_000L
-    const val PRO_MAX_AI_SESSIONS = 5
+    const val PRO_MAX_AI_SESSIONS = Int.MAX_VALUE // unlimited
 }
 
 object FeatureGate {
@@ -420,7 +420,7 @@ Upgrade sheet copy: matrix bullets + 3 price buttons (mo / yr / lifetime) + Rest
 | 2 | Git clone + GH login | works | works |
 | 3 | Launch free AI only | works | works |
 | 4 | Launch second AI tool | upgrade | works |
-| 5 | Two AI sessions | blocked | up to 5 |
+| 5 | Two AI sessions | blocked | unlimited |
 | 6 | Shell / root-shell tab | upgrade sheet | works (10 tabs) |
 | 7 | AI in project A then B | block B agent | works |
 | 8 | XFCE 0 budget | block | unlimited |
@@ -510,7 +510,7 @@ Upgrade sheet copy: matrix bullets + 3 price buttons (mo / yr / lifetime) + Rest
 ```text
 FREE_AI_TOOL_IDS        = { opencode }   // or picker
 FREE_MAX_AI_SESSIONS    = 1
-PRO_MAX_AI_SESSIONS     = 5
+PRO_MAX_AI_SESSIONS     = Int.MAX_VALUE  // unlimited (was 5)
 FREE_AGENT_PROJECTS     = 1
 FREE_XFCE_DAILY_MS      = 30 * 60 * 1000
 PRO_GRACE_OFFLINE_MS    = 7 * 24 * 60 * 60 * 1000
