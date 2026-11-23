@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">Yalnızca terminal, henüz sohbet yok</string>
     <string name="chat_provider_requires_pro_state">Pro gerekir</string>
     <string name="chat_model_header">Model · %1$s</string>
+    <string name="chat_picker_title">Sağlayıcı ve model</string>
+    <string name="chat_provider_busy">Yanıt sürerken sağlayıcı kilitlidir.</string>
+    <string name="chat_provider_child">Devredilen görevler kendi sağlayıcısında kalır.</string>
+    <string name="chat_previous_models">Önceki modeller</string>
+    <string name="chat_provider_terminal_short">Yalnızca terminal</string>
+    <string name="chat_selected">Seçili</string>
     <string name="chat_switch_to_load_models">Başlatmak ve modellerini yüklemek için geçiş yapın</string>
     <string name="chat_switch_to_provider">%1$s sağlayıcısına geç</string>
     <string name="chat_switched_to">Geçildi: %1$s · %2$s</string>

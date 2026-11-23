@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">Solo terminale, ancora nessuna chat</string>
     <string name="chat_provider_requires_pro_state">Richiede Pro</string>
     <string name="chat_model_header">Modello · %1$s</string>
+    <string name="chat_picker_title">Provider e modello</string>
+    <string name="chat_provider_busy">Il provider è bloccato mentre una risposta è in corso.</string>
+    <string name="chat_provider_child">Le attività delegate restano sul proprio provider.</string>
+    <string name="chat_previous_models">Modelli precedenti</string>
+    <string name="chat_provider_terminal_short">Solo terminale</string>
+    <string name="chat_selected">Selezionato</string>
     <string name="chat_switch_to_load_models">Passa per avviarlo e caricare i suoi modelli</string>
     <string name="chat_switch_to_provider">Passa a %1$s</string>
     <string name="chat_switched_to">Passato a %1$s · %2$s</string>

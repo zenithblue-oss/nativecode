@@ -1616,6 +1616,12 @@
     <string name="chat_provider_terminal_only">Terminal only, no chat yet</string>
     <string name="chat_provider_requires_pro_state">Requires Pro</string>
     <string name="chat_model_header">Model · %1$s</string>
+    <string name="chat_picker_title">Provider and model</string>
+    <string name="chat_provider_busy">Provider is locked while a reply is running.</string>
+    <string name="chat_provider_child">Delegated tasks stay on their provider.</string>
+    <string name="chat_previous_models">Previous models</string>
+    <string name="chat_provider_terminal_short">Terminal only</string>
+    <string name="chat_selected">Selected</string>
     <string name="chat_switch_to_load_models">Switch to start it and load its models</string>
     <string name="chat_switch_to_provider">Switch to %1$s</string>
     <string name="chat_switched_to">Switched to %1$s · %2$s</string>

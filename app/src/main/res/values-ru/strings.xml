@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">Только терминал, чата пока нет</string>
     <string name="chat_provider_requires_pro_state">Требуется Pro</string>
     <string name="chat_model_header">Модель · %1$s</string>
+    <string name="chat_picker_title">Провайдер и модель</string>
+    <string name="chat_provider_busy">Провайдера нельзя сменить, пока идёт ответ.</string>
+    <string name="chat_provider_child">Делегированные задачи остаются на своём провайдере.</string>
+    <string name="chat_previous_models">Предыдущие модели</string>
+    <string name="chat_provider_terminal_short">Только терминал</string>
+    <string name="chat_selected">Выбрано</string>
     <string name="chat_switch_to_load_models">Переключитесь, чтобы запустить его и загрузить его модели</string>
     <string name="chat_switch_to_provider">Переключиться на %1$s</string>
     <string name="chat_switched_to">Переключено на %1$s · %2$s</string>

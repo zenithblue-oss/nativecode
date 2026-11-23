@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">ターミナルのみ、チャットはまだありません</string>
     <string name="chat_provider_requires_pro_state">Proが必要です</string>
     <string name="chat_model_header">モデル · %1$s</string>
+    <string name="chat_picker_title">プロバイダーとモデル</string>
+    <string name="chat_provider_busy">返信の実行中はプロバイダーを変更できません。</string>
+    <string name="chat_provider_child">委任されたタスクは元のプロバイダーのままです。</string>
+    <string name="chat_previous_models">以前のモデル</string>
+    <string name="chat_provider_terminal_short">ターミナルのみ</string>
+    <string name="chat_selected">選択中</string>
     <string name="chat_switch_to_load_models">切り替えて起動し、モデルを読み込みます</string>
     <string name="chat_switch_to_provider">%1$sに切り替え</string>
     <string name="chat_switched_to">%1$sに切り替えました · %2$s</string>

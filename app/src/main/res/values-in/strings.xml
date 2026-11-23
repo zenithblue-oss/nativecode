@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">Hanya terminal, belum ada chat</string>
     <string name="chat_provider_requires_pro_state">Memerlukan Pro</string>
     <string name="chat_model_header">Model · %1$s</string>
+    <string name="chat_picker_title">Penyedia dan model</string>
+    <string name="chat_provider_busy">Penyedia dikunci selama balasan berjalan.</string>
+    <string name="chat_provider_child">Tugas yang didelegasikan tetap pada penyedianya.</string>
+    <string name="chat_previous_models">Model sebelumnya</string>
+    <string name="chat_provider_terminal_short">Hanya terminal</string>
+    <string name="chat_selected">Dipilih</string>
     <string name="chat_switch_to_load_models">Beralih untuk memulainya dan memuat modelnya</string>
     <string name="chat_switch_to_provider">Beralih ke %1$s</string>
     <string name="chat_switched_to">Dialihkan ke %1$s · %2$s</string>

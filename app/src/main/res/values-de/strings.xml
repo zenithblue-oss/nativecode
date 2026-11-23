@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">Nur Terminal, noch kein Chat</string>
     <string name="chat_provider_requires_pro_state">Erfordert Pro</string>
     <string name="chat_model_header">Modell · %1$s</string>
+    <string name="chat_picker_title">Anbieter und Modell</string>
+    <string name="chat_provider_busy">Anbieter ist gesperrt, solange eine Antwort läuft.</string>
+    <string name="chat_provider_child">Delegierte Aufgaben bleiben bei ihrem Anbieter.</string>
+    <string name="chat_previous_models">Frühere Modelle</string>
+    <string name="chat_provider_terminal_short">Nur Terminal</string>
+    <string name="chat_selected">Ausgewählt</string>
     <string name="chat_switch_to_load_models">Wechsle, um ihn zu starten und seine Modelle zu laden</string>
     <string name="chat_switch_to_provider">Zu %1$s wechseln</string>
     <string name="chat_switched_to">Gewechselt zu %1$s · %2$s</string>

@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">Terminal uniquement, pas encore de chat</string>
     <string name="chat_provider_requires_pro_state">Nécessite Pro</string>
     <string name="chat_model_header">Modèle · %1$s</string>
+    <string name="chat_picker_title">Fournisseur et modèle</string>
+    <string name="chat_provider_busy">Le fournisseur est verrouillé pendant une réponse.</string>
+    <string name="chat_provider_child">Les tâches déléguées restent chez leur fournisseur.</string>
+    <string name="chat_previous_models">Modèles précédents</string>
+    <string name="chat_provider_terminal_short">Terminal seulement</string>
+    <string name="chat_selected">Sélectionné</string>
     <string name="chat_switch_to_load_models">Basculez pour le démarrer et charger ses modèles</string>
     <string name="chat_switch_to_provider">Basculer vers %1$s</string>
     <string name="chat_switched_to">Basculé vers %1$s · %2$s</string>

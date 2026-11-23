@@ -12,6 +12,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.graphics.Color
+import com.zenithblue.nativecode.agent.chat.core.ModelInfo
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -19,6 +28,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -67,9 +78,10 @@ internal enum class ComposerSheet { MODEL, PLUS, SKILLS, FILES }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ComposerSheets(v: AgentChatView, t: ChatThread, s: ComposerState, onSlash: () -> Unit) {
-    val sheet = s.sheet?.takeIf { it != ComposerSheet.MODEL } ?: return // MODEL = inline menu on the chip
+    val sheet = s.sheet ?: return
     val close = { s.sheet = null }
-    ModalBottomSheet(close, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
+    if (sheet == ComposerSheet.MODEL) return ModelSheet(v, t, close)
+    ModalBottomSheet(close, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
         Column(Modifier.fillMaxWidth().padding(horizontal = S.l).padding(bottom = S.l).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(S.s)) {
             when (sheet) {
                 ComposerSheet.MODEL -> Unit
@@ -82,17 +94,20 @@ internal fun ComposerSheets(v: AgentChatView, t: ChatThread, s: ComposerState, o
 }
 
 /**
- * Unified picker for the menu anchored to the model chip (t3code ProviderModelPicker): provider first (logo strip of the
- * CLI tools; no chat yet = dimmed, Pro tool on Free = lock + upsell), then that provider's models. A model of the current
- * provider applies at once; one of another provider switches the thread to it (handoff, see ChatThreadController.switchProvider).
- * The strip is hidden while a turn runs and for delegated children (they stay on their provider).
- * ponytail: plain Column (DropdownMenu measures intrinsics, a LazyColumn would crash), so rows are capped at 60; search narrows.
+ * Provider + model picker, a bottom sheet opened from the model chip (t3code ProviderModelPicker): search, a tab per CLI tool
+ * (no chat yet = dimmed "Terminal only", Pro tool on Free = lock + upsell, signed out = "Sign in" opens its login page), then
+ * that provider's models and the effort control. A model of the current provider applies at once; one of another provider
+ * switches the thread to it (handoff, see ChatThreadController.switchProvider). Tabs are locked (with the reason) while a
+ * turn runs and for delegated children, which stay on their provider.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
+internal fun ModelSheet(v: AgentChatView, t: ChatThread, close: () -> Unit) {
     val ctx = LocalContext.current
     val live = v.live.value
-    val canSwitch = live?.runId == null && !NcTasks.isChild(t.id)
+    val busy = live?.runId != null
+    val child = NcTasks.isChild(t.id)
+    val canSwitch = !busy && !child
     val defs = remember { CliToolCatalog.forMethod(LinuxCommandBuilder.currentMethod).sortedBy { it.chat == null } }
     // Signed-out providers (login optional ones, like opencode, stay usable) show "Sign in" and open their login page instead of switching.
     val auth by produceState(emptyMap<String, AuthState>()) {
@@ -109,76 +124,121 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
     val loaded = own || cached?.first == sel
     val models = if (own) live?.models.orEmpty() else cached?.takeIf { it.first == sel }?.second?.models.orEmpty()
     val current = if (own) t.model ?: live?.defaultModel else null
+    val efforts = if (own && live?.caps?.effort == true) models.firstOrNull { it.id == current }?.variants.orEmpty() else emptyList()
     var q by remember { mutableStateOf("") }
-    Column(Modifier.width(300.dp).padding(horizontal = S.m, vertical = S.xs), verticalArrangement = Arrangement.spacedBy(S.xs)) {
-        if (canSwitch) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.xs)) {
-            defs.forEach { def ->
-                val chat = def.chat != null
-                val locked = chat && !v.host.canUseTool(def.terminalType)
-                val on = def.terminalType == sel
-                val signIn = chat && !locked && !def.loginOptional && def.terminalType != t.tool && auth[def.terminalType] == AuthState.SIGNED_OUT
-                Column(
-                    Modifier.width(68.dp).alpha(if (chat) 1f else 0.4f)
-                        .selectable(on, enabled = chat, role = Role.RadioButton) {
-                            when {
-                                locked -> { v.host.showUpgradeSheet(tr(R.string.chat_provider_requires_pro, def.displayName)); close() }
-                                signIn -> { v.host.openCliLoginPage(def.id); close() }
-                                else -> { picked = def.terminalType; q = "" }
+    ModalBottomSheet(close, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = S.l).navigationBarsPadding().imePadding(), verticalArrangement = Arrangement.spacedBy(S.m)) {
+            Column {
+                Text(tr(R.string.chat_picker_title), color = C.on, style = T.title)
+                if (!canSwitch) Text(tr(if (child) R.string.chat_provider_child else R.string.chat_provider_busy), color = C.outline, style = T.bodySm)
+            }
+            if (models.size > 5) SearchField(q, { q = it }, tr(R.string.chat_search_models, models.size))
+            LazyRow(Modifier.fillMaxWidth().selectableGroup(), rememberLazyListState(defs.indexOfFirst { it.terminalType == t.tool }.coerceAtLeast(0)), horizontalArrangement = Arrangement.spacedBy(S.s)) {
+                items(defs, key = { it.id }) { def ->
+                    val chat = def.chat != null
+                    val locked = chat && !v.host.canUseTool(def.terminalType)
+                    val on = def.terminalType == sel
+                    val signIn = chat && !locked && !def.loginOptional && def.terminalType != t.tool && auth[def.terminalType] == AuthState.SIGNED_OUT
+                    val note = when { !chat -> tr(R.string.chat_provider_terminal_short); signIn -> tr(R.string.chat_sign_in); else -> null }
+                    Row(
+                        Modifier.heightIn(min = 48.dp).alpha(if (chat && (canSwitch || on)) 1f else 0.4f)
+                            .background(if (on) C.primary.copy(alpha = 0.14f) else C.low).border(1.dp, if (on) C.primary else C.border)
+                            .selectable(on, enabled = chat && (canSwitch || on), role = Role.Tab) {
+                                when {
+                                    locked -> { v.host.showUpgradeSheet(tr(R.string.chat_provider_requires_pro, def.displayName)); close() }
+                                    signIn -> { v.host.openCliLoginPage(def.id); close() }
+                                    else -> { picked = def.terminalType; q = "" }
+                                }
+                            }
+                            .padding(horizontal = S.m)
+                            .semantics { if (!chat) stateDescription = tr(R.string.chat_provider_terminal_only) else if (locked) stateDescription = tr(R.string.chat_provider_requires_pro_state) else if (signIn) stateDescription = tr(R.string.chat_sign_in) },
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(S.s),
+                    ) {
+                        ProviderLogo(def.terminalType, size = 24.dp)
+                        Column {
+                            Text(def.displayName, color = if (on) C.primary else C.on, style = T.codeSm, maxLines = 1)
+                            if (note != null) Text(note, color = C.tertiary, style = T.meta, maxLines = 1)
+                        }
+                        if (locked) Row(Modifier.background(C.tertiary.copy(alpha = 0.16f)).padding(horizontal = S.s, vertical = S.xs), verticalAlignment = Alignment.CenterVertically) {
+                            NcIcon(Ic.Lock, null, tint = C.tertiary, size = 12.dp)
+                            Label("PRO", Modifier.padding(start = S.xs), color = C.tertiary, size = 10, bold = true)
+                        }
+                    }
+                }
+            }
+            val hits = models.filter { q.isBlank() || it.name.contains(q, true) || it.id.contains(q, true) }
+            // claude: the aliases carry the full id in `detail`; the older generations the CLI still accepts have none.
+            val older = if (sel == "claude-code" && hits.any { it.detail != null }) hits.filter { it.detail == null && it.id != "default" }.toSet() else emptySet()
+            LazyColumn(Modifier.fillMaxWidth().heightIn(min = 160.dp).weight(1f, fill = false)) {
+                when {
+                    models.isNotEmpty() -> {
+                        items(hits.filter { it !in older }, key = { it.id }) { m -> ModelRow(m, own && m.id == current) { pick(v, t, sel, own, m, close) } }
+                        if (older.isNotEmpty()) item("older") { Overline(tr(R.string.chat_previous_models), Modifier.padding(top = S.m, bottom = S.xs), color = C.outline) }
+                        items(older.toList(), key = { "o:" + it.id }) { m -> ModelRow(m, own && m.id == current) { pick(v, t, sel, own, m, close) } }
+                        if (hits.isEmpty()) item("none") { Text(tr(R.string.chat_no_model_matches), Modifier.padding(vertical = S.m), color = C.outline, style = T.bodySm) }
+                    }
+                    !loaded -> item("load") { Spinner(18.dp, C.outline) }
+                    !own -> item("other") {
+                        Column(Modifier.padding(vertical = S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
+                            Text(tr(R.string.chat_default_model), color = C.on, style = T.body)
+                            Text(tr(R.string.chat_switch_to_load_models), color = C.outline, style = T.bodySm)
+                            NcButton(tr(R.string.chat_switch_to_provider, providerName(sel)), icon = Ic.Retry) { v.bg { v.backend.switchProvider(t.id, sel, null) }; close() }
+                        }
+                    }
+                    else -> item("own") {
+                        Column(Modifier.padding(vertical = S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
+                            Text(current ?: tr(R.string.chat_default_model), color = C.on, style = T.body)
+                            if (live?.alive == true) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(S.s)) {
+                                Spinner(14.dp, C.outline)
+                                Text(tr(R.string.chat_loading_models), color = C.outline, style = T.bodySm)
+                            } else {
+                                Text(tr(R.string.chat_start_the_session_to_load), color = C.outline, style = T.bodySm)
+                                NcButton(tr(R.string.chat_load_models), icon = Ic.Retry) { v.bg { v.backend.resume(t.id) } }
                             }
                         }
-                        .background(if (on) C.primary.copy(alpha = 0.08f) else C.low).padding(S.xs)
-                        .semantics { if (!chat) stateDescription = tr(R.string.chat_provider_terminal_only) else if (locked) stateDescription = tr(R.string.chat_provider_requires_pro_state) else if (signIn) stateDescription = tr(R.string.chat_sign_in) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box {
-                        ProviderLogo(def.terminalType, size = 32.dp)
-                        if (locked) NcIcon(Ic.Lock, null, Modifier.align(Alignment.BottomEnd), tint = C.tertiary, size = 12.dp)
                     }
-                    Text(def.displayName, color = if (on) C.primary else C.onVar, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (signIn) Text(tr(R.string.chat_sign_in), color = C.tertiary, style = T.meta, maxLines = 1)
                 }
             }
-        }
-        Overline(tr(R.string.chat_model_header, providerName(sel)), color = C.outline)
-        if (models.isEmpty()) {
-            if (!own) {
-                if (loaded) {
-                    Text(tr(R.string.chat_default_model), color = C.on, style = T.codeSm)
-                    Text(tr(R.string.chat_switch_to_load_models), color = C.outline, style = T.meta)
-                    NcButton(tr(R.string.chat_switch_to_provider, providerName(sel)), icon = Ic.Retry) { v.bg { v.backend.switchProvider(t.id, sel, null) }; close() }
+            if (efforts.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(S.xs)) {
+                Overline(tr(R.string.chat_reasoning_effort), color = C.outline)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).border(1.dp, C.border).selectableGroup()) {
+                    efforts.forEach { x ->
+                        val on = x == t.effort
+                        Box(
+                            Modifier.widthIn(min = 64.dp).heightIn(min = 44.dp).background(if (on) C.primary.copy(alpha = 0.14f) else C.low)
+                                .selectable(on, role = Role.RadioButton) { v.bg { v.backend.configure(t.id, ConfigChange(effort = x)) } }.padding(horizontal = S.m),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(x, color = if (on) C.primary else C.onVar, style = T.codeSm, maxLines = 1) }
+                    }
                 }
-                return@Column
             }
-            Text(current ?: tr(R.string.chat_default_model), color = C.on, style = T.codeSm)
-            if (live?.alive == true) Text("Loading models…", color = C.outline, style = T.meta)
-            else {
-                Text(tr(R.string.chat_start_the_session_to_load), color = C.outline, style = T.meta)
-                NcButton(tr(R.string.chat_load_models), icon = Ic.Retry) { v.bg { v.backend.resume(t.id) } }
-            }
-            return@Column
+            Spacer(Modifier.height(S.xs))
         }
-        if (models.size > 8) SearchField(q, { q = it }, tr(R.string.chat_search_models, models.size))
-        val hits = models.filter { q.isBlank() || it.name.contains(q, true) || it.id.contains(q, true) }
-        hits.take(60).forEach { m ->
-            val on = own && m.id == current
-            Row(
-                Modifier.fillMaxWidth().selectable(on, role = Role.RadioButton) {
-                    if (!on) v.bg { if (own) v.backend.configure(t.id, ConfigChange(model = m.id)) else v.backend.switchProvider(t.id, sel, m.id) }
-                    close()
-                }.background(if (on) C.primary.copy(alpha = 0.08f) else C.low).heightIn(min = 48.dp).padding(horizontal = S.s, vertical = S.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Ring(if (on) C.primary else C.outline, size = 14.dp, filled = on)
-                Column(Modifier.weight(1f).padding(horizontal = S.s)) {
-                    Text(m.name.ifBlank { m.id }, color = C.on, style = T.bodySm, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(listOfNotNull(m.detail ?: m.id, m.contextLimit?.let { "${ChatLogic.tokens(it)} ctx" }).joinToString(" · "),
-                        color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                if (m.free) FreeBadge()
-            }
+    }
+}
+
+private fun pick(v: AgentChatView, t: ChatThread, sel: String, own: Boolean, m: ModelInfo, close: () -> Unit) {
+    val on = own && m.id == (t.model ?: v.live.value?.defaultModel)
+    if (!on) v.bg { if (own) v.backend.configure(t.id, ConfigChange(model = m.id)) else v.backend.switchProvider(t.id, sel, m.id) }
+    close()
+}
+
+/** Model name (one line), id / version + context below, FREE badge and a check on the selected one; 56 dp touch target. */
+@Composable
+private fun ModelRow(m: ModelInfo, on: Boolean, onClick: () -> Unit) {
+    val name = m.name.ifBlank { m.id }
+    val sub = listOfNotNull((m.detail ?: m.id).takeIf { it != name }, m.contextLimit?.let { "${ChatLogic.tokens(it)} ctx" }).joinToString(" · ")
+    Row(
+        Modifier.fillMaxWidth().selectable(on, role = Role.RadioButton, onClick = onClick)
+            .background(if (on) C.primary.copy(alpha = 0.08f) else Color.Transparent).heightIn(min = 56.dp).padding(horizontal = S.s, vertical = S.s),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(S.s),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(name, color = if (on) C.primary else C.on, style = T.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (sub.isNotEmpty()) Text(sub, color = C.outline, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (hits.size > 60) Text("${hits.size - 60} more · search to narrow", color = C.outline, style = T.meta)
-        if (hits.isEmpty()) Text(tr(R.string.chat_no_model_matches), color = C.outline, style = T.bodySm)
+        if (m.free) FreeBadge()
+        if (on) NcIcon(Ic.Check, tr(R.string.chat_selected), tint = C.primary, size = 18.dp)
     }
 }
 

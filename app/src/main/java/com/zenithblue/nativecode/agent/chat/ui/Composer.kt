@@ -166,7 +166,6 @@ internal fun Composer(
     onSlash: (SlashCommand) -> Unit,
 ) {
     var sendMenu by remember { mutableStateOf(false) }
-    var effortMenu by remember { mutableStateOf(false) }
     var modeMenu by remember { mutableStateOf(false) }
     var confirmFull by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
@@ -238,30 +237,12 @@ internal fun Composer(
                 IconBtn(Ic.Plus, tr(R.string.chat_add_photo_file_file_command), tint = C.onVar, box = 40.dp) { s.sheet = ComposerSheet.PLUS }
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
                     val modelName = model?.name?.ifBlank { null } ?: currentModel?.substringAfterLast('/') ?: tr(R.string.chat_default_model)
-                    Box {
-                        Chip(
-                            modelName + if (model?.free == true) " · free" else "",
-                            Modifier.widthIn(max = 200.dp).semantics { contentDescription = tr(if (model?.free == true) R.string.chat_model_chip_desc_free else R.string.chat_model_chip_desc, providerName(t.tool), modelName) },
-                            icon = Ic.Bot, trailing = Ic.ChevronDown, leading = { ProviderLogo(t.tool, size = 20.dp) },
-                        ) { s.sheet = ComposerSheet.MODEL }
-                        DropdownMenu(s.sheet == ComposerSheet.MODEL, { s.sheet = null }, containerColor = C.low) {
-                            ModelMenu(v, t) { s.sheet = null }
-                        }
-                    }
-                    if (efforts.isNotEmpty()) Box {
-                        val e = t.effort ?: tr(R.string.chat_effort)
-                        Chip(e, Modifier.semantics { contentDescription = "Reasoning effort $e. Change effort" }, icon = Ic.Lightbulb, trailing = Ic.ChevronDown) { effortMenu = true }
-                        DropdownMenu(effortMenu, { effortMenu = false }, containerColor = C.low) {
-                            Overline(tr(R.string.chat_reasoning_effort), Modifier.padding(horizontal = S.l, vertical = S.xs), color = C.outline)
-                            efforts.forEach { x ->
-                                DropdownMenuItem(
-                                    text = { Text(x, style = T.bodySm, color = C.on) },
-                                    onClick = { effortMenu = false; cfg(ConfigChange(effort = x)) },
-                                    trailingIcon = if (x == t.effort) ({ NcIcon(Ic.Check, "Selected", tint = C.primary, size = 16.dp) }) else null,
-                                )
-                            }
-                        }
-                    }
+                    val tag = if (efforts.isNotEmpty() && t.effort != null) " · " + t.effort else if (model?.free == true) " · free" else ""
+                    Chip(
+                        modelName + tag,
+                        Modifier.widthIn(max = 220.dp).semantics { contentDescription = tr(if (model?.free == true) R.string.chat_model_chip_desc_free else R.string.chat_model_chip_desc, providerName(t.tool), modelName) },
+                        trailing = Ic.ChevronDown, leading = { ProviderLogo(t.tool, size = 20.dp) },
+                    ) { s.sheet = ComposerSheet.MODEL }
                     Box {
                         val full = t.runtimeMode == RuntimeMode.FULL_ACCESS
                         Chip(

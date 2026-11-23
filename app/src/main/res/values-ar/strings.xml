@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">الطرفية فقط، لا توجد دردشة بعد</string>
     <string name="chat_provider_requires_pro_state">يتطلب Pro</string>
     <string name="chat_model_header">النموذج · %1$s</string>
+    <string name="chat_picker_title">المزوّد والنموذج</string>
+    <string name="chat_provider_busy">المزوّد مقفل أثناء تشغيل الرد.</string>
+    <string name="chat_provider_child">المهام المفوّضة تبقى لدى مزوّدها.</string>
+    <string name="chat_previous_models">النماذج السابقة</string>
+    <string name="chat_provider_terminal_short">الطرفية فقط</string>
+    <string name="chat_selected">محدد</string>
     <string name="chat_switch_to_load_models">بدّل لتشغيله وتحميل نماذجه</string>
     <string name="chat_switch_to_provider">التبديل إلى %1$s</string>
     <string name="chat_switched_to">تم التبديل إلى %1$s · %2$s</string>

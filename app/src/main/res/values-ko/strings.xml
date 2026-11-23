@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">터미널 전용, 아직 채팅 없음</string>
     <string name="chat_provider_requires_pro_state">Pro 필요</string>
     <string name="chat_model_header">모델 · %1$s</string>
+    <string name="chat_picker_title">제공자 및 모델</string>
+    <string name="chat_provider_busy">응답이 진행되는 동안에는 제공자를 바꿀 수 없습니다.</string>
+    <string name="chat_provider_child">위임된 작업은 해당 제공자에 유지됩니다.</string>
+    <string name="chat_previous_models">이전 모델</string>
+    <string name="chat_provider_terminal_short">터미널 전용</string>
+    <string name="chat_selected">선택됨</string>
     <string name="chat_switch_to_load_models">전환하면 시작하고 모델을 불러옵니다</string>
     <string name="chat_switch_to_provider">%1$s(으)로 전환</string>
     <string name="chat_switched_to">%1$s · %2$s(으)로 전환됨</string>

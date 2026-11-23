@@ -1573,6 +1573,12 @@
     <string name="chat_provider_terminal_only">仅终端，暂无聊天</string>
     <string name="chat_provider_requires_pro_state">需要 Pro</string>
     <string name="chat_model_header">模型 · %1$s</string>
+    <string name="chat_picker_title">提供方和模型</string>
+    <string name="chat_provider_busy">回复进行中时无法更换提供方。</string>
+    <string name="chat_provider_child">委派的任务保持在其提供方上。</string>
+    <string name="chat_previous_models">以前的模型</string>
+    <string name="chat_provider_terminal_short">仅终端</string>
+    <string name="chat_selected">已选择</string>
     <string name="chat_switch_to_load_models">切换后即可启动并加载其模型</string>
     <string name="chat_switch_to_provider">切换到 %1$s</string>
     <string name="chat_switched_to">已切换到 %1$s · %2$s</string>
