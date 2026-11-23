@@ -39,6 +39,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.zenithblue.nativecode.agent.chat.ModelCache
+import com.zenithblue.nativecode.agent.chat.tools.NcTasks
+import com.zenithblue.nativecode.cliauth.CliToolCatalog
+import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
@@ -73,18 +80,62 @@ internal fun ComposerSheets(v: AgentChatView, t: ChatThread, s: ComposerState, o
 }
 
 /**
- * Model picker body for the menu anchored to the model chip (t3code ModelPicker popover). A pick applies at once.
+ * Unified picker for the menu anchored to the model chip (t3code ProviderModelPicker): provider first (logo strip of the
+ * CLI tools; no chat yet = dimmed, Pro tool on Free = lock + upsell), then that provider's models. A model of the current
+ * provider applies at once; one of another provider switches the thread to it (handoff, see ChatThreadController.switchProvider).
+ * The strip is hidden while a turn runs and for delegated children (they stay on their provider).
  * ponytail: plain Column (DropdownMenu measures intrinsics, a LazyColumn would crash), so rows are capped at 60; search narrows.
  */
 @Composable
 internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
+    val ctx = LocalContext.current
     val live = v.live.value
-    val models = live?.models.orEmpty()
-    val current = t.model ?: live?.defaultModel
+    val canSwitch = live?.runId == null && !NcTasks.isChild(t.id)
+    val defs = remember { CliToolCatalog.forMethod(LinuxCommandBuilder.currentMethod).sortedBy { it.chat == null } }
+    var picked by remember { mutableStateOf(t.tool) }
+    val sel = if (canSwitch) picked else t.tool
+    val own = sel == t.tool
+    // Last-known list of another provider (it has no session here); tagged with its tool so a stale one never shows.
+    val cached by produceState<Pair<String, ModelCache.Entry?>?>(null, sel) {
+        value = if (sel == t.tool) null else sel to withContext(Dispatchers.IO) { ModelCache.load(ctx, sel) }
+    }
+    val loaded = own || cached?.first == sel
+    val models = if (own) live?.models.orEmpty() else cached?.takeIf { it.first == sel }?.second?.models.orEmpty()
+    val current = if (own) t.model ?: live?.defaultModel else null
     var q by remember { mutableStateOf("") }
     Column(Modifier.width(300.dp).padding(horizontal = S.m, vertical = S.xs), verticalArrangement = Arrangement.spacedBy(S.xs)) {
-        Overline("Model · ${t.tool}", color = C.outline)
+        if (canSwitch) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.xs)) {
+            defs.forEach { def ->
+                val chat = def.chat != null
+                val locked = chat && !v.host.canUseTool(def.terminalType)
+                val on = def.terminalType == sel
+                Column(
+                    Modifier.width(68.dp).alpha(if (chat) 1f else 0.4f)
+                        .selectable(on, enabled = chat, role = Role.RadioButton) {
+                            if (locked) { v.host.showUpgradeSheet("${def.displayName} requires Pro"); close() } else { picked = def.terminalType; q = "" }
+                        }
+                        .background(if (on) C.primary.copy(alpha = 0.08f) else C.low).padding(S.xs)
+                        .semantics { if (!chat) stateDescription = "Terminal only, no chat yet" else if (locked) stateDescription = "Requires Pro" },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box {
+                        ProviderLogo(def.terminalType, size = 32.dp)
+                        if (locked) NcIcon(Ic.Lock, null, Modifier.align(Alignment.BottomEnd), tint = C.tertiary, size = 12.dp)
+                    }
+                    Text(def.displayName, color = if (on) C.primary else C.onVar, style = T.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        Overline("Model · ${providerName(sel)}", color = C.outline)
         if (models.isEmpty()) {
+            if (!own) {
+                if (loaded) {
+                    Text(tr(R.string.chat_default_model), color = C.on, style = T.codeSm)
+                    Text("Switch to start it and load its models", color = C.outline, style = T.meta)
+                    NcButton("Switch to ${providerName(sel)}", icon = Ic.Retry) { v.bg { v.backend.switchProvider(t.id, sel, null) }; close() }
+                }
+                return@Column
+            }
             Text(current ?: tr(R.string.chat_default_model), color = C.on, style = T.codeSm)
             if (live?.alive == true) Text("Loading models…", color = C.outline, style = T.meta)
             else {
@@ -96,10 +147,12 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
         if (models.size > 8) SearchField(q, { q = it }, tr(R.string.chat_search_models, models.size))
         val hits = models.filter { q.isBlank() || it.name.contains(q, true) || it.id.contains(q, true) }
         hits.take(60).forEach { m ->
-            val on = m.id == current
+            val on = own && m.id == current
             Row(
-                Modifier.fillMaxWidth().selectable(on, role = Role.RadioButton) { if (!on) v.bg { v.backend.configure(t.id, ConfigChange(model = m.id)) }; close() }
-                    .background(if (on) C.primary.copy(alpha = 0.08f) else C.low).heightIn(min = 48.dp).padding(horizontal = S.s, vertical = S.xs),
+                Modifier.fillMaxWidth().selectable(on, role = Role.RadioButton) {
+                    if (!on) v.bg { if (own) v.backend.configure(t.id, ConfigChange(model = m.id)) else v.backend.switchProvider(t.id, sel, m.id) }
+                    close()
+                }.background(if (on) C.primary.copy(alpha = 0.08f) else C.low).heightIn(min = 48.dp).padding(horizontal = S.s, vertical = S.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Ring(if (on) C.primary else C.outline, size = 14.dp, filled = on)

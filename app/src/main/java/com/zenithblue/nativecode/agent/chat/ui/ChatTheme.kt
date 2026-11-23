@@ -181,7 +181,7 @@ internal fun IconBtn(
 @Composable
 internal fun Chip(
     text: String, modifier: Modifier = Modifier, on: Boolean = false, color: Color = C.onVar,
-    icon: ImageVector? = null, trailing: ImageVector? = null, onClick: (() -> Unit)? = null,
+    icon: ImageVector? = null, trailing: ImageVector? = null, leading: (@Composable () -> Unit)? = null, onClick: (() -> Unit)? = null,
 ) {
     val fg = if (on) C.primary else color
     Row(
@@ -195,7 +195,7 @@ internal fun Chip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(S.gap),
     ) {
-        icon?.let { NcIcon(it, null, tint = fg, size = 14.dp) }
+        if (leading != null) leading() else icon?.let { NcIcon(it, null, tint = fg, size = 14.dp) }
         Text(text, color = fg, style = T.codeSm, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         trailing?.let { NcIcon(it, null, tint = fg, size = 14.dp) }
     }
@@ -341,6 +341,9 @@ internal fun RowScope.AddDel(add: Int, del: Int, size: Int = 11) {
     if (add > 0 || del == 0) Label("+$add", color = C.primary, size = size, bold = true)
     if (del > 0) Label("−$del", Modifier.padding(start = S.xs), color = C.error, size = size, bold = true)
 }
+
+/** Catalog display name of a thread tool ("Claude Code" for claude-code); the id when unknown. */
+internal fun providerName(tool: String): String = com.zenithblue.nativecode.cliauth.CliToolCatalog.ALL.firstOrNull { it.terminalType == tool }?.displayName ?: tool
 
 /** Provider logo the app ships (assets/images/cli, same files as the terminal tool cards). */
 @Composable

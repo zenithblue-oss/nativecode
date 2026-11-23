@@ -104,12 +104,27 @@ private fun ItemRow(v: AgentChatView, t: ChatThread, item: TurnItem, live: Boole
             if (item.status == ItemStatus.RUNNING) "Compacting context" else "Context compacted" + (p.tokens?.let { " · ${ChatLogic.tokens(it)} tok" } ?: ""),
             Ic.Fold, shimmer = item.status == ItemStatus.RUNNING,
         )
+        is ItemPayload.ProviderSwitch -> SwitchDivider(p, ROW_PAD.padding(vertical = S.xs))
         is ItemPayload.Bridge -> BridgeCard(v, t.id, item, p, ROW_PAD)
         is ItemPayload.SystemNotice -> Row(ROW_PAD, verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(4.dp).background(C.outline))
             Text(p.text, Modifier.padding(start = S.s), color = C.outline, style = T.meta)
         }
         else -> WorkItem(v, t, item, ROW_PAD.card(C.low))
+    }
+}
+
+/** "Switched to Codex · gpt-x": the thread moved to another provider here. */
+@Composable
+private fun SwitchDivider(p: ItemPayload.ProviderSwitch, modifier: Modifier) {
+    val label = "Switched to ${providerName(p.tool)} · ${p.model?.substringAfterLast('/') ?: tr(R.string.chat_default_model)}"
+    Row(modifier.semantics(mergeDescendants = true) { contentDescription = label }, verticalAlignment = Alignment.CenterVertically) {
+        Hairline(Modifier.weight(1f))
+        Row(Modifier.padding(horizontal = S.s), verticalAlignment = Alignment.CenterVertically) {
+            ProviderLogo(p.tool, size = 18.dp)
+            Text(label, Modifier.padding(start = S.s), color = C.outline, style = T.meta)
+        }
+        Hairline(Modifier.weight(1f))
     }
 }
 
