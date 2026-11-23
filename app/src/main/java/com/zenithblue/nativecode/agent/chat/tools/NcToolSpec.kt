@@ -32,16 +32,16 @@ object NcToolSpec {
 
     // ---------------- schema DSL ----------------
 
-    private fun obj(vararg p: Pair<String, JSONObject>, required: List<String> = emptyList()) = JSONObject().put("type", "object")
+    internal fun obj(vararg p: Pair<String, JSONObject>, required: List<String> = emptyList()) = JSONObject().put("type", "object")
         .put("properties", JSONObject().apply { p.forEach { put(it.first, it.second) } }).put("required", JSONArray(required))
-    private fun str(d: String? = null, max: Int? = null, enum: List<String>? = null) = JSONObject().put("type", "string").apply {
+    internal fun str(d: String? = null, max: Int? = null, enum: List<String>? = null) = JSONObject().put("type", "string").apply {
         d?.let { put("description", it) }; max?.let { put("maxLength", it) }; enum?.let { put("enum", JSONArray(it)) }
     }
     private fun int(d: String? = null, min: Int? = null, max: Int? = null) = JSONObject().put("type", "integer").apply {
         d?.let { put("description", it) }; min?.let { put("minimum", it) }; max?.let { put("maximum", it) }
     }
-    private fun num(d: String? = null) = JSONObject().put("type", "number").apply { d?.let { put("description", it) } }
-    private fun bool(d: String? = null) = JSONObject().put("type", "boolean").apply { d?.let { put("description", it) } }
+    internal fun num(d: String? = null) = JSONObject().put("type", "number").apply { d?.let { put("description", it) } }
+    internal fun bool(d: String? = null) = JSONObject().put("type", "boolean").apply { d?.let { put("description", it) } }
     private fun anyObj(d: String) = JSONObject().put("type", "object").put("description", d)
 
     private val RUNTIME_MODES = listOf("inherit") + RuntimeMode.entries.map { it.wire }

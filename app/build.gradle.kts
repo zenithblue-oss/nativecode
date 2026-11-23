@@ -149,6 +149,8 @@ dependencies {
     testImplementation("org.json:json:20240303")
 
     implementation("androidx.core:core-ktx:1.19.1")
+    // Agent browser: ProfileStore / WebViewCompat.setProfile isolate its cookies from the app's other WebViews (Apache-2.0).
+    implementation("androidx.webkit:webkit:1.15.0")
     implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("com.google.android.material:material:1.14.0")
     implementation("androidx.constraintlayout:constraintlayout:2.2.2")

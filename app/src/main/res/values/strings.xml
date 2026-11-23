@@ -1604,4 +1604,13 @@
     <string name="viewer_pause">Pause</string>
     <string name="viewer_page_of">Page %1$d of %2$d</string>
     <string name="viewer_html_sandboxed">Scripts, network and linked files are blocked</string>
+    <string name="browser_consent_title">Let %1$s use the browser?</string>
+    <string name="browser_consent_body">It can open pages, read them, and click or type in them. You see the page here and can close it any time. Page text is untrusted.</string>
+    <string name="browser_not_isolated">This device\'s WebView cannot keep the browser\'s cookies apart from the app\'s other web pages.</string>
+    <string name="browser_allow">Allow for this chat</string>
+    <string name="browser_deny">Deny</string>
+    <string name="browser_agent_in_control">Agent in control</string>
+    <string name="browser_collapse">Collapse browser</string>
+    <string name="browser_expand">Expand browser</string>
+    <string name="browser_close">Close browser and stop the agent</string>
 </resources>

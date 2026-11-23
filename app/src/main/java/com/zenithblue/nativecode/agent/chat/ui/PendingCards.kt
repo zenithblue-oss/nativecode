@@ -54,7 +54,7 @@ internal fun ChatRequest.rejectOption() = options.firstOrNull { it.kind.startsWi
 
 /** Docked card shell: amber accent edge, hard shadow, header icon tile + overline + title. */
 @Composable
-private fun PendingShell(icon: ImageVector, overline: String, title: String, trailing: String?, content: @Composable () -> Unit) {
+internal fun PendingShell(icon: ImageVector, overline: String, title: String, trailing: String?, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(start = S.m, end = S.m, top = S.s)) {
         Column(Modifier.fillMaxWidth().brutal(4.dp, C.tertiary.copy(alpha = 0.25f)).card(C.low, C.tertiary).padding(S.m).animateContentSize()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
