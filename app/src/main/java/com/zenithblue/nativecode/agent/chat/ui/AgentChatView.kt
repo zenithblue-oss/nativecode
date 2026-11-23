@@ -220,7 +220,7 @@ class AgentChatView(
         if (workspace && scope == null) return
         io.execute {
             val list = runCatching {
-                backend.threads(scope, all = !workspace).map { t ->
+                backend.threads(scope, all = !workspace).map { t -> ChatLogic.rowOrBare(t) {
                     val runs = backend.runs(t.id)
                     val last = runs.lastOrNull { it.status != com.zenithblue.nativecode.agent.chat.core.RunStatus.QUEUED }
                     val stat = last?.diffStat.orEmpty()
@@ -230,7 +230,7 @@ class AgentChatView(
                             ?.trim()?.trimStart('#', '>', '-', '*', ' ')?.take(200)?.let { Md.inline(it).text }
                     }?.takeUnless { it.startsWith(t.title.take(40)) } // the first prompt is already the title
                     ThreadRow(t, ChatLogic.status(t, last, backend.openRequests(t.id)), last, stat.sumOf { it.add }, stat.sumOf { it.del }, preview, draft = runs.isEmpty() && recent.isEmpty())
-                }
+                } }
             }.getOrDefault(emptyList())
             main.post {
                 if (scope != projectPath) return@post

@@ -160,6 +160,16 @@ class ChatLogicTest {
         assertEquals(listOf("u", "a1", "a2", "m:r1", "q"), ChatLogic.rows(items, runs).map { it.key })
     }
 
+    @Test fun oneUnreadableThreadIsStillListedAndDoesNotHideTheRest() {
+        val rows = listOf(thread("a"), thread("bad"), thread("c")).map { t ->
+            ChatLogic.rowOrBare(t) { if (t.id == "bad") error("corrupt rows") else ThreadRow(t, ThreadStatus.DONE, null, 1, 2) }
+        }
+        assertEquals(listOf("a", "bad", "c"), rows.map { it.thread.id })
+        assertEquals(ThreadStatus.IDLE, rows[1].status)
+        assertFalse(rows[1].draft)
+        assertEquals(ThreadStatus.DONE, rows[0].status)
+    }
+
     @Test fun rowKeysAreUniqueEvenForCorruptHistory() {
         fun item(id: String, ord: Int, run: String?, p: ItemPayload) = TurnItem(id, "t", run, ord, null, null, ItemStatus.COMPLETED, p, 0)
         val items = listOf(

@@ -40,6 +40,9 @@ object ChatLogic {
     /** Default Chat; beta off = terminal only (1.7.x). */
     fun isChatMode(stored: String?, betaOn: Boolean): Boolean = betaOn && stored != MODE_TERMINAL
 
+    /** One thread whose runs/items cannot be read is still listed (bare row, never a "draft"); it must never hide the other threads of the scope. */
+    fun rowOrBare(t: ChatThread, build: () -> ThreadRow): ThreadRow = runCatching(build).getOrElse { ThreadRow(t, ThreadStatus.IDLE, null, 0, 0) }
+
     fun status(thread: ChatThread, lastRun: Run?, open: List<ChatRequest>): ThreadStatus {
         val pending = open.filter { it.status == RequestStatus.PENDING }
         return when {
