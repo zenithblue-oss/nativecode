@@ -235,7 +235,7 @@ internal fun Composer(
                     Box {
                         Chip(
                             modelName + if (model?.free == true) " · free" else "",
-                            Modifier.widthIn(max = 200.dp).semantics { contentDescription = "${providerName(t.tool)}, model $modelName${if (model?.free == true) ", free" else ""}. Change provider or model" },
+                            Modifier.widthIn(max = 200.dp).semantics { contentDescription = tr(if (model?.free == true) R.string.chat_model_chip_desc_free else R.string.chat_model_chip_desc, providerName(t.tool), modelName) },
                             icon = Ic.Bot, trailing = Ic.ChevronDown, leading = { ProviderLogo(t.tool, size = 20.dp) },
                         ) { s.sheet = ComposerSheet.MODEL }
                         DropdownMenu(s.sheet == ComposerSheet.MODEL, { s.sheet = null }, containerColor = C.low) {

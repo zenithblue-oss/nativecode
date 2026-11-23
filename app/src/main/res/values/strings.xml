@@ -1613,4 +1613,13 @@
     <string name="browser_collapse">Collapse browser</string>
     <string name="browser_expand">Expand browser</string>
     <string name="browser_close">Close browser and stop the agent</string>
+    <string name="chat_model_chip_desc">%1$s, model %2$s. Change provider or model</string>
+    <string name="chat_model_chip_desc_free">%1$s, model %2$s, free. Change provider or model</string>
+    <string name="chat_provider_requires_pro">%1$s requires Pro</string>
+    <string name="chat_provider_terminal_only">Terminal only, no chat yet</string>
+    <string name="chat_provider_requires_pro_state">Requires Pro</string>
+    <string name="chat_model_header">Model · %1$s</string>
+    <string name="chat_switch_to_load_models">Switch to start it and load its models</string>
+    <string name="chat_switch_to_provider">Switch to %1$s</string>
+    <string name="chat_switched_to">Switched to %1$s · %2$s</string>
 </resources>

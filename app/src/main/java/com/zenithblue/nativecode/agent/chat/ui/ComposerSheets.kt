@@ -112,10 +112,10 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
                 Column(
                     Modifier.width(68.dp).alpha(if (chat) 1f else 0.4f)
                         .selectable(on, enabled = chat, role = Role.RadioButton) {
-                            if (locked) { v.host.showUpgradeSheet("${def.displayName} requires Pro"); close() } else { picked = def.terminalType; q = "" }
+                            if (locked) { v.host.showUpgradeSheet(tr(R.string.chat_provider_requires_pro, def.displayName)); close() } else { picked = def.terminalType; q = "" }
                         }
                         .background(if (on) C.primary.copy(alpha = 0.08f) else C.low).padding(S.xs)
-                        .semantics { if (!chat) stateDescription = "Terminal only, no chat yet" else if (locked) stateDescription = "Requires Pro" },
+                        .semantics { if (!chat) stateDescription = tr(R.string.chat_provider_terminal_only) else if (locked) stateDescription = tr(R.string.chat_provider_requires_pro_state) },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box {
@@ -126,13 +126,13 @@ internal fun ModelMenu(v: AgentChatView, t: ChatThread, close: () -> Unit) {
                 }
             }
         }
-        Overline("Model · ${providerName(sel)}", color = C.outline)
+        Overline(tr(R.string.chat_model_header, providerName(sel)), color = C.outline)
         if (models.isEmpty()) {
             if (!own) {
                 if (loaded) {
                     Text(tr(R.string.chat_default_model), color = C.on, style = T.codeSm)
-                    Text("Switch to start it and load its models", color = C.outline, style = T.meta)
-                    NcButton("Switch to ${providerName(sel)}", icon = Ic.Retry) { v.bg { v.backend.switchProvider(t.id, sel, null) }; close() }
+                    Text(tr(R.string.chat_switch_to_load_models), color = C.outline, style = T.meta)
+                    NcButton(tr(R.string.chat_switch_to_provider, providerName(sel)), icon = Ic.Retry) { v.bg { v.backend.switchProvider(t.id, sel, null) }; close() }
                 }
                 return@Column
             }

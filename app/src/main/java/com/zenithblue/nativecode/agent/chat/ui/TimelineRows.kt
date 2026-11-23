@@ -116,7 +116,7 @@ private fun ItemRow(v: AgentChatView, t: ChatThread, item: TurnItem, live: Boole
 /** "Switched to Codex · gpt-x": the thread moved to another provider here. */
 @Composable
 private fun SwitchDivider(p: ItemPayload.ProviderSwitch, modifier: Modifier) {
-    val label = "Switched to ${providerName(p.tool)} · ${p.model?.substringAfterLast('/') ?: tr(R.string.chat_default_model)}"
+    val label = tr(R.string.chat_switched_to, providerName(p.tool), p.model?.substringAfterLast('/') ?: tr(R.string.chat_default_model))
     Row(modifier.semantics(mergeDescendants = true) { contentDescription = label }, verticalAlignment = Alignment.CenterVertically) {
         Hairline(Modifier.weight(1f))
         Row(Modifier.padding(horizontal = S.s), verticalAlignment = Alignment.CenterVertically) {
