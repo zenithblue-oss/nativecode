@@ -291,7 +291,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
             NcIcon(Ic.ChevronRight, null, tint = C.onVar, size = 16.dp)
         }
 
-        BrowserCard(threadId)
+        BrowserCard(threadId, approvalPending = pending != null)
         AnimatedVisibility(pending != null, enter = slideInVertically { it / 2 } + fadeIn(), exit = fadeOut()) {
             when {
                 pending == null -> {}

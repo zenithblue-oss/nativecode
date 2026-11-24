@@ -26,7 +26,7 @@ private val PANEL_H = 260.dp
  * touch the page; Close stops the agent and withdraws its consent.
  */
 @Composable
-internal fun BrowserCard(threadId: String) {
+internal fun BrowserCard(threadId: String, approvalPending: Boolean = false) {
     val b = AgentBrowser.ui
     val c = b.consent
     if (c != null && c.threadId == threadId) {
@@ -56,7 +56,8 @@ internal fun BrowserCard(threadId: String) {
                 }
                 // Collapsed = not composed: AgentBrowser parks the WebView in the window (alpha ~0), so it keeps rendering and
                 // keeps its viewport; a clipped-to-nothing child would stop Chromium drawing.
-                if (!b.collapsed) Column(Modifier.fillMaxWidth().height(PANEL_H).clipToBounds()) {
+                // An approval card pending = panel parked too, so APPROVE / DENY never get pushed off screen.
+                if (!b.collapsed && !approvalPending) Column(Modifier.fillMaxWidth().height(PANEL_H).clipToBounds()) {
                     AndroidView(
                         factory = { AgentBrowser.attach(it) },
                         modifier = Modifier.fillMaxWidth().requiredHeight(PANEL_H),
