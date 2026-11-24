@@ -49,6 +49,8 @@ object AgentChats {
     fun markLive(e: Entry) { e.starting = false; onChanged?.invoke() }
     fun remove(e: Entry) { if (entries.remove(e)) onChanged?.invoke() }
 
+    /** Any chat process (live or starting) of this terminal-type tool. */
+    fun hasTool(tool: String): Boolean = entries.any { it.tool == tool }
     fun startingCount(): Int = entries.count { it.starting }
     fun liveCount(): Int = entries.count { !it.starting }
 

@@ -25,6 +25,7 @@ object CliVersionCheck {
     }
 
     private val cache = ConcurrentHashMap<String, Result>()
+    private val ANSI = Regex("\u001B\\[[0-9;?]*[A-Za-z]")
 
     /** [id] = catalog id or terminal type (a chat thread stores the terminal type). */
     fun def(id: String): CliToolDef? = CliToolCatalog.ALL.firstOrNull { it.id == id || it.terminalType == id }
@@ -55,12 +56,21 @@ object CliVersionCheck {
      * The existing update path for this CLI: opencode comes with the Components update pack (download, apply, progress);
      * the others run their own self-update in the guest. [onState] runs on the main thread. Success clears the cached version.
      */
-    fun update(activity: Activity, id: String, onState: (State) -> Unit) {
+    fun update(activity: Activity, id: String, onState: (State) -> Unit) = exec(activity, id, null, onState)
+
+    /** Installs (or reinstalls) from the vendor's installer: same progress and re-probe as [update]. */
+    fun install(activity: Activity, id: String, onState: (State) -> Unit) {
+        val c = def(id)?.installCmd ?: return onState(State.Done(false, "No installer for $id"))
+        exec(activity, id, c, onState)
+    }
+
+    /** [cmd] null = the update path above (opencode: Components pack first); else that guest command. */
+    private fun exec(activity: Activity, id: String, cmd: String?, onState: (State) -> Unit) {
         val d = def(id) ?: return onState(State.Done(false, "Unknown tool"))
         val app = activity.applicationContext
         val main = Handler(Looper.getMainLooper())
         fun done(ok: Boolean, msg: String) { if (ok) cache.remove(d.id); main.post { onState(State.Done(ok, msg)) } }
-        if (d.id == "opencode" && RuntimeUpdatePack.isNeeded(app)) {
+        if (cmd == null && d.id == "opencode" && RuntimeUpdatePack.isNeeded(app)) {
             RuntimeUpdatePack.update(activity) { p ->
                 when (p) {
                     is RuntimeUpdatePack.Progress.Running -> onState(State.Running(p.text))
@@ -69,16 +79,26 @@ object CliVersionCheck {
             }
             return
         }
-        val cmd = d.updateCmd ?: return onState(State.Done(false, "${d.displayName} has no in-app updater. Update it from a terminal."))
-        onState(State.Running("Updating ${d.displayName}…"))
+        val sh = cmd ?: d.updateCmd ?: return onState(State.Done(false, "${d.displayName} has no in-app updater. Update it from a terminal."))
+        onState(State.Running("${d.displayName}…"))
         Thread {
             try {
-                val (args, env) = LinuxCommandBuilder.build(app, login("$cmd 2>&1 | tail -n 5"), "flux", method = "proot")
-                val out = ShellCommandRunner.runCaptureExit(app, args, env).second.trim()
+                val (args, env) = LinuxCommandBuilder.build(app, login("set -o pipefail; $sh 2>&1"), "flux", method = "proot")
+                val proc = ShellCommandRunner.startPiped(app, args, env, mergeStderr = true)
+                var last = ""
+                var shown = 0L
+                proc.inputStream.bufferedReader().forEachLine { raw ->
+                    val l = raw.replace(ANSI, "").trim()
+                    if (l.isEmpty()) return@forEachLine
+                    last = l
+                    val now = System.currentTimeMillis()
+                    if (now - shown > 400) { shown = now; main.post { onState(State.Running(l.take(90))) } }
+                }
+                val code = proc.waitFor()
                 cache.remove(d.id)
                 val now = check(app, d.id, force = true)
-                val ok = now?.installed != null && !now.tooOld
-                done(ok, if (ok) "${d.displayName} ${now?.installed}" else out.lineSequence().lastOrNull { it.isNotBlank() } ?: "Update failed")
+                val ok = code == 0 && now?.installed != null && !now.tooOld
+                done(ok, if (ok) "${d.displayName} ${now?.installed}" else last.ifEmpty { "Update failed" })
             } catch (e: Exception) {
                 done(false, e.message ?: "Update failed")
             }

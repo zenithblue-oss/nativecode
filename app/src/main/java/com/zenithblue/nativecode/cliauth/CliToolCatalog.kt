@@ -44,7 +44,11 @@ data class CliToolDef(
      */
     val minChatVersion: String? = null,
     /** Guest shell command that updates this CLI itself (null = delivered by the Components update pack). */
-    val updateCmd: String? = null
+    val updateCmd: String? = null,
+    /** Guest shell command that installs (or reinstalls) this CLI from its vendor, as setup_cli_tools.sh does. */
+    val installCmd: String? = null,
+    /** One short line for the Settings card. */
+    val description: String = ""
 )
 
 enum class ChatProtocol { OPENCODE_HTTP, CLAUDE_STREAM, CODEX_APP_SERVER, ACP }
@@ -63,7 +67,9 @@ object CliToolCatalog {
             subtitle = tr(R.string.cli_claude_auth_login_browser_oauth),
             chat = ChatProtocol.CLAUDE_STREAM,
             minChatVersion = "2.1.0",
-            updateCmd = "claude update"
+            updateCmd = "claude update",
+            installCmd = "curl -fsSL https://claude.ai/install.sh | bash",
+            description = tr(R.string.cli_desc_claude)
         ),
         CliToolDef(
             id = "codex",
@@ -76,7 +82,9 @@ object CliToolCatalog {
             subtitle = tr(R.string.cli_codex_login_device_auth),
             chat = ChatProtocol.CODEX_APP_SERVER,
             minChatVersion = "0.130.0",
-            updateCmd = "npm install -g @openai/codex@latest"
+            updateCmd = "npm install -g @openai/codex@latest",
+            installCmd = "npm install -g @openai/codex@latest",
+            description = tr(R.string.cli_desc_codex)
         ),
         CliToolDef(
             id = "qwen",
@@ -86,7 +94,10 @@ object CliToolCatalog {
             terminalType = "qwen-code",
             consoleUrl = "https://modelstudio.console.alibabacloud.com/?tab=coding-plan#/efm/coding-plan-index",
             envKey = "BAILIAN_CODING_PLAN_API_KEY",
-            subtitle = tr(R.string.cli_api_key_oauth_free_tier)
+            subtitle = tr(R.string.cli_api_key_oauth_free_tier),
+            updateCmd = "npm install -g @qwen-code/qwen-code@latest",
+            installCmd = "npm install -g @qwen-code/qwen-code@latest",
+            description = tr(R.string.cli_desc_qwen)
         ),
         CliToolDef(
             id = "opencode",
@@ -98,7 +109,10 @@ object CliToolCatalog {
             subtitle = tr(R.string.cli_opencode_auth_login_providers),
             loginOptional = true,
             chat = ChatProtocol.OPENCODE_HTTP,
-            minChatVersion = "2.0.0"
+            minChatVersion = "2.0.0",
+            updateCmd = "opencode upgrade",
+            installCmd = "curl -fsSL https://opencode.ai/v2/install | bash",
+            description = tr(R.string.cli_desc_opencode)
         ),
         CliToolDef(
             id = "agy",
@@ -110,7 +124,10 @@ object CliToolCatalog {
             subtitle = tr(R.string.cli_agy_acp_login_google_oauth),
             chat = ChatProtocol.ACP,
             acpProfile = "agy",
-            minChatVersion = "1.4.0"
+            minChatVersion = "1.4.0",
+            updateCmd = "agy update",
+            installCmd = "A=~/.local/bin/agy; [ -x \$A ] && mv -f \$A \$A.prev; if curl -fsSL https://antigravity.google/cli/install.sh | bash; then rm -f \$A.prev; else [ -e \$A.prev ] && mv -f \$A.prev \$A; false; fi",
+            description = tr(R.string.cli_desc_agy)
         ),
         CliToolDef(
             id = "grok",
@@ -124,7 +141,9 @@ object CliToolCatalog {
             chat = ChatProtocol.ACP,
             acpProfile = "grok",
             minChatVersion = "1.0.50",
-            updateCmd = "grok update"
+            updateCmd = "grok update",
+            installCmd = "curl -fsSL https://x.ai/cli/install.sh | bash",
+            description = tr(R.string.cli_desc_grok)
         ),
         CliToolDef(
             id = "kiro",
@@ -135,7 +154,10 @@ object CliToolCatalog {
             terminalType = "kiro",
             consoleUrl = "https://app.kiro.dev",
             envKey = "KIRO_API_KEY",
-            subtitle = tr(R.string.cli_kiro_cli_login_device_browser)
+            subtitle = tr(R.string.cli_kiro_cli_login_device_browser),
+            updateCmd = "kiro-cli update --non-interactive",
+            installCmd = "curl -fsSL https://cli.kiro.dev/install | bash",
+            description = tr(R.string.cli_desc_kiro)
         )
     )
 

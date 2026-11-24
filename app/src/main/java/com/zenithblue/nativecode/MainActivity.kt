@@ -200,7 +200,6 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** AI CLI browser login page (Settings Hub → AI CLI LOGIN). */
     private lateinit var cliAuthScrollView: ScrollView
     private var cliAuthMethodBadge: TextView? = null
-    private var cliAuthBody: LinearLayout? = null
     /** AI CLI sign-in popup ([CliLoginSheet]) shown for this tool id; null = closed. */
     private val cliLoginId = androidx.compose.runtime.mutableStateOf<String?>(null)
     /** Settings → AI Safety & Report (C5 / B16). */
@@ -16867,8 +16866,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         headerTitleRow.addView(methodBadge)
         pageLayout.addView(headerTitleRow)
         pageLayout.addView(spacer(12))
-        cliAuthBody = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        pageLayout.addView(cliAuthBody)
+        pageLayout.addView(androidx.compose.ui.platform.ComposeView(this).apply {
+            setContent {
+                com.zenithblue.nativecode.agent.chat.ui.ChatTheme {
+                    com.zenithblue.nativecode.cliauth.ui.CliToolsPage(cliTools, cliToolsHost)
+                }
+            }
+        })
     }
 
 
@@ -18257,6 +18261,97 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Last probed login state per CLI id; a change rebuilds the card grids (see paintCliAuth). */
     private val cliAuthStates = HashMap<String, AuthState>()
 
+    // ── AI CLI tools page (Compose: cliauth/ui/CliToolsPage.kt): one card per CLI with version, status chips and actions ──
+    private val cliTools = com.zenithblue.nativecode.cliauth.ui.CliToolsModel()
+
+    private fun cliUpdLocked(id: String) = aiToolLocked(CliToolCatalog.byId(id)?.terminalType ?: id)
+
+    /** Guest `--version` + vendor latest for every unlocked CLI, off the main thread; cards update as each lands. */
+    private fun checkCliUpdates(force: Boolean) {
+        if (cliTools.checking) return
+        val ids = cliTools.tools.map { it.id }.filter { !cliUpdLocked(it) && it !in cliTools.busy && (force || CliUpdates.stale(it)) }
+        if (ids.isEmpty()) return
+        cliTools.checking = true
+        Thread {
+            ids.forEach { id -> val r = CliUpdates.status(this, id, force); runOnUiThread { r?.let { cliTools.rows[id] = it } } }
+            runOnUiThread { cliTools.checking = false; cliTools.checkedAt = cliTools.rows.values.maxOfOrNull { it.at } ?: 0L }
+        }.start()
+    }
+
+    /** A chat process or terminal tab of this CLI is open: updating would swap the binary under it. */
+    private fun cliInUse(def: CliToolDef): Boolean {
+        val others = projectTabNamesMap.filterKeys { it != workspaceLoadedPath }.values.flatten()
+        return AgentChats.hasTool(def.terminalType) || (terminalSessionTypes + workspaceTabNames + others).any { it == def.terminalType }
+    }
+
+    /** Update or (re)install [id] under the same gate as launching the tool (Free: opencode only). [then] runs when it ends or is refused. */
+    private fun runCliOp(id: String, install: Boolean, then: () -> Unit = {}) {
+        val def = CliToolCatalog.byId(id)
+        if (def == null || id in cliTools.busy || !gateAllows(FeatureGate.canLaunchAiTool(isPro(), def.terminalType))) return then()
+        if (cliInUse(def)) {
+            Toast.makeText(this, tr(R.string.cli_upd_in_use, def.displayName), Toast.LENGTH_LONG).show()
+            return then()
+        }
+        cliTools.busy[id] = tr(R.string.main_updating)
+        val onState = { st: CliVersionCheck.State ->
+            when (st) {
+                is CliVersionCheck.State.Running -> cliTools.busy[id] = st.text
+                is CliVersionCheck.State.Done -> Thread {
+                    val row = CliUpdates.status(this, id, force = true)
+                    runOnUiThread {
+                        row?.let { cliTools.rows[id] = it }
+                        cliTools.checkedAt = cliTools.rows.values.maxOfOrNull { it.at } ?: 0L
+                        cliTools.busy.remove(id)
+                        val ver = row?.installed.orEmpty()
+                        Toast.makeText(this, when {
+                            st.ok && install -> tr(R.string.cli_page_install_done, def.displayName, ver)
+                            st.ok -> tr(R.string.cli_upd_done, def.displayName, ver)
+                            install -> tr(R.string.cli_page_install_failed, def.displayName, st.message)
+                            else -> tr(R.string.cli_upd_failed, def.displayName, st.message)
+                        }, Toast.LENGTH_LONG).show()
+                        paintCliAuth()
+                        then()
+                    }
+                }.start()
+            }
+        }
+        if (install) CliVersionCheck.install(this, id, onState) else CliVersionCheck.update(this, id, onState)
+    }
+
+    private val cliToolsHost = object : com.zenithblue.nativecode.cliauth.ui.CliToolsHost {
+        override fun check() = checkCliUpdates(true)
+        override fun updateAll() {
+            val ids = cliTools.pending().map { it.id }
+            fun next(i: Int) { if (i < ids.size) runCliOp(ids[i], false) { next(i + 1) } }
+            next(0)
+        }
+        override fun update(id: String) = runCliOp(id, false)
+        override fun install(id: String) = runCliOp(id, true)
+        override fun signIn(id: String) = showCliLogin(id)
+        override fun openTerminal(def: CliToolDef) = openCliTerminal(def)
+        override fun upgrade(id: String) { gateAllows(FeatureGate.canLaunchAiTool(isPro(), CliToolCatalog.byId(id)?.terminalType ?: id)) }
+        override fun github(signedIn: Boolean) {
+            val method = LinuxCommandBuilder.currentMethod
+            if (signedIn) confirmGhLogout(method) else startGithubConnect(method, fromSettings = true)
+        }
+        override fun openSafety() {
+            if (pageStack.isEmpty() || pageStack.peek() != ID_AI_SAFETY) pageStack.push(ID_AI_SAFETY)
+            navigateToPage(ID_AI_SAFETY)
+        }
+        override fun clearCredentials() {
+            CredentialClearService.clearAllAiCredentials(this@MainActivity, LinuxCommandBuilder.currentMethod) { _, msg ->
+                Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                paintCliAuth()
+            }
+        }
+        override fun clearSuiteFlag() {
+            CredentialClearService.clearAiSuiteProvisionFlag(this@MainActivity, LinuxCommandBuilder.currentMethod)
+            refreshTerminalToolSelector()
+            refreshWorkspaceHubTools()
+            paintCliAuth()
+        }
+    }
+
     /**
      * ONE shared login status row for every AI CLI card (terminal grid, workspace hub, Settings list):
      * hairline divider, state dot + label, and a LOGIN action on the right. 48dp touch target.
@@ -18335,77 +18430,32 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private fun cliAuthDetail(i: CliAuthInfo): String? =
         listOfNotNull(i.account, i.detail).takeIf { it.isNotEmpty() }?.joinToString(" · ")
 
-    /** Re-reads login state from the auth files (plain file I/O off the main thread) and repaints. */
+    /** Re-reads login state from the auth files (plain file I/O off the main thread) and refreshes the page model. */
     private fun paintCliAuth() {
-        val body = cliAuthBody ?: return
         val method = LinuxCommandBuilder.currentMethod
         cliAuthMethodBadge?.text = method.uppercase()
-        val ids = CliToolCatalog.forMethod(method).map { it.id } + "gh"
+        val tools = CliToolCatalog.forMethod(method)
+        val ids = tools.map { it.id } + "gh"
         Thread {
             val home = ProjectPathResolver.guestHomeDir(this, method)
             val infos = ids.associateWith { CliCredentialProbe.probe(it, home) }
             runOnUiThread {
-                if (cliAuthBody !== body) return@runOnUiThread
                 // Login state changed since last look: rebuild the card grids so their pills update.
                 val changed = infos.any { (k, v) -> cliAuthStates[k]?.let { it != v.state } == true }
-                infos.forEach { (k, v) -> cliAuthStates[k] = v.state }
+                infos.forEach { (k, v) -> cliAuthStates[k] = v.state; cliTools.auth[k] = v }
                 if (changed) {
                     refreshTerminalToolSelector()
                     refreshWorkspaceHubTools()
                 }
-                body.removeAllViews()
-                paintCliAuthList(body, infos)
+                cliTools.tools = tools
+                tools.forEach { t ->
+                    cliTools.locked[t.id] = cliUpdLocked(t.id)
+                    CliUpdates.row(t.id)?.let { cliTools.rows[t.id] = it }
+                }
+                cliTools.checkedAt = cliTools.rows.values.maxOfOrNull { it.at } ?: 0L
+                checkCliUpdates(false)
             }
         }.start()
-    }
-
-    /** Row / pill tap: the CLI's sign-in popup; GitHub keeps its own device flow (sign out when already connected). */
-    private fun openCliRow(id: String, signedIn: Boolean) {
-        val method = LinuxCommandBuilder.currentMethod
-        if (id != "gh") showCliLogin(id)
-        else if (signedIn) confirmGhLogout(method)
-        else startGithubConnect(method, fromSettings = true)
-    }
-
-    private fun paintCliAuthList(body: LinearLayout, infos: Map<String, CliAuthInfo>) {
-        infos.forEach { (id, info) ->
-            val signedIn = info.state == AuthState.SIGNED_IN
-            val card = glassCard().apply {
-                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(10) }
-                setOnClickListener { openCliRow(id, signedIn) }
-            }
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-            }
-            row.addView(TextView(this).apply {
-                text = cliAuthName(id)
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
-                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
-            })
-            val ctl = cliLoginControl(id, info.state) { openCliRow(id, signedIn) }
-            card.addView(row)
-            if (ctl != null) card.addView(ctl)
-            cliAuthDetail(info)?.let {
-                card.addView(TextView(this).apply {
-                    text = it
-                    textSize = 11f
-                    setTextColor(NC.OUTLINE)
-                    typeface = Typeface.MONOSPACE
-                    setPadding(0, dp(4), 0, 0)
-                })
-            }
-            body.addView(card)
-        }
-        body.addView(secondaryButton(tr(R.string.main_ai_safety_report)) {
-            if (pageStack.isEmpty() || pageStack.peek() != ID_AI_SAFETY) pageStack.push(ID_AI_SAFETY)
-            navigateToPage(ID_AI_SAFETY)
-        }.apply {
-            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6); bottomMargin = dp(16) }
-            textSize = 12f
-        })
     }
 
     private fun openCliTerminal(def: CliToolDef) {
