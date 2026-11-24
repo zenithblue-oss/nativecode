@@ -167,6 +167,7 @@ internal fun Composer(
 ) {
     var sendMenu by remember { mutableStateOf(false) }
     var modeMenu by remember { mutableStateOf(false) }
+    var effortMenu by remember { mutableStateOf(false) }
     var confirmFull by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val focus = remember { MutableInteractionSource() }
@@ -237,12 +238,29 @@ internal fun Composer(
                 IconBtn(Ic.Plus, tr(R.string.chat_add_photo_file_file_command), tint = C.onVar, box = 40.dp) { s.sheet = ComposerSheet.PLUS }
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(S.gap)) {
                     val modelName = model?.name?.ifBlank { null } ?: currentModel?.substringAfterLast('/') ?: tr(R.string.chat_default_model)
-                    val tag = if (efforts.isNotEmpty() && t.effort != null) " · " + t.effort else if (model?.free == true) " · free" else ""
                     Chip(
-                        modelName + tag,
+                        modelName + if (model?.free == true) " · free" else "",
                         Modifier.widthIn(max = 220.dp).semantics { contentDescription = tr(if (model?.free == true) R.string.chat_model_chip_desc_free else R.string.chat_model_chip_desc, providerName(t.tool), modelName) },
                         trailing = Ic.ChevronDown, leading = { ProviderLogo(t.tool, size = 20.dp) },
                     ) { s.sheet = ComposerSheet.MODEL }
+                    if (efforts.isNotEmpty()) Box {
+                        val level = t.effort ?: tr(R.string.chat_effort_default)
+                        Chip(
+                            tr(R.string.chat_effort_chip, level), Modifier.semantics { contentDescription = tr(R.string.chat_effort_chip_desc, level) },
+                            icon = Ic.Lightbulb, trailing = Ic.ChevronDown,
+                        ) { effortMenu = true }
+                        DropdownMenu(effortMenu, { effortMenu = false }, containerColor = C.low) {
+                            Overline(tr(R.string.chat_reasoning_effort), Modifier.padding(horizontal = S.l, vertical = S.xs), color = C.outline)
+                            efforts.forEach { x ->
+                                val on = x == t.effort
+                                DropdownMenuItem(
+                                    text = { Text(x, style = T.codeSm, color = if (on) C.primary else C.on) },
+                                    onClick = { effortMenu = false; if (!on) cfg(ConfigChange(effort = x)) },
+                                    trailingIcon = if (on) ({ NcIcon(Ic.Check, tr(R.string.chat_selected), tint = C.primary, size = 16.dp) }) else null,
+                                )
+                            }
+                        }
+                    }
                     Box {
                         val full = t.runtimeMode == RuntimeMode.FULL_ACCESS
                         Chip(

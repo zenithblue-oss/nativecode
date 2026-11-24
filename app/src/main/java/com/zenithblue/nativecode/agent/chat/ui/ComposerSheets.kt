@@ -40,6 +40,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -95,8 +96,8 @@ internal fun ComposerSheets(v: AgentChatView, t: ChatThread, s: ComposerState, o
 
 /**
  * Provider + model picker, a bottom sheet opened from the model chip (t3code ProviderModelPicker): search, a tab per CLI tool
- * (no chat yet = dimmed "Terminal only", Pro tool on Free = lock + upsell, signed out = "Sign in" opens its login page), then
- * that provider's models and the effort control. A model of the current provider applies at once; one of another provider
+ * (no chat yet = dimmed "Terminal only", Pro tool on Free = lock + upsell, signed out = "Sign in" opens its sign-in popup), then
+ * that provider's models (effort has its own composer chip). A model of the current provider applies at once; one of another provider
  * switches the thread to it (handoff, see ChatThreadController.switchProvider). Tabs are locked (with the reason) while a
  * turn runs and for delegated children, which stay on their provider.
  */
@@ -109,8 +110,10 @@ internal fun ModelSheet(v: AgentChatView, t: ChatThread, close: () -> Unit) {
     val child = NcTasks.isChild(t.id)
     val canSwitch = !busy && !child
     val defs = remember { CliToolCatalog.forMethod(LinuxCommandBuilder.currentMethod).sortedBy { it.chat == null } }
-    // Signed-out providers (login optional ones, like opencode, stay usable) show "Sign in" and open their login page instead of switching.
-    val auth by produceState(emptyMap<String, AuthState>()) {
+    // Signed-out providers (login optional ones, like opencode, stay usable) show "Sign in" and open their sign-in popup instead of switching.
+    var login by remember { mutableStateOf<String?>(null) }
+    var authRev by remember { mutableIntStateOf(0) }
+    val auth by produceState(emptyMap<String, AuthState>(), authRev) {
         val home = v.host.guestHome()
         value = withContext(Dispatchers.IO) { defs.associate { it.terminalType to CliCredentialProbe.probe(it.id, home).state } }
     }
@@ -124,7 +127,6 @@ internal fun ModelSheet(v: AgentChatView, t: ChatThread, close: () -> Unit) {
     val loaded = own || cached?.first == sel
     val models = if (own) live?.models.orEmpty() else cached?.takeIf { it.first == sel }?.second?.models.orEmpty()
     val current = if (own) t.model ?: live?.defaultModel else null
-    val efforts = if (own && live?.caps?.effort == true) models.firstOrNull { it.id == current }?.variants.orEmpty() else emptyList()
     var q by remember { mutableStateOf("") }
     ModalBottomSheet(close, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = C.bg, shape = Square, dragHandle = { SheetHandle() }) {
         Column(Modifier.fillMaxWidth().padding(horizontal = S.l).navigationBarsPadding().imePadding(), verticalArrangement = Arrangement.spacedBy(S.m)) {
@@ -146,7 +148,7 @@ internal fun ModelSheet(v: AgentChatView, t: ChatThread, close: () -> Unit) {
                             .selectable(on, enabled = chat && (canSwitch || on), role = Role.Tab) {
                                 when {
                                     locked -> { v.host.showUpgradeSheet(tr(R.string.chat_provider_requires_pro, def.displayName)); close() }
-                                    signIn -> { v.host.openCliLoginPage(def.id); close() }
+                                    signIn -> login = def.id
                                     else -> { picked = def.terminalType; q = "" }
                                 }
                             }
@@ -199,21 +201,11 @@ internal fun ModelSheet(v: AgentChatView, t: ChatThread, close: () -> Unit) {
                     }
                 }
             }
-            if (efforts.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(S.xs)) {
-                Overline(tr(R.string.chat_reasoning_effort), color = C.outline)
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).border(1.dp, C.border).selectableGroup()) {
-                    efforts.forEach { x ->
-                        val on = x == t.effort
-                        Box(
-                            Modifier.widthIn(min = 64.dp).heightIn(min = 44.dp).background(if (on) C.primary.copy(alpha = 0.14f) else C.low)
-                                .selectable(on, role = Role.RadioButton) { v.bg { v.backend.configure(t.id, ConfigChange(effort = x)) } }.padding(horizontal = S.m),
-                            contentAlignment = Alignment.Center,
-                        ) { Text(x, color = if (on) C.primary else C.onVar, style = T.codeSm, maxLines = 1) }
-                    }
-                }
-            }
             Spacer(Modifier.height(S.xs))
         }
+    }
+    login?.let { id ->
+        CliLoginSheet(id, onChanged = { authRev++ }, openTerminal = { d -> v.host.openTerminal(d.terminalType, emptyList(), null, false); close() }, close = { login = null })
     }
 }
 

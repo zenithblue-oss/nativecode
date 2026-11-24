@@ -1361,19 +1361,15 @@
     <string name="main_not_signed_in_2">ВХОД НЕ ВЫПОЛНЕН</string>
     <string name="main_unknown">НЕИЗВЕСТНО</string>
     <string name="main_login">ВХОД</string>
-    <string name="main_state_unknown_open_the_terminal">СОСТОЯНИЕ НЕИЗВЕСТНО · откройте terminal для проверки</string>
     <string name="main_sign_out">ВЫЙТИ</string>
     <string name="main_open_terminal">ОТКРЫТЬ TERMINAL</string>
     <string name="main_open_website">ОТКРЫТЬ САЙТ</string>
     <string name="main_sign_out_of">Выйти из %1$s?</string>
     <string name="main_this_removes_the_saved_login">Это удалит сохранённый вход только для этого инструмента. Другие инструменты не затрагиваются.</string>
     <string name="main_api_key">API-ключ</string>
-    <string name="main_paste_key_for_stored_in">Вставьте ключ для %1$s. Хранится в гостевом ~/.config/fluxlinux/cli-auth.env (%2$s).</string>
-    <string name="main_open_web">ОТКРЫТЬ ВЕБ</string>
     <string name="main_paste_the_code_from_the">Вставьте код из браузера</string>
     <string name="main_send">ОТПРАВИТЬ</string>
     <string name="main_code_sent_waiting">Код отправлен, ожидание…</string>
-    <string name="main_no_url_yet">URL пока нет</string>
     <string name="main_link_copied">Ссылка скопирована</string>
     <string name="main_create_import_project">Создать / импортировать проект</string>
     <string name="main_project_name">ИМЯ ПРОЕКТА</string>
@@ -1582,4 +1578,14 @@
     <string name="chat_switch_to_load_models">Переключитесь, чтобы запустить его и загрузить его модели</string>
     <string name="chat_switch_to_provider">Переключиться на %1$s</string>
     <string name="chat_switched_to">Переключено на %1$s · %2$s</string>
+    <string name="chat_effort_chip">Глубина: %1$s</string>
+    <string name="chat_effort_chip_desc">Глубина рассуждений %1$s. Изменить</string>
+    <string name="chat_effort_default">по умолчанию</string>
+    <string name="cli_login_steps_device">1. Нажмите «Открыть страницу входа».\n2. Введите код ниже, когда он потребуется.\n3. Подтвердите доступ. Это окно закроется, когда вы войдёте.</string>
+    <string name="cli_login_steps_browser">1. Нажмите «Открыть страницу входа» и подтвердите доступ.\n2. Скопируйте код, который показывает страница.\n3. Вставьте его ниже и нажмите «Отправить».</string>
+    <string name="cli_login_steps_key">1. Откройте сайт и создайте API-ключ.\n2. Вставьте ключ ниже.\n3. Нажмите «Сохранить». Ключ остаётся на этом устройстве.</string>
+    <string name="cli_login_steps_terminal">Этот инструмент входит через собственный terminal. Откройте terminal и следуйте его запросу на вход.</string>
+    <string name="cli_login_open_page">Открыть страницу входа</string>
+    <string name="cli_login_code">Ваш код</string>
+    <string name="cli_login_use_key">Использовать API-ключ</string>
 </resources>

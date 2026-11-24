@@ -1361,19 +1361,15 @@
     <string name="main_not_signed_in_2">未登录</string>
     <string name="main_unknown">未知</string>
     <string name="main_login">登录</string>
-    <string name="main_state_unknown_open_the_terminal">状态未知 · 请打开终端检查</string>
     <string name="main_sign_out">退出登录</string>
     <string name="main_open_terminal">打开终端</string>
     <string name="main_open_website">打开网站</string>
     <string name="main_sign_out_of">退出 %1$s 的登录？</string>
     <string name="main_this_removes_the_saved_login">这只会移除此工具已保存的登录信息，不影响其他工具。</string>
     <string name="main_api_key">API 密钥</string>
-    <string name="main_paste_key_for_stored_in">粘贴 %1$s 的密钥。存储于 guest 的 ~/.config/fluxlinux/cli-auth.env（%2$s）。</string>
-    <string name="main_open_web">打开网页</string>
     <string name="main_paste_the_code_from_the">粘贴浏览器中的代码</string>
     <string name="main_send">发送</string>
     <string name="main_code_sent_waiting">代码已发送，等待中…</string>
-    <string name="main_no_url_yet">暂无 URL</string>
     <string name="main_link_copied">链接已复制</string>
     <string name="main_create_import_project">创建 / 导入项目</string>
     <string name="main_project_name">项目名称</string>
@@ -1582,4 +1578,14 @@
     <string name="chat_switch_to_load_models">切换后即可启动并加载其模型</string>
     <string name="chat_switch_to_provider">切换到 %1$s</string>
     <string name="chat_switched_to">已切换到 %1$s · %2$s</string>
+    <string name="chat_effort_chip">强度：%1$s</string>
+    <string name="chat_effort_chip_desc">推理强度 %1$s。点按更改</string>
+    <string name="chat_effort_default">默认</string>
+    <string name="cli_login_steps_device">1. 点按“打开登录页面”。\n2. 按提示输入下方的代码。\n3. 批准访问。登录成功后此窗口会自动关闭。</string>
+    <string name="cli_login_steps_browser">1. 点按“打开登录页面”并批准访问。\n2. 复制页面显示的代码。\n3. 粘贴到下方并点按“发送”。</string>
+    <string name="cli_login_steps_key">1. 打开网站并创建 API 密钥。\n2. 将密钥粘贴到下方。\n3. 点按“保存”。密钥会保留在此设备上。</string>
+    <string name="cli_login_steps_terminal">此工具通过自己的终端登录。请打开终端并按提示登录。</string>
+    <string name="cli_login_open_page">打开登录页面</string>
+    <string name="cli_login_code">你的代码</string>
+    <string name="cli_login_use_key">改用 API 密钥</string>
 </resources>

@@ -1361,19 +1361,15 @@
     <string name="main_not_signed_in_2">未サインイン</string>
     <string name="main_unknown">不明</string>
     <string name="main_login">ログイン</string>
-    <string name="main_state_unknown_open_the_terminal">状態不明 · terminalを開いて確認してください</string>
     <string name="main_sign_out">サインアウト</string>
     <string name="main_open_terminal">terminalを開く</string>
     <string name="main_open_website">Webサイトを開く</string>
     <string name="main_sign_out_of">%1$sからサインアウトしますか？</string>
     <string name="main_this_removes_the_saved_login">このツールの保存済みログインのみ削除されます。他のツールには影響しません。</string>
     <string name="main_api_key">APIキー</string>
-    <string name="main_paste_key_for_stored_in">%1$sのキーを貼り付けてください。ゲストの~/.config/fluxlinux/cli-auth.env（%2$s）に保存されます。</string>
-    <string name="main_open_web">Webを開く</string>
     <string name="main_paste_the_code_from_the">ブラウザーのコードを貼り付けてください</string>
     <string name="main_send">送信</string>
     <string name="main_code_sent_waiting">コードを送信しました。待機中…</string>
-    <string name="main_no_url_yet">URLがまだありません</string>
     <string name="main_link_copied">リンクをコピーしました</string>
     <string name="main_create_import_project">プロジェクトを作成 / インポート</string>
     <string name="main_project_name">プロジェクト名</string>
@@ -1582,4 +1578,14 @@
     <string name="chat_switch_to_load_models">切り替えて起動し、モデルを読み込みます</string>
     <string name="chat_switch_to_provider">%1$sに切り替え</string>
     <string name="chat_switched_to">%1$sに切り替えました · %2$s</string>
+    <string name="chat_effort_chip">強度: %1$s</string>
+    <string name="chat_effort_chip_desc">推論の強度 %1$s。変更</string>
+    <string name="chat_effort_default">デフォルト</string>
+    <string name="cli_login_steps_device">1. 「サインインページを開く」をタップします。\n2. 求められたら、下のコードを入力します。\n3. アクセスを承認します。サインインするとこのウィンドウは閉じます。</string>
+    <string name="cli_login_steps_browser">1. 「サインインページを開く」をタップし、アクセスを承認します。\n2. ページに表示されたコードをコピーします。\n3. 下に貼り付けて「送信」をタップします。</string>
+    <string name="cli_login_steps_key">1. Webサイトを開いてAPIキーを作成します。\n2. 下にキーを貼り付けます。\n3. 「保存」をタップします。キーはこの端末に保存されます。</string>
+    <string name="cli_login_steps_terminal">このツールは専用のterminalからサインインします。terminalを開き、サインインの案内に従ってください。</string>
+    <string name="cli_login_open_page">サインインページを開く</string>
+    <string name="cli_login_code">コード</string>
+    <string name="cli_login_use_key">代わりにAPIキーを使う</string>
 </resources>

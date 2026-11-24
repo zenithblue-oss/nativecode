@@ -1361,19 +1361,15 @@
     <string name="main_not_signed_in_2">GİRİŞ YAPILMADI</string>
     <string name="main_unknown">BİLİNMİYOR</string>
     <string name="main_login">GİRİŞ</string>
-    <string name="main_state_unknown_open_the_terminal">DURUM BİLİNMİYOR · denetlemek için terminali açın</string>
     <string name="main_sign_out">ÇIKIŞ YAP</string>
     <string name="main_open_terminal">TERMİNALİ AÇ</string>
     <string name="main_open_website">WEB SİTESİNİ AÇ</string>
     <string name="main_sign_out_of">%1$s oturumu kapatılsın mı?</string>
     <string name="main_this_removes_the_saved_login">Bu işlem yalnızca bu aracın kayıtlı girişini kaldırır. Diğer araçlar etkilenmez.</string>
     <string name="main_api_key">API anahtarı</string>
-    <string name="main_paste_key_for_stored_in">%1$s için anahtarı yapıştırın. Konuktaki ~/.config/fluxlinux/cli-auth.env dosyasında saklanır (%2$s).</string>
-    <string name="main_open_web">WEB\'İ AÇ</string>
     <string name="main_paste_the_code_from_the">Tarayıcıdaki kodu yapıştırın</string>
     <string name="main_send">GÖNDER</string>
     <string name="main_code_sent_waiting">Kod gönderildi, bekleniyor…</string>
-    <string name="main_no_url_yet">Henüz URL yok</string>
     <string name="main_link_copied">Bağlantı kopyalandı</string>
     <string name="main_create_import_project">Proje Oluştur / İçe Aktar</string>
     <string name="main_project_name">PROJE ADI</string>
@@ -1582,4 +1578,14 @@
     <string name="chat_switch_to_load_models">Başlatmak ve modellerini yüklemek için geçiş yapın</string>
     <string name="chat_switch_to_provider">%1$s sağlayıcısına geç</string>
     <string name="chat_switched_to">Geçildi: %1$s · %2$s</string>
+    <string name="chat_effort_chip">Efor: %1$s</string>
+    <string name="chat_effort_chip_desc">Akıl yürütme eforu %1$s. Değiştir</string>
+    <string name="chat_effort_default">varsayılan</string>
+    <string name="cli_login_steps_device">1. “Giriş sayfasını aç” düğmesine dokunun.\n2. İstendiğinde aşağıdaki kodu girin.\n3. Erişimi onaylayın. Giriş yaptığınızda bu pencere kapanır.</string>
+    <string name="cli_login_steps_browser">1. “Giriş sayfasını aç” düğmesine dokunun ve erişimi onaylayın.\n2. Sayfanın gösterdiği kodu kopyalayın.\n3. Aşağıya yapıştırıp “Gönder” düğmesine dokunun.</string>
+    <string name="cli_login_steps_key">1. Web sitesini açıp bir API anahtarı oluşturun.\n2. Anahtarı aşağıya yapıştırın.\n3. “Kaydet” düğmesine dokunun. Anahtar bu cihazda kalır.</string>
+    <string name="cli_login_steps_terminal">Bu araç giriş için kendi terminalini kullanır. Terminali açın ve giriş istemini izleyin.</string>
+    <string name="cli_login_open_page">Giriş sayfasını aç</string>
+    <string name="cli_login_code">Kodunuz</string>
+    <string name="cli_login_use_key">Bunun yerine API anahtarı kullan</string>
 </resources>

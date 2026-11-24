@@ -1361,19 +1361,15 @@
     <string name="main_not_signed_in_2">NON CONNECTÉ</string>
     <string name="main_unknown">INCONNU</string>
     <string name="main_login">CONNEXION</string>
-    <string name="main_state_unknown_open_the_terminal">ÉTAT INCONNU · ouvrez le terminal pour vérifier</string>
     <string name="main_sign_out">SE DÉCONNECTER</string>
     <string name="main_open_terminal">OUVRIR LE TERMINAL</string>
     <string name="main_open_website">OUVRIR LE SITE</string>
     <string name="main_sign_out_of">Se déconnecter de %1$s ?</string>
     <string name="main_this_removes_the_saved_login">Cela supprime la connexion enregistrée pour cet outil uniquement. Les autres outils ne sont pas affectés.</string>
     <string name="main_api_key">Clé API</string>
-    <string name="main_paste_key_for_stored_in">Collez la clé pour %1$s. Stockée dans ~/.config/fluxlinux/cli-auth.env de l\'invité (%2$s).</string>
-    <string name="main_open_web">OUVRIR LE WEB</string>
     <string name="main_paste_the_code_from_the">Collez le code du navigateur</string>
     <string name="main_send">ENVOYER</string>
     <string name="main_code_sent_waiting">Code envoyé, en attente…</string>
-    <string name="main_no_url_yet">Pas encore d\'URL</string>
     <string name="main_link_copied">Lien copié</string>
     <string name="main_create_import_project">Créer / importer un projet</string>
     <string name="main_project_name">NOM DU PROJET</string>
@@ -1582,4 +1578,14 @@
     <string name="chat_switch_to_load_models">Basculez pour le démarrer et charger ses modèles</string>
     <string name="chat_switch_to_provider">Basculer vers %1$s</string>
     <string name="chat_switched_to">Basculé vers %1$s · %2$s</string>
+    <string name="chat_effort_chip">Effort : %1$s</string>
+    <string name="chat_effort_chip_desc">Effort de raisonnement %1$s. Modifier</string>
+    <string name="chat_effort_default">par défaut</string>
+    <string name="cli_login_steps_device">1. Touchez « Ouvrir la page de connexion ».\n2. Saisissez le code ci-dessous lorsqu\'il est demandé.\n3. Autorisez l\'accès. Cette fenêtre se ferme une fois connecté.</string>
+    <string name="cli_login_steps_browser">1. Touchez « Ouvrir la page de connexion » et autorisez l\'accès.\n2. Copiez le code affiché par la page.\n3. Collez-le ci-dessous et touchez « Envoyer ».</string>
+    <string name="cli_login_steps_key">1. Ouvrez le site et créez une clé API.\n2. Collez la clé ci-dessous.\n3. Touchez « Enregistrer ». La clé reste sur cet appareil.</string>
+    <string name="cli_login_steps_terminal">Cet outil se connecte depuis son propre terminal. Ouvrez le terminal et suivez son invite de connexion.</string>
+    <string name="cli_login_open_page">Ouvrir la page de connexion</string>
+    <string name="cli_login_code">Votre code</string>
+    <string name="cli_login_use_key">Utiliser plutôt une clé API</string>
 </resources>

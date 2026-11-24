@@ -38,8 +38,8 @@ internal interface UsageHostApi {
     fun allowed(agent: String): Boolean
     /** Shows the Upgrade sheet. */
     fun upgrade()
-    /** Opens the CLI sign-in page (Settings). */
-    fun openLogin()
+    /** Opens the sign-in popup of [agent] (a ccusage name such as `claude`). */
+    fun openLogin(agent: String)
     /** Opens Settings > Components, where the Linux runtime update (ccusage, OpenSSH) is applied. */
     fun openComponents()
 }
@@ -361,7 +361,7 @@ internal class UsagePage(private val ctx: Context, private val host: UsageHostAp
             LimitState.FREE -> addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = tr(R.string.usage_free_models_no_plan_limits); setPadding(0, dp(10), 0, 0) })
             LimitState.NOT_SIGNED_IN -> {
                 addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = tr(R.string.usage_not_signed_in); setPadding(0, dp(10), 0, dp(8)) })
-                addView(chip(tr(R.string.usage_sign_in), false) { host.openLogin() })
+                addView(chip(tr(R.string.usage_sign_in), false) { host.openLogin(l.agent) })
             }
             LimitState.UNAVAILABLE -> addView(text(12f, NC.ON_SURF_VAR, mono = false).apply { text = l.message ?: tr(R.string.usage_not_available); setPadding(0, dp(10), 0, 0) })
             LimitState.ERROR -> addView(text(12f, NC.ERROR, mono = false).apply { text = l.message ?: tr(R.string.usage_could_not_read_limits); setPadding(0, dp(10), 0, 0) })

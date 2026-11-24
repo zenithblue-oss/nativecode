@@ -1361,19 +1361,15 @@
     <string name="main_not_signed_in_2">لم يتم تسجيل الدخول</string>
     <string name="main_unknown">غير معروف</string>
     <string name="main_login">تسجيل الدخول</string>
-    <string name="main_state_unknown_open_the_terminal">الحالة غير معروفة · افتح terminal للتحقق</string>
     <string name="main_sign_out">تسجيل الخروج</string>
     <string name="main_open_terminal">فتح TERMINAL</string>
     <string name="main_open_website">فتح الموقع</string>
     <string name="main_sign_out_of">تسجيل الخروج من %1$s؟</string>
     <string name="main_this_removes_the_saved_login">يزيل هذا تسجيل الدخول المحفوظ لهذه الأداة فقط. الأدوات الأخرى لا تتأثر.</string>
     <string name="main_api_key">مفتاح API</string>
-    <string name="main_paste_key_for_stored_in">الصق مفتاح %1$s. يُخزَّن في guest ~/.config/fluxlinux/cli-auth.env (%2$s).</string>
-    <string name="main_open_web">فتح الويب</string>
     <string name="main_paste_the_code_from_the">الصق الرمز من المتصفح</string>
     <string name="main_send">إرسال</string>
     <string name="main_code_sent_waiting">تم إرسال الرمز، في الانتظار…</string>
-    <string name="main_no_url_yet">لا يوجد URL بعد</string>
     <string name="main_link_copied">تم نسخ الرابط</string>
     <string name="main_create_import_project">إنشاء / استيراد مشروع</string>
     <string name="main_project_name">اسم المشروع</string>
@@ -1582,4 +1578,14 @@
     <string name="chat_switch_to_load_models">بدّل لتشغيله وتحميل نماذجه</string>
     <string name="chat_switch_to_provider">التبديل إلى %1$s</string>
     <string name="chat_switched_to">تم التبديل إلى %1$s · %2$s</string>
+    <string name="chat_effort_chip">الجهد: %1$s</string>
+    <string name="chat_effort_chip_desc">جهد الاستدلال %1$s. تغيير</string>
+    <string name="chat_effort_default">افتراضي</string>
+    <string name="cli_login_steps_device">1. اضغط على «فتح صفحة تسجيل الدخول».\n2. أدخل الرمز أدناه عند الطلب.\n3. وافق على الوصول. تُغلق هذه النافذة عند تسجيل دخولك.</string>
+    <string name="cli_login_steps_browser">1. اضغط على «فتح صفحة تسجيل الدخول» ووافق على الوصول.\n2. انسخ الرمز الذي تعرضه الصفحة.\n3. الصقه أدناه واضغط على «إرسال».</string>
+    <string name="cli_login_steps_key">1. افتح الموقع وأنشئ مفتاح API.\n2. الصق المفتاح أدناه.\n3. اضغط على «حفظ». يبقى المفتاح على هذا الجهاز.</string>
+    <string name="cli_login_steps_terminal">تسجّل هذه الأداة الدخول من terminal الخاص بها. افتح terminal واتبع مطالبة تسجيل الدخول.</string>
+    <string name="cli_login_open_page">فتح صفحة تسجيل الدخول</string>
+    <string name="cli_login_code">الرمز الخاص بك</string>
+    <string name="cli_login_use_key">استخدام مفتاح API بدلاً من ذلك</string>
 </resources>

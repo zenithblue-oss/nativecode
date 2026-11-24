@@ -12,7 +12,8 @@ interface ChatHost {
     /** Tool card gate (Free: opencode only). */
     fun canUseTool(tool: String): Boolean
     fun showUpgradeSheet(reason: String?)
-    fun openCliLoginPage(id: String)
+    /** The sign-in popup of CLI [id] (device code / browser / API key), over the current screen. */
+    fun showCliLogin(id: String)
     /** Error card "Update": the CLI's update path with progress; [onState] on the main thread. */
     fun updateCli(id: String, onState: (com.zenithblue.nativecode.cliauth.CliVersionCheck.State) -> Unit) {}
     /** CLI TUI in a terminal tab of this surface; [args] resume flags (empty = fresh start). Forces Terminal. */

@@ -1361,19 +1361,15 @@
     <string name="main_not_signed_in_2">NÃO CONECTADO</string>
     <string name="main_unknown">DESCONHECIDO</string>
     <string name="main_login">ENTRAR</string>
-    <string name="main_state_unknown_open_the_terminal">ESTADO DESCONHECIDO · abra o terminal para verificar</string>
     <string name="main_sign_out">DESCONECTAR</string>
     <string name="main_open_terminal">ABRIR TERMINAL</string>
     <string name="main_open_website">ABRIR SITE</string>
     <string name="main_sign_out_of">Desconectar de %1$s?</string>
     <string name="main_this_removes_the_saved_login">Isso remove o login salvo somente desta ferramenta. As outras ferramentas não são afetadas.</string>
     <string name="main_api_key">Chave de API</string>
-    <string name="main_paste_key_for_stored_in">Cole a chave de %1$s. Armazenada em ~/.config/fluxlinux/cli-auth.env do guest (%2$s).</string>
-    <string name="main_open_web">ABRIR WEB</string>
     <string name="main_paste_the_code_from_the">Cole o código do navegador</string>
     <string name="main_send">ENVIAR</string>
     <string name="main_code_sent_waiting">Código enviado, aguardando…</string>
-    <string name="main_no_url_yet">Nenhuma URL ainda</string>
     <string name="main_link_copied">Link copiado</string>
     <string name="main_create_import_project">Criar / importar projeto</string>
     <string name="main_project_name">NOME DO PROJETO</string>
@@ -1582,4 +1578,14 @@
     <string name="chat_switch_to_load_models">Troque para iniciá-lo e carregar seus modelos</string>
     <string name="chat_switch_to_provider">Trocar para %1$s</string>
     <string name="chat_switched_to">Trocado para %1$s · %2$s</string>
+    <string name="chat_effort_chip">Esforço: %1$s</string>
+    <string name="chat_effort_chip_desc">Esforço de raciocínio %1$s. Alterar</string>
+    <string name="chat_effort_default">padrão</string>
+    <string name="cli_login_steps_device">1. Toque em Abrir página de entrada.\n2. Digite o código abaixo quando solicitado.\n3. Aprove o acesso. Esta janela fecha quando você entrar.</string>
+    <string name="cli_login_steps_browser">1. Toque em Abrir página de entrada e aprove o acesso.\n2. Copie o código mostrado pela página.\n3. Cole abaixo e toque em Enviar.</string>
+    <string name="cli_login_steps_key">1. Abra o site e crie uma chave de API.\n2. Cole a chave abaixo.\n3. Toque em Salvar. A chave fica neste dispositivo.</string>
+    <string name="cli_login_steps_terminal">Esta ferramenta entra pelo próprio terminal. Abra o terminal e siga o aviso de entrada.</string>
+    <string name="cli_login_open_page">Abrir página de entrada</string>
+    <string name="cli_login_code">Seu código</string>
+    <string name="cli_login_use_key">Usar uma chave de API</string>
 </resources>

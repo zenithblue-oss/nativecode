@@ -511,7 +511,7 @@ private fun ErrorRow(v: AgentChatView, t: ChatThread, item: TurnItem, p: ItemPay
                 }
                 if (!updating) NcButton(tr(R.string.chat_retry), icon = Ic.Retry) { v.retry(t, item.runId) }
                 if (p.cls == FailureClass.PERMISSION_ERROR) NcButton(tr(R.string.chat_sign_in), icon = Ic.Lock, primary = true) {
-                    v.host.openCliLoginPage(CliVersionCheck.def(t.tool)?.id ?: t.tool)
+                    v.host.showCliLogin(CliVersionCheck.def(t.tool)?.id ?: t.tool)
                 }
                 NcButton(tr(R.string.chat_terminal), icon = Ic.Terminal) { openInTerminal(v, t) }
                 NcButton(tr(R.string.chat_copy_details), icon = Ic.Copy) {

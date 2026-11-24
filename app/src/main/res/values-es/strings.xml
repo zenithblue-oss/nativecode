@@ -1361,19 +1361,15 @@
     <string name="main_not_signed_in_2">SIN SESIÓN</string>
     <string name="main_unknown">DESCONOCIDO</string>
     <string name="main_login">INICIAR SESIÓN</string>
-    <string name="main_state_unknown_open_the_terminal">ESTADO DESCONOCIDO · abre la terminal para comprobarlo</string>
     <string name="main_sign_out">CERRAR SESIÓN</string>
     <string name="main_open_terminal">ABRIR TERMINAL</string>
     <string name="main_open_website">ABRIR SITIO WEB</string>
     <string name="main_sign_out_of">¿Cerrar sesión en %1$s?</string>
     <string name="main_this_removes_the_saved_login">Esto elimina el inicio de sesión guardado solo de esta herramienta. Las demás herramientas no se ven afectadas.</string>
     <string name="main_api_key">Clave API</string>
-    <string name="main_paste_key_for_stored_in">Pega la clave de %1$s. Se guarda en ~/.config/fluxlinux/cli-auth.env del invitado (%2$s).</string>
-    <string name="main_open_web">ABRIR WEB</string>
     <string name="main_paste_the_code_from_the">Pega el código del navegador</string>
     <string name="main_send">ENVIAR</string>
     <string name="main_code_sent_waiting">Código enviado, esperando…</string>
-    <string name="main_no_url_yet">Aún no hay URL</string>
     <string name="main_link_copied">Enlace copiado</string>
     <string name="main_create_import_project">Crear / importar proyecto</string>
     <string name="main_project_name">NOMBRE DEL PROYECTO</string>
@@ -1582,4 +1578,14 @@
     <string name="chat_switch_to_load_models">Cambia para iniciarlo y cargar sus modelos</string>
     <string name="chat_switch_to_provider">Cambiar a %1$s</string>
     <string name="chat_switched_to">Cambiado a %1$s · %2$s</string>
+    <string name="chat_effort_chip">Esfuerzo: %1$s</string>
+    <string name="chat_effort_chip_desc">Esfuerzo de razonamiento %1$s. Cambiar</string>
+    <string name="chat_effort_default">predeterminado</string>
+    <string name="cli_login_steps_device">1. Toca «Abrir página de inicio de sesión».\n2. Introduce el código de abajo cuando se te pida.\n3. Aprueba el acceso. Esta ventana se cierra cuando hayas iniciado sesión.</string>
+    <string name="cli_login_steps_browser">1. Toca «Abrir página de inicio de sesión» y aprueba el acceso.\n2. Copia el código que muestra la página.\n3. Pégalo abajo y toca «Enviar».</string>
+    <string name="cli_login_steps_key">1. Abre el sitio web y crea una clave API.\n2. Pega la clave abajo.\n3. Toca «Guardar». La clave se queda en este dispositivo.</string>
+    <string name="cli_login_steps_terminal">Esta herramienta inicia sesión desde su propio terminal. Abre el terminal y sigue su aviso de inicio de sesión.</string>
+    <string name="cli_login_open_page">Abrir página de inicio de sesión</string>
+    <string name="cli_login_code">Tu código</string>
+    <string name="cli_login_use_key">Usar una clave API</string>
 </resources>

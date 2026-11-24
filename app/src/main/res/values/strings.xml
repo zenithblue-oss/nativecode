@@ -1404,19 +1404,15 @@
     <string name="main_not_signed_in_2">NOT SIGNED IN</string>
     <string name="main_unknown">UNKNOWN</string>
     <string name="main_login">LOGIN</string>
-    <string name="main_state_unknown_open_the_terminal">STATE UNKNOWN · open the terminal to check</string>
     <string name="main_sign_out">SIGN OUT</string>
     <string name="main_open_terminal">OPEN TERMINAL</string>
     <string name="main_open_website">OPEN WEBSITE</string>
     <string name="main_sign_out_of">Sign out of %1$s?</string>
     <string name="main_this_removes_the_saved_login">This removes the saved login for this tool only. Other tools are not affected.</string>
     <string name="main_api_key">API key</string>
-    <string name="main_paste_key_for_stored_in">Paste key for %1$s. Stored in guest ~/.config/fluxlinux/cli-auth.env (%2$s).</string>
-    <string name="main_open_web">OPEN WEB</string>
     <string name="main_paste_the_code_from_the">Paste the code from the browser</string>
     <string name="main_send">SEND</string>
     <string name="main_code_sent_waiting">Code sent, waiting…</string>
-    <string name="main_no_url_yet">No URL yet</string>
     <string name="main_link_copied">Link copied</string>
     <string name="main_create_import_project">Create / Import Project</string>
     <string name="main_project_name">PROJECT NAME</string>
@@ -1625,4 +1621,14 @@
     <string name="chat_switch_to_load_models">Switch to start it and load its models</string>
     <string name="chat_switch_to_provider">Switch to %1$s</string>
     <string name="chat_switched_to">Switched to %1$s · %2$s</string>
+    <string name="chat_effort_chip">Effort: %1$s</string>
+    <string name="chat_effort_chip_desc">Reasoning effort %1$s. Change</string>
+    <string name="chat_effort_default">default</string>
+    <string name="cli_login_steps_device">1. Tap Open sign-in page.\n2. Enter the code below when asked.\n3. Approve access. This window closes when you are signed in.</string>
+    <string name="cli_login_steps_browser">1. Tap Open sign-in page and approve access.\n2. Copy the code the page shows.\n3. Paste it below and tap Send.</string>
+    <string name="cli_login_steps_key">1. Open the website and create an API key.\n2. Paste the key below.\n3. Tap Save. The key stays on this device.</string>
+    <string name="cli_login_steps_terminal">This tool signs in from its own terminal. Open the terminal and follow its sign-in prompt.</string>
+    <string name="cli_login_open_page">Open sign-in page</string>
+    <string name="cli_login_code">Your code</string>
+    <string name="cli_login_use_key">Use an API key instead</string>
 </resources>

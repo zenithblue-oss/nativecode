@@ -272,7 +272,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
         banner?.let { b ->
             BannerRow(b) {
                 when (b.kind) {
-                    "signin" -> v.host.openCliLoginPage(CliToolCatalog.ALL.firstOrNull { it.terminalType == t.tool }?.id ?: t.tool)
+                    "signin" -> v.host.showCliLogin(CliToolCatalog.ALL.firstOrNull { it.terminalType == t.tool }?.id ?: t.tool)
                     "queue" -> v.bg { v.backend.queueResume(threadId) }
                     "upsell" -> v.host.showUpgradeSheet(b.text)
                     "error" -> openInTerminal(v, t)
