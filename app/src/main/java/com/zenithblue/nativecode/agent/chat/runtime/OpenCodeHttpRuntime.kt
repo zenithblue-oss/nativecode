@@ -193,10 +193,11 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
         val loc = location(cfg.cwd)
         // The first call with a location boots opencode's instance for that directory (project scan, git, plugins):
         // well over 15 s on a phone in a fresh project, so it alone gets the long timeout.
-        models = OpenCodeWire.parseModels(runCatching { client.call("GET", "/api/model?$loc", timeoutMs = BOOT_CALL_MS)?.optJSONArray("data") }
-            .onFailure { host.log("NATIVE", "models: ${it.message}") }.getOrNull())
-        val serverDefault = runCatching { OpenCodeWire.slugOf(client.call("GET", "/api/model/default?$loc")?.optJSONObject("data")) }.getOrNull()
-        val default = serverDefault?.takeIf { s -> models.any { it.id == s } } ?: models.firstOrNull { it.free }?.id ?: models.firstOrNull()?.id
+        models = fetchModels(client, loc, BOOT_CALL_MS)
+        // opencode 2.4 lists providers lazily: the first call can be empty (then `model.updated` follows, see onFrame). Give it a moment.
+        var tries = 0
+        while (models.isEmpty() && tries++ < MODEL_RETRIES && !closed) { Thread.sleep(MODEL_RETRY_MS); models = fetchModels(client, loc, 10_000) }
+        val default = defaultOf(client, loc, models)
         commands = loadCommands()
         ChatMcp.endpoint(cfg.threadId, "opencode")?.let { e -> // M7 NC tools (t3 `client.mcp.add`); body carries the token
             runCatching { client.call("PUT", "/api/experimental/mcp/${enc(e.name)}?$loc", OpenCodeSlash.mcpBody(e), secret = true) }
@@ -214,6 +215,29 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
         mapper.root = sid
         sink(AgentEvent.NativeId(sid))
         sink(AgentEvent.SessionState(AgentEvent.Phase.READY, caps, models, default, commands, message = OpenCodeWire.SIGN_IN.takeIf { models.isEmpty() }, model = model))
+    }
+
+    private fun fetchModels(client: OpenCodeHttp, loc: String, timeoutMs: Int): List<ModelInfo> =
+        OpenCodeWire.parseModels(runCatching { client.call("GET", "/api/model?$loc", timeoutMs = timeoutMs)?.optJSONArray("data") }
+            .onFailure { host.log("NATIVE", "models: ${it.message}") }.getOrNull())
+
+    private fun defaultOf(client: OpenCodeHttp, loc: String, list: List<ModelInfo>): String? {
+        val serverDefault = runCatching { OpenCodeWire.slugOf(client.call("GET", "/api/model/default?$loc")?.optJSONObject("data")) }.getOrNull()
+        return serverDefault?.takeIf { s -> list.any { it.id == s } } ?: list.firstOrNull { it.free }?.id ?: list.firstOrNull()?.id
+    }
+
+    /** Booted with an empty list (lazy provider load): fetch again once opencode says its models changed. I/O thread. */
+    private fun refreshModels() {
+        val client = http
+        if (closed || models.isNotEmpty() || client == null) return
+        val loc = location(cfg.cwd)
+        val fresh = fetchModels(client, loc, 10_000).ifEmpty { return }
+        models = fresh
+        val default = defaultOf(client, loc, fresh)
+        model = cfg.model?.takeIf { s -> fresh.any { it.id == s } } ?: model?.takeIf { s -> fresh.any { it.id == s } } ?: default
+        effort = cfg.effort ?: OpenCodeWire.defaultEffort(fresh.firstOrNull { it.id == model })
+        mapper.contextSize = fresh.firstOrNull { it.id == model }?.contextLimit
+        sink(AgentEvent.SessionState(AgentEvent.Phase.READY, caps, fresh, default, commands, model = model))
     }
 
     /** Spawn + wait for `server listening on http://…` (30 s); one retry on a new port when the bind fails. */
@@ -356,6 +380,7 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
 
     private fun onFrame(f: SseFrame) {
         if (!DELTA.containsMatchIn(f.data.take(240))) host.log("NATIVE", f.data)
+        if (OpenCodeWire.modelsChanged(f.data)) onIo { refreshModels() }
         mapper.handle(f.data)
     }
 
@@ -381,6 +406,8 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
         )
         private const val READY_TIMEOUT_S = 30L
         private const val BOOT_CALL_MS = 120_000
+        private const val MODEL_RETRIES = 3
+        private const val MODEL_RETRY_MS = 1_500L
         private const val SILENCE_MS = 45_000
         private const val RECONNECT_ATTEMPTS = 5
         private const val RECONNECT_DELAY_MS = 2_000L

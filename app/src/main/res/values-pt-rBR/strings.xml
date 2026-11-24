@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">Troque para iniciá-lo e carregar seus modelos</string>
     <string name="chat_switch_to_provider">Trocar para %1$s</string>
     <string name="chat_switched_to">Trocado para %1$s · %2$s</string>
-    <string name="chat_effort_chip">Esforço: %1$s</string>
     <string name="chat_effort_chip_desc">Esforço de raciocínio %1$s. Alterar</string>
     <string name="chat_effort_default">padrão</string>
     <string name="cli_login_steps_device">1. Toque em Abrir página de entrada.\n2. Digite o código abaixo quando solicitado.\n3. Aprove o acesso. Esta janela fecha quando você entrar.</string>

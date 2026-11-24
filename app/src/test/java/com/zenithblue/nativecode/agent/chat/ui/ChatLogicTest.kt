@@ -18,6 +18,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatLogicTest {
+    @Test fun signInBannerNeverForLoginOptionalTools() {
+        assertTrue(ChatLogic.showSignInBanner(ready = true, modelCount = 0, loginOptional = false))
+        assertFalse(ChatLogic.showSignInBanner(ready = true, modelCount = 0, loginOptional = true)) // opencode: free models, lazy list
+        assertFalse(ChatLogic.showSignInBanner(ready = true, modelCount = 3, loginOptional = false))
+        assertFalse(ChatLogic.showSignInBanner(ready = false, modelCount = 0, loginOptional = false))
+    }
+
+    @Test fun headerModelLabelUsesTheProviderDefaultAndDisplayName() {
+        val known = listOf(com.zenithblue.nativecode.agent.chat.core.ModelInfo("opencode/big-pickle", "Big Pickle"))
+        assertEquals("Big Pickle", ChatLogic.modelLabel(null, "opencode/big-pickle", known))
+        assertEquals("Big Pickle", ChatLogic.modelLabel("opencode/big-pickle", null, known))
+        assertEquals("big-pickle", ChatLogic.modelLabel(null, "opencode/big-pickle", emptyList()))
+        assertEquals("default model", ChatLogic.modelLabel(null, null, known))
+    }
+
     private fun thread(id: String, project: String? = null, updated: Long = 0, pinned: Long? = null, archived: Long? = null, visited: Long? = null) =
         ChatThread(id, project, project ?: "/home/flux", "opencode", id, pinnedAt = pinned, archivedAt = archived, lastVisitedAt = visited, createdAt = 0, updatedAt = updated)
 

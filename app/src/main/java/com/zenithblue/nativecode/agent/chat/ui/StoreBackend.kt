@@ -56,7 +56,7 @@ class StoreBackend(ctx: Context) : ChatBackend {
 
     override fun removeListener(l: (Set<String>) -> Unit) { listeners.remove(l)?.let { store.removeListener(it) } }
 
-    override fun live(threadId: String): LiveState? = AgentChats.peekController(threadId)?.state?.let(::map)
+    override fun live(threadId: String): LiveState? = AgentChats.peekController(threadId)?.let { c -> map(c.state, c.thread.tool) }
 
     override fun observeLive(threadId: String, l: () -> Unit): () -> Unit {
         val sub: (ChatLiveState) -> Unit = { l() }
@@ -120,7 +120,7 @@ class StoreBackend(ctx: Context) : ChatBackend {
 
     override fun liveThreadIds(): List<String> = AgentChats.liveThreadIds()
 
-    private fun map(s: ChatLiveState) = LiveState(
+    private fun map(s: ChatLiveState, tool: String) = LiveState(
         phase = when (s.phase) {
             LivePhase.STARTING -> AgentEvent.Phase.STARTING
             LivePhase.READY -> AgentEvent.Phase.READY
@@ -135,7 +135,7 @@ class StoreBackend(ctx: Context) : ChatBackend {
         defaultModel = s.defaultModel,
         commands = s.commands,
         caps = s.caps,
-        banner = banner(s),
+        banner = banner(s, tool),
         usage = s.usage,
         forceStopAvailable = s.forceStopAvailable,
         ttftMs = s.firstTokenMs,
@@ -146,7 +146,7 @@ class StoreBackend(ctx: Context) : ChatBackend {
         runId = s.runningRunId,
     )
 
-    private fun banner(s: ChatLiveState): Banner? {
+    private fun banner(s: ChatLiveState, tool: String): Banner? {
         s.banner?.let { b ->
             return when (b.kind) {
                 BannerKind.SESSION_ENDED -> Banner("ended", "Session ended", "Resume")
@@ -158,7 +158,8 @@ class StoreBackend(ctx: Context) : ChatBackend {
         s.rateLimit?.takeIf { it.status !in setOf("ok", "allowed", "allowed_warning") }?.let { r ->
             return Banner("ratelimit", "Rate limited" + (r.resetAt?.let { " · resets " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(it)) } ?: ""))
         }
-        if (s.phase == LivePhase.READY && s.models.isEmpty()) return Banner("signin", "Not signed in · no models", "Sign in")
+        val optional = com.zenithblue.nativecode.cliauth.CliToolCatalog.ALL.firstOrNull { it.terminalType == tool }?.loginOptional == true
+        if (ChatLogic.showSignInBanner(s.phase == LivePhase.READY, s.models.size, optional)) return Banner("signin", "Not signed in · no models", "Sign in")
         return null
     }
 }

@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">Basculez pour le démarrer et charger ses modèles</string>
     <string name="chat_switch_to_provider">Basculer vers %1$s</string>
     <string name="chat_switched_to">Basculé vers %1$s · %2$s</string>
-    <string name="chat_effort_chip">Effort : %1$s</string>
     <string name="chat_effort_chip_desc">Effort de raisonnement %1$s. Modifier</string>
     <string name="chat_effort_default">par défaut</string>
     <string name="cli_login_steps_device">1. Touchez « Ouvrir la page de connexion ».\n2. Saisissez le code ci-dessous lorsqu\'il est demandé.\n3. Autorisez l\'accès. Cette fenêtre se ferme une fois connecté.</string>

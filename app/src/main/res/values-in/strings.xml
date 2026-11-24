@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">Beralih untuk memulainya dan memuat modelnya</string>
     <string name="chat_switch_to_provider">Beralih ke %1$s</string>
     <string name="chat_switched_to">Dialihkan ke %1$s · %2$s</string>
-    <string name="chat_effort_chip">Upaya: %1$s</string>
     <string name="chat_effort_chip_desc">Upaya penalaran %1$s. Ubah</string>
     <string name="chat_effort_default">default</string>
     <string name="cli_login_steps_device">1. Ketuk Buka halaman masuk.\n2. Masukkan kode di bawah saat diminta.\n3. Setujui akses. Jendela ini tertutup saat Anda sudah masuk.</string>

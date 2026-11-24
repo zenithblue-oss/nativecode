@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">전환하면 시작하고 모델을 불러옵니다</string>
     <string name="chat_switch_to_provider">%1$s(으)로 전환</string>
     <string name="chat_switched_to">%1$s · %2$s(으)로 전환됨</string>
-    <string name="chat_effort_chip">강도: %1$s</string>
     <string name="chat_effort_chip_desc">추론 강도 %1$s. 변경</string>
     <string name="chat_effort_default">기본값</string>
     <string name="cli_login_steps_device">1. 로그인 페이지 열기를 누르세요.\n2. 요청되면 아래 코드를 입력하세요.\n3. 접근을 승인하세요. 로그인하면 이 창이 닫힙니다.</string>

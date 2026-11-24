@@ -73,6 +73,9 @@ internal object OpenCodeWire {
         )
     }
 
+    /** SSE frame announcing that opencode's provider / model list changed (it loads lazily after the first calls). */
+    fun modelsChanged(frame: String): Boolean = frame.length < 400 && runCatching { JSONObject(frame).optString("type") }.getOrNull() in setOf("model.updated", "provider.updated")
+
     fun slugOf(m: JSONObject?): String? = m?.let { "${it.optString("providerID")}/${it.optString("id")}" }?.takeIf { it.length > 1 }
 
     /** t3code default effort for opencode providers: `medium`, when the model lists it. */

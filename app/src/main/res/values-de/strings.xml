@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">Wechsle, um ihn zu starten und seine Modelle zu laden</string>
     <string name="chat_switch_to_provider">Zu %1$s wechseln</string>
     <string name="chat_switched_to">Gewechselt zu %1$s · %2$s</string>
-    <string name="chat_effort_chip">Aufwand: %1$s</string>
     <string name="chat_effort_chip_desc">Denkaufwand %1$s. Ändern</string>
     <string name="chat_effort_default">Standard</string>
     <string name="cli_login_steps_device">1. Tippen Sie auf „Anmeldeseite öffnen“.\n2. Geben Sie unten den Code ein, wenn Sie danach gefragt werden.\n3. Bestätigen Sie den Zugriff. Dieses Fenster schließt sich, sobald Sie angemeldet sind.</string>

@@ -13,6 +13,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OpenCodeWireTest {
+    @Test fun modelListChangeFramesTriggerARefresh() {
+        assertTrue(OpenCodeWire.modelsChanged("""{"id":"evt_1","type":"model.updated","location":{"directory":"/x"},"data":{}}"""))
+        assertTrue(OpenCodeWire.modelsChanged("""{"type":"provider.updated","data":{}}"""))
+        assertFalse(OpenCodeWire.modelsChanged("""{"type":"mcp.status.changed","data":{}}"""))
+        assertFalse(OpenCodeWire.modelsChanged("not json"))
+    }
+
     private fun JSONArray.triples() = OpenCodeWire.objects(this).map { "${it.getString("action")} ${it.getString("resource")} ${it.getString("effect")}" }
 
     @Test fun modeRulesTable() {

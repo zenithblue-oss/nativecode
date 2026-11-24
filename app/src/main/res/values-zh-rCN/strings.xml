@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">切换后即可启动并加载其模型</string>
     <string name="chat_switch_to_provider">切换到 %1$s</string>
     <string name="chat_switched_to">已切换到 %1$s · %2$s</string>
-    <string name="chat_effort_chip">强度：%1$s</string>
     <string name="chat_effort_chip_desc">推理强度 %1$s。点按更改</string>
     <string name="chat_effort_default">默认</string>
     <string name="cli_login_steps_device">1. 点按“打开登录页面”。\n2. 按提示输入下方的代码。\n3. 批准访问。登录成功后此窗口会自动关闭。</string>

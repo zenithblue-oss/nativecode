@@ -404,7 +404,7 @@ private fun ChatTopBar(v: AgentChatView, t: ChatThread, status: HeaderStatus, ru
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = S.l, end = S.l, bottom = S.s),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(S.m),
         ) {
-            InfoBit(Ic.Bot, "${t.tool} · ${t.model?.substringAfterLast('/') ?: "default model"}", C.on) { v.push(Route.Settings(t.id)) }
+            InfoBit(Ic.Bot, "${t.tool} · ${ChatLogic.modelLabel(t.model, v.live.value?.defaultModel, v.live.value?.models.orEmpty())}", C.on) { v.push(Route.Settings(t.id)) }
             InfoBit(Ic.Folder, t.projectPath?.let { ChatLogic.baseName(it) } ?: t.cwd.removePrefix(AgentChatView.HOME).ifEmpty { "~" })
             branch?.let { InfoBit(Ic.Branch, it) }
             val cost = runs.mapNotNull { it.usage?.costUsd }

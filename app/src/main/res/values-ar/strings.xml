@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">بدّل لتشغيله وتحميل نماذجه</string>
     <string name="chat_switch_to_provider">التبديل إلى %1$s</string>
     <string name="chat_switched_to">تم التبديل إلى %1$s · %2$s</string>
-    <string name="chat_effort_chip">الجهد: %1$s</string>
     <string name="chat_effort_chip_desc">جهد الاستدلال %1$s. تغيير</string>
     <string name="chat_effort_default">افتراضي</string>
     <string name="cli_login_steps_device">1. اضغط على «فتح صفحة تسجيل الدخول».\n2. أدخل الرمز أدناه عند الطلب.\n3. وافق على الوصول. تُغلق هذه النافذة عند تسجيل دخولك.</string>

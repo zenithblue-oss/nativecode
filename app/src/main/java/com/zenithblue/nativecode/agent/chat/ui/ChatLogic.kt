@@ -87,7 +87,16 @@ object ChatLogic {
             ?: chatTools.firstOrNull { it != "opencode" && canUse(it) && signedIn(it) }
             ?: "opencode"
 
-    fun baseName(path: String) = path.trimEnd('/').substringAfterLast('/').ifEmpty { path }
+    /** "Not signed in · no models" only for a CLI that needs a login; opencode's models load lazily and its free ones need none. */
+    fun showSignInBanner(ready: Boolean, modelCount: Int, loginOptional: Boolean) = ready && modelCount == 0 && !loginOptional
+
+    /** Model shown in the thread header: the chosen one, else the provider default, by display name when the list has it. */
+    fun modelLabel(model: String?, defaultModel: String?, known: List<com.zenithblue.nativecode.agent.chat.core.ModelInfo>): String {
+        val id = model ?: defaultModel ?: return "default model"
+        return known.firstOrNull { it.id == id }?.name?.ifBlank { null } ?: id.substringAfterLast('/')
+    }
+
+    fun baseName(path: String) =path.trimEnd('/').substringAfterLast('/').ifEmpty { path }
 
     fun relativeTime(now: Long, then: Long): String {
         val s = ((now - then) / 1000).coerceAtLeast(0)

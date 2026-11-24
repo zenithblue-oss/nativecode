@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">Başlatmak ve modellerini yüklemek için geçiş yapın</string>
     <string name="chat_switch_to_provider">%1$s sağlayıcısına geç</string>
     <string name="chat_switched_to">Geçildi: %1$s · %2$s</string>
-    <string name="chat_effort_chip">Efor: %1$s</string>
     <string name="chat_effort_chip_desc">Akıl yürütme eforu %1$s. Değiştir</string>
     <string name="chat_effort_default">varsayılan</string>
     <string name="cli_login_steps_device">1. “Giriş sayfasını aç” düğmesine dokunun.\n2. İstendiğinde aşağıdaki kodu girin.\n3. Erişimi onaylayın. Giriş yaptığınızda bu pencere kapanır.</string>

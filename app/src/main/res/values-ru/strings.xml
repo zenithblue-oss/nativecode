@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">Переключитесь, чтобы запустить его и загрузить его модели</string>
     <string name="chat_switch_to_provider">Переключиться на %1$s</string>
     <string name="chat_switched_to">Переключено на %1$s · %2$s</string>
-    <string name="chat_effort_chip">Глубина: %1$s</string>
     <string name="chat_effort_chip_desc">Глубина рассуждений %1$s. Изменить</string>
     <string name="chat_effort_default">по умолчанию</string>
     <string name="cli_login_steps_device">1. Нажмите «Открыть страницу входа».\n2. Введите код ниже, когда он потребуется.\n3. Подтвердите доступ. Это окно закроется, когда вы войдёте.</string>

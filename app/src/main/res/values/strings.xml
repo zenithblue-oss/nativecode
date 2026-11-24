@@ -1659,7 +1659,6 @@
     <string name="chat_switch_to_load_models">Switch to start it and load its models</string>
     <string name="chat_switch_to_provider">Switch to %1$s</string>
     <string name="chat_switched_to">Switched to %1$s · %2$s</string>
-    <string name="chat_effort_chip">Effort: %1$s</string>
     <string name="chat_effort_chip_desc">Reasoning effort %1$s. Change</string>
     <string name="chat_effort_default">default</string>
     <string name="cli_login_steps_device">1. Tap Open sign-in page.\n2. Enter the code below when asked.\n3. Approve access. This window closes when you are signed in.</string>

@@ -1616,7 +1616,6 @@
     <string name="chat_switch_to_load_models">切り替えて起動し、モデルを読み込みます</string>
     <string name="chat_switch_to_provider">%1$sに切り替え</string>
     <string name="chat_switched_to">%1$sに切り替えました · %2$s</string>
-    <string name="chat_effort_chip">強度: %1$s</string>
     <string name="chat_effort_chip_desc">推論の強度 %1$s。変更</string>
     <string name="chat_effort_default">デフォルト</string>
     <string name="cli_login_steps_device">1. 「サインインページを開く」をタップします。\n2. 求められたら、下のコードを入力します。\n3. アクセスを承認します。サインインするとこのウィンドウは閉じます。</string>
