@@ -22,6 +22,11 @@ import com.zenithblue.nativecode.agent.chat.core.RunStatus
 import com.zenithblue.nativecode.agent.chat.core.TurnInput
 import com.zenithblue.nativecode.agent.chat.store.ChatStore
 import com.zenithblue.nativecode.agent.chat.store.ChatWrite
+import com.zenithblue.nativecode.R
+import com.zenithblue.nativecode.cliauth.CliGate
+import com.zenithblue.nativecode.cliauth.CliNeed
+import com.zenithblue.nativecode.cliauth.CliVersionCheck
+import com.zenithblue.nativecode.tr
 import org.json.JSONObject
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
@@ -55,6 +60,8 @@ class ChatThreadController internal constructor(
     private var ready = false
     private var closing = false
     private var pendingTurn: TurnInput? = null
+    private var cliWait = false // version gate: probing / the update popup is open
+    private var cliWaitTurn = false // ... and a turn is waiting on it
     private var flushTask: Future<*>? = null
     private var idleTask: Future<*>? = null
     private var forceTask: Future<*>? = null
@@ -73,6 +80,8 @@ class ChatThreadController internal constructor(
         reducer = ChatReducer(initial, maxItem + 1, maxRun + 1, queued, stale)
         ModelCache.load(ctx, initial.tool)?.let { c -> reducer.seedModels(c.copy(caps = ChatRuntimes.staticCaps(initial.tool) ?: c.caps)) } // picker usable before the first send
         state = reducer.state
+        // Warm the version gate: the first send then finds the installed version cached.
+        if (AgentChats.gate != null && CliVersionCheck.cached(initial.tool) == null) AgentChats.checkpoints.execute { runCatching { CliVersionCheck.check(ctx, initial.tool) } }
     }
 
     fun addListener(l: (ChatLiveState) -> Unit) { listeners += l }
@@ -282,19 +291,52 @@ class ChatThreadController internal constructor(
         return turn.copy(text = block + turn.text)
     }
 
-    /** Spawns the runtime if none. False = no chat runtime for this tool (run fails). */
-    private fun ensureStarted(): Boolean {
-        if (runtime != null) return true
+    /** Spawns the runtime if none, once the CLI version is known good. False = not started now (no chat runtime for this tool: run fails; too old: update popup). */
+    private fun ensureStarted(): Boolean = runtime != null || (versionOk() && spawn())
+    /**
+     * Version gate (loop thread): the CLI's installed version is read once per app session (cached, probed off the loop) and compared
+     * with its chat minimum. Too old = the turn waits here while the update popup runs: updated → it starts; cancelled / failed → the run
+     * fails with the "version too old" card. Unknown version / no gate (tests) = go.
+     */
+    private fun versionOk(): Boolean {
+        val g = AgentChats.gate ?: return true
+        if (cliWait) return false
+        val tool = thread.tool
+        if (CliVersionCheck.cached(tool)?.tooOld(CliNeed.CHAT) == false) return true
+        cliWait = true
+        cliWaitTurn = pendingTurn != null
+        AgentChats.checkpoints.execute {
+            val r = runCatching { CliVersionCheck.probe(ctx, tool, CliNeed.CHAT) }.getOrNull()
+            CliGate.run(r?.installed, r?.min(CliNeed.CHAT),
+                ask = { cb -> AgentChats.onMain { g.updateCli(tool, CliNeed.CHAT, cb) } },
+                go = { AgentChats.post { cliWait = false; continueStart() } },
+                stop = { AgentChats.post { cliWait = false; failOld(r) } })
+        }
+        return false
+    }
+    /** The gate let the start through: what [startTurn] / [resume] were about to do. A turn stopped meanwhile is not started. */
+    private fun continueStart() {
+        if (runtime != null || (cliWaitTurn && pendingTurn == null)) return
+        if (spawn() && ready) dispatch()
+        commit()
+    }
+    private fun failOld(r: CliVersionCheck.Result?) {
+        failStart(Failure(FailureClass.VERSION_OLD, r?.let { tr(R.string.chat_err_too_old, it.name, it.installed.orEmpty(), it.min(CliNeed.CHAT).orEmpty()) } ?: "CLI version too old"))
+        commit()
+    }
+    private fun failStart(f: Failure) {
+        reducer.reduce(AgentEvent.SessionState(AgentEvent.Phase.ERROR, message = f.message))
+        if (reducer.activeRun != null) reducer.reduce(AgentEvent.TurnTerminal(RunStatus.FAILED, f))
+        pendingTurn = null
+    }
+    private fun spawn(): Boolean {
         val t = reducer.thread
         val host = ThreadHost(ctx, threadId, t.tool, t.projectPath, t.cwd,
             onSpawned = { e -> entry = e; proc = e.process },
             onProcessExit = { p, code, tail -> AgentChats.post { if (p === proc) onExit(code, tail) } })
         val rt = runCatching { ChatRuntimes.create(t.tool, host) }.getOrNull()
         if (rt == null) {
-            reducer.reduce(AgentEvent.SessionState(AgentEvent.Phase.ERROR, message = "Chat not available for ${t.tool}"))
-            if (reducer.activeRun != null) reducer.reduce(AgentEvent.TurnTerminal(RunStatus.FAILED,
-                Failure(FailureClass.VALIDATION_ERROR, "Chat not available for ${t.tool}")))
-            pendingTurn = null
+            failStart(Failure(FailureClass.VALIDATION_ERROR, "Chat not available for ${t.tool}"))
             return false
         }
         runtime = rt

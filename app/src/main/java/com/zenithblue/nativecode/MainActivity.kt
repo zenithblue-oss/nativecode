@@ -202,6 +202,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private var cliAuthMethodBadge: TextView? = null
     /** AI CLI sign-in popup ([CliLoginSheet]) shown for this tool id; null = closed. */
     private val cliLoginId = androidx.compose.runtime.mutableStateOf<String?>(null)
+    /** The CLI update popup (too old for chat / sign-in): what it is about, and why the last update failed. [done] true = updated. */
+    private class CliUpdateReq(val r: CliVersionCheck.Result, val need: CliNeed, val done: (Boolean) -> Unit)
+    private val cliUpdateReq = androidx.compose.runtime.mutableStateOf<CliUpdateReq?>(null)
+    private val cliUpdateErr = androidx.compose.runtime.mutableStateOf<String?>(null)
     /** Settings → AI Safety & Report (C5 / B16). */
     private lateinit var aiSafetyScrollView: ScrollView
     private var aiSafetyVendorList: LinearLayout? = null
@@ -1966,6 +1970,14 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     cliLoginId.value?.let { id ->
                         com.zenithblue.nativecode.agent.chat.ui.ChatTheme {
                             com.zenithblue.nativecode.agent.chat.ui.CliLoginSheet(id, ::paintCliAuth, ::openCliTerminal) { cliLoginId.value = null }
+                        }
+                    }
+                    cliUpdateReq.value?.let { q ->
+                        com.zenithblue.nativecode.agent.chat.ui.ChatTheme {
+                            com.zenithblue.nativecode.agent.chat.ui.CliUpdateDialog(q.r, q.need, cliTools.busy[q.r.tool], cliUpdateErr.value, ::runCliUpdate, ::closeCliUpdate) {
+                                CliToolCatalog.byId(q.r.tool)?.let(::openCliTerminal)
+                                closeCliUpdate()
+                            }
                         }
                     }
                 }
@@ -4349,6 +4361,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun allowLaunch(tool: String, projectPath: String?) = aiLaunchAllowed(tool, "chat")
         override fun canUseTool(tool: String) = FeatureGate.canLaunchAiTool(isPro(), tool) is GateResult.Allow
         override fun showUpsell(tool: String) { gateAllows(FeatureGate.canLaunchAiTool(isPro(), tool)) }
+        override fun updateCli(tool: String, need: CliNeed, done: (Boolean) -> Unit) = showCliUpdate(tool, need, done)
     }
 
     private val chatHost = object : ChatHost {
@@ -4356,7 +4369,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun canUseTool(tool: String) = !aiToolLocked(tool)
         override fun showUpgradeSheet(reason: String?) = this@MainActivity.showUpgradeSheet(reason)
         override fun showCliLogin(id: String) = this@MainActivity.showCliLogin(id)
-        override fun updateCli(id: String, onState: (CliVersionCheck.State) -> Unit) = CliVersionCheck.update(this@MainActivity, id, onState)
+        override fun showCliUpdate(id: String, need: CliNeed, done: (Boolean) -> Unit) = this@MainActivity.showCliUpdate(id, need, done)
         override fun openTerminal(tool: String, args: List<String>, cwd: String?, workspace: Boolean) {
             // ponytail: resume flags unverified for opencode/agy/grok → [args] unused, fresh start (plan 9.2.8).
             if (workspace) { createWorkspaceTerminalTab(tool); return }
@@ -18284,13 +18297,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         return AgentChats.hasTool(def.terminalType) || (terminalSessionTypes + workspaceTabNames + others).any { it == def.terminalType }
     }
 
-    /** Update or (re)install [id] under the same gate as launching the tool (Free: opencode only). [then] runs when it ends or is refused. */
-    private fun runCliOp(id: String, install: Boolean, then: () -> Unit = {}) {
-        val def = CliToolCatalog.byId(id)
-        if (def == null || id in cliTools.busy || !gateAllows(FeatureGate.canLaunchAiTool(isPro(), def.terminalType))) return then()
+    /** Update or (re)install [id] under the same gate as launching the tool (Free: opencode only). [then] runs when it ends or is refused: null = done, else why not. */
+    private fun runCliOp(id: String, install: Boolean, then: (String?) -> Unit = {}) {
+        val def = CliToolCatalog.byId(id) ?: return then("Unknown tool")
+        if (id in cliTools.busy) return then(tr(R.string.main_updating))
+        if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), def.terminalType))) return then(tr(R.string.chat_err_pro))
         if (cliInUse(def)) {
-            Toast.makeText(this, tr(R.string.cli_upd_in_use, def.displayName), Toast.LENGTH_LONG).show()
-            return then()
+            val why = tr(R.string.cli_upd_in_use, def.displayName)
+            Toast.makeText(this, why, Toast.LENGTH_LONG).show()
+            return then(why)
         }
         cliTools.busy[id] = tr(R.string.main_updating)
         val onState = { st: CliVersionCheck.State ->
@@ -18310,7 +18325,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                             else -> tr(R.string.cli_upd_failed, def.displayName, st.message)
                         }, Toast.LENGTH_LONG).show()
                         paintCliAuth()
-                        then()
+                        then(if (st.ok) null else st.message)
                     }
                 }.start()
             }
@@ -18322,7 +18337,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         override fun check() = checkCliUpdates(true)
         override fun updateAll() {
             val ids = cliTools.pending().map { it.id }
-            fun next(i: Int) { if (i < ids.size) runCliOp(ids[i], false) { next(i + 1) } }
+            fun next(i: Int) { if (i < ids.size) runCliOp(ids[i], false) { _ -> next(i + 1) } }
             next(0)
         }
         override fun update(id: String) = runCliOp(id, false)
@@ -18410,7 +18425,41 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /** Sign-in popup for AI CLI [id], from every entry point (Settings list, tool cards, chat banners, Usage). */
     private fun showCliLogin(id: String) {
         val def = CliToolCatalog.byId(id) ?: return
-        if (gateAllows(FeatureGate.canLaunchAiTool(isPro(), def.terminalType))) cliLoginId.value = id
+        if (!gateAllows(FeatureGate.canLaunchAiTool(isPro(), def.terminalType))) return
+        // Version gate: the popup opens at once unless the cached version is already known too old; the (cached, once per session) probe
+        // then either lets it be or swaps it for the update popup, which reopens the sign-in after a successful update.
+        val open = CliVersionCheck.cached(id)?.tooOld(CliNeed.LOGIN) != true
+        if (open) cliLoginId.value = id
+        var asked = false
+        Thread {
+            val r = CliVersionCheck.probe(this, id, CliNeed.LOGIN)
+            runOnUiThread {
+                CliGate.run(r?.installed, def.minLoginVersion,
+                    ask = { cb -> asked = true; if (cliLoginId.value == id) cliLoginId.value = null; showCliUpdate(id, CliNeed.LOGIN, cb) },
+                    go = { if (!open || asked) cliLoginId.value = id },
+                    stop = {})
+            }
+        }.start()
+    }
+    /** The update popup for [id] (cached version = the one that was just found too old); [done] true once it was updated, false on cancel / failure. */
+    private fun showCliUpdate(id: String, need: CliNeed, done: (Boolean) -> Unit) {
+        val r = CliVersionCheck.cached(id)
+        if (r?.installed == null) return done(false)
+        cliUpdateReq.value?.done?.invoke(false)
+        cliUpdateErr.value = null
+        cliUpdateReq.value = CliUpdateReq(r, need, done)
+    }
+    private fun runCliUpdate() {
+        val q = cliUpdateReq.value ?: return
+        cliUpdateErr.value = null
+        runCliOp(q.r.tool, false) { err ->
+            if (err == null) { cliUpdateReq.value = null; q.done(true) } else cliUpdateErr.value = err
+        }
+    }
+    private fun closeCliUpdate() {
+        val q = cliUpdateReq.value ?: return
+        cliUpdateReq.value = null
+        q.done(false)
     }
 
     /** Card pill: probes login state off-thread, then appends the shared pill to [card]. */

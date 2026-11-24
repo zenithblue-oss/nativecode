@@ -14,8 +14,8 @@ interface ChatHost {
     fun showUpgradeSheet(reason: String?)
     /** The sign-in popup of CLI [id] (device code / browser / API key), over the current screen. */
     fun showCliLogin(id: String)
-    /** Error card "Update": the CLI's update path with progress; [onState] on the main thread. */
-    fun updateCli(id: String, onState: (com.zenithblue.nativecode.cliauth.CliVersionCheck.State) -> Unit) {}
+    /** Error card "Update": the CLI update popup (progress, result); [done] true = updated, false = cancelled or failed. Main thread. */
+    fun showCliUpdate(id: String, need: com.zenithblue.nativecode.cliauth.CliNeed, done: (Boolean) -> Unit) { done(false) }
     /** CLI TUI in a terminal tab of this surface; [args] resume flags (empty = fresh start). Forces Terminal. */
     fun openTerminal(tool: String, args: List<String>, cwd: String?, workspace: Boolean)
     /** Shell tab at [cwd] (Pro; Free: upsell). Forces Terminal. */

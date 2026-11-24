@@ -21,6 +21,8 @@ interface ChatGate {
     fun allowLaunch(tool: String, projectPath: String?): Boolean
     fun canUseTool(tool: String): Boolean
     fun showUpsell(tool: String)
+    /** The CLI is older than its [need] minimum: the update popup; [done] true = updated (the launch goes on), false = cancelled / failed. Any thread. */
+    fun updateCli(tool: String, need: com.zenithblue.nativecode.cliauth.CliNeed, done: (Boolean) -> Unit)
 }
 
 /**

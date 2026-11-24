@@ -54,6 +54,7 @@ import com.zenithblue.nativecode.agent.chat.core.ChatAttachment
 import com.zenithblue.nativecode.agent.chat.core.ChatFailures
 import com.zenithblue.nativecode.agent.chat.core.Failure
 import com.zenithblue.nativecode.agent.chat.core.FailureClass
+import com.zenithblue.nativecode.cliauth.CliNeed
 import com.zenithblue.nativecode.cliauth.CliVersionCheck
 import com.zenithblue.nativecode.agent.chat.core.ChatThread
 import com.zenithblue.nativecode.agent.chat.core.ConfigChange
@@ -468,22 +469,20 @@ private fun errorLook(cls: FailureClass): Pair<ImageVector, String> = when (cls)
 /**
  * Error card: icon, plain title, a short reason, and Retry / Terminal / Sign in / Update / Copy details. A version-related
  * failure (unknown flag, missing method, protocol mismatch) checks `<cli> --version` once (cached) and, when it is below the
- * catalog minimum, says so with an Update button that runs the CLI's update path and then retries.
+ * catalog minimum, says so with an Update button that opens the update popup ([ChatHost.showCliUpdate]) and then retries.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ErrorRow(v: AgentChatView, t: ChatThread, item: TurnItem, p: ItemPayload.Error, modifier: Modifier) {
     val ctx = LocalContext.current
     var details by remember { mutableStateOf(false) }
-    var upd by remember { mutableStateOf<CliVersionCheck.State?>(null) }
     val versionLike = remember(p) { ChatFailures.versionRelated(Failure(p.cls, p.message, p.retryAt, p.details)) }
     val ver by produceState<CliVersionCheck.Result?>(null, p.cls, t.tool) {
         if (versionLike) value = withContext(Dispatchers.IO) { CliVersionCheck.check(ctx, t.tool) }
     }
-    val old = ver?.takeIf { it.tooOld && it.installed != null && it.min != null }
+    val old = ver?.takeIf { it.tooOld(CliNeed.CHAT) }
     val (icon, title) = errorLook(if (old != null) FailureClass.VERSION_OLD else p.cls)
-    val reason = old?.let { tr(R.string.chat_err_too_old, it.name, it.installed.orEmpty(), it.min.orEmpty()) } ?: ChatFailures.reason(p.message)
-    val updating = upd is CliVersionCheck.State.Running
+    val reason = old?.let { tr(R.string.chat_err_too_old, it.name, it.installed.orEmpty(), it.min(CliNeed.CHAT).orEmpty()) } ?: ChatFailures.reason(p.message)
     Column(modifier) {
         Column(Modifier.fillMaxWidth().card(C.errorCon.copy(alpha = 0.14f), C.error.copy(alpha = 0.6f)).padding(S.m)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -492,24 +491,11 @@ private fun ErrorRow(v: AgentChatView, t: ChatThread, item: TurnItem, p: ItemPay
                 p.retryAt?.let { Label("retry " + TIME.format(Date(it)), color = C.error) }
             }
             Text(reason, Modifier.padding(vertical = S.s), color = C.on, style = T.bodySm)
-            (upd as? CliVersionCheck.State.Running)?.let {
-                Row(Modifier.padding(bottom = S.s), verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(14.dp), color = C.primary, strokeWidth = 2.dp)
-                    Text(it.text, Modifier.padding(start = S.s), color = C.onVar, style = T.bodySm)
-                }
-            }
-            (upd as? CliVersionCheck.State.Done)?.takeIf { !it.ok }?.let {
-                Text(tr(R.string.chat_err_update_failed, ChatFailures.reason(it.message)), Modifier.padding(bottom = S.s), color = C.error, style = T.bodySm)
-            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
-                if (old != null && old.canUpdate && !updating) NcButton(tr(R.string.chat_err_update), icon = Ic.Download, primary = true) {
-                    upd = CliVersionCheck.State.Running(tr(R.string.chat_err_updating))
-                    v.host.updateCli(t.tool) { st ->
-                        upd = st
-                        if (st is CliVersionCheck.State.Done && st.ok) v.retry(t, item.runId)
-                    }
+                if (old != null && old.canUpdate) NcButton(tr(R.string.chat_err_update), icon = Ic.Download, primary = true) {
+                    v.host.showCliUpdate(t.tool, CliNeed.CHAT) { ok -> if (ok) v.retry(t, item.runId) }
                 }
-                if (!updating) NcButton(tr(R.string.chat_retry), icon = Ic.Retry) { v.retry(t, item.runId) }
+                NcButton(tr(R.string.chat_retry), icon = Ic.Retry) { v.retry(t, item.runId) }
                 if (p.cls == FailureClass.PERMISSION_ERROR) NcButton(tr(R.string.chat_sign_in), icon = Ic.Lock, primary = true) {
                     v.host.showCliLogin(CliVersionCheck.def(t.tool)?.id ?: t.tool)
                 }

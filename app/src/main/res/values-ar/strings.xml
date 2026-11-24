@@ -1568,6 +1568,8 @@
     <string name="chat_err_update">تحديث</string>
     <string name="chat_err_updating">جارٍ التحديث…</string>
     <string name="chat_err_update_failed">فشل التحديث: %1$s</string>
+    <string name="cli_gate_chat">%1$s %2$s قديم جدًا للدردشة. يتطلب %3$s أو أحدث. هل تريد التحديث الآن؟</string>
+    <string name="cli_gate_login">%1$s %2$s قديم جدًا لتسجيل الدخول. يتطلب %3$s أو أحدث. هل تريد التحديث الآن؟</string>
     <string name="chat_copy_details">نسخ التفاصيل</string>
     <string name="chat_open_file">فتح الملف</string>
     <string name="chat_preview_failed">تعذّرت معاينة هذا الملف</string>

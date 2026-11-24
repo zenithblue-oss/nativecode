@@ -12,12 +12,16 @@ import com.zenithblue.nativecode.terminal.ShellQuoting
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * `<cli> --version` against [CliToolDef.minChatVersion], for the chat error card only: it runs after a version-related
- * chat failure, never on a healthy start. The result is cached per tool until [update] succeeds (or the process ends).
+ * `<cli> --version` against [CliToolDef.min] (chat / sign-in). Read before a chat session or sign-in starts ([CliGate]) and
+ * after a version-related chat failure. Cached per tool until [update] succeeds (or the process ends), so only the first
+ * use per app session pays for the guest shell.
  */
 object CliVersionCheck {
     /** [installed] null = `--version` gave nothing usable (not installed, or the Free gate shim answered). */
-    data class Result(val tool: String, val name: String, val installed: String?, val min: String?, val tooOld: Boolean, val canUpdate: Boolean)
+    data class Result(val tool: String, val name: String, val installed: String?, val canUpdate: Boolean) {
+        fun min(need: CliNeed): String? = CliToolCatalog.byId(tool)?.min(need)
+        fun tooOld(need: CliNeed): Boolean = ChatFailures.versionTooOld(installed, min(need))
+    }
 
     sealed interface State {
         data class Running(val text: String) : State
@@ -41,9 +45,14 @@ object CliVersionCheck {
             ShellCommandRunner.runCaptureExit(ctx, args, env).second
         } catch (_: Exception) { "" }
         val v = if (out.contains("NativeCode:")) null else ChatFailures.parseVersion(out)
-        val r = Result(d.id, d.displayName, v, d.minChatVersion, ChatFailures.versionTooOld(v, d.minChatVersion), canUpdate(ctx, d))
+        val r = Result(d.id, d.displayName, v, canUpdate(ctx, d))
         cache[d.id] = r
         return r
+    }
+    /** [check], but a cached "too old for [need]" is re-read once: the user may have updated it in a terminal since. Blocking. */
+    fun probe(ctx: Context, id: String, need: CliNeed): Result? {
+        val r = check(ctx, id)
+        return if (r?.tooOld(need) == true) check(ctx, id, force = true) else r
     }
 
     /** A login shell re-applies the CLI PATH (~/.local/bin, ~/.opencode/bin): a plain `sh -c` does not find the CLIs. */
@@ -97,7 +106,7 @@ object CliVersionCheck {
                 val code = proc.waitFor()
                 cache.remove(d.id)
                 val now = check(app, d.id, force = true)
-                val ok = code == 0 && now?.installed != null && !now.tooOld
+                val ok = code == 0 && now?.installed != null && CliNeed.values().none { now.tooOld(it) }
                 done(ok, if (ok) "${d.displayName} ${now?.installed}" else last.ifEmpty { "Update failed" })
             } catch (e: Exception) {
                 done(false, e.message ?: "Update failed")

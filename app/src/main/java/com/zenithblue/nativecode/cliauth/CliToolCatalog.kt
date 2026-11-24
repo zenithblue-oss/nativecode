@@ -39,18 +39,24 @@ data class CliToolDef(
     /** [ChatProtocol.ACP] profile id (argv, env, mode map) when [chat] is ACP. */
     val acpProfile: String? = null,
     /**
-     * Lowest CLI version the chat runtime is known to work with (dotted). Only consulted after a version-related chat
-     * failure (unknown flag, missing app-server method, protocol mismatch, missing endpoint); never on a healthy start.
+     * Lowest CLI version the chat runtime works with (dotted): the flags / JSON-RPC methods / endpoints it calls exist from
+     * there. Checked before a chat session starts ([CliGate]) and again after a version-related chat failure.
      */
     val minChatVersion: String? = null,
+    /** Lowest CLI version whose sign-in command (the one [CliGuestCommands] runs) works; checked before the sign-in popup starts. */
+    val minLoginVersion: String? = null,
     /** Guest shell command that updates this CLI itself (null = delivered by the Components update pack). */
     val updateCmd: String? = null,
     /** Guest shell command that installs (or reinstalls) this CLI from its vendor, as setup_cli_tools.sh does. */
     val installCmd: String? = null,
     /** One short line for the Settings card. */
     val description: String = ""
-)
+) {
+    fun min(need: CliNeed): String? = if (need == CliNeed.CHAT) minChatVersion else minLoginVersion
+}
 
+/** What a CLI is about to be used for; picks [CliToolDef.minChatVersion] or [CliToolDef.minLoginVersion]. */
+enum class CliNeed { CHAT, LOGIN }
 enum class ChatProtocol { OPENCODE_HTTP, CLAUDE_STREAM, CODEX_APP_SERVER, ACP }
 
 object CliToolCatalog {
@@ -66,7 +72,11 @@ object CliToolCatalog {
             envKey = "CLAUDE_CODE_OAUTH_TOKEN",
             subtitle = tr(R.string.cli_claude_auth_login_browser_oauth),
             chat = ChatProtocol.CLAUDE_STREAM,
-            minChatVersion = "2.1.0",
+            // 2.1.94 = first build with the hidden --thinking-display flag the stream runtime passes (the rest, --permission-prompt-tool stdio,
+            // --effort, --setting-sources, --session-id / --fork-session, is older). 2.1.126: `claude auth login` takes the pasted code,
+            // which on-device (no localhost callback) is the only way to finish (auth subcommand itself: 2.1.41). Rootfs 2.1.263 passes.
+            minChatVersion = "2.1.94",
+            minLoginVersion = "2.1.126",
             updateCmd = "claude update",
             installCmd = "curl -fsSL https://claude.ai/install.sh | bash",
             description = tr(R.string.cli_desc_claude)
@@ -81,7 +91,10 @@ object CliToolCatalog {
             consoleUrl = "https://auth.openai.com/codex/device",
             subtitle = tr(R.string.cli_codex_login_device_auth),
             chat = ChatProtocol.CODEX_APP_SERVER,
-            minChatVersion = "0.130.0",
+            // app-server-protocol common.rs per tag: thread/start|resume 0.56, turn/steer 0.99, thread/compact/start 0.96, permissions approval
+            // 0.113, thread/goal/* 0.128 (experimental until 0.133, which makes goals stable); `login --device-auth` 0.46. Rootfs 0.153.2 passes.
+            minChatVersion = "0.133.0",
+            minLoginVersion = "0.46.0",
             updateCmd = "npm install -g @openai/codex@latest",
             installCmd = "npm install -g @openai/codex@latest",
             description = tr(R.string.cli_desc_codex)
@@ -109,7 +122,9 @@ object CliToolCatalog {
             subtitle = tr(R.string.cli_opencode_auth_login_providers),
             loginOptional = true,
             chat = ChatProtocol.OPENCODE_HTTP,
-            minChatVersion = "2.0.0",
+            // opencode 2.2.0 = first public 2.x release with the /api/session v2 routes, forms and usage limits (releases page). The rootfs
+            // npm opencode-ai 1.18.27 only has session create/fetch; the update pack brings 2.3.0. Sign-in is the terminal `opencode auth login`.
+            minChatVersion = "2.2.0",
             updateCmd = "opencode upgrade",
             installCmd = "curl -fsSL https://opencode.ai/v2/install | bash",
             description = tr(R.string.cli_desc_opencode)
@@ -124,7 +139,10 @@ object CliToolCatalog {
             subtitle = tr(R.string.cli_agy_acp_login_google_oauth),
             chat = ChatProtocol.ACP,
             acpProfile = "agy",
-            minChatVersion = "1.4.0",
+            // CHANGELOG: `agy acp` + modes + session/resume + `acp --login` arrive in 1.5.0; 1.5.9 makes a failed turn report its real
+            // quota / model error (the app maps stopReason refusal to quota). The rootfs ships 1.1.26, which has no `agy acp` at all.
+            minChatVersion = "1.5.9",
+            minLoginVersion = "1.5.0",
             updateCmd = "agy update",
             installCmd = "A=~/.local/bin/agy; [ -x \$A ] && mv -f \$A \$A.prev; if curl -fsSL https://antigravity.google/cli/install.sh | bash; then rm -f \$A.prev; else [ -e \$A.prev ] && mv -f \$A.prev \$A; false; fi",
             description = tr(R.string.cli_desc_agy)
@@ -140,7 +158,10 @@ object CliToolCatalog {
             subtitle = tr(R.string.cli_grok_login_or_xai_api),
             chat = ChatProtocol.ACP,
             acpProfile = "grok",
+            // Release notes: `agent stdio` listing and --always-approve are documented from 1.0.51 (ACP effort at session open from 1.0.5);
+            // earlier builds lack the ACP config options / clientType the app sets. The rootfs ships 1.0.13.
             minChatVersion = "1.0.50",
+            minLoginVersion = "1.0.50",
             updateCmd = "grok update",
             installCmd = "curl -fsSL https://x.ai/cli/install.sh | bash",
             description = tr(R.string.cli_desc_grok)

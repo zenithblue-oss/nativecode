@@ -1611,6 +1611,8 @@
     <string name="chat_err_update">Update</string>
     <string name="chat_err_updating">Updating…</string>
     <string name="chat_err_update_failed">Update failed: %1$s</string>
+    <string name="cli_gate_chat">%1$s %2$s is too old for chat. It needs %3$s or newer. Update now?</string>
+    <string name="cli_gate_login">%1$s %2$s is too old to sign in. It needs %3$s or newer. Update now?</string>
     <string name="chat_copy_details">Copy details</string>
     <string name="chat_open_file">Open file</string>
     <string name="chat_preview_failed">Can\'t preview this file</string>

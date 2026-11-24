@@ -1568,6 +1568,8 @@
     <string name="chat_err_update">Güncelle</string>
     <string name="chat_err_updating">Güncelleniyor…</string>
     <string name="chat_err_update_failed">Güncelleme başarısız: %1$s</string>
+    <string name="cli_gate_chat">%1$s %2$s sohbet için çok eski. %3$s veya daha yenisi gerekir. Şimdi güncellensin mi?</string>
+    <string name="cli_gate_login">%1$s %2$s oturum açmak için çok eski. %3$s veya daha yenisi gerekir. Şimdi güncellensin mi?</string>
     <string name="chat_copy_details">Ayrıntıları kopyala</string>
     <string name="chat_open_file">Dosyayı aç</string>
     <string name="chat_preview_failed">Bu dosya önizlenemiyor</string>

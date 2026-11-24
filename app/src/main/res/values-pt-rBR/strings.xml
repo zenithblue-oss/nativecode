@@ -1568,6 +1568,8 @@
     <string name="chat_err_update">Atualizar</string>
     <string name="chat_err_updating">Atualizando…</string>
     <string name="chat_err_update_failed">Falha ao atualizar: %1$s</string>
+    <string name="cli_gate_chat">%1$s %2$s é muito antiga para o chat. Requer %3$s ou mais recente. Atualizar agora?</string>
+    <string name="cli_gate_login">%1$s %2$s é muito antiga para entrar. Requer %3$s ou mais recente. Atualizar agora?</string>
     <string name="chat_copy_details">Copiar detalhes</string>
     <string name="chat_open_file">Abrir arquivo</string>
     <string name="chat_preview_failed">Não é possível pré-visualizar este arquivo</string>
