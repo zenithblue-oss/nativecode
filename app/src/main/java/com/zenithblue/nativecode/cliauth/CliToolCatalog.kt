@@ -123,7 +123,7 @@ object CliToolCatalog {
             loginOptional = true,
             chat = ChatProtocol.OPENCODE_HTTP,
             // opencode 2.2.0 = first public 2.x release with the /api/session v2 routes, forms and usage limits (releases page). The rootfs
-            // npm opencode-ai 1.18.27 only has session create/fetch; the update pack brings 2.3.0. Sign-in is the terminal `opencode auth login`.
+            // npm opencode-ai 1.18.27 only has session create/fetch; the update pack brings 2.4.1. Sign-in is the terminal `opencode auth login`.
             minChatVersion = "2.2.0",
             updateCmd = "opencode upgrade",
             installCmd = "curl -fsSL https://opencode.ai/v2/install | bash",
@@ -140,7 +140,7 @@ object CliToolCatalog {
             chat = ChatProtocol.ACP,
             acpProfile = "agy",
             // CHANGELOG: `agy acp` + modes + session/resume + `acp --login` arrive in 1.5.0; 1.5.9 makes a failed turn report its real
-            // quota / model error (the app maps stopReason refusal to quota). The rootfs ships 1.1.26, which has no `agy acp` at all.
+            // quota / model error (the app maps stopReason refusal to quota). The rootfs ships 1.1.26, which has no `agy acp` at all; the update pack brings 1.5.16.
             minChatVersion = "1.5.9",
             minLoginVersion = "1.5.0",
             updateCmd = "agy update",
@@ -159,7 +159,7 @@ object CliToolCatalog {
             chat = ChatProtocol.ACP,
             acpProfile = "grok",
             // Release notes: `agent stdio` listing and --always-approve are documented from 1.0.51 (ACP effort at session open from 1.0.5);
-            // earlier builds lack the ACP config options / clientType the app sets. The rootfs ships 1.0.13.
+            // earlier builds lack the ACP config options / clientType the app sets. The rootfs ships 1.0.13; the update pack brings 1.0.92.
             minChatVersion = "1.0.50",
             minLoginVersion = "1.0.50",
             updateCmd = "grok update",

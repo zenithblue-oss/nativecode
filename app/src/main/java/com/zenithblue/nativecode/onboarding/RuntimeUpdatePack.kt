@@ -18,9 +18,9 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
 /**
- * The 1.8.0 runtime delta on top of the 1.7.1 rootfs: opencode 2.3.0, GitHub CLI, the rebuilt zsh, OpenSSH 10.6
+ * The 1.8.0 runtime delta on top of the 1.7.1 rootfs: opencode 2.4.1, Antigravity agy 1.5.16, Grok 1.0.92, GitHub CLI, the rebuilt zsh, OpenSSH 10.6
  * (server + client) and the pinned ccusage 20.0.49, delivered as one Play asset pack (`nativecode_update_core`,
- * about 140 MB) instead of the whole 1.3 GB rootfs.
+ * about 320 MB) instead of the whole 1.3 GB rootfs.
  *
  * The 1.8.0 `nativecode_runtime` pack is byte-identical to 1.7.1's, so Play has nothing to patch on update and
  * existing users download only this pack. A FRESH install extracts the same 1.7.1 archive and then applies this
@@ -33,10 +33,10 @@ object RuntimeUpdatePack {
     private const val TAG = "RuntimeUpdatePack"
     const val ARCHIVE_NAME = "nativecode_update.tgz"
     const val SHA_NAME = "$ARCHIVE_NAME.sha256"
-    const val PINNED_SHA256 = "2ddd44b20ac446a41186189912772f86b34871a0bb9f7345535d522b05de3611"
+    const val PINNED_SHA256 = "fa9f25582d523fa36c3fc93e260aabafa1762842a6dd65bfa71ee093de778a01"
     const val MARKER_REL = "etc/nativecode/update-pack-1.8.0.sha256"
 
-    private const val MIN_FREE_BYTES = 400L * 1024L * 1024L // opencode alone unpacks to ~254 MB
+    private const val MIN_FREE_BYTES = 1200L * 1024L * 1024L // opencode, agy and grok unpack to ~254 + 258 + 178 MB
     private var promptedThisProcess = false
 
     data class ApplyResult(val success: Boolean, val message: String)
@@ -79,7 +79,7 @@ object RuntimeUpdatePack {
         return applyTo(root, archive).also { if (it.success) removePack(context) }
     }
 
-    /** Drop the ~140 MB on-demand pack once applied; the marker in the rootfs keeps [isNeeded] false. */
+    /** Drop the ~320 MB on-demand pack once applied; the marker in the rootfs keeps [isNeeded] false. */
     private fun removePack(context: Context) =
         PlayAssetDeliveryManager.removePack(context, PlayAssetDeliveryManager.PACK_UPDATE_CORE)
 
@@ -106,7 +106,7 @@ object RuntimeUpdatePack {
             return ApplyResult(false, "Runtime update checksum mismatch")
         }
         if (rootfs.usableSpace < MIN_FREE_BYTES) {
-            return ApplyResult(false, "Not enough free storage for the runtime update (need 400 MB)")
+            return ApplyResult(false, "Not enough free storage for the runtime update (need 1.2 GB)")
         }
         return try {
             val count = extract(archive, rootfs)
@@ -255,8 +255,8 @@ object RuntimeUpdatePack {
     // What the Components card shows (no dialog: the update lives on Settings > Components).
     const val TITLE = "Linux runtime update"
     const val FROM_TO = "1.7 runtime to 1.8.0 runtime"
-    const val SIZE = "About 140 MB download"
-    const val CHANGES = "opencode 2.3.0, GitHub CLI 2.104, a zsh fix, OpenSSH 10.6 and ccusage 20.0.49. Replaces ~/.opencode/bin/opencode, /usr/local/bin/gh, zsh and the OpenSSH files (a newer self-updated opencode is replaced too); your other files are not touched."
+    const val SIZE = "About 320 MB download"
+    const val CHANGES = "opencode 2.4.1, Antigravity 1.5.16, Grok CLI 1.0.92, GitHub CLI 2.104, a zsh fix, OpenSSH 10.6 and ccusage 20.0.49. Replaces ~/.opencode/bin/opencode, ~/.local/bin/agy, the Grok binary, /usr/local/bin/gh, zsh and the OpenSSH files (a newer self-updated copy is replaced too); your other files are not touched."
 
     /** App start: a pack already on the device is applied silently; otherwise the Components card offers it. */
     fun applyIfDownloaded(app: Context) {

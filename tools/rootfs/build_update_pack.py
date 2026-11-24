@@ -6,21 +6,27 @@ Everything new in the 1.8.0 runtime reaches BOTH upgraded users and fresh instal
 applied by app-side Kotlin file I/O (RuntimeUpdatePack.kt); nothing in it runs in the guest.
 
 Contents:
-  - opencode 2.3.0        release tarball, sha256 pinned          -> ~/.opencode/bin/opencode
+  - opencode 2.4.1        release tarball, sha256 pinned          -> ~/.opencode/bin/opencode
+  - Antigravity agy 1.5.16 vendor manifest tarball, sha512 pinned  -> ~/.local/bin/agy
+  - Grok CLI 1.0.92       vendor GCS binary, sha256 pinned (md5 = GCS etag) -> ~/.grok/downloads/grok-linux-aarch64 (bin/grok, bin/agent link to it)
   - GitHub CLI 2.104.0    release tarball, sha256 pinned          -> /usr/local/bin/gh
   - zsh 5.9               rebuilt (see zsh_update_build.sh)       -> /usr/bin/zsh, /usr/bin/zsh-5.9
   - OpenSSH 10.6p2        files of the Alpaquita apk packages     -> /usr/bin/ssh*, /usr/sbin/sshd, /usr/lib/ssh, /etc/ssh, libedit
   - ccusage 20.0.49       @ccusage/ccusage-linux-arm64, npm sha512 -> ~/.local/share/nativecode/ccusage/ccusage
 
   build_update_pack.py --dl DIR --overlay update-overlay.tar --out DIR
-DIR must hold opencode-linux-arm64.tar.gz, gh_<ver>_linux_arm64.tar.gz and ccusage-linux-arm64-<ver>.tgz.
+DIR must hold opencode-linux-arm64.tar.gz, agy-<ver>.tar.gz, grok-<ver>-linux-aarch64, gh_<ver>_linux_arm64.tar.gz and ccusage-linux-arm64-<ver>.tgz.
 update-overlay.tar comes from build_update_overlay.sh (dereferenced regular files: usr/bin/zsh-5.9 + the openssh files).
 Output: OUT/nativecode_update.tgz and OUT/nativecode_update.tgz.sha256 (USTAR, root-relative paths,
 regular files and directories only: the app-side extractor refuses anything else).
 """
 import argparse, base64, gzip, hashlib, io, os, sys, tarfile
 
-OPENCODE_SHA256 = "3207fb5cdec448d479242c0f1a14f4f7bdfcad3a79209b5eb8f9003725e93711"
+OPENCODE_SHA256 = "cb28cf94541aeb62a4b2ea5997a99b5dd6bae595a772f36fbe279299f2032a4f"  # v2.4.1
+AGY_VERSION = "1.5.16"  # https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/linux_arm64.json (glibc)
+AGY_SHA512 = "23c193151499a4986fd5fa0d8132665cc8ffbad6cc0b3ff4fd53a2cb68abb76b149a992b836d53063443cd89add335f14d8134fb02abdcecbf6e1eaef6c53d33"
+GROK_VERSION = "1.0.92"  # https://storage.googleapis.com/grok-build-public-artifacts/cli/grok-<ver>-linux-aarch64 (no vendor checksum; sha256 is ours, md5 matched the GCS etag)
+GROK_SHA256 = "8c74f1dc6cdc1befff6b9faada06bec4cf6759d04f2a60cdc28ece5ff696b44f"
 GH_VERSION = "2.104.0"
 GH_SHA256 = "cb34cefc6f4e77b90731374a2b737516bb8f3033c6ca46aa949e5344f68069e3"
 CCUSAGE_VERSION = "20.0.49"  # must equal UsageModel.VERSION
@@ -32,6 +38,7 @@ CCUSAGE_PATH = "home/flux/.local/share/nativecode/ccusage/ccusage"
 # folders the pack may have to create; every other parent already exists in the 1.7.1 rootfs
 NEW_DIRS = (
     "home/flux/.opencode", "home/flux/.opencode/bin",
+    "home/flux/.local/bin", "home/flux/.grok", "home/flux/.grok/downloads",
     "home/flux/.local/share/nativecode", "home/flux/.local/share/nativecode/ccusage",
     "etc/ssh", "usr/lib/ssh",
 )
@@ -59,11 +66,21 @@ def main():
 
     oc = os.path.join(a.dl, "opencode-linux-arm64.tar.gz")
     gh = os.path.join(a.dl, f"gh_{GH_VERSION}_linux_arm64.tar.gz")
+    agy = os.path.join(a.dl, f"agy-{AGY_VERSION}.tar.gz")
+    grok = os.path.join(a.dl, f"grok-{GROK_VERSION}-linux-aarch64")
     cc = os.path.join(a.dl, f"ccusage-linux-arm64-{CCUSAGE_VERSION}.tgz")
     for path, want in ((oc, OPENCODE_SHA256), (gh, GH_SHA256)):
         got = sha256(path)
         if got != want:
             sys.exit(f"sha256 mismatch {path}: {got} != {want}")
+    h = hashlib.sha512()
+    with open(agy, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    if h.hexdigest() != AGY_SHA512:
+        sys.exit(f"sha512 mismatch {agy}: {h.hexdigest()} != {AGY_SHA512}")
+    if sha256(grok) != GROK_SHA256:
+        sys.exit(f"sha256 mismatch {grok}")
     cc_raw = open(cc, "rb").read()
     got = "sha512-" + base64.b64encode(hashlib.sha512(cc_raw).digest()).decode()
     if got != CCUSAGE_INTEGRITY:
@@ -72,6 +89,9 @@ def main():
     files = [
         ("home/flux/.opencode/bin/opencode", member_bytes(oc, "opencode"), 0o755),
         ("usr/local/bin/gh", member_bytes(gh, f"gh_{GH_VERSION}_linux_arm64/bin/gh"), 0o755),
+        ("home/flux/.local/bin/agy", member_bytes(agy, "antigravity"), 0o755),
+        # bin/grok and bin/agent are relative links to this file in the 1.7.1 rootfs; the extractor never writes links
+        ("home/flux/.grok/downloads/grok-linux-aarch64", open(grok, "rb").read(), 0o755),
         (CCUSAGE_PATH, member_bytes(cc, "package/bin/ccusage"), 0o755),
     ]
     with tarfile.open(a.overlay, "r") as ov:
