@@ -240,7 +240,7 @@ internal fun Composer(
                     val modelName = model?.name?.ifBlank { null } ?: currentModel?.substringAfterLast('/') ?: tr(R.string.chat_default_model)
                     Chip(
                         modelName + if (model?.free == true) " · free" else "",
-                        Modifier.widthIn(max = 220.dp).semantics { contentDescription = tr(if (model?.free == true) R.string.chat_model_chip_desc_free else R.string.chat_model_chip_desc, providerName(t.tool), modelName) },
+                        Modifier.widthIn(max = 160.dp).semantics { contentDescription = tr(if (model?.free == true) R.string.chat_model_chip_desc_free else R.string.chat_model_chip_desc, providerName(t.tool), modelName) },
                         trailing = Ic.ChevronDown, leading = { ProviderLogo(t.tool, size = 20.dp) },
                     ) { s.sheet = ComposerSheet.MODEL }
                     if (efforts.isNotEmpty()) Box {
