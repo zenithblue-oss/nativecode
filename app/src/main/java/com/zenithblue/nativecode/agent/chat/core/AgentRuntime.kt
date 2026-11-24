@@ -72,6 +72,8 @@ data class RequestAnswer(
 data class ConfigChange(
     val model: String? = null,
     val effort: String? = null,
+    /** Back to the CLI's own default effort (null [effort] means "no change"). */
+    val clearEffort: Boolean = false,
     val runtimeMode: RuntimeMode? = null,
     val interactionMode: InteractionMode? = null,
 )

@@ -398,6 +398,8 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
         else JSONObject().put("outcome", JSONObject().put("outcome", "cancelled"))
 
     override fun configure(change: ConfigChange) = onIo {
+        // ponytail: ACP has no unset; Default drops our pick, so the CLI default applies from the next session start
+        if (change.clearEffort) effort = null
         if (change.model != null || change.effort != null) {
             applySelection(change.model ?: model, change.effort ?: effort)
             sink(AgentEvent.SessionState(AgentEvent.Phase.READY, caps, models, model = model))

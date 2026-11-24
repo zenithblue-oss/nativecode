@@ -408,4 +408,11 @@ class ChatReducerTest {
         assertEquals("agy", r.thread.tool); assertEquals("codex", r.thread.handoffFrom)
         assertEquals(2, rows.items.size)
     }
+
+    @Test fun clearEffortGoesBackToTheCliDefault() {
+        val r = reducer()
+        r.configure(com.zenithblue.nativecode.agent.chat.core.ConfigChange(effort = "high")); assertEquals("high", r.thread.effort)
+        r.configure(com.zenithblue.nativecode.agent.chat.core.ConfigChange(model = "m")); assertEquals("high", r.thread.effort)
+        r.configure(com.zenithblue.nativecode.agent.chat.core.ConfigChange(clearEffort = true)); assertNull(r.thread.effort)
+    }
 }

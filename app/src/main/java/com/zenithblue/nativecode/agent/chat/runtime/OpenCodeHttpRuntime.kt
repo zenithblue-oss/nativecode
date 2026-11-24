@@ -129,9 +129,9 @@ class OpenCodeHttpRuntime(private val host: RuntimeHost) : AgentRuntime {
     override fun configure(change: ConfigChange) = onIo {
         val sid = sessionId ?: return@onIo
         val s = "/api/session/${enc(sid)}"
-        if (change.model != null || change.effort != null) {
+        if (change.model != null || change.effort != null || change.clearEffort) {
             model = change.model ?: model
-            effort = change.effort ?: effort
+            effort = if (change.clearEffort) null else change.effort ?: effort
             mapper.contextSize = models.firstOrNull { it.id == model }?.contextLimit
             OpenCodeWire.modelRef(model, effort, models)?.let { api.call("POST", "$s/model", JSONObject().put("model", it)) }
         }

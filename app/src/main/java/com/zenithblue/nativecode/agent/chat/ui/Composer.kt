@@ -251,11 +251,11 @@ internal fun Composer(
                         ) { effortMenu = true }
                         DropdownMenu(effortMenu, { effortMenu = false }, containerColor = C.low) {
                             Overline(tr(R.string.chat_reasoning_effort), Modifier.padding(horizontal = S.l, vertical = S.xs), color = C.outline)
-                            efforts.forEach { x ->
+                            (listOf<String?>(null) + efforts).forEach { x ->
                                 val on = x == t.effort
                                 DropdownMenuItem(
-                                    text = { Text(x, style = T.codeSm, color = if (on) C.primary else C.on) },
-                                    onClick = { effortMenu = false; if (!on) cfg(ConfigChange(effort = x)) },
+                                    text = { Text(x ?: tr(R.string.chat_effort_default), style = T.codeSm, color = if (on) C.primary else C.on) },
+                                    onClick = { effortMenu = false; if (!on) cfg(if (x == null) ConfigChange(clearEffort = true) else ConfigChange(effort = x)) },
                                     trailingIcon = if (on) ({ NcIcon(Ic.Check, tr(R.string.chat_selected), tint = C.primary, size = 16.dp) }) else null,
                                 )
                             }

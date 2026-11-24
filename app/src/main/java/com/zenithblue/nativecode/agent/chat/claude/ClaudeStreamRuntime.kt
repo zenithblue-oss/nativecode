@@ -96,13 +96,15 @@ class ClaudeStreamRuntime(private val host: RuntimeHost) : AgentRuntime {
     override fun configure(change: ConfigChange) = onIo {
         val old = cfg
         cfg = cfg.copy(
-            model = change.model ?: cfg.model, effort = change.effort ?: cfg.effort,
+            model = change.model ?: cfg.model, effort = if (change.clearEffort) null else change.effort ?: cfg.effort,
             runtimeMode = change.runtimeMode ?: cfg.runtimeMode, interactionMode = change.interactionMode ?: cfg.interactionMode,
         )
         if (proc == null) return@onIo
         if (change.model != null && change.model != old.model) call("set_model", JSONObject().put("model", change.model))
         if (change.effort != null && change.effort != old.effort)
             call("apply_flag_settings", JSONObject().put("settings", JSONObject().put("effortLevel", change.effort)))
+        if (change.clearEffort && old.effort != null)
+            call("apply_flag_settings", JSONObject().put("settings", JSONObject().put("effortLevel", JSONObject.NULL)))
         val mode = ClaudeWire.permissionMode(cfg.runtimeMode, cfg.interactionMode)
         if (mode != ClaudeWire.permissionMode(old.runtimeMode, old.interactionMode)) call("set_permission_mode", JSONObject().put("mode", mode))
     }

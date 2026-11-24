@@ -340,7 +340,7 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
     /** Model, effort, approvals and plan mode go with the next `turn/start`: nothing to send now. */
     override fun configure(change: ConfigChange) {
         cfg = cfg.copy(
-            model = change.model ?: cfg.model, effort = change.effort ?: cfg.effort,
+            model = change.model ?: cfg.model, effort = if (change.clearEffort) null else change.effort ?: cfg.effort,
             runtimeMode = change.runtimeMode ?: cfg.runtimeMode, interactionMode = change.interactionMode ?: cfg.interactionMode,
         )
     }

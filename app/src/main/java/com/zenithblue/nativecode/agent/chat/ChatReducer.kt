@@ -227,7 +227,7 @@ class ChatReducer(
     fun starting() { state = state.copy(phase = LivePhase.STARTING, banner = state.banner?.takeIf { it.kind == BannerKind.QUEUE_HELD }) }
 
     fun configure(c: ConfigChange) {
-        thread = thread.copy(model = c.model ?: thread.model, effort = c.effort ?: thread.effort,
+        thread = thread.copy(model = c.model ?: thread.model, effort = if (c.clearEffort) null else c.effort ?: thread.effort,
             runtimeMode = c.runtimeMode ?: thread.runtimeMode, interactionMode = c.interactionMode ?: thread.interactionMode)
         val t = thread
         writes += ChatWrite.UpdateThread(t.id) { it.copy(model = t.model, effort = t.effort, runtimeMode = t.runtimeMode, interactionMode = t.interactionMode) }
