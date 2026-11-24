@@ -54,8 +54,9 @@ internal fun BrowserCard(threadId: String) {
                         box = 40.dp, size = 16.dp) { b.collapsed = !b.collapsed }
                     IconBtn(Ic.Close, tr(R.string.browser_close), box = 40.dp, size = 16.dp) { AgentBrowser.userClose() }
                 }
-                // Collapsed = clipped to nothing, still laid out at full size so the page keeps its viewport.
-                Column(Modifier.fillMaxWidth().height(if (b.collapsed) 0.dp else PANEL_H).clipToBounds()) {
+                // Collapsed = not composed: AgentBrowser parks the WebView in the window (alpha ~0), so it keeps rendering and
+                // keeps its viewport; a clipped-to-nothing child would stop Chromium drawing.
+                if (!b.collapsed) Column(Modifier.fillMaxWidth().height(PANEL_H).clipToBounds()) {
                     AndroidView(
                         factory = { AgentBrowser.attach(it) },
                         modifier = Modifier.fillMaxWidth().requiredHeight(PANEL_H),

@@ -12,9 +12,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import android.view.Gravity
 import android.view.PixelCopy
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.webkit.GeolocationPermissions
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
@@ -34,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.webkit.ProfileStore
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.zenithblue.nativecode.R
 import com.zenithblue.nativecode.agent.chat.ChatAttachments
 import com.zenithblue.nativecode.agent.chat.tools.NcToolSpec.Failure
 import org.json.JSONArray
@@ -41,6 +45,7 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -80,6 +85,8 @@ object AgentBrowser {
     private const val BUSY_MS = 15_000L
     private const val SHOTS = "/home/flux/.nativecode/browser"
     private const val KEEP_SHOTS = 20
+    private const val PARK_ALPHA = 0.01f
+    private const val PANEL_DP = 260
 
     private val main = Handler(Looper.getMainLooper())
     private val lock = ReentrantLock()
@@ -97,6 +104,9 @@ object AgentBrowser {
     @Volatile private var active = 0
     private var web: WebView? = null                   // main thread only
     private var wrapper: MutableContextWrapper? = null
+    private var hostAct: WeakReference<Activity>? = null  // the activity whose window keeps the WebView alive (park) and shows fullscreen video
+    private var custom: FrameLayout? = null                // fullscreen video overlay
+    private var customCb: WebChromeClient.CustomViewCallback? = null
     private val driver: String by lazy { requireNotNull(app).assets.open("browser/driver.js").use { it.readBytes().toString(Charsets.UTF_8) } }
 
     fun init(ctx: Context) { if (app == null) app = ctx.applicationContext }
@@ -124,6 +134,7 @@ object AgentBrowser {
         ui.owner = null
         ui.controlling = false
         topUrl = null
+        exitFullscreen()
         web?.let { w ->
             runCatching { w.stopLoading(); w.loadUrl("about:blank"); w.clearHistory(); w.clearCache(true); w.clearFormData() }
         }
@@ -138,13 +149,43 @@ object AgentBrowser {
     fun attach(host: Context): WebView {
         val v = web ?: create()
         (v.parent as? ViewGroup)?.removeView(v)
+        activityOf(host)?.let { hostAct = WeakReference(it) }
+        v.alpha = 1f; v.translationZ = 0f; v.setOnTouchListener(null)
         wrapper?.baseContext = host
         return v
     }
 
+    /** The card let go of it (collapsed, scrolled away, closed): park it so Chromium keeps rendering and decoding. */
     fun detach(v: View) {
         (v.parent as? ViewGroup)?.removeView(v)
         wrapper?.baseContext = app
+        (v as? WebView)?.let { park(it) }
+    }
+
+    private fun activityOf(c: Context): Activity? = generateSequence(c) { (it as? ContextWrapper)?.baseContext }.firstOrNull { it is Activity } as? Activity
+
+    /**
+     * Main thread: while an agent owns the browser but no card shows it, keep the WebView attached at the bottom of
+     * the activity window, panel-sized, alpha 0.01 and touch-proof. A detached or fully clipped WebView stops drawing,
+     * which stalls video frames, WebGL and requestAnimationFrame; this keeps them alive and PixelCopy-able ([grab]).
+     */
+    private fun park(v: WebView) {
+        val act = hostAct?.get()
+        if (ui.owner == null || act == null || act.isFinishing || v.parent != null) return
+        val d = v.resources.displayMetrics
+        v.alpha = PARK_ALPHA
+        v.setOnTouchListener { _, _ -> true }
+        (act.window.decorView as? ViewGroup)?.addView(v, 0, FrameLayout.LayoutParams(d.widthPixels, (PANEL_DP * d.density).toInt()))
+    }
+
+    /** Main thread: leave fullscreen video. */
+    private fun exitFullscreen() {
+        val f = custom ?: return
+        val cb = customCb
+        custom = null; customCb = null
+        (f.parent as? ViewGroup)?.removeView(f)
+        f.removeAllViews()
+        cb?.onCustomViewHidden()
     }
 
     @Suppress("DEPRECATION")
@@ -156,6 +197,7 @@ object AgentBrowser {
         v.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            mediaPlaybackRequiresUserGesture = false  // agent-driven video.play()
             allowFileAccess = false
             allowContentAccess = false
             setGeolocationEnabled(false)
@@ -166,6 +208,7 @@ object AgentBrowser {
             useWideViewPort = true
             loadWithOverviewMode = true
         }
+        @Suppress("DEPRECATION") v.settings.offscreenPreRaster = true  // keep tiles rastered while parked
         v.setDownloadListener { url, _, _, _, _ -> note("Download blocked: ${url.take(150)}") }
         v.webViewClient = Client()
         v.webChromeClient = Chrome()
@@ -216,6 +259,7 @@ object AgentBrowser {
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
             note("The page's renderer stopped; the browser was reset.")
             loadError = "The page crashed"; loadLatch.countDown(); loading = false
+            exitFullscreen()
             (view.parent as? ViewGroup)?.removeView(view)
             runCatching { view.destroy() }
             if (web === view) { web = null; ui.owner = null }
@@ -231,6 +275,26 @@ object AgentBrowser {
         override fun onJsPrompt(view: WebView, url: String?, message: String?, defaultValue: String?, result: JsPromptResult): Boolean { note("Dialog dismissed (prompt): ${message.orEmpty().take(160)}"); result.cancel(); return true }
         override fun onJsBeforeUnload(view: WebView, url: String?, message: String?, result: JsResult): Boolean { result.confirm(); return true }
         override fun onPermissionRequest(request: PermissionRequest) { request.deny() }
+
+        /** Fullscreen video: the page's view over the whole window with a close button; the video's own toggle or browser_close/navigate also exit. */
+        override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+            val act = hostAct?.get()
+            if (act == null || act.isFinishing || custom != null) { callback.onCustomViewHidden(); return }
+            val close = ImageButton(act).apply {
+                setImageResource(R.drawable.ic_close); setColorFilter(Color.WHITE); setBackgroundColor(0x66000000)
+                contentDescription = act.getString(R.string.browser_close)
+                setOnClickListener { exitFullscreen() }
+            }
+            val s = (48 * act.resources.displayMetrics.density).toInt()
+            val f = FrameLayout(act).apply {
+                setBackgroundColor(Color.BLACK); isClickable = true
+                addView(view, FrameLayout.LayoutParams(-1, -1))
+                addView(close, FrameLayout.LayoutParams(s, s, Gravity.TOP or Gravity.END))
+            }
+            (act.window.decorView as ViewGroup).addView(f, ViewGroup.LayoutParams(-1, -1))
+            custom = f; customCb = callback
+        }
+        override fun onHideCustomView() { exitFullscreen() }
         override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) { callback.invoke(origin, false, false) }
         override fun onShowFileChooser(view: WebView, cb: ValueCallback<Array<android.net.Uri>>, params: FileChooserParams): Boolean { cb.onReceiveValue(null); return true }
     }
@@ -280,7 +344,7 @@ object AgentBrowser {
 
     /** The panel belongs to the calling thread; opens it if closed. */
     private fun claim(threadId: String) {
-        onMain<Unit> { cb -> if (ui.owner != threadId) { ui.owner = threadId; ui.collapsed = false }; web ?: create(); cb(Unit) }
+        onMain<Unit> { cb -> if (ui.owner != threadId) { ui.owner = threadId; ui.collapsed = false }; (web ?: create()).let { if (it.parent == null) park(it) }; cb(Unit) }
     }
 
     private fun run(name: String, a: JSONObject, ep: Int): JSONObject = when (name) {
@@ -343,6 +407,7 @@ object AgentBrowser {
         onMain<Unit> { cb ->
             loadLatch = CountDownLatch(1); loadError = null; httpStatus = 0; loading = true
             ui.url = url; topUrl = url
+            exitFullscreen()
             view().loadUrl(url); cb(Unit)
         }
         val done = loadLatch.await(NAV_MS, TimeUnit.MILLISECONDS)
@@ -410,9 +475,8 @@ object AgentBrowser {
     }
 
     private fun screenshot(ep: Int): JSONObject {
-        if (ui.collapsed) { main.post { ui.collapsed = false }; Thread.sleep(500) }
         val bmp = onMain<Bitmap?>(8_000) { cb -> grab(view(), cb) }
-            ?: throw Failure("browser_not_visible", "The browser panel is not on screen. Ask the user to open this chat so the panel is visible, then retry. browser_snapshot works without it.")
+            ?: throw Failure("browser_not_visible", "The browser panel is not on screen. Ask the user to keep the app open on this chat, then retry. browser_snapshot works without it.")
         stopped(ep)
         val small = if (bmp.width > 800) Bitmap.createScaledBitmap(bmp, 800, (bmp.height * 800L / bmp.width).toInt().coerceAtLeast(1), true) else bmp
         val png = ByteArrayOutputStream().also { small.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
@@ -429,16 +493,24 @@ object AgentBrowser {
         return BrowserLogic.image(text, Base64.encodeToString(jpg, Base64.NO_WRAP), "image/jpeg")
     }
 
-    /** Main thread: PixelCopy of the attached view (draw() as the fallback); null when it is not on screen. */
+    /**
+     * Main thread: PixelCopy of the view's window region (draw() as the fallback; it shows video and WebGL as black).
+     * A parked view is lifted to alpha 1 and above the app UI for ~150 ms so the copy has real pixels, then parked again.
+     */
     private fun grab(v: WebView, cb: (Bitmap?) -> Unit) {
         if (!v.isAttachedToWindow || v.width <= 0 || v.height <= 0 || !v.isShown) { cb(null); return }
         val bmp = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
-        fun draw() = cb(runCatching { v.draw(Canvas(bmp)); bmp }.getOrNull())
-        val act = generateSequence(v.context) { (it as? ContextWrapper)?.baseContext }.firstOrNull { it is Activity } as? Activity
+        val parked = v.alpha < 1f
+        fun done(b: Bitmap?) { if (parked) { v.alpha = PARK_ALPHA; v.translationZ = 0f }; cb(b) }
+        fun draw() = done(runCatching { v.draw(Canvas(bmp)); bmp }.getOrNull())
+        val act = activityOf(v.context) ?: hostAct?.get()
         if (act == null || Build.VERSION.SDK_INT < 26) { draw(); return }
-        val loc = IntArray(2).also { v.getLocationInWindow(it) }
-        runCatching {
-            PixelCopy.request(act.window, Rect(loc[0], loc[1], loc[0] + v.width, loc[1] + v.height), bmp, { r -> if (r == PixelCopy.SUCCESS) cb(bmp) else draw() }, main)
-        }.onFailure { draw() }
+        fun copy() {
+            val loc = IntArray(2).also { v.getLocationInWindow(it) }
+            runCatching {
+                PixelCopy.request(act.window, Rect(loc[0], loc[1], loc[0] + v.width, loc[1] + v.height), bmp, { r -> if (r == PixelCopy.SUCCESS) done(bmp) else draw() }, main)
+            }.onFailure { draw() }
+        }
+        if (parked) { v.alpha = 1f; v.translationZ = 100f; main.postDelayed({ copy() }, 150) } else copy()
     }
 }
