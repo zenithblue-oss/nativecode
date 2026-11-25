@@ -596,7 +596,7 @@ class AcpRuntime(private val host: RuntimeHost, private val profile: AcpProfile)
     }
 
     companion object {
-        const val VERSION = "1.8.0"
+        const val VERSION = "1.8.1"
         private const val INIT_S = 60L
         private const val SETUP_S = 90L
         private const val LOAD_S = 90L

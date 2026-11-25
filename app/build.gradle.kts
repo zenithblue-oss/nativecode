@@ -44,7 +44,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 22
-        versionName = "1.8.0"
+        versionName = "1.8.1"
         buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
         // Freemium gates (docs/monetisation/plan.md). On with Play Billing (PR5).
         buildConfigField("boolean", "MONETISATION_ENFORCE", "true")
