@@ -452,7 +452,7 @@ class CodexAppServerRuntime(private val host: RuntimeHost) : AgentRuntime {
     }
 
     companion object {
-        const val VERSION = "1.8.1"
+        const val VERSION = "1.8.2"
         private const val INIT_S = 60L
         private const val SETUP_S = 60L
         private const val SKILLS_S = 10L
