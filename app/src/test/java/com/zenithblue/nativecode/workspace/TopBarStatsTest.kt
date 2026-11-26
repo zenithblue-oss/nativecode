@@ -2,6 +2,7 @@ package com.zenithblue.nativecode.workspace
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,18 +33,6 @@ class TopBarStatsTest {
         assertEquals(Stat.RAM, TopBarStats.allOrdered(listOf(Stat.RAM)).first())
     }
 
-    @Test fun fitDropsLowestPriorityFirstAndNeverOverflows() {
-        val w = listOf(50, 40, 60)
-        assertEquals(3, TopBarStats.fitCount(w, 4, 158))
-        assertEquals(2, TopBarStats.fitCount(w, 4, 157))
-        assertEquals(1, TopBarStats.fitCount(w, 4, 93))
-        assertEquals(0, TopBarStats.fitCount(w, 4, 49))
-        assertEquals(0, TopBarStats.fitCount(w, 4, 0))
-        assertEquals(0, TopBarStats.fitCount(emptyList(), 4, 100))
-        // A wide chip in the middle drops itself and everything after it, even if a later one would fit.
-        assertEquals(1, TopBarStats.fitCount(listOf(30, 500, 10), 4, 100))
-    }
-
     @Test fun titleDecidesRows() {
         assertTrue(TopBarStats.singleRow(titleW = 100, statsW = 150, railW = 120, fixedW = 60, totalW = 430))
         assertFalse(TopBarStats.singleRow(titleW = 101, statsW = 150, railW = 120, fixedW = 60, totalW = 430))
@@ -54,5 +43,36 @@ class TopBarStatsTest {
         assertEquals("0K", TopBarStats.rate(0))
         assertEquals("12K", TopBarStats.rate(12_400))
         assertEquals("1.5M", TopBarStats.rate(1_500_000))
+    }
+
+    @Test fun wattsAreSignedAndScaled() {
+        // 2 A at 4.2 V into the battery = +8.4 W; same out = -8.4 W
+        assertEquals("+8.4W", Wattage.format(Wattage.watts(2_000_000, 4200, 1f, true)!!))
+        assertEquals("-8.4W", Wattage.format(Wattage.watts(-2_000_000, 4200, 1f, false)!!))
+        // magnitude only: raw sign never leaks into the result
+        assertEquals(Wattage.watts(-500_000, 4000, 1f, true), Wattage.watts(500_000, 4000, 1f, true))
+        // device reports mA as if microamps: x1000 restores it; the reverse needs /1000
+        assertEquals("-3.1W", Wattage.format(Wattage.watts(-775, 4000, 1000f, false)!!))
+        assertEquals("+4.0W", Wattage.format(Wattage.watts(1_000_000_000, 4000, 0.001f, true)!!))
+        assertEquals("0.0W", Wattage.format(0.0))
+        assertNull(Wattage.watts(1_000_000_000, 4000, 1f, true)) // 4 kW: unit error
+        assertEquals("\u00F71000", Wattage.scaleLabel(0.001f))
+        assertEquals("\u00D71", Wattage.scaleLabel(1f))
+    }
+
+    @Test fun polarityFollowsPluggedUntilKernelSignLearned() {
+        // nothing learned: plugged decides
+        assertTrue(Wattage.intoBattery(-1, 0, false, true))
+        assertFalse(Wattage.intoBattery(1, 0, false, false))
+        // learn the discharge sign while unplugged, then see the flip while plugged
+        var st = Wattage.learn(-1, 900_000, false, 0, false)
+        assertEquals(-1 to false, st)
+        st = Wattage.learn(1, 1_500_000, true, st.first, st.second)
+        assertEquals(-1 to true, st)
+        // now the raw sign decides, even plugged-but-discharging
+        assertTrue(Wattage.intoBattery(1, -1, true, true))
+        assertFalse(Wattage.intoBattery(-1, -1, true, true))
+        // tiny currents never teach anything
+        assertEquals(0 to false, Wattage.learn(1, 5_000, false, 0, false))
     }
 }

@@ -971,6 +971,8 @@
     <string name="main_sdk_download_pending">SDK 等待下载…</string>
     <string name="main_sdk_downloading">SDK 下载中 %1$s%%</string>
     <string name="main_sdk_transferring">SDK 传输中 %1$s%%</string>
+    <string name="topbar_wattage_scaling">瓦数缩放 (W 项)</string>
+    <string name="skills_attach">添加</string>
     <string name="main_waiting_for_wi_fi_approval">正在等待 Wi-Fi 授权…</string>
     <string name="main_sdk_download_failed">SDK 下载失败（%1$s）</string>
     <string name="main_sdk_download_canceled">SDK 下载已取消</string>

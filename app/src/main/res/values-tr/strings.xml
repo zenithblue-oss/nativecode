@@ -971,6 +971,8 @@
     <string name="main_sdk_download_pending">SDK indirmesi bekleniyor…</string>
     <string name="main_sdk_downloading">SDK indiriliyor %%%1$s</string>
     <string name="main_sdk_transferring">SDK aktarılıyor %%%1$s</string>
+    <string name="topbar_wattage_scaling">Watt ölçeği (W değeri)</string>
+    <string name="skills_attach">EKLE</string>
     <string name="main_waiting_for_wi_fi_approval">Wi-Fi onayı bekleniyor…</string>
     <string name="main_sdk_download_failed">SDK indirilemedi (%1$s)</string>
     <string name="main_sdk_download_canceled">SDK indirmesi iptal edildi</string>

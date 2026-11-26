@@ -971,6 +971,8 @@
     <string name="main_sdk_download_pending">Загрузка SDK ожидает…</string>
     <string name="main_sdk_downloading">Загрузка SDK %1$s%%</string>
     <string name="main_sdk_transferring">Передача SDK %1$s%%</string>
+    <string name="topbar_wattage_scaling">Масштаб ватт (показатель W)</string>
+    <string name="skills_attach">ДОБАВИТЬ</string>
     <string name="main_waiting_for_wi_fi_approval">Ожидание разрешения Wi-Fi…</string>
     <string name="main_sdk_download_failed">Не удалось загрузить SDK (%1$s)</string>
     <string name="main_sdk_download_canceled">Загрузка SDK отменена</string>

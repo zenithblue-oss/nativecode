@@ -971,6 +971,8 @@
     <string name="main_sdk_download_pending">Download dell\'SDK in attesa…</string>
     <string name="main_sdk_downloading">Download SDK %1$s%%</string>
     <string name="main_sdk_transferring">Trasferimento SDK %1$s%%</string>
+    <string name="topbar_wattage_scaling">Scala dei watt (stat W)</string>
+    <string name="skills_attach">AGGIUNGI</string>
     <string name="main_waiting_for_wi_fi_approval">In attesa dell\'approvazione per il Wi-Fi…</string>
     <string name="main_sdk_download_failed">Download dell\'SDK non riuscito (%1$s)</string>
     <string name="main_sdk_download_canceled">Download dell\'SDK annullato</string>

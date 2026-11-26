@@ -971,6 +971,8 @@
     <string name="main_sdk_download_pending">تنزيل SDK قيد الانتظار…</string>
     <string name="main_sdk_downloading">جارٍ تنزيل SDK %1$s%%</string>
     <string name="main_sdk_transferring">جارٍ نقل SDK %1$s%%</string>
+    <string name="topbar_wattage_scaling">مقياس الواط (إحصاء W)</string>
+    <string name="skills_attach">إضافة</string>
     <string name="main_waiting_for_wi_fi_approval">في انتظار الموافقة على Wi-Fi…</string>
     <string name="main_sdk_download_failed">فشل تنزيل SDK (%1$s)</string>
     <string name="main_sdk_download_canceled">أُلغي تنزيل SDK</string>

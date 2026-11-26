@@ -971,6 +971,8 @@
     <string name="main_sdk_download_pending">SDKのダウンロード待機中…</string>
     <string name="main_sdk_downloading">SDKをダウンロード中 %1$s%%</string>
     <string name="main_sdk_transferring">SDKを転送中 %1$s%%</string>
+    <string name="topbar_wattage_scaling">ワット数のスケール (W)</string>
+    <string name="skills_attach">追加</string>
     <string name="main_waiting_for_wi_fi_approval">Wi-Fiの承認を待機中…</string>
     <string name="main_sdk_download_failed">SDKのダウンロードに失敗しました（%1$s）</string>
     <string name="main_sdk_download_canceled">SDKのダウンロードをキャンセルしました</string>

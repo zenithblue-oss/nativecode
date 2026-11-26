@@ -19,8 +19,8 @@ import com.zenithblue.nativecode.R
  *
  * One slim row when the full title, every enabled stat and the rail fit (landscape, short names).
  * Otherwise two slim rows: the title owns row 1, stats + rail share row 2. The title always wins:
- * stats drop from the end before the title loses a pixel; only a title longer than its whole row
- * is middle-ellipsized (keeps the distinguishing suffix).
+ * the stats strip scrolls sideways (thin position bar) before the title loses a pixel; only a title longer
+ * than its whole row is middle-ellipsized (keeps the distinguishing suffix).
  */
 class WorkspaceTopBar(context: Context, onBack: () -> Unit) : ViewGroup(context) {
     private fun dp(v: Int): Int =

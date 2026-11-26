@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.TrafficStats
@@ -21,6 +23,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -118,30 +121,39 @@ object StatReader {
             netAt = now
             TopBarStats.rate(netRate)
         }
+        put(Stat.WATT, "W") {
+            val prefs = c.statPrefs()
+            val ua = bm?.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) ?: Long.MIN_VALUE
+            val mv = battery?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0
+            if (ua == Long.MIN_VALUE || mv <= 0) return@put null
+            val plugged = battery?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) == BatteryManager.BATTERY_STATUS_CHARGING ||
+                (battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0
+            val sign = java.lang.Long.signum(ua)
+            val (ds, flip) = Wattage.learn(sign, Math.abs(ua), plugged,
+                prefs.getInt(Wattage.PREF_DISCHARGE_SIGN, 0), prefs.getBoolean(Wattage.PREF_FLIP_SEEN, false))
+            if (ds != prefs.getInt(Wattage.PREF_DISCHARGE_SIGN, 0) || flip != prefs.getBoolean(Wattage.PREF_FLIP_SEEN, false)) {
+                prefs.edit().putInt(Wattage.PREF_DISCHARGE_SIGN, ds).putBoolean(Wattage.PREF_FLIP_SEEN, flip).apply()
+            }
+            Wattage.watts(ua, mv, prefs.getFloat(Wattage.PREF_SCALE, 1f), Wattage.intoBattery(sign, ds, flip, plugged))
+                ?.let(Wattage::format)
+        }
         put(Stat.DISK, "D") { "${StatFs(c.filesDir.path).availableBytes / 1073741824}G" }
         return out
     }
 }
 
 /**
- * Compact phone-stat chips. Shows the user's ordered list; chips that do not fit the width it is
- * given are dropped from the end (never scrolls, never wraps, never squeezes its neighbours).
- * Tap a chip = full name + value. Long-press = customise sheet.
+ * Phone-stat chips: the user's ordered list at full width, never dropped. [StatStrip] scrolls it when the
+ * given width is short. Tap a chip = full name + value. Long-press = customise sheet.
  */
-class StatStrip(context: Context) : ViewGroup(context), SharedPreferences.OnSharedPreferenceChangeListener {
+private class StatRow(context: Context) : ViewGroup(context), SharedPreferences.OnSharedPreferenceChangeListener {
     private val gap = context.dp(4)
+    /** Chip height; the strip's last 3 dp carry the scroll indicator. */
+    private val chipH = context.dp(21)
     private val font: Typeface =
         try { Typeface.createFromAsset(context.assets, "fonts/font.ttf") } catch (_: Exception) { Typeface.MONOSPACE }
     private var enabled: List<Stat> = emptyList()
     private val chips = LinkedHashMap<Stat, TextView>()
-    private var shown = 0
-
-    /** Extra cap on top of the parent's width (single-row bars reserve room for the title). */
-    var maxWidthPx: Int = Int.MAX_VALUE
-        set(value) { if (field != value) { field = value; requestLayout() } }
-
-    /** Right-align chips inside a stretched strip (app header). */
-    var alignEnd = false
 
     /** Fired when the enabled list (not the values) changes, so a host can re-flow its rows. */
     var onStatsChanged: (() -> Unit)? = null
@@ -226,30 +238,16 @@ class StatStrip(context: Context) : ViewGroup(context), SharedPreferences.OnShar
 
     override fun onMeasure(widthSpec: Int, heightSpec: Int) {
         val un = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-        val chipH = context.dp(24)
         val l = live()
         l.forEach { it.measure(un, MeasureSpec.makeMeasureSpec(chipH, MeasureSpec.EXACTLY)) }
-        val limit = if (MeasureSpec.getMode(widthSpec) == MeasureSpec.UNSPECIFIED) maxWidthPx
-        else minOf(MeasureSpec.getSize(widthSpec), maxWidthPx)
-        shown = TopBarStats.fitCount(l.map { it.measuredWidth }, gap, limit.coerceAtLeast(0))
-        val used = l.take(shown).sumOf { it.measuredWidth } + gap * (shown - 1).coerceAtLeast(0)
-        val w = if (MeasureSpec.getMode(widthSpec) == MeasureSpec.EXACTLY) MeasureSpec.getSize(widthSpec) else used
-        setMeasuredDimension(w, resolveSize(chipH, heightSpec))
+        setMeasuredDimension(l.sumOf { it.measuredWidth } + gap * (l.size - 1).coerceAtLeast(0), resolveSize(chipH, heightSpec))
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
-        val h = b - t
-        val all = live()
-        val used = all.take(shown).sumOf { it.measuredWidth } + gap * (shown - 1).coerceAtLeast(0)
-        var x = if (alignEnd) (r - l - used).coerceAtLeast(0) else 0
-        all.forEachIndexed { i, chip ->
-            if (i < shown) {
-                val top = (h - chip.measuredHeight) / 2
-                chip.layout(x, top, x + chip.measuredWidth, top + chip.measuredHeight)
-                x += chip.measuredWidth + gap
-            } else {
-                chip.layout(0, 0, 0, 0) // dropped: does not fit
-            }
+        var x = 0
+        live().forEach { chip ->
+            chip.layout(x, 0, x + chip.measuredWidth, chipH)
+            x += chip.measuredWidth + gap
         }
     }
 
@@ -271,6 +269,51 @@ class StatStrip(context: Context) : ViewGroup(context), SharedPreferences.OnShar
         if (key != TopBarStats.PREF) return
         reload()
         onStatsChanged?.invoke()
+    }
+}
+
+/**
+ * Phone-stat chips in a horizontal scroller: fits = plain chips, too wide = swipe sideways with a thin
+ * position bar along the bottom. Wrap it in a bounded width (the hosts do); alignEnd right-aligns when it fits.
+ */
+class StatStrip(context: Context) : HorizontalScrollView(context) {
+    private val row = StatRow(context)
+    private val track = Paint().apply { color = NC.OUTLINE_VAR }
+    private val thumb = Paint().apply { color = NC.PRIMARY }
+    private val barH = context.dp(2)
+
+    /** Right-align chips inside a stretched strip (app header). */
+    var alignEnd = false
+    var onStatsChanged: (() -> Unit)? by row::onStatsChanged
+    var onCustomize: (() -> Unit)? by row::onCustomize
+    val isEmpty: Boolean get() = row.isEmpty
+
+    init {
+        isHorizontalScrollBarEnabled = false
+        overScrollMode = OVER_SCROLL_NEVER
+        isFillViewport = false
+        addView(row, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
+
+    fun fullWidth(): Int = row.fullWidth()
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        (row.layoutParams as LayoutParams).gravity =
+            if (alignEnd && row.measuredWidth <= r - l) Gravity.END else Gravity.START
+        super.onLayout(changed, l, t, r, b)
+    }
+
+    override fun onDrawForeground(canvas: Canvas) {
+        super.onDrawForeground(canvas)
+        val range = row.width
+        val w = width
+        if (range <= w || w <= 0) return
+        val y = (height - barH).toFloat()
+        val left = scrollX.toFloat()
+        canvas.drawRect(left, y, left + w, y + barH, track)
+        val tw = (w.toFloat() * w / range).coerceAtLeast(context.dp(12).toFloat())
+        val tx = left + scrollX.toFloat() / (range - w) * (w - tw)
+        canvas.drawRect(tx, y, tx + tw, y + barH, thumb)
     }
 }
 
@@ -303,9 +346,43 @@ object StatsEditor {
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 }, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             })
-            addView(caption("// STATS · ORDER = PRIORITY. WHEN SPACE IS SHORT THE LAST ONES DROP FIRST; THE TITLE IS NEVER SQUEEZED."))
+            addView(caption("// STATS · ORDER = LEFT TO RIGHT. WHEN SPACE IS SHORT THE STATS SCROLL SIDEWAYS; THE TITLE IS NEVER SQUEEZED."))
             addView(buildList(context))
+            addView(caption(tr(R.string.topbar_wattage_scaling)))
+            addView(scaleRow(context))
         }
+    }
+
+    /** ÷1000 / ×1 / ×1000 chips for the W stat; the pick is saved at once and repainted here. */
+    private fun scaleRow(context: Context): LinearLayout {
+        val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        fun paint() {
+            val cur = context.statPrefs().getFloat(Wattage.PREF_SCALE, 1f)
+            for (i in 0 until row.childCount) {
+                val on = Wattage.SCALES[i] == cur
+                (row.getChildAt(i) as TextView).apply {
+                    setTextColor(if (on) Color.parseColor("#0A0A0A") else NC.ON_SURF_VAR)
+                    background = GradientDrawable().apply {
+                        setColor(if (on) NC.PRIMARY else NC.SURFACE_LOW)
+                        setStroke(context.dp(1), if (on) NC.PRIMARY else NC.OUTLINE_VAR)
+                    }
+                    isSelected = on
+                }
+            }
+        }
+        Wattage.SCALES.forEach { sc ->
+            row.addView(TextView(context).apply {
+                text = Wattage.scaleLabel(sc)
+                textSize = 13f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                minimumHeight = context.dp(44)
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = context.dp(6) }
+                setOnClickListener { context.statPrefs().edit().putFloat(Wattage.PREF_SCALE, sc).apply(); paint() }
+            })
+        }
+        paint()
+        return row
     }
 
     /** Self-rebuilding list: every change is saved at once; strips follow via the pref listener. */

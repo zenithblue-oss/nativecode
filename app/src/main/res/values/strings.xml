@@ -1014,6 +1014,8 @@
     <string name="main_sdk_download_pending">SDK download pending…</string>
     <string name="main_sdk_downloading">SDK downloading %1$s%%</string>
     <string name="main_sdk_transferring">SDK transferring %1$s%%</string>
+    <string name="topbar_wattage_scaling">Wattage scaling (W stat)</string>
+    <string name="skills_attach">ADD</string>
     <string name="main_waiting_for_wi_fi_approval">Waiting for Wi-Fi approval…</string>
     <string name="main_sdk_download_failed">SDK download failed (%1$s)</string>
     <string name="main_sdk_download_canceled">SDK download canceled</string>
