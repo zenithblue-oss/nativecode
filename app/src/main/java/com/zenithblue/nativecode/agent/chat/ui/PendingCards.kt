@@ -75,11 +75,11 @@ internal fun PendingShell(icon: ImageVector, overline: String, title: String, tr
 /** Screen F: approval card docked over the composer; exactly the agent's options, answered by id. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ApprovalCard(v: AgentChatView, t: ChatThread, req: ChatRequest, feedback: String, agentGone: Boolean, clearFeedback: () -> Unit) {
+internal fun ApprovalCard(v: AgentChatView, t: ChatThread, req: ChatRequest, feedback: String, agentGone: Boolean, bodyMax: androidx.compose.ui.unit.Dp? = null, clearFeedback: () -> Unit) {
     val d = req.detail
     val haptics = LocalHapticFeedback.current
     var reasonOpen by remember { mutableStateOf(false) }
-    val maxH = (LocalConfiguration.current.screenHeightDp * 0.4f).dp
+    val maxH = bodyMax ?: (LocalConfiguration.current.screenHeightDp * 0.4f).dp
     PendingShell(if (req.kind == RequestKind.PLAN_EXIT) Ic.ClipboardList else Ic.ShieldAlert, kindTitle(req.kind) + " · " + t.tool, d.title.ifBlank { kindTitle(req.kind) }, null) {
         Column(Modifier.heightIn(max = maxH).verticalScroll(rememberScrollState()).padding(top = S.m), verticalArrangement = Arrangement.spacedBy(S.s)) {
             d.command?.let {
@@ -120,7 +120,7 @@ internal fun ApprovalCard(v: AgentChatView, t: ChatThread, req: ChatRequest, fee
                 NcButton(tr(R.string.chat_restart), icon = Ic.Retry) { v.retry(t, req.runId) }
             }
         } else FlowRow(Modifier.fillMaxWidth().padding(top = S.m), horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
-            req.options.forEach { o ->
+            PendingQueue.ordered(req.options).forEach { o ->
                 val reject = o.kind.startsWith("reject") || o.kind == "cancel"
                 NcButton(
                     o.label, primary = o.kind == "allow_once", danger = reject,
@@ -149,10 +149,10 @@ private fun kindTitle(k: RequestKind) = when (k) {
 /** User-input variant: options with descriptions, custom answer typed in the composer, Prev/Next, Dismiss. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun UserInputCard(v: AgentChatView, t: ChatThread, req: ChatRequest, draft: InputDraft) {
+internal fun UserInputCard(v: AgentChatView, t: ChatThread, req: ChatRequest, draft: InputDraft, bodyMax: androidx.compose.ui.unit.Dp? = null) {
     val qs = req.detail.questions
     val haptics = LocalHapticFeedback.current
-    val maxH = (LocalConfiguration.current.screenHeightDp * 0.4f).dp
+    val maxH = bodyMax ?: (LocalConfiguration.current.screenHeightDp * 0.4f).dp
     fun respond(a: RequestAnswer, ok: Boolean = true) {
         haptics.performHapticFeedback(if (ok) HapticFeedbackType.Confirm else HapticFeedbackType.Reject)
         v.bg { v.backend.respond(t.id, req.id, a) }

@@ -679,6 +679,7 @@
     <string name="chat_edit">Modifica</string>
     <string name="chat_remove">Rimuovi</string>
     <string name="chat_waiting_for_approval">In attesa di approvazione</string>
+    <string name="chat_pending_counter">%1$d di %2$d in sospeso</string>
     <string name="chat_idle">Inattivo</string>
     <string name="chat_back_to_threads">Torna ai thread</string>
     <string name="chat_more_actions">Altre azioni</string>

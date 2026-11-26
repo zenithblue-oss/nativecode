@@ -62,7 +62,7 @@ import java.util.concurrent.locks.ReentrantLock
  * (`isTrusted=false`), not MotionEvents. Add a per-thread session only if two agents truly browse at once.
  */
 object AgentBrowser {
-    class Consent(val threadId: String, val agent: String)
+    class Consent(val threadId: String, val agent: String, val at: Long = System.currentTimeMillis())
 
     /** Compose-observed state of the card. */
     class Ui {

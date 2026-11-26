@@ -25,22 +25,29 @@ private val PANEL_H = 260.dp
  * calls a browser tool, then the live panel: URL, an "agent in control" indicator, collapse and close. The user can
  * touch the page; Close stops the agent and withdraws its consent.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun BrowserConsentCard(c: AgentBrowser.Consent) {
+    val b = AgentBrowser.ui
+    PendingShell(Ic.Globe, tr(R.string.chat_browser), tr(R.string.browser_consent_title, c.agent), null) {
+        Column(Modifier.padding(top = S.m), verticalArrangement = Arrangement.spacedBy(S.m)) {
+            Text(tr(R.string.browser_consent_body), color = C.onVar, style = T.bodySm)
+            if (!b.isolated) Text(tr(R.string.browser_not_isolated), color = C.tertiary, style = T.bodySm)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(S.s), verticalArrangement = Arrangement.spacedBy(S.s)) {
+                NcButton(tr(R.string.browser_allow), primary = true, icon = Ic.Check) { AgentBrowser.answer(true) }
+                NcButton(tr(R.string.browser_deny), danger = true, icon = Ic.Close) { AgentBrowser.answer(false) }
+            }
+        }
+    }
+}
+
+/** The live panel only; the consent card is docked with the approvals ([BrowserConsentCard]). */
 @Composable
 internal fun BrowserCard(threadId: String, approvalPending: Boolean = false) {
     val b = AgentBrowser.ui
     val c = b.consent
-    if (c != null && c.threadId == threadId) {
-        PendingShell(Ic.Globe, tr(R.string.chat_browser), tr(R.string.browser_consent_title, c.agent), null) {
-            Column(Modifier.padding(top = S.m), verticalArrangement = Arrangement.spacedBy(S.m)) {
-                Text(tr(R.string.browser_consent_body), color = C.onVar, style = T.bodySm)
-                if (!b.isolated) Text(tr(R.string.browser_not_isolated), color = C.tertiary, style = T.bodySm)
-                Row(horizontalArrangement = Arrangement.spacedBy(S.s)) {
-                    NcButton(tr(R.string.browser_allow), primary = true, icon = Ic.Check) { AgentBrowser.answer(true) }
-                    NcButton(tr(R.string.browser_deny), danger = true, icon = Ic.Close) { AgentBrowser.answer(false) }
-                }
-            }
-        }
-    } else if (b.owner == threadId) {
+    if (c != null && c.threadId == threadId) return
+    if (b.owner == threadId) {
         Column(Modifier.fillMaxWidth().padding(start = S.m, end = S.m, top = S.s)) {
             Column(Modifier.fillMaxWidth().card(C.low, if (b.controlling) C.primary else C.border)) {
                 Row(Modifier.fillMaxWidth().padding(start = S.m), verticalAlignment = Alignment.CenterVertically) {

@@ -679,6 +679,7 @@
     <string name="chat_edit">編集</string>
     <string name="chat_remove">削除</string>
     <string name="chat_waiting_for_approval">承認待ち</string>
+    <string name="chat_pending_counter">%1$d / %2$d 件保留中</string>
     <string name="chat_idle">アイドル</string>
     <string name="chat_back_to_threads">スレッドに戻る</string>
     <string name="chat_more_actions">その他の操作</string>

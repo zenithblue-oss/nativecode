@@ -30,6 +30,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
@@ -114,7 +116,11 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
     val running = live?.runStartedAt != null || activeRun != null
     val startedAt = live?.runStartedAt ?: activeRun?.startedAt
     val queued = d.runs.filter { it.status == RunStatus.QUEUED }
-    val pending = d.requests.filter { it.status == RequestStatus.PENDING }.sortedBy { it.createdAt }.firstOrNull()
+    val queue = d.requests.filter { it.status == RequestStatus.PENDING }.sortedBy { it.createdAt }
+    val consent = com.zenithblue.nativecode.agent.chat.tools.AgentBrowser.ui.consent?.takeIf { it.threadId == threadId }
+    val consentFirst = PendingQueue.consentFirst(consent?.at, queue.firstOrNull()?.createdAt)
+    val waiting = queue.isNotEmpty() || consent != null
+    val pending = queue.firstOrNull()?.takeIf { !consentFirst } // the one request shown; the browser consent can come first
     val inputDraft = remember(pending?.id) { pending?.takeIf { it.isInput() }?.let { InputDraft(it.id) } }
     val todo = items.lastOrNull { it.payload is ItemPayload.TodoList }?.payload as? ItemPayload.TodoList
     val lastRun = d.runs.lastOrNull { it.status != RunStatus.QUEUED }
@@ -203,7 +209,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
     val usage = live?.usage ?: lastRun?.usage
     val ctxSize = usage?.contextSize ?: live?.models?.firstOrNull { it.id == (t.model ?: live.defaultModel) }?.contextLimit
     val compacting = items.any { it.payload is ItemPayload.Compaction && it.status == ItemStatus.RUNNING }
-    val status = headerStatus(live, pending != null, running, lastRun?.status)
+    val status = headerStatus(live, waiting, running, lastRun?.status)
 
     Column(Modifier.fillMaxSize()) {
         if (!embedded) ChatTopBar(v, t, status, d.runs, imeOpen = WindowInsets.isImeVisible)
@@ -255,7 +261,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
             ) {
                 WorkingPill(
                     elapsed = tick - (startedAt ?: tick),
-                    activity = ChatLogic.currentActivity(items, liveRunId) ?: if (pending != null) "Waiting for you" else null,
+                    activity = ChatLogic.currentActivity(items, liveRunId) ?: if (waiting) "Waiting for you" else null,
                     queued = queued.size,
                     forceStop = live?.forceStopAvailable == true || (stopAt > 0 && tick - stopAt >= 10_000),
                     stopping = stopAt > 0,
@@ -305,12 +311,21 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
             NcIcon(Ic.ChevronRight, null, tint = C.onVar, size = 16.dp)
         }
 
-        BrowserCard(threadId, approvalPending = pending != null)
-        AnimatedVisibility(pending != null, enter = slideInVertically { it / 2 } + fadeIn(), exit = fadeOut()) {
-            when {
-                pending == null -> {}
-                inputDraft != null -> UserInputCard(v, t, pending, inputDraft)
-                else -> ApprovalCard(v, t, pending, composer.text, agentGone = live?.alive != true) { composer.text = "" }
+        BrowserCard(threadId, approvalPending = waiting)
+        // One pending card at a time (oldest first) in a capped, scrolling region: the composer is never squeezed out.
+        val cap = PendingQueue.capDp(LocalConfiguration.current.screenHeightDp.toFloat(), WindowInsets.isImeVisible)
+        AnimatedVisibility(waiting, enter = slideInVertically { it / 2 } + fadeIn(), exit = fadeOut()) {
+            Column(Modifier.heightIn(max = cap.dp).verticalScroll(rememberScrollState())) {
+                if (queue.size + (if (consent != null) 1 else 0) > 1) {
+                    Overline(tr(R.string.chat_pending_counter, 1, queue.size + (if (consent != null) 1 else 0)), Modifier.padding(start = S.l, top = S.s), color = C.tertiary)
+                }
+                val body = PendingQueue.bodyDp(cap).dp
+                when {
+                    consentFirst && consent != null -> com.zenithblue.nativecode.agent.chat.ui.BrowserConsentCard(consent)
+                    pending == null -> {}
+                    inputDraft != null -> UserInputCard(v, t, pending, inputDraft, body)
+                    else -> ApprovalCard(v, t, pending, composer.text, agentGone = live?.alive != true, bodyMax = body) { composer.text = "" }
+                }
             }
         }
         Composer(
@@ -323,7 +338,7 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
             autoFocus = !embedded && items.isEmpty(), // a fresh thread opens with the keyboard on its composer
             commands = live?.commands.orEmpty(),
             slashCtx = slashCtx,
-            running = running && pending == null,
+            running = running && !waiting,
             canSteer = live?.caps?.steer == true,
             context = ContextInfo(usage?.contextUsed, ctxSize, compacting),
             stopping = stopAt > 0,

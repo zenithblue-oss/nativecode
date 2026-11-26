@@ -679,6 +679,7 @@
     <string name="chat_edit">편집</string>
     <string name="chat_remove">제거</string>
     <string name="chat_waiting_for_approval">승인 대기 중</string>
+    <string name="chat_pending_counter">%1$d / %2$d 대기 중</string>
     <string name="chat_idle">대기</string>
     <string name="chat_back_to_threads">스레드로 돌아가기</string>
     <string name="chat_more_actions">더 보기</string>

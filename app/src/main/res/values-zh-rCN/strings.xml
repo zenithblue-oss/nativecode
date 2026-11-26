@@ -679,6 +679,7 @@
     <string name="chat_edit">编辑</string>
     <string name="chat_remove">移除</string>
     <string name="chat_waiting_for_approval">等待审批</string>
+    <string name="chat_pending_counter">第 %1$d 项，共 %2$d 项待处理</string>
     <string name="chat_idle">空闲</string>
     <string name="chat_back_to_threads">返回对话列表</string>
     <string name="chat_more_actions">更多操作</string>

@@ -679,6 +679,7 @@
     <string name="chat_edit">تعديل</string>
     <string name="chat_remove">إزالة</string>
     <string name="chat_waiting_for_approval">في انتظار الموافقة</string>
+    <string name="chat_pending_counter">%1$d من %2$d قيد الانتظار</string>
     <string name="chat_idle">خامل</string>
     <string name="chat_back_to_threads">العودة إلى المحادثات</string>
     <string name="chat_more_actions">المزيد من الإجراءات</string>

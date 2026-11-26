@@ -679,6 +679,7 @@
     <string name="chat_edit">Edit</string>
     <string name="chat_remove">Hapus</string>
     <string name="chat_waiting_for_approval">Menunggu persetujuan</string>
+    <string name="chat_pending_counter">%1$d dari %2$d tertunda</string>
     <string name="chat_idle">Diam</string>
     <string name="chat_back_to_threads">Kembali ke thread</string>
     <string name="chat_more_actions">Aksi lainnya</string>
