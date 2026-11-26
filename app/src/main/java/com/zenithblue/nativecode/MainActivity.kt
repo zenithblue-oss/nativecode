@@ -4269,12 +4269,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         applyKeepAwake()
     }
 
-    private fun showSkillsPicker() {
+    private fun showSkillsPicker(workspace: Boolean) {
         if (skillsPicker != null) {
             skillsPicker?.dismiss()
             return
         }
-        skillsPicker = com.zenithblue.nativecode.skills.SkillsPickerSheet(this, contentFrame) {
+        val attach: ((com.zenithblue.nativecode.skills.Skill) -> Boolean)? = if (!isChatMode(workspace)) null else { sk ->
+            (if (workspace) wsChatView else appChatView)?.attachSkill(sk.title, sk.body) == true
+        }
+        skillsPicker = com.zenithblue.nativecode.skills.SkillsPickerSheet(this, contentFrame, attach) {
             skillsPicker = null
         }
     }
@@ -4502,11 +4505,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 (if (workspace) wsDocumentPickerLauncher else termDocumentPickerLauncher).launch(arrayOf("*/*"))
             }
         }
+        // Terminal page: copy a skill. Chat page: the same list adds the skill to the open chat's composer.
         rail.add(
             icon = { R.drawable.ic_lucide_bot },
-            desc = { tr(R.string.main_copy_skill) },
-            visible = termOnly,
-        ) { showSkillsPicker() }
+            desc = { if (isChatMode(workspace)) tr(R.string.chat_skills) else tr(R.string.main_copy_skill) },
+        ) { showSkillsPicker(workspace) }
         rail.add(
             icon = { if (keepAwake) R.drawable.ic_lucide_eye else R.drawable.ic_lucide_eye_off },
             desc = { if (keepAwake) tr(R.string.main_keep_awake_on) else tr(R.string.main_keep_awake_off) },

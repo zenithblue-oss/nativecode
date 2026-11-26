@@ -77,6 +77,10 @@ class AgentChatView(
     /** Bridge card: open a host file in the in-app viewer (this surface is where Back returns to). */
     internal fun openHostFile(path: String) = host.openFile(path, workspace)
 
+    /** The open chat's composer, while one is on screen: the top bar skills list adds a skill through it. */
+    internal var skillSink: ((String, String) -> Unit)? = null
+    internal fun attachSkill(name: String, body: String): Boolean = skillSink?.also { it(name, body) } != null
+
     internal val stack = mutableStateListOf<Route>(Route.List)
     internal val rows = mutableStateOf<List<ThreadRow>>(emptyList())
     internal val loaded = mutableStateOf(false)

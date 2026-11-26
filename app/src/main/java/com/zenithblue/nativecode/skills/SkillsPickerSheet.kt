@@ -33,6 +33,8 @@ private const val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
 internal class SkillsPickerSheet(
     private val ctx: Context,
     private val host: ViewGroup,
+    /** Chat page: add the skill to the open composer; false = no chat open, fall back to copy. */
+    private val attach: ((Skill) -> Boolean)?,
     private val onDismiss: () -> Unit,
 ) {
     val overlay: FrameLayout = FrameLayout(ctx).apply {
@@ -96,7 +98,7 @@ internal class SkillsPickerSheet(
             setPadding(0, 0, 0, ctx.dp(10))
         }
         row.addView(TextView(ctx).apply {
-            text = tr(R.string.skills_copy_skill)
+            text = if (attach != null) tr(R.string.chat_skills).uppercase() else tr(R.string.skills_copy_skill)
             textSize = 16f
             setTextColor(NC.PRIMARY)
             typeface = Typeface.DEFAULT_BOLD
@@ -261,7 +263,7 @@ internal class SkillsPickerSheet(
                 })
             })
             addView(TextView(ctx).apply {
-                text = tr(R.string.skills_copy)
+                text = tr(if (attach != null) R.string.skills_attach else R.string.skills_copy)
                 textSize = 11f
                 setTextColor(Color.parseColor("#0A0A0A"))
                 typeface = Typeface.MONOSPACE
@@ -272,7 +274,7 @@ internal class SkillsPickerSheet(
                     setColor(NC.PRIMARY)
                 }
                 setPadding(ctx.dp(12), ctx.dp(8), ctx.dp(12), ctx.dp(8))
-                setOnClickListener { copy(skill) }
+                setOnClickListener { if (attach?.invoke(skill) == true) dismiss() else copy(skill) }
                 setOnTouchListener { v, event ->
                     when (event.action) {
                         MotionEvent.ACTION_DOWN -> v.animate().scaleX(0.96f).scaleY(0.96f).setDuration(50).start()

@@ -88,5 +88,11 @@ internal object SkillIcons {
         "read-documents" to "document.png",
         "convert-documents" to "document.png",
         "make-spreadsheet" to "libreoffice.png",
+        "frontend-design" to "html5.png",
+        "theme-factory" to "css3.png",
+        "taste-design" to "web.png",
+        "design-mobile-compose-ui" to "kotlin.png",
+        "design-system-tokens" to "css3.png",
+        "make-vanilla-animation" to "javascript.png",
     )
 }

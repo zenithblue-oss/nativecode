@@ -45,6 +45,22 @@ object OpenSourceLicenses {
             licenseSummary = "GNU General Public License v3.0. Provides the embedded graphics canvas, touch controls, input handling, and desktop windowing."
         ),
         OssLicenseItem(
+            name = "Anthropic agent skills",
+            component = "Bundled skills: frontend-design, theme-factory (anthropics/skills, commit e4bb5d9)",
+            licenseType = "Apache-2.0",
+            copyright = "Copyright Anthropic, PBC and contributors",
+            url = "https://github.com/anthropics/skills",
+            licenseSummary = "Apache License 2.0. Text used unchanged; each skill folder keeps its LICENSE.txt and a SOURCE.md."
+        ),
+        OssLicenseItem(
+            name = "Google Stitch skills",
+            component = "Bundled skill: taste-design (google-labs-code/stitch-skills, commit 75f4696)",
+            licenseType = "Apache-2.0",
+            copyright = "Copyright the stitch-skills authors",
+            url = "https://github.com/google-labs-code/stitch-skills",
+            licenseSummary = "Apache License 2.0. Text used unchanged; the skill folder keeps the repository LICENSE and a SOURCE.md."
+        ),
+        OssLicenseItem(
             name = "Android Terminal Emulator",
             component = "terminal-view / terminal-emulator",
             licenseType = "Apache-2.0",

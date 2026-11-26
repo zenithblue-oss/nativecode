@@ -13,13 +13,14 @@ class AdditionalSkillTextsTest {
         val install = AdditionalSkillTexts.install
         val project = AdditionalSkillTexts.project
         assertEquals(13, install.size)
-        assertEquals(36, project.size)
+        assertEquals(42, project.size)
         val ids = (install + project).map { it.id }
-        assertEquals(49, ids.size)
+        assertEquals(55, ids.size)
         assertEquals(ids.size, ids.toSet().size)
         (install + project).forEach { skill ->
             assertTrue(skill.id, skill.body.isNotEmpty())
-            assertEquals("", skill.source)
+            // Imported third-party skills name their upstream; our own ones leave it empty.
+            if (skill.id !in THIRD_PARTY) assertEquals("", skill.source)
         }
     }
 
@@ -57,7 +58,7 @@ class AdditionalSkillTextsTest {
         val files = assets.walkTopDown()
             .filter { it.isFile && it.name == "SKILL.md" }
             .toList()
-        assertEquals(49, files.size)
+        assertEquals(55, files.size)
         val byBytes = files.associateBy { it.readBytes().contentHash() }
         val seen = HashSet<String>()
         for (skill in AdditionalSkillTexts.install + AdditionalSkillTexts.project) {
@@ -67,8 +68,28 @@ class AdditionalSkillTextsTest {
             assertTrue(bytes.contentEquals(file!!.readBytes()))
             assertTrue(seen.add(file.canonicalPath))
         }
-        assertEquals(49, seen.size)
+        assertEquals(55, seen.size)
     }
+
+    @Test
+    fun thirdPartySkillsKeepLicenseAndSource() {
+        val dir = skillsAssetsDir()
+        THIRD_PARTY.forEach { id ->
+            val skill = AdditionalSkillTexts.project.first { it.id == id }
+            assertTrue(id, skill.source.contains("Apache-2.0"))
+            assertTrue(id, File(dir, "$id/LICENSE.txt").readText().contains("Apache License"))
+            assertTrue(id, File(dir, "$id/SOURCE.md").readText().contains("Commit:"))
+        }
+    }
+
+    @Test
+    fun bodiesFitTheJvmConstantLimit() {
+        (AdditionalSkillTexts.install + AdditionalSkillTexts.project).forEach {
+            assertTrue(it.id, it.body.toByteArray(StandardCharsets.UTF_8).size < 60_000)
+        }
+    }
+
+    private val THIRD_PARTY = setOf("frontend-design", "theme-factory", "taste-design")
 
     private fun skillsAssetsDir(): File {
         val candidates = listOf(

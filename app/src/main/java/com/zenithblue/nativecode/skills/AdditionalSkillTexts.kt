@@ -55,6 +55,12 @@ internal object AdditionalSkillTexts {
         readDocuments(),
         convertDocuments(),
         makeSpreadsheet(),
+        frontendDesign(),
+        themeFactory(),
+        tasteDesign(),
+        designMobileComposeUi(),
+        designSystemTokens(),
+        makeVanillaAnimation(),
     )
 
     private fun installDevUtils() = Skill(
@@ -6491,6 +6497,1013 @@ Better: ask the user to add the host on the SSH page so it opens as a tab with t
 
 ## Report
 State whether the client works, whether the server is on, the address and port the page shows, and the key fingerprints you compared. Never include private keys.
+""",
+    )
+
+    private fun frontendDesign() = Skill(
+        id = "frontend-design",
+        title = "Frontend Design",
+        summary = "Distinctive, intentional visual design for new or existing UI.",
+        source = "anthropics/skills e4bb5d9 - Apache-2.0",
+        body = """---
+name: frontend-design
+description: Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.
+license: Complete terms in LICENSE.txt
+---
+
+# Frontend Design
+
+Approach this as the design lead at a design studio known for giving every client a distinct visual identity that is not mistaken for anyone else's. This client has already rejected proposals that felt cliché or templated, and is paying for a distinctive point of view: make deliberate, opinionated choices about palette, typography, and layout that are specific to this brief, and take aesthetic risk if justified.
+
+## Ground your designs in the subject matter
+
+If the brief does not identify what the product or subject matter is, identify it yourself before designing, and confirm with the client. You can come up with one concrete subject, the design's audience, and the design's primary job, as a proposal. If there's any information in your memory about the client's preferences or context about what they're building, use that as a hint. The subject's industry, subject matter, materials, and vernacular are where distinctive visual choices come from — a design for a toy for girls aged 8–11 will be very aesthetically different from a dashboard for financial analysts. Build with the brief's real content and subject matter throughout.
+
+## Design principles
+
+For web designs, the hero is the first thing viewers will see. Open with the most characteristic thing in the subject's world, in the form that is most appropriate: a headline, an image, an animation, a live demo, an interactive moment, or other treatments. Be deliberate with your choice: a big number with a small label, supporting stats, and a gradient accent is the default treatment, so only use it if that's truly the best option.
+
+Typography carries the personality of the page. You don't need a different typeface for display or headline text and body content: use one family or two, and if two, make them clearly distinct.
+
+Choose your typefaces deliberately, not the default families you would reach for on any other project, and set a clear type scale following the default guidance of The Elements of Typographic Style with intentional weights, widths, and spacing. When type is used as a headline or visual element, use the type treatment itself as an active part of the design, not a neutral delivery vehicle for the content.
+
+Default to line lengths of less than 80 characters. Serif typefaces can have slightly longer line lengths; give serif body text slightly more line-height than a sans-serif.
+
+Avoid these default typographic treatments; they are the commonest tells of a generated page:
+- Accenting just a single word or phrase in a headline, like putting one word in italic/bold or a different color.
+- Using all caps for labels.
+- Adding unnecessary typographic labels above content.
+
+Visual structure is information. Structural devices like outlines, borders, numbering, eyebrows, dividers, labels, etc., encode useful information about the content rather than decorate it. Many generic designs use numbered markers (01 / 02 / 03), but that's only appropriate if the content actually is a sequence — like a stepped process or a timeline. Before adding numbered markers, check the content really is a sequence.
+
+Use non-user-triggered motion sparingly and deliberately, only to draw attention. A single orchestrated moment — one page-load sequence or one reveal — lands better than scattered effects; fade-and-slide-up entrances on each section and hover transitions on every card are the generic default and read as AI-generated. Motion that answers a person's action (opening, expanding, confirming) is welcome when it shows what changed.
+
+Consider written content carefully. Often a design brief may not contain real content, and it's up to you to come up with copy and placeholder content. Copy can make a design feel as templated as the design itself. See the below section on writing for more guidance.
+
+## Process: plan, review against the brief, build, critique
+
+For calibration, AI-generated design right now clusters around some traits:
+1. a warm cream background (near #F4F1EA) with a high-contrast serif display and a terracotta or warm-clay accent (often near #D97757 — Anthropic's own Claude-interaction accent, so on a user's brief it reads as a tell);
+2. a near-black background with a single bright acid-green or vermilion accent;
+3. a broadsheet-style layout with hairline rules, zero border-radius, and dense newspaper-like columns;
+4. the SaaS-card kit: content chopped into identical rounded cards, one border-radius on everything regardless of hierarchy, the same soft grey shadow (rgba(0,0,0,.1)) under each, and gradient washes as decoration;
+5. template chrome that appears whatever the subject: a tracked-out ALL-CAPS eyebrow label above every heading; meta strings joined with middle dots ('A · B · C'); labels built as 'WORD — fragment' with a spaced em dash; tinted near-black (#0B0B0B, #111) standing in for black; a monospace face for small data labels; a '→' appended to link and button text.
+
+All traits are legitimate for some briefs, but they are defaults rather than choices, and they appear regardless of subject. Where the brief pins down a visual direction, follow it exactly — the brief's own words always win, including when it asks for one of these looks. Where it leaves an axis free, don't spend that freedom on one of these defaults. As with a hired human designer, there's often a careful balance between doing what you're good at and taking each project as a chance to experiment and learn.
+
+Work in two passes. First, brainstorm a short design plan based on the client's design brief: create a compact token system with color, type, layout, and principles.
+- Color: describe the core base palette as 4–6 named hex values.
+- Type: the typefaces and their roles.
+- Layout: a layout concept, using one-sentence prose descriptions and ASCII wireframes to ideate and compare. Include alignment guidance; should the content be left aligned, center aligned, justified?
+- Principles: the high-level guidance for what makes this page unique.
+
+Then review that plan against the brief before building: if any part of it reads like the generic default you would produce for any similar page (work through a similar prompt to see if you arrive somewhere similar) rather than a choice made for this specific brief — revise that part, say what you changed and why. Only after you've confirmed the relative uniqueness of your design plan should you start to write the code, following the revised plan.
+
+When writing the code, be careful of structuring your CSS selector specificities. It's easy to generate CSS classes that cancel each other out (especially with a type-based selector like .section and an element-based selector like .cta). This can happen often with padding/margin between sections.
+
+## Restraint and self-critique
+
+Spend your boldness in one place. Let one element be the memorable thing, keep everything around it quiet and disciplined, and cut any decoration that does not serve the brief. Build to a quality floor without announcing it: responsive down to mobile, visible keyboard focus, reduced motion respected, visually accessible, harmonious color palettes. Critique your own work as you build, taking screenshots to review if your environment supports it — a picture is worth 1000 tokens. Consider Chanel's advice: before leaving the house, take a look in the mirror and remove one accessory. Human creatives have memory and always try to do something new, so if you have a space to quickly jot down notes about what you've tried, it can help you in future passes.
+
+## More on writing in design
+
+Words appear in a design for one reason: to make it easier to understand and use. They are design content, not decoration. Bring the same intentionality and minimalism to copywriting that you would bring to spacing and color. Before writing anything, ask what the design needs to say, and how it can best be said to help the person navigate the experience.
+
+Write from the end user's perspective. Name things by what users will understand in simple language, not by how the system is built. A user manages notifications, not webhook config. Describe what something is or does in plain terms rather than selling it. Being specific and legible to new users is always better than being clever.
+
+Use active voice as default. A CTA says exactly what happens when it is used: "Save changes," not "Submit." An action keeps the same name through the whole flow, so the button that says "Publish" produces a toast that says "Published." The vocabulary of an interface is the signposting for someone navigating the product. Cohesion and consistency are how people learn their way around.
+
+Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it, in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened. An empty screen is an invitation to act.
+
+Keep the tone conversational: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each written element do exactly one job.
+""",
+    )
+
+    private fun themeFactory() = Skill(
+        id = "theme-factory",
+        title = "Theme Factory",
+        summary = "Apply one of 10 curated color and font themes to slides, docs or HTML pages.",
+        source = "anthropics/skills e4bb5d9 - Apache-2.0",
+        body = """---
+name: theme-factory
+description: Toolkit for styling artifacts with a theme. These artifacts can be slides, docs, reportings, HTML landing pages, etc. There are 10 pre-set themes with colors/fonts that you can apply to any artifact that has been creating, or can generate a new theme on-the-fly.
+license: Complete terms in LICENSE.txt
+---
+
+
+# Theme Factory Skill
+
+This skill provides a curated collection of professional font and color themes themes, each with carefully selected color palettes and font pairings. Once a theme is chosen, it can be applied to any artifact.
+
+## Purpose
+
+To apply consistent, professional styling to presentation slide decks, use this skill. Each theme includes:
+- A cohesive color palette with hex codes
+- Complementary font pairings for headers and body text
+- A distinct visual identity suitable for different contexts and audiences
+
+## Usage Instructions
+
+To apply styling to a slide deck or other artifact:
+
+1. **Show the theme showcase**: Display the `theme-showcase.pdf` file to allow users to see all available themes visually. Do not make any modifications to it; simply show the file for viewing.
+2. **Ask for their choice**: Ask which theme to apply to the deck
+3. **Wait for selection**: Get explicit confirmation about the chosen theme
+4. **Apply the theme**: Once a theme has been chosen, apply the selected theme's colors and fonts to the deck/artifact
+
+## Themes Available
+
+The following 10 themes are available, each showcased in `theme-showcase.pdf`:
+
+1. **Ocean Depths** - Professional and calming maritime theme
+2. **Sunset Boulevard** - Warm and vibrant sunset colors
+3. **Forest Canopy** - Natural and grounded earth tones
+4. **Modern Minimalist** - Clean and contemporary grayscale
+5. **Golden Hour** - Rich and warm autumnal palette
+6. **Arctic Frost** - Cool and crisp winter-inspired theme
+7. **Desert Rose** - Soft and sophisticated dusty tones
+8. **Tech Innovation** - Bold and modern tech aesthetic
+9. **Botanical Garden** - Fresh and organic garden colors
+10. **Midnight Galaxy** - Dramatic and cosmic deep tones
+
+## Theme Details
+
+Each theme is defined in the `themes/` directory with complete specifications including:
+- Cohesive color palette with hex codes
+- Complementary font pairings for headers and body text
+- Distinct visual identity suitable for different contexts and audiences
+
+## Application Process
+
+After a preferred theme is selected:
+1. Read the corresponding theme file from the `themes/` directory
+2. Apply the specified colors and fonts consistently throughout the deck
+3. Ensure proper contrast and readability
+4. Maintain the theme's visual identity across all slides
+
+## Create your Own Theme
+To handle cases where none of the existing themes work for an artifact, create a custom theme. Based on provided inputs, generate a new theme similar to the ones above. Give the theme a similar name describing what the font/color combinations represent. Use any basic description provided to choose appropriate colors/fonts. After generating the theme, show it for review and verification. Following that, apply the theme as described above.
+
+---
+
+# Bundled theme files
+
+The theme files this skill refers to, included here verbatim so the skill is a single document in NativeCode. (Upstream also ships theme-showcase.pdf, not included.)
+
+---
+
+## themes/arctic-frost.md
+
+# Arctic Frost
+
+A cool and crisp winter-inspired theme that conveys clarity, precision, and professionalism.
+
+## Color Palette
+
+- **Ice Blue**: `#d4e4f7` - Light backgrounds and highlights
+- **Steel Blue**: `#4a6fa5` - Primary accent color
+- **Silver**: `#c0c0c0` - Metallic accent elements
+- **Crisp White**: `#fafafa` - Clean backgrounds and text
+
+## Typography
+
+- **Headers**: DejaVu Sans Bold
+- **Body Text**: DejaVu Sans
+
+## Best Used For
+
+Healthcare presentations, technology solutions, winter sports, clean tech, pharmaceutical content.
+
+---
+
+## themes/botanical-garden.md
+
+# Botanical Garden
+
+A fresh and organic theme featuring vibrant garden-inspired colors for lively presentations.
+
+## Color Palette
+
+- **Fern Green**: `#4a7c59` - Rich natural green
+- **Marigold**: `#f9a620` - Bright floral accent
+- **Terracotta**: `#b7472a` - Earthy warm tone
+- **Cream**: `#f5f3ed` - Soft neutral backgrounds
+
+## Typography
+
+- **Headers**: DejaVu Serif Bold
+- **Body Text**: DejaVu Sans
+
+## Best Used For
+
+Garden centers, food presentations, farm-to-table content, botanical brands, natural products.
+
+---
+
+## themes/desert-rose.md
+
+# Desert Rose
+
+A soft and sophisticated theme with dusty, muted tones perfect for elegant presentations.
+
+## Color Palette
+
+- **Dusty Rose**: `#d4a5a5` - Soft primary color
+- **Clay**: `#b87d6d` - Earthy accent
+- **Sand**: `#e8d5c4` - Warm neutral backgrounds
+- **Deep Burgundy**: `#5d2e46` - Rich dark contrast
+
+## Typography
+
+- **Headers**: FreeSans Bold
+- **Body Text**: FreeSans
+
+## Best Used For
+
+Fashion presentations, beauty brands, wedding planning, interior design, boutique businesses.
+
+---
+
+## themes/forest-canopy.md
+
+# Forest Canopy
+
+A natural and grounded theme featuring earth tones inspired by dense forest environments.
+
+## Color Palette
+
+- **Forest Green**: `#2d4a2b` - Primary dark green
+- **Sage**: `#7d8471` - Muted green accent
+- **Olive**: `#a4ac86` - Light accent color
+- **Ivory**: `#faf9f6` - Backgrounds and text
+
+## Typography
+
+- **Headers**: FreeSerif Bold
+- **Body Text**: FreeSans
+
+## Best Used For
+
+Environmental presentations, sustainability reports, outdoor brands, wellness content, organic products.
+
+---
+
+## themes/golden-hour.md
+
+# Golden Hour
+
+A rich and warm autumnal palette that creates an inviting and sophisticated atmosphere.
+
+## Color Palette
+
+- **Mustard Yellow**: `#f4a900` - Bold primary accent
+- **Terracotta**: `#c1666b` - Warm secondary color
+- **Warm Beige**: `#d4b896` - Neutral backgrounds
+- **Chocolate Brown**: `#4a403a` - Dark text and anchors
+
+## Typography
+
+- **Headers**: FreeSans Bold
+- **Body Text**: FreeSans
+
+## Best Used For
+
+Restaurant presentations, hospitality brands, fall campaigns, cozy lifestyle content, artisan products.
+
+---
+
+## themes/midnight-galaxy.md
+
+# Midnight Galaxy
+
+A dramatic and cosmic theme with deep purples and mystical tones for impactful presentations.
+
+## Color Palette
+
+- **Deep Purple**: `#2b1e3e` - Rich dark base
+- **Cosmic Blue**: `#4a4e8f` - Mystical mid-tone
+- **Lavender**: `#a490c2` - Soft accent color
+- **Silver**: `#e6e6fa` - Light highlights and text
+
+## Typography
+
+- **Headers**: FreeSans Bold
+- **Body Text**: FreeSans
+
+## Best Used For
+
+Entertainment industry, gaming presentations, nightlife venues, luxury brands, creative agencies.
+
+---
+
+## themes/modern-minimalist.md
+
+# Modern Minimalist
+
+A clean and contemporary theme with a sophisticated grayscale palette for maximum versatility.
+
+## Color Palette
+
+- **Charcoal**: `#36454f` - Primary dark color
+- **Slate Gray**: `#708090` - Medium gray for accents
+- **Light Gray**: `#d3d3d3` - Backgrounds and dividers
+- **White**: `#ffffff` - Text and clean backgrounds
+
+## Typography
+
+- **Headers**: DejaVu Sans Bold
+- **Body Text**: DejaVu Sans
+
+## Best Used For
+
+Tech presentations, architecture portfolios, design showcases, modern business proposals, data visualization.
+
+---
+
+## themes/ocean-depths.md
+
+# Ocean Depths
+
+A professional and calming maritime theme that evokes the serenity of deep ocean waters.
+
+## Color Palette
+
+- **Deep Navy**: `#1a2332` - Primary background color
+- **Teal**: `#2d8b8b` - Accent color for highlights and emphasis
+- **Seafoam**: `#a8dadc` - Secondary accent for lighter elements
+- **Cream**: `#f1faee` - Text and light backgrounds
+
+## Typography
+
+- **Headers**: DejaVu Sans Bold
+- **Body Text**: DejaVu Sans
+
+## Best Used For
+
+Corporate presentations, financial reports, professional consulting decks, trust-building content.
+
+---
+
+## themes/sunset-boulevard.md
+
+# Sunset Boulevard
+
+A warm and vibrant theme inspired by golden hour sunsets, perfect for energetic and creative presentations.
+
+## Color Palette
+
+- **Burnt Orange**: `#e76f51` - Primary accent color
+- **Coral**: `#f4a261` - Secondary warm accent
+- **Warm Sand**: `#e9c46a` - Highlighting and backgrounds
+- **Deep Purple**: `#264653` - Dark contrast and text
+
+## Typography
+
+- **Headers**: DejaVu Serif Bold
+- **Body Text**: DejaVu Sans
+
+## Best Used For
+
+Creative pitches, marketing presentations, lifestyle brands, event promotions, inspirational content.
+
+---
+
+## themes/tech-innovation.md
+
+# Tech Innovation
+
+A bold and modern theme with high-contrast colors perfect for cutting-edge technology presentations.
+
+## Color Palette
+
+- **Electric Blue**: `#0066ff` - Vibrant primary accent
+- **Neon Cyan**: `#00ffff` - Bright highlight color
+- **Dark Gray**: `#1e1e1e` - Deep backgrounds
+- **White**: `#ffffff` - Clean text and contrast
+
+## Typography
+
+- **Headers**: DejaVu Sans Bold
+- **Body Text**: DejaVu Sans
+
+## Best Used For
+
+Tech startups, software launches, innovation showcases, AI/ML presentations, digital transformation content.
+""",
+    )
+
+    private fun tasteDesign() = Skill(
+        id = "taste-design",
+        title = "Taste Design",
+        summary = "Write a DESIGN.md that enforces premium, anti-generic UI standards.",
+        source = "google-labs-code/stitch-skills 75f4696 - Apache-2.0",
+        body = """---
+name: taste-design
+description: Semantic Design System Skill for Google Stitch. Generates agent-friendly DESIGN.md files that enforce premium, anti-generic UI standards — strict typography, calibrated color, asymmetric layouts, perpetual micro-motion, and hardware-accelerated performance.
+allowed-tools:
+  - "StitchMCP"
+  - "Read"
+  - "Write"
+---
+
+# Stitch Design Taste — Semantic Design System Skill
+
+## Overview
+This skill generates `DESIGN.md` files optimized for Google Stitch screen generation. It translates the battle-tested anti-slop frontend engineering directives into Stitch's native semantic design language — descriptive, natural-language rules paired with precise values that Stitch's AI agent can interpret to produce premium, non-generic interfaces.
+
+The generated `DESIGN.md` serves as the **single source of truth** for prompting Stitch to generate new screens that align with a curated, high-agency design language. Stitch interprets design through **"Visual Descriptions"** supported by specific color values, typography specs, and component behaviors.
+
+## Prerequisites
+- Access to Google Stitch via [stitch.withgoogle.com](https://stitch.withgoogle.com)
+- Optionally: Stitch MCP Server for programmatic integration with Cursor, Antigravity, or Gemini CLI
+
+## The Goal
+Generate a `DESIGN.md` file that encodes:
+1. **Visual atmosphere** — the mood, density, and design philosophy
+2. **Color calibration** — neutrals, accents, and banned patterns with hex codes
+3. **Typographic architecture** — font stacks, scale hierarchy, and anti-patterns
+4. **Component behaviors** — buttons, cards, inputs with interaction states
+5. **Layout principles** — grid systems, spacing philosophy, responsive strategy
+6. **Motion philosophy** — animation engine specs, spring physics, perpetual micro-interactions
+7. **Anti-patterns** — explicit list of banned AI design clichés
+
+## Analysis & Synthesis Instructions
+
+### 1. Define the Atmosphere
+Evaluate the target project's intent. Use evocative adjectives from the taste spectrum:
+- **Density:** "Art Gallery Airy" (1–3) → "Daily App Balanced" (4–7) → "Cockpit Dense" (8–10)
+- **Variance:** "Predictable Symmetric" (1–3) → "Offset Asymmetric" (4–7) → "Artsy Chaotic" (8–10)
+- **Motion:** "Static Restrained" (1–3) → "Fluid CSS" (4–7) → "Cinematic Choreography" (8–10)
+
+Default baseline: Creativity 9, Variance 8, Motion 6, Density 5. Adapt dynamically based on user's vibe description.
+
+### 2. Map the Color Palette
+For each color provide: **Descriptive Name** + **Hex Code** + **Functional Role**.
+
+**Mandatory constraints:**
+- Maximum 1 accent color. Saturation below 80%
+- The "AI Purple/Blue Neon" aesthetic is strictly BANNED — no purple button glows, no neon gradients
+- Use absolute neutral bases (Zinc/Slate) with high-contrast singular accents
+- Stick to one palette for the entire output — no warm/cool gray fluctuation
+- Never use pure black (`#000000`) — use Off-Black, Zinc-950, or Charcoal
+
+### 3. Establish Typography Rules
+- **Display/Headlines:** Track-tight, controlled scale. Not screaming. Hierarchy through weight and color, not just massive size
+- **Body:** Relaxed leading, max 65 characters per line
+- **Font Selection:** `Inter` is BANNED for premium/creative contexts. Force unique character: `Geist`, `Outfit`, `Cabinet Grotesk`, or `Satoshi`
+- **Serif Ban:** Generic serif fonts (`Times New Roman`, `Georgia`, `Garamond`, `Palatino`) are BANNED. If serif is needed for editorial/creative contexts, use only distinctive modern serifs: `Fraunces`, `Gambarino`, `Editorial New`, or `Instrument Serif`. Serif is always BANNED in dashboards or software UIs
+- **Dashboard Constraint:** Use Sans-Serif pairings exclusively (`Geist` + `Geist Mono` or `Satoshi` + `JetBrains Mono`)
+- **High-Density Override:** When density exceeds 7, all numbers must use Monospace
+
+### 4. Define the Hero Section
+The Hero is the first impression and must be creative, striking, and never generic:
+- **Inline Image Typography:** Embed small, contextual photos or visuals directly between words or letters in the headline. Images sit inline at type-height, rounded, acting as visual punctuation. This is the signature creative technique
+- **No Overlapping:** Text must never overlap images or other text. Every element occupies its own clean spatial zone
+- **No Filler Text:** "Scroll to explore", "Swipe down", scroll arrow icons, bouncing chevrons are BANNED. The content should pull users in naturally
+- **Asymmetric Structure:** Centered Hero layouts BANNED when variance exceeds 4
+- **CTA Restraint:** Maximum one primary CTA. No secondary "Learn more" links
+
+### 5. Describe Component Stylings
+For each component type, describe shape, color, shadow depth, and interaction behavior:
+- **Buttons:** Tactile push feedback on active state. No neon outer glows. No custom mouse cursors
+- **Cards:** Use ONLY when elevation communicates hierarchy. Tint shadows to background hue. For high-density layouts, replace cards with border-top dividers or negative space
+- **Inputs/Forms:** Label above input, helper text optional, error text below. Standard gap spacing
+- **Loading States:** Skeletal loaders matching layout dimensions — no generic circular spinners
+- **Empty States:** Composed compositions indicating how to populate data
+- **Error States:** Clear, inline error reporting
+
+### 6. Define Layout Principles
+- No overlapping elements — every element occupies its own clear spatial zone. No absolute-positioned content stacking
+- Centered Hero sections are BANNED when variance exceeds 4 — force Split Screen, Left-Aligned, or Asymmetric Whitespace
+- The generic "3 equal cards horizontally" feature row is BANNED — use 2-column Zig-Zag, asymmetric grid, or horizontal scroll
+- CSS Grid over Flexbox math — never use `calc()` percentage hacks
+- Contain layouts using max-width constraints (e.g., 1400px centered)
+- Full-height sections must use `min-h-[100dvh]` — never `h-screen` (iOS Safari catastrophic jump)
+
+### 7. Define Responsive Rules
+Every design must work across all viewports:
+- **Mobile-First Collapse (< 768px):** All multi-column layouts collapse to single column. No exceptions
+- **No Horizontal Scroll:** Horizontal overflow on mobile is a critical failure
+- **Typography Scaling:** Headlines scale via `clamp()`. Body text minimum `1rem`/`14px`
+- **Touch Targets:** All interactive elements minimum `44px` tap target
+- **Image Behavior:** Inline typography images (photos between words) stack below headline on mobile
+- **Navigation:** Desktop horizontal nav collapses to clean mobile menu
+- **Spacing:** Vertical section gaps reduce proportionally (`clamp(3rem, 8vw, 6rem)`)
+
+### 8. Encode Motion Philosophy
+- **Spring Physics default:** `stiffness: 100, damping: 20` — premium, weighty feel. No linear easing
+- **Perpetual Micro-Interactions:** Every active component should have an infinite loop state (Pulse, Typewriter, Float, Shimmer)
+- **Staggered Orchestration:** Never mount lists instantly — use cascade delays for waterfall reveals
+- **Performance:** Animate exclusively via `transform` and `opacity`. Never animate `top`, `left`, `width`, `height`. Grain/noise filters on fixed pseudo-elements only
+
+### 9. List Anti-Patterns (AI Tells)
+Encode these as explicit "NEVER DO" rules in the DESIGN.md:
+- No emojis anywhere
+- No `Inter` font
+- No generic serif fonts (`Times New Roman`, `Georgia`, `Garamond`) — distinctive modern serifs only if needed
+- No pure black (`#000000`)
+- No neon/outer glow shadows
+- No oversaturated accents
+- No excessive gradient text on large headers
+- No custom mouse cursors
+- No overlapping elements — clean spatial separation always
+- No 3-column equal card layouts
+- No generic names ("John Doe", "Acme", "Nexus")
+- No fake round numbers (`99.99%`, `50%`)
+- No fabricated data or statistics — never generate metrics, performance numbers, uptime percentages, response times, or any data that the user did not explicitly provide. "99.98% UPTIME SLA", "124ms AVG. RESPONSE", "18.5k DEPLOY CYCLES" are invented AI filler. If real data is not available, use clear placeholder labels like `[metric]` instead of making up numbers
+- No fake system/metric sections — "SYSTEM PERFORMANCE METRICS", "KEY STATISTICS", "BY THE NUMBERS" dashboard cards filled with invented data are BANNED
+- No `LABEL // YEAR` formatting — "SYSTEM // 2024", "METRICS // 2025" is a lazy AI convention, not real design typography
+- No AI copywriting clichés ("Elevate", "Seamless", "Unleash", "Next-Gen")
+- No filler UI text: "Scroll to explore", "Swipe down", scroll arrows, bouncing chevrons
+- No broken Unsplash links — use `picsum.photos` or SVG avatars
+- No centered Hero sections (for high-variance projects)
+
+## Output Format (DESIGN.md Structure)
+
+```markdown
+# Design System: [Project Title]
+
+## 1. Visual Theme & Atmosphere
+(Evocative description of the mood, density, variance, and motion intensity.
+Example: "A restrained, gallery-airy interface with confident asymmetric layouts
+and fluid spring-physics motion. The atmosphere is clinical yet warm — like a
+well-lit architecture studio.")
+
+## 2. Color Palette & Roles
+- **Canvas White** (#F9FAFB) — Primary background surface
+- **Pure Surface** (#FFFFFF) — Card and container fill
+- **Charcoal Ink** (#18181B) — Primary text, Zinc-950 depth
+- **Muted Steel** (#71717A) — Secondary text, descriptions, metadata
+- **Whisper Border** (rgba(226,232,240,0.5)) — Card borders, 1px structural lines
+- **[Accent Name]** (#XXXXXX) — Single accent for CTAs, active states, focus rings
+(Max 1 accent. Saturation < 80%. No purple/neon.)
+
+## 3. Typography Rules
+- **Display:** [Font Name] — Track-tight, controlled scale, weight-driven hierarchy
+- **Body:** [Font Name] — Relaxed leading, 65ch max-width, neutral secondary color
+- **Mono:** [Font Name] — For code, metadata, timestamps, high-density numbers
+- **Banned:** Inter, generic system fonts for premium contexts. Serif fonts banned in dashboards.
+
+## 4. Component Stylings
+* **Buttons:** Flat, no outer glow. Tactile -1px translate on active. Accent fill for primary, ghost/outline for secondary.
+* **Cards:** Generously rounded corners (2.5rem). Diffused whisper shadow. Used only when elevation serves hierarchy. High-density: replace with border-top dividers.
+* **Inputs:** Label above, error below. Focus ring in accent color. No floating labels.
+* **Loaders:** Skeletal shimmer matching exact layout dimensions. No circular spinners.
+* **Empty States:** Composed, illustrated compositions — not just "No data" text.
+
+## 5. Layout Principles
+(Grid-first responsive architecture. Asymmetric splits for Hero sections.
+Strict single-column collapse below 768px. Max-width containment.
+No flexbox percentage math. Generous internal padding.)
+
+## 6. Motion & Interaction
+(Spring physics for all interactive elements. Staggered cascade reveals.
+Perpetual micro-loops on active dashboard components. Hardware-accelerated
+transforms only. Isolated Client Components for CPU-heavy animations.)
+
+## 7. Anti-Patterns (Banned)
+(Explicit list of forbidden patterns: no emojis, no Inter, no pure black,
+no neon glows, no 3-column equal grids, no AI copywriting clichés,
+no generic placeholder names, no broken image links.)
+```
+
+## Best Practices
+- **Be Descriptive:** "Deep Charcoal Ink (#18181B)" — not just "dark text"
+- **Be Functional:** Explain what each element is used for
+- **Be Consistent:** Same terminology throughout the document
+- **Be Precise:** Include exact hex codes, rem values, pixel values in parentheses
+- **Be Opinionated:** This is not a neutral template — it enforces a specific, premium aesthetic
+
+## Tips for Success
+1. Start with the atmosphere — understand the vibe before detailing tokens
+2. Look for patterns — identify consistent spacing, sizing, and styling
+3. Think semantically — name colors by purpose, not just appearance
+4. Consider hierarchy — document how visual weight communicates importance
+5. Encode the bans — anti-patterns are as important as the rules themselves
+
+## Common Pitfalls to Avoid
+- Using technical jargon without translation ("rounded-xl" instead of "generously rounded corners")
+- Omitting hex codes or using only descriptive names
+- Forgetting functional roles of design elements
+- Being too vague in atmosphere descriptions
+- Ignoring the anti-pattern list — these are what make the output premium
+- Defaulting to generic "safe" designs instead of enforcing the curated aesthetic
+
+---
+
+# Bundled resource
+
+The resource file this skill refers to, included here verbatim so the skill is a single document in NativeCode.
+
+## resources/DESIGN.md
+
+# Design System: Taste Standard
+**Skill:** stitch-design-taste
+
+---
+
+## Configuration — Set Your Style
+Adjust these dials before using this design system. They control how creative, dense, and animated the output should be. Pick the level that fits your project.
+
+| Dial | Level | Description |
+|------|-------|-------------|
+| **Creativity** | `9` | `1` = Ultra-minimal, Swiss, silent, monochrome. `5` = Balanced, clean but with personality. `10` = Expressive, editorial, bold typography experiments, inline images in headlines, strong asymmetry. Default: `9` |
+| **Density** | `5` | `1` = Gallery-airy, massive whitespace. `5` = Balanced sections. `10` = Cockpit-dense, data-heavy. Default: `5` |
+| **Variance** | `8` | `1` = Predictable, symmetric grids. `5` = Subtle offsets. `10` = Artsy chaotic, no two sections alike. Default: `8` |
+| **Motion Intent** | `6` | `1` = Static, no animation noted. `5` = Subtle hover/entrance cues. `10` = Cinematic orchestration noted in every component. Default: `6` |
+
+> **How to use:** Change the numbers above to match your project's vibe. At **Creativity 1–3**, the system produces clean, quiet, Notion-like interfaces. At **Creativity 7–10**, expect inline image typography, dramatic scale contrast, and strong editorial layouts. The rest of the rules below adapt to your chosen levels.
+
+---
+
+## 1. Visual Theme & Atmosphere
+A restrained, gallery-airy interface with confident asymmetric layouts and fluid spring-physics motion. The atmosphere is clinical yet warm — like a well-lit architecture studio where every element earns its place through function. Density is balanced (Level 4), variance runs high (Level 8) to prevent symmetrical boredom, and motion is fluid but never theatrical (Level 6). The overall impression: expensive, intentional, alive.
+
+## 2. Color Palette & Roles
+- **Canvas White** (#F9FAFB) — Primary background surface. Warm-neutral, never clinical blue-white
+- **Pure Surface** (#FFFFFF) — Card and container fill. Used with whisper shadow for elevation
+- **Charcoal Ink** (#18181B) — Primary text. Zinc-950 depth — never pure black
+- **Steel Secondary** (#71717A) — Body text, descriptions, metadata. Zinc-500 warmth
+- **Muted Slate** (#94A3B8) — Tertiary text, timestamps, disabled states
+- **Whisper Border** (rgba(226,232,240,0.5)) — Card borders, structural 1px lines. Semi-transparent for depth
+- **Diffused Shadow** (rgba(0,0,0,0.05)) — Card elevation. Wide-spreading, 40px blur, -15px offset. Never harsh
+
+### Accent Selection (Pick ONE per project)
+- **Emerald Signal** (#10B981) — For growth, success, positive data dashboards
+- **Electric Blue** (#3B82F6) — For productivity, SaaS, developer tools
+- **Deep Rose** (#E11D48) — For creative, editorial, fashion-adjacent projects
+- **Amber Warmth** (#F59E0B) — For community, social, warm-toned products
+
+### Banned Colors
+- Purple/Violet neon gradients — the "AI Purple" aesthetic
+- Pure Black (#000000) — always Off-Black or Zinc-950
+- Oversaturated accents above 80% saturation
+- Mixed warm/cool gray systems within one project
+
+## 3. Typography Rules
+- **Display:** `Geist`, `Satoshi`, `Cabinet Grotesk`, or `Outfit` — Track-tight (`-0.025em`), controlled fluid scale, weight-driven hierarchy (700–900). Not screaming. Leading compressed (`1.1`). Alternatives forced — `Inter` is BANNED for premium contexts
+- **Body:** Same family at weight 400 — Relaxed leading (`1.65`), 65ch max-width, Steel Secondary color (#71717A)
+- **Mono:** `Geist Mono` or `JetBrains Mono` — For code blocks, metadata, timestamps. When density exceeds Level 7, all numbers switch to monospace
+- **Scale:** Display at `clamp(2.25rem, 5vw, 3.75rem)`. Body at `1rem/1.125rem`. Mono metadata at `0.8125rem`
+
+### Banned Fonts
+- `Inter` — banned everywhere in premium/creative contexts
+- Generic serif fonts (`Times New Roman`, `Georgia`, `Garamond`, `Palatino`) — BANNED. If serif is needed for editorial/creative, use only distinctive modern serifs like `Fraunces`, `Gambarino`, `Editorial New`, or `Instrument Serif`. Never use default browser serif stacks. Serif is always BANNED in dashboards or software UIs regardless
+
+## 4. Component Stylings
+* **Buttons:** Flat surface, no outer glow. Primary: accent fill with white text. Secondary: ghost/outline. Active state: `-1px translateY` or `scale(0.98)` for tactile push. Hover: subtle background shift, never glow
+* **Cards/Containers:** Generously rounded corners (`2.5rem`). Pure white fill. Whisper border (`1px`, semi-transparent). Diffused shadow (`0 20px 40px -15px rgba(0,0,0,0.05)`). Internal padding `2rem–2.5rem`. Used ONLY when elevation communicates hierarchy — high-density layouts replace cards with `border-top` dividers or negative space
+* **Inputs/Forms:** Label positioned above input. Helper text optional. Error text below in Deep Rose. Focus ring in accent color, `2px` offset. No floating labels. Standard `0.5rem` gap between label-input-error stack
+* **Navigation:** Sleek, sticky. Icons scale on hover (Dock Magnification optional). No hamburger on desktop. Clean horizontal with generous spacing
+* **Loaders:** Skeletal shimmer matching exact layout dimensions and rounded corners. Shifting light reflection across placeholder shapes. Never circular spinners
+* **Empty States:** Composed illustration or icon composition with guidance text. Never just "No data found"
+* **Error States:** Inline, contextual. Red accent underline or border. Clear recovery action
+
+## 5. Hero Section
+The Hero is the first impression — it must be striking, creative, and never generic.
+- **Inline Image Typography:** Embed small, contextual photos or visuals directly between words or letters in the headline. Example: "We build [photo of hands typing] digital [photo of screen] products" — images sit inline at type-height, rounded, acting as visual punctuation between words. This is the signature creative technique
+- **No Overlapping Elements:** Text must never overlap images or other text. Every element has its own clear spatial zone. No z-index stacking of content layers, no absolute-positioned headlines over images. Clean separation always
+- **No Filler Text:** "Scroll to explore", "Swipe down", scroll arrow icons, bouncing chevrons, and any instructional UI chrome are BANNED. The user knows how to scroll. Let the content pull them in naturally
+- **Asymmetric Structure:** Centered Hero layouts are BANNED at this variance level. Use Split Screen (50/50), Left-Aligned text / Right visual, or Asymmetric Whitespace with large empty zones
+- **CTA Restraint:** Maximum one primary CTA button. No secondary "Learn more" links. No redundant micro-copy below the headline
+
+## 6. Layout Principles
+- **Grid-First:** CSS Grid for all structural layouts. Never flexbox percentage math (`calc(33% - 1rem)` is BANNED)
+- **No Overlapping:** Elements must never overlap each other. No absolute-positioned layers stacking content on content. Every element occupies its own grid cell or flow position. Clean, separated spatial zones
+- **Feature Sections:** The "3 equal cards in a row" pattern is BANNED. Use 2-column Zig-Zag, asymmetric Bento grids (2fr 1fr 1fr), or horizontal scroll galleries
+- **Containment:** All content within `max-width: 1400px`, centered. Generous horizontal padding (`1rem` mobile, `2rem` tablet, `4rem` desktop)
+- **Full-Height:** Use `min-height: 100dvh` — never `height: 100vh` (iOS Safari address bar jump)
+- **Bento Architecture:** For feature grids, use Row 1: 3 columns | Row 2: 2 columns (70/30 split). Each tile contains a perpetual micro-animation
+
+## 7. Responsive Rules
+Every screen must work flawlessly across all viewports. **Responsive is not optional — it is a hard requirement. Every single element must be tested at 375px, 768px, and 1440px.**
+- **Mobile-First Collapse (< 768px):** All multi-column layouts collapse to a strict single column. `width: 100%`, `padding: 1rem`, `gap: 1.5rem`. No exceptions
+- **No Horizontal Scroll:** Horizontal overflow on mobile is a critical failure. All elements must fit within viewport width. If any element causes horizontal scroll, the design is broken
+- **Typography Scaling:** Headlines scale down gracefully via `clamp()`. Body text stays `1rem` minimum. Never shrink body below `14px`. Headlines must remain readable on 375px screens
+- **Touch Targets:** All interactive elements minimum `44px` tap target. Generous spacing between clickable items. Buttons must be full-width on mobile
+- **Image Behavior:** Hero and inline images scale proportionally. Inline typography images (photos between words) stack below the headline on mobile instead of inline
+- **Navigation:** Desktop horizontal nav collapses to a clean mobile menu (slide-in or full-screen overlay). No tiny hamburger icons without labels
+- **Cards & Grids:** Bento grids and asymmetric layouts revert to stacked single-column cards with full-width. Maintain internal padding (`1rem`)
+- **Spacing Consistency:** Vertical section gaps reduce proportionally on mobile (`clamp(3rem, 8vw, 6rem)`). Never cramped, never excessively airy
+- **Testing Viewports:** Designs must be verified at: `375px` (iPhone SE), `390px` (iPhone 14), `768px` (iPad), `1024px` (small laptop), `1440px` (desktop)
+
+## 8. Motion & Interaction (Code-Phase Intent)
+> **Note:** Stitch generates static screens — it does not animate. This section documents the **intended motion behavior** so that the coding agent (Antigravity, Cursor, etc.) knows exactly how to implement animations when building the exported design into a live product.
+
+- **Physics Engine:** Spring-based exclusively. `stiffness: 100, damping: 20`. No linear easing anywhere. Premium, weighty feel on all interactive elements
+- **Perpetual Micro-Loops:** Every active dashboard component has an infinite-loop state — Pulse on status dots, Typewriter on search bars, Float on feature icons, Shimmer on loading states
+- **Staggered Orchestration:** Lists and grids mount with cascaded delays (`animation-delay: calc(var(--index) * 100ms)`). Waterfall reveals, never instant mount
+- **Layout Transitions:** Smooth re-ordering via shared element IDs. Items swap positions with physics, simulating real-time intelligence
+- **Hardware Rules:** Animate ONLY `transform` and `opacity`. Never `top`, `left`, `width`, `height`. Grain/noise filters on fixed, pointer-events-none pseudo-elements only
+- **Performance:** CPU-heavy perpetual animations isolated in microscopic leaf components. Never trigger parent re-renders. Target 60fps minimum
+
+## 9. Anti-Patterns (Banned)
+- No emojis — anywhere in UI, code, or alt text
+- No `Inter` font — use `Geist`, `Outfit`, `Cabinet Grotesk`, `Satoshi`
+- No generic serif fonts (`Times New Roman`, `Georgia`, `Garamond`) — if serif is needed, use distinctive modern serifs only (`Fraunces`, `Instrument Serif`)
+- No pure black (`#000000`) — Off-Black or Zinc-950 only
+- No neon outer glows or default box-shadow glows
+- No oversaturated accent colors above 80%
+- No excessive gradient text on large headers
+- No custom mouse cursors
+- No overlapping elements — text never overlaps images or other content. Clean spatial separation always
+- No 3-column equal card layouts for features
+- No centered Hero sections (at this variance level)
+- No filler UI text: "Scroll to explore", "Swipe down", "Discover more below", scroll arrows, bouncing chevrons — all BANNED
+- No generic names: "John Doe", "Sarah Chan", "Acme", "Nexus", "SmartFlow"
+- No fake round numbers: `99.99%`, `50%`, `1234567` — use organic data: `47.2%`, `+1 (312) 847-1928`
+- No fabricated data or statistics — never generate metrics, performance numbers, uptime percentages, response times, or any data not explicitly provided by the user. "99.98% UPTIME SLA", "124ms AVG. RESPONSE", "18.5k DEPLOY CYCLES" are invented AI filler. Use `[metric]` placeholders if real data is unavailable
+- No fake system/metric sections — "SYSTEM PERFORMANCE METRICS", "KEY STATISTICS", "BY THE NUMBERS" dashboard cards filled with invented data are BANNED
+- No `LABEL // YEAR` formatting — "SYSTEM // 2024", "METRICS // 2025" is a lazy AI convention, not real design typography
+- No AI copywriting clichés: "Elevate", "Seamless", "Unleash", "Next-Gen", "Revolutionize"
+- No broken Unsplash links — use `picsum.photos/seed/{id}/800/600` or SVG UI Avatars
+- No generic `shadcn/ui` defaults — customize radii, colors, shadows to match this system
+- No `z-index` spam — use only for Navbar, Modal, Overlay layer contexts
+- No `h-screen` — always `min-h-[100dvh]`
+- No circular loading spinners — skeletal shimmer only
+""",
+    )
+
+    private fun designMobileComposeUi() = Skill(
+        id = "design-mobile-compose-ui",
+        title = "Design Mobile UI",
+        summary = "Phone-first Android and Jetpack Compose screens: layout, type, color, motion, accessibility.",
+        source = "",
+        body = """---
+name: design-mobile-compose-ui
+description: Design and review phone-first Android and Jetpack Compose screens: layout, touch targets, type, color, motion, insets and accessibility. Use when building or judging a mobile UI so it does not look like a default template.
+compatibility: NativeCode ARM64 PRoot; Kotlin/Compose project sources and Gradle builds as supplied by the project
+metadata:
+  title: Design Mobile UI
+  category: PROJECT
+  group: Design
+  status: authored; not independently device-tested
+---
+
+# Design Mobile UI (Jetpack Compose)
+
+**Use for:** a new Android screen, a redesign, or a UI review of a Compose (or View) app.
+
+**Deliver:** working Compose code that follows the project's existing theme, plus a short list of the design decisions you made.
+
+## Before you design
+
+1. Read the project's theme first (`Theme.kt`, `Color.kt`, `Type.kt`, any `DesignTokens`). Reuse its colors, shapes and spacing. Never add a second palette next to it.
+2. Name the screen's one job in a sentence. Everything on the screen either serves that job or is removed.
+3. Pick one primary action. Give it the strongest visual weight; every other action is secondary or tertiary.
+
+## Layout and spacing
+
+- Use a 4 dp base grid; common steps 4, 8, 12, 16, 24, 32. Screen edge padding 16 dp on phones. Put the steps in named constants, not inline numbers.
+- Touch targets are at least 48 x 48 dp, with 8 dp between neighbours. A 24 dp icon sits in a 48 dp hit area (`IconButton`, or `Modifier.minimumInteractiveComponentSize()`).
+- Group related items with whitespace first, dividers last. Do not wrap every group in a card.
+- Thumb zone: primary actions and navigation live in the lower half. Destructive actions are never next to the primary action without a gap or confirmation.
+- Edge to edge: call `enableEdgeToEdge()`, then apply `WindowInsets.systemBars`, `ime` and `displayCutout` through `Scaffold` padding or `Modifier.windowInsetsPadding`. A list scrolls under the bars with content padding, it is not clipped by them.
+- Scroll with `LazyColumn` and stable `key`s. Never nest a vertical scroller in another vertical scroller.
+
+## Adaptive
+
+- Design for 360 dp wide first, then verify 320 dp (small), 600 dp (foldable and tablet) and landscape.
+- Use `currentWindowAdaptiveInfo().windowSizeClass`: Compact = one pane and bottom bar, Medium = navigation rail, Expanded = list-detail with two panes.
+- Text must survive 200 percent font scale: use `sp`, `Modifier.heightIn(min = ...)` instead of fixed heights, `maxLines` plus `overflow = Ellipsis` only where truncation is acceptable.
+
+## Typography
+
+- Take sizes from `MaterialTheme.typography` roles (display, headline, title, body, label); do not invent font sizes per screen.
+- Build hierarchy with size, weight and color together, not size alone. Body is 14 to 16 sp with line height about 1.4 to 1.5. Lines longer than about 70 characters are hard to read: cap content width on wide screens.
+- One typeface family per product, two at most. Use tabular numbers (`fontFeatureSettings = "tnum"`) for values that change in place.
+
+## Color
+
+- Use color roles (`primary`, `onPrimary`, `surfaceContainer`, `outline`, `error`), never raw hex in composables.
+- Neutral surfaces carry most of the screen; one accent marks the primary action and the selected state. State is never conveyed by color alone: add an icon, a label or a shape change.
+- Contrast: text 4.5:1, large text and icons 3:1. Check dark and light themes both. In dark theme use lighter surfaces for elevation, not shadows.
+- Avoid the default-AI look: purple to blue gradients, glowing buttons, glass cards on every item, emoji as icons, identical rounded cards in a grid.
+
+## Components and states
+
+- Every interactive element has all states: enabled, pressed, focused, disabled, error and loading. Show a skeleton or progress while loading, an explanation plus action when empty, and a retry when failed.
+- Icons come from one vector set (Material Symbols or the project's drawables), one size and one stroke weight. Never use emoji or font glyphs as icons.
+- Dialogs for decisions only. Prefer a snackbar with Undo over a confirmation dialog for reversible actions.
+- Bottom navigation holds three to five top-level destinations. Back always works and leaves state intact.
+
+## Motion
+
+- Motion explains change: enter, exit, reorder, state. 150 to 300 ms, standard easing (`FastOutSlowInEasing`), no bounce on utility screens.
+- Use `AnimatedVisibility`, `animateContentSize`, `animate*AsState` and shared-element transitions where the item stays recognisable. Respect the system "remove animations" setting.
+
+## Accessibility
+
+- `contentDescription` on every informative icon; `null` on decorative ones. Use `Modifier.semantics { ... }` for custom controls, `clearAndSetSemantics` to merge a row into one announcement.
+- Logical focus order, visible focus indicator for keyboard and switch access, `Role` for custom clickables (`Modifier.clickable(onClickLabel = ...)`).
+- Test with TalkBack once, with 200 percent font scale once, and in grayscale once.
+
+## Verify
+
+- Add `@Preview` for light, dark, small width and large font scale.
+- Build with `./gradlew :app:assembleDebug`, install, and look at the real screen at its shipped size before calling it done.
+- Finish with a checklist reply: primary action, touch targets, insets, contrast, states, font scale, dark theme, TalkBack.
+""",
+    )
+
+    private fun designSystemTokens() = Skill(
+        id = "design-system-tokens",
+        title = "Design System Tokens",
+        summary = "Color, type and spacing tokens for web and Android, with a DESIGN.md.",
+        source = "",
+        body = """---
+name: design-system-tokens
+description: Create or tidy a design system built on tokens: color, type, spacing, radius, elevation and motion defined once and used everywhere, for web (CSS variables) and Android (Compose theme), with a DESIGN.md that agents and people follow.
+compatibility: NativeCode ARM64 PRoot; plain files, no extra tools required
+metadata:
+  title: Design System Tokens
+  category: PROJECT
+  group: Design
+  status: authored; not independently device-tested
+---
+
+# Design System Tokens
+
+**Use for:** starting a design system, replacing scattered hex values and magic numbers, adding dark mode or a second theme, or documenting the look so every later change stays consistent.
+
+**Deliver:** a token file, the platform theme that consumes it, and a short `DESIGN.md`.
+
+## 1. Inspect before inventing
+
+- Search the project for existing colors, font sizes, spacing and radii (`grep -rE "#[0-9a-fA-F]{3,8}|[0-9]+px|[0-9]+\.dp"`). The values used most often are the real system; promote them to tokens instead of picking new ones.
+- Keep the brand the project already has. Change values only when asked.
+
+## 2. Three layers
+
+1. **Primitive**: raw values with no meaning. `gray-900: #14161a`, `space-4: 16px`.
+2. **Semantic**: purpose. `color.surface`, `color.text`, `color.text-muted`, `color.accent`, `color.danger`, `space.page`, `radius.control`. Components use only this layer.
+3. **Component** (only when needed): `button.padding-x`, `card.radius`, pointing at semantic tokens.
+
+Themes (light, dark, high contrast) swap the primitive mapping behind the same semantic names. Components never know which theme is active.
+
+## 3. What to define
+
+- **Color**: surface (3 steps), border, text (default, muted, disabled, on-accent), accent (default, hover, pressed), and status (success, warning, danger, info). One accent. Check contrast: text 4.5:1, large text and UI parts 3:1, in every theme.
+- **Type**: a scale of 6 to 8 steps (for example 12, 14, 16, 20, 24, 32, 48) with size, line height and weight per role (caption, body, label, title, headline, display). One or two families.
+- **Space**: a 4 px base scale (4, 8, 12, 16, 24, 32, 48, 64). No other values in layout code.
+- **Radius** (2 to 4 steps), **border width**, **elevation** (shadow or surface tint, 3 levels), **motion** (durations 120, 200, 320 ms; one or two easings), **z-index** layers, **breakpoints**.
+
+## 4. Web output (CSS variables)
+
+```css
+:root {
+  --gray-900: #14161a; --gray-50: #f6f7f9; --blue-600: #2458d6;
+  --color-surface: var(--gray-50);
+  --color-text: var(--gray-900);
+  --color-accent: var(--blue-600);
+  --space-2: 8px; --space-4: 16px; --radius-control: 8px;
+  --font-body: system-ui, sans-serif; --text-body: 1rem/1.5 var(--font-body);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --color-surface: #14161a; --color-text: #f6f7f9; }
+}
+:root[data-theme="dark"] { --color-surface: #14161a; --color-text: #f6f7f9; }
+```
+
+Rules: components reference `var(--color-*)` and `var(--space-*)` only. A raw color or pixel value in a component is a bug. Use `rem` for type, `clamp()` for fluid headings, and `color-scheme: light dark`.
+
+## 5. Android output (Compose)
+
+- Put colors in `Color.kt` as primitives, map them into `lightColorScheme(...)` and `darkColorScheme(...)` roles in `Theme.kt`.
+- Spacing and radius as an immutable object (`object Space { val s = 8.dp ... }`) or a `CompositionLocal` when themes change them.
+- Type in `Typography(...)`. Screens read `MaterialTheme.colorScheme.*` and `MaterialTheme.typography.*`, never hex or ad hoc `sp`.
+
+## 6. Write DESIGN.md
+
+Keep it under two pages: purpose and tone in two sentences; the token table (name, value, use); do and do not rules (one accent, no gradients on surfaces, spacing only from the scale); component states; accessibility floor; where the tokens live in code. Agents read this file first on every UI task.
+
+## 7. Migrate safely
+
+- Replace values in small steps, one screen or component at a time, and build after each step.
+- Add a lint-style check: a script or test that fails on raw hex colors and non-scale spacing in component files.
+- Screenshot before and after at phone width, in light and dark. The look should not change unless the user asked for a change.
+""",
+    )
+
+    private fun makeVanillaAnimation() = Skill(
+        id = "make-vanilla-animation",
+        title = "Make Vanilla Animation",
+        summary = "Animated shorts in plain HTML, CSS and JS, exported to MP4 with headless Chrome and FFmpeg.",
+        source = "",
+        body = """---
+name: make-vanilla-animation
+description: Build animated shorts, title cards and explainers with plain HTML, CSS and JavaScript (canvas 2D, WebGL, CSS or Web Animations) and no animation library, then export a deterministic MP4 by capturing frames with headless Chrome and encoding with FFmpeg.
+compatibility: NativeCode ARM64 PRoot; Node, the supplied Chrome wrapper and FFmpeg as installed in the guest
+metadata:
+  title: Make Vanilla Animation
+  category: PROJECT
+  group: Video and audio
+  engine: plain HTML/CSS/JS + headless Chrome + FFmpeg
+  status: authored; not independently device-tested
+---
+
+# Make Vanilla Animation
+
+**Use for:** a short animated clip, loop, title sequence, chart or explainer when the user wants no framework or animation library (no GSAP, no Remotion). For the HyperFrames workflow use the make-motion-video skill instead.
+
+**Deliver:** one editable `index.html` that plays live in a browser, a captured PNG sequence, and `out.mp4`.
+
+## Rule 1: everything is a function of time
+
+Write one `render(t)` (seconds) that draws the whole frame from `t` alone. No `Date.now()`, no `setInterval`, no unseeded `Math.random()`, no state that depends on earlier frames. The live preview calls `render(performance.now()/1000)`; the exporter calls `render(frame / fps)`. This makes the video identical on every run and lets you scrub.
+
+## Template
+
+```html
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html,body{margin:0;background:#101114}
+  canvas{display:block;width:100vw;height:100vh;object-fit:contain}
+</style>
+<canvas id="c" width="1280" height="720"></canvas>
+<script>
+const W = 1280, H = 720, DURATION = 5, FPS = 30;
+const ctx = document.getElementById('c').getContext('2d');
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = x => 1 - Math.pow(1 - clamp(x), 3);          // easeOutCubic
+const seg = (t, from, to) => clamp((t - from) / (to - from)); // 0..1 inside [from,to]
+function rng(seed){ return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296; }
+
+function render(t) {
+  ctx.fillStyle = '#101114'; ctx.fillRect(0, 0, W, H);
+  const a = ease(seg(t, 0.2, 1.2));
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#f2f2f0';
+  ctx.font = '700 96px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Hello motion', W / 2, H / 2 + 32 * (1 - a));
+  ctx.globalAlpha = 1;
+}
+window.render = render; window.DURATION = DURATION; window.FPS = FPS;
+if (!new URLSearchParams(location.search).has('export')) {
+  const t0 = performance.now();
+  (function loop(){ render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })();
+} else render(0);
+</script>
+```
+
+## Building blocks
+
+- **Timeline**: define scenes as `[start, end]` ranges and map time with `seg()`; stagger items with `seg(t, i * 0.08, i * 0.08 + 0.5)`.
+- **Easing**: write the few curves you need (`ease`, easeInOutCubic, a spring `1 - Math.exp(-6 * x) * Math.cos(12 * x)`), keep them in one place.
+- **Canvas 2D**: shapes, text, gradients, `ctx.save/restore`, `ctx.filter` for blur. Prefer vector drawing over images. Wait for fonts with `document.fonts.ready` before the first export frame.
+- **CSS and WAAPI** alternative: create animations paused and seek them: `document.getAnimations().forEach(a => { a.pause(); a.currentTime = t * 1000; })`. Works for HTML layouts, text and SVG.
+- **WebGL**: one fragment shader with a `u_time` uniform set from `t`; render into a canvas created with `preserveDrawingBuffer: true` so screenshots capture it.
+- **Audio**: synthesize or supply a file; mux it in the FFmpeg step. Never rely on live `AudioContext` timing for export.
+- **Design**: apply the frontend-design skill rules: one idea per scene, strong hierarchy, 5 to 7 second scenes at most, readable text (at least 48 px at 1280 x 720), safe margins of 5 percent.
+
+## Export (headless Chrome + FFmpeg)
+
+Work as the `flux` user. Reuse the supplied browser wrapper `/home/flux/.local/bin/google-chrome` and the installed `ffmpeg`; do not reinstall them.
+
+```sh
+cd <project> && npm init -y >/dev/null && npm i puppeteer-core
+```
+
+`export.mjs`:
+
+```js
+import puppeteer from 'puppeteer-core';
+import { mkdirSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const browser = await puppeteer.launch({
+  executablePath: '/home/flux/.local/bin/google-chrome',
+  args: ['--no-sandbox', '--force-device-scale-factor=1'],
+});
+const page = await browser.newPage();
+await page.setViewport({ width: 1280, height: 720 });
+await page.goto(pathToFileURL(process.cwd() + '/index.html').href + '?export');
+await page.evaluate(() => document.fonts.ready);
+const { d, fps } = await page.evaluate(() => ({ d: DURATION, fps: FPS }));
+mkdirSync('frames', { recursive: true });
+for (let i = 0; i < d * fps; i++) {
+  await page.evaluate(t => render(t), i / fps);
+  await page.screenshot({ path: `frames/${'$'}{String(i).padStart(5, '0')}.png`, clip: { x: 0, y: 0, width: 1280, height: 720 } });
+}
+await browser.close();
+```
+
+```sh
+node export.mjs
+ffmpeg -y -framerate 30 -i frames/%05d.png -c:v libx264 -pix_fmt yuv420p -crf 18 -movflags +faststart out.mp4
+ffprobe -v error -show_entries format=duration -of csv=p=0 out.mp4
+```
+
+Add `-i audio.wav -shortest -c:a aac` to include sound. For a GIF use `-vf "fps=15,scale=640:-1:flags=lanczos"`.
+
+## Verify
+
+1. Open `index.html` in the in-app preview or browser and scrub a few times: nothing flickers, nothing depends on wall-clock time.
+2. Look at frames 0, the middle and the last one (`frames/00000.png` and so on). Text is readable, nothing is cut off, the end state is intentional.
+3. Check the MP4 duration equals `DURATION` and that it plays.
+4. Cost: a 5 s, 30 fps, 1280 x 720 clip is 150 screenshots. Lower `FPS` to 24 or the size to 960 x 540 on slow devices; do not skip frames in the middle.
 """,
     )
 

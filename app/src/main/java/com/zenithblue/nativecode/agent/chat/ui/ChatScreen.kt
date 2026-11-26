@@ -88,6 +88,11 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
     val composer = remember(threadId) { ComposerState(t.draftJson) }
     var queueSheet by remember { mutableStateOf(false) }
     var stopAt by remember(threadId) { mutableLongStateOf(0L) }
+    DisposableEffect(composer) {
+        val sink: (String, String) -> Unit = composer::addSkill
+        v.skillSink = sink
+        onDispose { if (v.skillSink === sink) v.skillSink = null }
+    }
 
     // Store rows + the controller's in-memory items of the running turn (newer by id).
     val items = remember(d.items, live?.liveItems) { merge(d.items, live?.liveItems.orEmpty()) }
