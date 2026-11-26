@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.BufferedInputStream
 import java.io.File
@@ -55,14 +56,33 @@ object RuntimeUpdatePack {
         Files.exists(File(rootfs, "$it/ld-linux-aarch64.so.1").toPath(), LinkOption.NOFOLLOW_LINKS)
     }
 
-    fun resolveArchive(context: Context): File? {
+    fun resolveArchive(context: Context): File? = pickArchive(
         PlayAssetDeliveryManager.getInstalledPackLocation(context, PlayAssetDeliveryManager.PACK_UPDATE_CORE)
-            ?.let { File(it, ARCHIVE_NAME) }?.takeIf { it.isFile }?.let { return it }
-        return listOf(
-            File(context.filesDir, "assets/$ARCHIVE_NAME"),
-            File(context.filesDir, ARCHIVE_NAME),
+            ?.let { File(it, ARCHIVE_NAME) },
+        localCandidates(context.filesDir, BuildConfig.DEBUG),
+    )
+
+    /** Dev sideload paths, DEBUG only: a stale world-readable file there must never beat Play in a release build. */
+    internal fun localCandidates(filesDir: File, debug: Boolean): List<File> =
+        if (!debug) emptyList() else listOf(
+            File(filesDir, "assets/$ARCHIVE_NAME"),
+            File(filesDir, ARCHIVE_NAME),
             File("/data/local/tmp", ARCHIVE_NAME),
-        ).firstOrNull { it.isFile && it.length() > MIN_ARCHIVE_BYTES }
+        )
+
+    /** Play pack wins; a local candidate counts only if it matches the pin, so a stale one falls through to Play. */
+    internal fun pickArchive(play: File?, local: List<File>, matchesPin: (File) -> Boolean = ::matchesPinCached): File? {
+        play?.takeIf { it.isFile }?.let { return it }
+        return local.firstOrNull { it.isFile && it.length() > MIN_ARCHIVE_BYTES && matchesPin(it) }
+    }
+
+    private val pinCache = HashMap<String, Boolean>()
+
+    // Memoised per file identity: resolveArchive is called often and the pack is ~320 MB (DEBUG candidates only).
+    private fun matchesPinCached(f: File): Boolean = synchronized(pinCache) {
+        pinCache.getOrPut("${f.path}|${f.length()}|${f.lastModified()}") {
+            runCatching { sha256(f).equals(PINNED_SHA256, ignoreCase = true) }.getOrDefault(false)
+        }
     }
 
     private const val MIN_ARCHIVE_BYTES = 1L * 1024L * 1024L

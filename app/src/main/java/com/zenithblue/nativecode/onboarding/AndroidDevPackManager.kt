@@ -39,16 +39,7 @@ object AndroidDevPackManager {
             if (f.isFile && f.length() > 2L * 1024L * 1024L) return f
         }
 
-        val localCandidates = listOf(
-            File(context.filesDir, "assets/$ARCHIVE_NAME"),
-            File(context.filesDir, ARCHIVE_NAME),
-            File("/data/local/tmp", ARCHIVE_NAME),
-            File("/sdcard/Download", ARCHIVE_NAME),
-            File("/storage/emulated/0/Download", ARCHIVE_NAME)
-        )
-        for (c in localCandidates) {
-            if (c.isFile && c.length() > 2L * 1024L * 1024L) return c
-        }
+        pickLocal(localCandidates(context.filesDir, BuildConfig.DEBUG))?.let { return it }
 
         try {
             val list = context.assets.list("") ?: emptyArray()
@@ -66,6 +57,27 @@ object AndroidDevPackManager {
             Log.w(TAG, "Bundled asset resolve failed: ${e.message}")
         }
         return null
+    }
+
+    /** Dev sideload paths, DEBUG only: release never reads /data/local/tmp or Download (the APK asset fallback below stays). */
+    internal fun localCandidates(filesDir: File, debug: Boolean): List<File> =
+        if (!debug) emptyList() else listOf(
+            File(filesDir, "assets/$ARCHIVE_NAME"),
+            File(filesDir, ARCHIVE_NAME),
+            File("/data/local/tmp", ARCHIVE_NAME),
+            File("/sdcard/Download", ARCHIVE_NAME),
+            File("/storage/emulated/0/Download", ARCHIVE_NAME),
+        )
+
+    /** A local candidate counts only if it matches the pin, so a stale one falls through to Play. */
+    internal fun pickLocal(local: List<File>, matchesPin: (File) -> Boolean = ::matchesPinCached): File? =
+        local.firstOrNull { it.isFile && it.length() > 2L * 1024L * 1024L && matchesPin(it) }
+
+    private val pinCache = HashMap<String, Boolean>()
+
+    // Memoised per file identity: resolveArchive is called often (DEBUG candidates only).
+    private fun matchesPinCached(f: File): Boolean = synchronized(pinCache) {
+        pinCache.getOrPut("${f.path}|${f.length()}|${f.lastModified()}") { verifyArchive(f) }
     }
 
     fun isApplied(context: Context): Boolean {
