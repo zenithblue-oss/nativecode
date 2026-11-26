@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">ESC, TAB, залипающие CTRL/ALT/SHIFT, стрелки, символы. Удерживайте стрелки для повтора; смахните клавишу вверх для альтернативы в углу; • переключает страницу.</string>
     <string name="main_chat_view_beta">ВИД ЧАТА (БЕТА)</string>
     <string name="main_agent_chat_on_the_terminal">Чат с агентом во вкладке Terminal и в рабочей области проекта с переключателем Чат/Terminal. Выкл. = только terminal.</string>
+    <string name="main_show_thinking">ПОКАЗЫВАТЬ РАЗМЫШЛЕНИЯ</string>
+    <string name="main_show_thinking_sub">Показывать строки рассуждений модели в чате агента. Выкл. = скрыты (сохраняются).</string>
     <string name="main_tokens_and_cost_per_ai_3">Токены и стоимость по каждому ИИ CLI. Нажмите для настройки.</string>
     <string name="main_today_tokens_est">Сегодня: %1$s токенов · прибл. %2$s</string>
     <string name="main_caps_create_new_project">СОЗДАТЬ НОВЫЙ ПРОЕКТ</string>

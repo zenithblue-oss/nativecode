@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">Esc、Tab、固定式Ctrl/Alt/Shift、矢印、記号。矢印は長押しで連打、キーを上にスワイプすると隅の代替キー、• でページを切り替えます。</string>
     <string name="main_chat_view_beta">チャットビュー（ベータ）</string>
     <string name="main_agent_chat_on_the_terminal">TerminalタブとプロジェクトワークスペースでエージェントチャットをChat/Terminalの切り替え付きで表示します。オフ = terminalのみ。</string>
+    <string name="main_show_thinking">思考を表示</string>
+    <string name="main_show_thinking_sub">エージェントチャットでモデルの思考行を表示します。オフ = 非表示（保存は継続）。</string>
     <string name="main_tokens_and_cost_per_ai_3">AI CLIごとのトークンとコスト。タップして設定。</string>
     <string name="main_today_tokens_est">今日: %1$sトークン · 推定%2$s</string>
     <string name="main_caps_create_new_project">新規プロジェクトを作成</string>

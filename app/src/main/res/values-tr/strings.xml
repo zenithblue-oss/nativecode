@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">ESC, TAB, yapışkan CTRL/ALT/SHIFT, oklar, semboller. Tekrarlamak için oklara basılı tutun; alternatifi için bir tuşu yukarı kaydırın; • sayfayı değiştirir.</string>
     <string name="main_chat_view_beta">SOHBET GÖRÜNÜMÜ (BETA)</string>
     <string name="main_agent_chat_on_the_terminal">Terminal sekmesinde ve proje çalışma alanında Sohbet/Terminal anahtarlı ajan sohbeti. Kapalı = yalnızca terminal.</string>
+    <string name="main_show_thinking">DÜŞÜNMEYİ GÖSTER</string>
+    <string name="main_show_thinking_sub">Ajan sohbetinde modelin düşünme satırlarını gösterir. Kapalı = gizli (kaydedilmeye devam eder).</string>
     <string name="main_tokens_and_cost_per_ai_3">Yapay zeka CLI başına token ve maliyet. Kurmak için dokunun.</string>
     <string name="main_today_tokens_est">Bugün: %1$s token · tahmini %2$s</string>
     <string name="main_caps_create_new_project">YENİ PROJE OLUŞTUR</string>

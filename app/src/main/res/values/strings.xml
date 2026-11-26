@@ -1522,6 +1522,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">ESC, TAB, sticky CTRL/ALT/SHIFT, arrows, symbols. Hold arrows to repeat; swipe a key up for its corner alternate; • switches page.</string>
     <string name="main_chat_view_beta">CHAT VIEW (BETA)</string>
     <string name="main_agent_chat_on_the_terminal">Agent chat on the Terminal tab and the project workspace, with a Chat/Terminal switch. Off = terminal only.</string>
+    <string name="main_show_thinking">SHOW THINKING</string>
+    <string name="main_show_thinking_sub">Show the model\'s reasoning rows in agent chat. Off = hidden (still saved).</string>
     <string name="main_tokens_and_cost_per_ai_3">Tokens and cost per AI CLI. Tap to set up.</string>
     <string name="main_today_tokens_est">Today: %1$s tokens · %2$s est.</string>
     <string name="main_caps_create_new_project">CREATE NEW PROJECT</string>

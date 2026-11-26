@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">ESC, TAB, Sticky-CTRL/ALT/SHIFT, Pfeile, Symbole. Pfeile halten zum Wiederholen; eine Taste nach oben wischen für die Eckenalternative; • wechselt die Seite.</string>
     <string name="main_chat_view_beta">CHAT-ANSICHT (BETA)</string>
     <string name="main_agent_chat_on_the_terminal">Agent-Chat im Terminal-Tab und im Projekt-Workspace mit Chat/Terminal-Umschalter. Aus = nur Terminal.</string>
+    <string name="main_show_thinking">DENKEN ANZEIGEN</string>
+    <string name="main_show_thinking_sub">Zeigt die Denkzeilen des Modells im Agent-Chat. Aus = ausgeblendet (bleibt gespeichert).</string>
     <string name="main_tokens_and_cost_per_ai_3">Tokens und Kosten pro KI-CLI. Zum Einrichten tippen.</string>
     <string name="main_today_tokens_est">Heute: %1$s Tokens · %2$s gesch.</string>
     <string name="main_caps_create_new_project">NEUES PROJEKT ERSTELLEN</string>

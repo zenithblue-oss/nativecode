@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">ESC、TAB、粘滞 CTRL/ALT/SHIFT、方向键、符号。按住方向键可重复；向上滑动按键可输入其角标备选；• 切换页面。</string>
     <string name="main_chat_view_beta">对话视图（测试版）</string>
     <string name="main_agent_chat_on_the_terminal">在终端标签页和项目工作区中显示智能体对话，并提供对话/终端切换。关闭 = 仅终端。</string>
+    <string name="main_show_thinking">显示思考</string>
+    <string name="main_show_thinking_sub">在智能体对话中显示模型的思考行。关闭 = 隐藏（仍会保存）。</string>
     <string name="main_tokens_and_cost_per_ai_3">各 AI CLI 的令牌和费用。点击设置。</string>
     <string name="main_today_tokens_est">今日：%1$s 令牌 · 预估 %2$s。</string>
     <string name="main_caps_create_new_project">创建新项目</string>

@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">ESC, TAB, 고정 CTRL/ALT/SHIFT, 방향키, 기호. 방향키를 길게 누르면 반복되고, 키를 위로 밀면 보조 문자가 입력되며, •는 페이지를 전환합니다.</string>
     <string name="main_chat_view_beta">채팅 보기 (베타)</string>
     <string name="main_agent_chat_on_the_terminal">Terminal 탭과 프로젝트 워크스페이스에서 채팅/Terminal 전환이 가능한 에이전트 채팅입니다. 끄면 terminal만 표시됩니다.</string>
+    <string name="main_show_thinking">생각 표시</string>
+    <string name="main_show_thinking_sub">에이전트 채팅에서 모델의 사고 행을 표시합니다. 끄면 숨김(저장은 유지).</string>
     <string name="main_tokens_and_cost_per_ai_3">AI CLI별 토큰 및 비용입니다. 눌러서 설정하세요.</string>
     <string name="main_today_tokens_est">오늘: 토큰 %1$s개 · 예상 %2$s</string>
     <string name="main_caps_create_new_project">새 프로젝트 만들기</string>

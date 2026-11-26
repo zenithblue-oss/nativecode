@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">Esc وTab وCtrl/Alt/Shift الثابتة والأسهم والرموز. اضغط مطولًا على الأسهم للتكرار؛ اسحب مفتاحًا للأعلى لبديله في الزاوية؛ • يبدّل الصفحة.</string>
     <string name="main_chat_view_beta">عرض الدردشة (تجريبي)</string>
     <string name="main_agent_chat_on_the_terminal">دردشة الوكيل في علامة Terminal ومساحة عمل المشروع مع مبدّل Chat/Terminal. متوقف = terminal فقط.</string>
+    <string name="main_show_thinking">إظهار التفكير</string>
+    <string name="main_show_thinking_sub">إظهار صفوف استدلال النموذج في دردشة الوكيل. إيقاف = مخفية (تبقى محفوظة).</string>
     <string name="main_tokens_and_cost_per_ai_3">الرموز والتكلفة لكل AI CLI. اضغط للإعداد.</string>
     <string name="main_today_tokens_est">اليوم: %1$s رمز · %2$s تقديري.</string>
     <string name="main_caps_create_new_project">إنشاء مشروع جديد</string>

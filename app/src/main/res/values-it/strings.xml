@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">ESC, TAB, CTRL/ALT/SHIFT bloccabili, frecce, simboli. Tieni premute le frecce per ripetere; scorri un tasto in su per l\'alternativa d\'angolo; • cambia pagina.</string>
     <string name="main_chat_view_beta">VISTA CHAT (BETA)</string>
     <string name="main_agent_chat_on_the_terminal">Chat con l\'agente nella scheda Terminal e nel workspace del progetto, con un interruttore Chat/Terminal. Off = solo terminal.</string>
+    <string name="main_show_thinking">MOSTRA RAGIONAMENTO</string>
+    <string name="main_show_thinking_sub">Mostra le righe di ragionamento del modello nella chat dell\'agente. Disattivato = nascoste (restano salvate).</string>
     <string name="main_tokens_and_cost_per_ai_3">Token e costo per CLI AI. Tocca per configurare.</string>
     <string name="main_today_tokens_est">Oggi: %1$s token · %2$s stim.</string>
     <string name="main_caps_create_new_project">CREA NUOVO PROGETTO</string>

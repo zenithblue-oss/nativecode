@@ -21589,6 +21589,32 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             })
         })
 
+        // Agent chat: show the model's thinking rows (off by default; hidden rows stay stored).
+        card.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, 0)
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(12) }
+                addView(TextView(this@MainActivity).apply {
+                    text = tr(R.string.main_show_thinking)
+                    textSize = 13f
+                    setTextColor(Color.WHITE)
+                    typeface = Typeface.DEFAULT_BOLD
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = tr(R.string.main_show_thinking_sub)
+                    textSize = 11f
+                    setTextColor(NC.ON_SURF_VAR)
+                    typeface = Typeface.MONOSPACE
+                })
+            })
+            addView(CustomBrutalistToggle(this@MainActivity, chatPrefs().getBoolean(ChatLogic.PREF_THINKING, false)) { on ->
+                chatPrefs().edit().putBoolean(ChatLogic.PREF_THINKING, on).apply()
+            })
+        })
+
         // 3. Extra keys preset (simple choice; no key editor)
         val presetRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL

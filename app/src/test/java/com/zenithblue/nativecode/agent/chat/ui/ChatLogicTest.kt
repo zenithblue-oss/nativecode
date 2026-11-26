@@ -163,6 +163,14 @@ class ChatLogicTest {
         assertEquals("Ran 1 command · edited 1 file", ChatLogic.workSummary((rows[1] as Row.Work).items))
     }
 
+    @Test fun reasoningRowsHiddenWhenShowThinkingOff() {
+        fun item(id: String, ord: Int, p: ItemPayload) = TurnItem(id, "t", "r1", ord, null, null, ItemStatus.COMPLETED, p, 0)
+        val items = listOf(item("u", 1, ItemPayload.UserMessage("go")), item("th", 2, ItemPayload.Reasoning("hmm")), item("a", 3, ItemPayload.AssistantMessage("hi")))
+        val runs = mapOf("r1" to Run("r1", "t", 1, RunStatus.COMPLETED))
+        assertEquals(listOf("u", "a", "m:r1"), ChatLogic.rows(items, runs, showThinking = false).map { it.key })
+        assertEquals(listOf("u", "th", "a", "m:r1"), ChatLogic.rows(items, runs, showThinking = true).map { it.key })
+    }
+
     @Test fun queuedMessageTypedMidTurnNeverSplitsItsRun() {
         // crash: a message queued while r1 ran sits between r1's items; r1 then ends (Stop / Force stop) -> two "m:r1" keys.
         fun item(id: String, ord: Int, run: String, p: ItemPayload) = TurnItem(id, "t", run, ord, null, null, ItemStatus.COMPLETED, p, 0)

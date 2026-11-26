@@ -92,7 +92,16 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
     // Store rows + the controller's in-memory items of the running turn (newer by id).
     val items = remember(d.items, live?.liveItems) { merge(d.items, live?.liveItems.orEmpty()) }
     val runsById = remember(d.runs) { d.runs.associateBy { it.id } }
-    val rows = remember(items, runsById) { ChatLogic.rows(items, runsById) }
+    val prefs = LocalContext.current.let { c -> remember { c.getSharedPreferences("nativecode_prefs", android.content.Context.MODE_PRIVATE) } }
+    var showThinking by remember { mutableStateOf(prefs.getBoolean(ChatLogic.PREF_THINKING, false)) }
+    DisposableEffect(prefs) {
+        val l = android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, k ->
+            if (k == ChatLogic.PREF_THINKING) showThinking = p.getBoolean(k, false)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(l)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(l) }
+    }
+    val rows = remember(items, runsById, showThinking) { ChatLogic.rows(items, runsById, showThinking) }
     val lastText = remember(items) {
         HashMap<String, String>().also { m -> items.forEach { i -> (i.payload as? ItemPayload.AssistantMessage)?.let { p -> i.runId?.let { m[it] = p.text } } } }
     }

@@ -1479,6 +1479,8 @@
     <string name="main_esc_tab_sticky_ctrl_alt">ESC, TAB, CTRL/ALT/SHIFT sticky, panah, simbol. Tahan panah untuk mengulang; usap tombol ke atas untuk alternatif sudutnya; • mengganti halaman.</string>
     <string name="main_chat_view_beta">TAMPILAN CHAT (BETA)</string>
     <string name="main_agent_chat_on_the_terminal">Chat agen di tab Terminal dan workspace proyek, dengan pengalih Chat/Terminal. Mati = hanya terminal.</string>
+    <string name="main_show_thinking">TAMPILKAN PEMIKIRAN</string>
+    <string name="main_show_thinking_sub">Tampilkan baris penalaran model di chat agen. Mati = disembunyikan (tetap tersimpan).</string>
     <string name="main_tokens_and_cost_per_ai_3">Token dan biaya per CLI AI. Ketuk untuk menyiapkan.</string>
     <string name="main_today_tokens_est">Hari ini: %1$s token · est. %2$s</string>
     <string name="main_caps_create_new_project">BUAT PROYEK BARU</string>
