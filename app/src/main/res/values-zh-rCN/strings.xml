@@ -971,6 +971,8 @@
     <string name="main_linux_runtime_android_sdk_36">Linux 运行时 · Android SDK 36</string>
     <string name="main_top_bar">顶部栏</string>
     <string name="main_phone_stats_order">手机状态 · 顺序</string>
+    <string name="topbar_wattage_scaling">瓦数缩放 (W 项)</string>
+    <string name="skills_attach">添加</string>
     <string name="main_backup">备份</string>
     <string name="main_back_up_and_restore_your">备份和恢复 guest 主目录</string>
     <string name="main_ssh_server_pro_remote_hosts">SSH 服务器（Pro）· 远程主机 · 密钥</string>
@@ -987,8 +989,6 @@
     <string name="main_sdk_download_pending">SDK 等待下载…</string>
     <string name="main_sdk_downloading">SDK 下载中 %1$s%%</string>
     <string name="main_sdk_transferring">SDK 传输中 %1$s%%</string>
-    <string name="topbar_wattage_scaling">瓦数缩放 (W 项)</string>
-    <string name="skills_attach">添加</string>
     <string name="main_waiting_for_wi_fi_approval">正在等待 Wi-Fi 授权…</string>
     <string name="main_sdk_download_failed">SDK 下载失败（%1$s）</string>
     <string name="main_sdk_download_canceled">SDK 下载已取消</string>

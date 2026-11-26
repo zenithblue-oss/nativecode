@@ -971,6 +971,8 @@
     <string name="main_linux_runtime_android_sdk_36">Runtime Linux · Android SDK 36</string>
     <string name="main_top_bar">BARRA SUPERIORE</string>
     <string name="main_phone_stats_order">Statistiche del telefono · ordine</string>
+    <string name="topbar_wattage_scaling">Scala dei watt (stat W)</string>
+    <string name="skills_attach">AGGIUNGI</string>
     <string name="main_backup">BACKUP</string>
     <string name="main_back_up_and_restore_your">Esegui il backup e ripristina la tua home guest</string>
     <string name="main_ssh_server_pro_remote_hosts">Server SSH (Pro) · host remoti · chiavi</string>
@@ -987,8 +989,6 @@
     <string name="main_sdk_download_pending">Download dell\'SDK in attesa…</string>
     <string name="main_sdk_downloading">Download SDK %1$s%%</string>
     <string name="main_sdk_transferring">Trasferimento SDK %1$s%%</string>
-    <string name="topbar_wattage_scaling">Scala dei watt (stat W)</string>
-    <string name="skills_attach">AGGIUNGI</string>
     <string name="main_waiting_for_wi_fi_approval">In attesa dell\'approvazione per il Wi-Fi…</string>
     <string name="main_sdk_download_failed">Download dell\'SDK non riuscito (%1$s)</string>
     <string name="main_sdk_download_canceled">Download dell\'SDK annullato</string>

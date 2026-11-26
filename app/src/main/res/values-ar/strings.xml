@@ -971,6 +971,8 @@
     <string name="main_linux_runtime_android_sdk_36">بيئة Linux · Android SDK 36</string>
     <string name="main_top_bar">الشريط العلوي</string>
     <string name="main_phone_stats_order">إحصاءات الهاتف · الترتيب</string>
+    <string name="topbar_wattage_scaling">مقياس الواط (إحصاء W)</string>
+    <string name="skills_attach">إضافة</string>
     <string name="main_backup">النسخ الاحتياطي</string>
     <string name="main_back_up_and_restore_your">انسخ المجلد الرئيسي لـ guest احتياطيًا واستعده</string>
     <string name="main_ssh_server_pro_remote_hosts">خادم SSH (Pro) · المضيفون البعيدون · المفاتيح</string>
@@ -987,8 +989,6 @@
     <string name="main_sdk_download_pending">تنزيل SDK قيد الانتظار…</string>
     <string name="main_sdk_downloading">جارٍ تنزيل SDK %1$s%%</string>
     <string name="main_sdk_transferring">جارٍ نقل SDK %1$s%%</string>
-    <string name="topbar_wattage_scaling">مقياس الواط (إحصاء W)</string>
-    <string name="skills_attach">إضافة</string>
     <string name="main_waiting_for_wi_fi_approval">في انتظار الموافقة على Wi-Fi…</string>
     <string name="main_sdk_download_failed">فشل تنزيل SDK (%1$s)</string>
     <string name="main_sdk_download_canceled">أُلغي تنزيل SDK</string>

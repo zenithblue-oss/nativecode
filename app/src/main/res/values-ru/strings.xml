@@ -971,6 +971,8 @@
     <string name="main_linux_runtime_android_sdk_36">Среда Linux · Android SDK 36</string>
     <string name="main_top_bar">ВЕРХНЯЯ ПАНЕЛЬ</string>
     <string name="main_phone_stats_order">Статистика телефона · порядок</string>
+    <string name="topbar_wattage_scaling">Масштаб ватт (показатель W)</string>
+    <string name="skills_attach">ДОБАВИТЬ</string>
     <string name="main_backup">РЕЗЕРВНАЯ КОПИЯ</string>
     <string name="main_back_up_and_restore_your">Резервное копирование и восстановление гостевого home</string>
     <string name="main_ssh_server_pro_remote_hosts">SSH-сервер (Pro) · удалённые хосты · ключи</string>
@@ -987,8 +989,6 @@
     <string name="main_sdk_download_pending">Загрузка SDK ожидает…</string>
     <string name="main_sdk_downloading">Загрузка SDK %1$s%%</string>
     <string name="main_sdk_transferring">Передача SDK %1$s%%</string>
-    <string name="topbar_wattage_scaling">Масштаб ватт (показатель W)</string>
-    <string name="skills_attach">ДОБАВИТЬ</string>
     <string name="main_waiting_for_wi_fi_approval">Ожидание разрешения Wi-Fi…</string>
     <string name="main_sdk_download_failed">Не удалось загрузить SDK (%1$s)</string>
     <string name="main_sdk_download_canceled">Загрузка SDK отменена</string>

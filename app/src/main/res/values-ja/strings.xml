@@ -971,6 +971,8 @@
     <string name="main_linux_runtime_android_sdk_36">Linuxランタイム · Android SDK 36</string>
     <string name="main_top_bar">トップバー</string>
     <string name="main_phone_stats_order">端末の統計 · 順序</string>
+    <string name="topbar_wattage_scaling">ワット数のスケール (W)</string>
+    <string name="skills_attach">追加</string>
     <string name="main_backup">バックアップ</string>
     <string name="main_back_up_and_restore_your">ゲストのホームをバックアップ・復元</string>
     <string name="main_ssh_server_pro_remote_hosts">SSHサーバー（Pro）· リモートホスト · キー</string>
@@ -987,8 +989,6 @@
     <string name="main_sdk_download_pending">SDKのダウンロード待機中…</string>
     <string name="main_sdk_downloading">SDKをダウンロード中 %1$s%%</string>
     <string name="main_sdk_transferring">SDKを転送中 %1$s%%</string>
-    <string name="topbar_wattage_scaling">ワット数のスケール (W)</string>
-    <string name="skills_attach">追加</string>
     <string name="main_waiting_for_wi_fi_approval">Wi-Fiの承認を待機中…</string>
     <string name="main_sdk_download_failed">SDKのダウンロードに失敗しました（%1$s）</string>
     <string name="main_sdk_download_canceled">SDKのダウンロードをキャンセルしました</string>

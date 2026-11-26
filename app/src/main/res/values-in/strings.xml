@@ -971,6 +971,8 @@
     <string name="main_linux_runtime_android_sdk_36">Runtime Linux · Android SDK 36</string>
     <string name="main_top_bar">BILAH ATAS</string>
     <string name="main_phone_stats_order">Statistik ponsel · urutan</string>
+    <string name="topbar_wattage_scaling">Skala watt (statistik W)</string>
+    <string name="skills_attach">TAMBAH</string>
     <string name="main_backup">CADANGAN</string>
     <string name="main_back_up_and_restore_your">Cadangkan dan pulihkan home guest Anda</string>
     <string name="main_ssh_server_pro_remote_hosts">Server SSH (Pro) · host remote · kunci</string>
@@ -987,8 +989,6 @@
     <string name="main_sdk_download_pending">Unduhan SDK tertunda…</string>
     <string name="main_sdk_downloading">Mengunduh SDK %1$s%%</string>
     <string name="main_sdk_transferring">Mentransfer SDK %1$s%%</string>
-    <string name="topbar_wattage_scaling">Skala watt (statistik W)</string>
-    <string name="skills_attach">TAMBAH</string>
     <string name="main_waiting_for_wi_fi_approval">Menunggu persetujuan Wi-Fi…</string>
     <string name="main_sdk_download_failed">Unduhan SDK gagal (%1$s)</string>
     <string name="main_sdk_download_canceled">Unduhan SDK dibatalkan</string>

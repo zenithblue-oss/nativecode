@@ -971,6 +971,8 @@
     <string name="main_linux_runtime_android_sdk_36">Linux 런타임 · Android SDK 36</string>
     <string name="main_top_bar">상단 바</string>
     <string name="main_phone_stats_order">휴대폰 상태 · 순서</string>
+    <string name="topbar_wattage_scaling">와트 배율 (W 항목)</string>
+    <string name="skills_attach">추가</string>
     <string name="main_backup">백업</string>
     <string name="main_back_up_and_restore_your">게스트 홈 백업 및 복원</string>
     <string name="main_ssh_server_pro_remote_hosts">SSH 서버 (Pro) · 원격 호스트 · 키</string>
@@ -987,8 +989,6 @@
     <string name="main_sdk_download_pending">SDK 다운로드 대기 중…</string>
     <string name="main_sdk_downloading">SDK 다운로드 중 %1$s%%</string>
     <string name="main_sdk_transferring">SDK 전송 중 %1$s%%</string>
-    <string name="topbar_wattage_scaling">와트 배율 (W 항목)</string>
-    <string name="skills_attach">추가</string>
     <string name="main_waiting_for_wi_fi_approval">Wi-Fi 승인을 기다리는 중…</string>
     <string name="main_sdk_download_failed">SDK 다운로드 실패 (%1$s)</string>
     <string name="main_sdk_download_canceled">SDK 다운로드가 취소되었습니다</string>
