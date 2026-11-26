@@ -300,9 +300,9 @@ internal object ClaudeWire {
         else -> ""
     }
 
-    /** "2.1.323" ≥ [MIN_VERSION]. Unknown = allowed. */
+    /** "2.1.323" ≥ [MIN_VERSION]. Unknown (null / blank: claude 2.1.263's initialize answer has no claude_code_version) = allowed; [CliGate] holds the real minimum. */
     fun versionOk(v: String?): Boolean {
-        val have = v?.split('.')?.mapNotNull { it.toIntOrNull() } ?: return true
+        val have = v?.split('.')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.isNotEmpty() } ?: return true
         val need = MIN_VERSION.split('.').map { it.toInt() }
         for (i in need.indices) { val h = have.getOrNull(i) ?: 0; if (h != need[i]) return h > need[i] }
         return true

@@ -72,10 +72,11 @@ object CliToolCatalog {
             envKey = "CLAUDE_CODE_OAUTH_TOKEN",
             subtitle = tr(R.string.cli_claude_auth_login_browser_oauth),
             chat = ChatProtocol.CLAUDE_STREAM,
-            // 2.1.94 = first build with the hidden --thinking-display flag the stream runtime passes (the rest, --permission-prompt-tool stdio,
-            // --effort, --setting-sources, --session-id / --fork-session, is older). 2.1.126: `claude auth login` takes the pasted code,
+            // 2.1.119 = `${ENV_VAR}` in MCP `headers` is substituted (the app's own MCP server config relies on it; 2.1.94 added the hidden
+            // --thinking-display flag the stream runtime passes, the rest, --permission-prompt-tool stdio, --effort, --setting-sources,
+            // --session-id / --fork-session, is older). Chat verified on device with 2.1.263 (its initialize answer has no claude_code_version). 2.1.126: `claude auth login` takes the pasted code,
             // which on-device (no localhost callback) is the only way to finish (auth subcommand itself: 2.1.41). Rootfs 2.1.263 passes.
-            minChatVersion = "2.1.94",
+            minChatVersion = "2.1.119",
             minLoginVersion = "2.1.126",
             updateCmd = "claude update",
             installCmd = "curl -fsSL https://claude.ai/install.sh | bash",

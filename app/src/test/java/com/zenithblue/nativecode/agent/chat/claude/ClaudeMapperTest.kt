@@ -241,6 +241,7 @@ class ClaudeMapperTest {
         assertEquals("application/pdf", content.getJSONObject(2).getJSONObject("source").getString("media_type"))
 
         assertTrue(ClaudeWire.versionOk("2.1.323")); assertFalse(ClaudeWire.versionOk("2.0.9")); assertTrue(ClaudeWire.versionOk("3.0.0"))
+        assertTrue(ClaudeWire.versionOk("")); assertTrue(ClaudeWire.versionOk(null)) // 2.1.263 omits claude_code_version: unknown never blocks
         val init = JSONObject(Replay("basic.ndjson").lines.first { it.contains("\"models\"") }.substring(2)).getJSONObject("response").getJSONObject("response")
         val models = ClaudeWire.parseModels(init.getJSONArray("models"))
         assertEquals("default", models.first().id)

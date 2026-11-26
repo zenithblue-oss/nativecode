@@ -1,4 +1,5 @@
 package com.zenithblue.nativecode.cliauth
+import com.zenithblue.nativecode.agent.chat.core.ChatFailures
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -57,6 +58,13 @@ class CliGateTest {
         assertFalse(result("codex", "0.153.2").tooOld(CliNeed.LOGIN))
         assertTrue(result("claude", "2.1.93").tooOld(CliNeed.CHAT))
         assertTrue(result("codex", "0.130.0").tooOld(CliNeed.CHAT)) // goals still experimental
+    }
+    @Test fun claudeGateWiring() {
+        assertEquals("claude", CliVersionCheck.def("claude-code")?.id) // a chat thread stores the terminal type
+        assertEquals("2.1.263", ChatFailures.parseVersion("2.1.263 (Claude Code)"))
+        assertTrue(result("claude", "2.1.118").tooOld(CliNeed.CHAT)) // MCP header ${ENV} substitution: 2.1.119
+        assertFalse(result("claude", "2.1.119").tooOld(CliNeed.CHAT))
+        assertEquals(listOf("ask", "go"), gate("2.1.118", CliToolCatalog.byId("claude")!!.minChatVersion, true))
     }
     @Test fun everyChatCliHasAChatMinimum() {
         CliToolCatalog.ALL.filter { it.chat != null }.forEach { assertNotNull(it.id, it.minChatVersion) }
