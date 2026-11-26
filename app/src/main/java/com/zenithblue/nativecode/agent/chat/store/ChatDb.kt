@@ -5,7 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /** `agent_chat.db` (plan 9.2.5): projection tables only, WAL, foreign keys on, `user_version` migrations here. */
-class ChatDb(ctx: Context) : SQLiteOpenHelper(ctx.applicationContext, NAME, null, VERSION) {
+class ChatDb(ctx: Context, name: String = NAME) : SQLiteOpenHelper(ctx.applicationContext, name, null, VERSION) {
 
     init { setWriteAheadLoggingEnabled(true) }
 

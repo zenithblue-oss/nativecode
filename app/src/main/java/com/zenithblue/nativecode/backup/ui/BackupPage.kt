@@ -21,6 +21,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.NC
+import com.zenithblue.nativecode.backup.AppDataBackup
 import com.zenithblue.nativecode.backup.BackupJob
 import com.zenithblue.nativecode.backup.BackupPlan
 import com.zenithblue.nativecode.backup.BackupScope
@@ -63,15 +64,13 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
 
     private var scope = BackupScope.HOME
     private val selected = BackupPlan.defaultExcludeIds().toMutableSet()
-    private var includeCreds = false
+    private var includeCreds = BackupPlan.INCLUDE_CREDENTIALS_DEFAULT
     private var estimate: Long? = null
     private var estimateJob: BackupJob? = null
     private var estimateRun = 0
 
     private var job: BackupJob? = null
     private var busy = false
-    private var lastManifest: Manifest? = null
-    private var lastArchiveName = ""
 
     private val scopeRow = LinearLayout(ctx)
     private val exclBox = LinearLayout(ctx)
@@ -86,7 +85,6 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
     private val resultCard = LinearLayout(ctx)
     private val resultTitle = text(14f, NC.PRIMARY, bold = true, mono = true)
     private val resultTv = text(12f, NC.ON_SURFACE, mono = true)
-    private val sidecarBtn = button(tr(R.string.backup_save_checksum_file), false)
 
     private fun text(size: Float, color: Int, bold: Boolean = false, mono: Boolean = false) = TextView(ctx).apply {
         textSize = size
@@ -130,6 +128,7 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         backup.addView(scopeRow)
         backup.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply { text = tr(R.string.backup_leave_out); setPadding(0, dp(14), 0, dp(2)) })
         backup.addView(exclBox)
+        backup.addView(text(11f, NC.ON_SURF_VAR).apply { text = tr(R.string.backup_one_file_note); setPadding(0, dp(8), 0, 0) })
         estimateTv.setPadding(0, dp(10), 0, dp(12))
         backup.addView(estimateTv)
         backup.addView(backupBtn, LinearLayout.LayoutParams(-1, -2))
@@ -157,8 +156,6 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         resultTv.setTextIsSelectable(true)
         resultCard.addView(resultTitle)
         resultCard.addView(resultTv, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
-        resultCard.addView(sidecarBtn, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
-        sidecarBtn.visibility = View.GONE
         content.addView(resultCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
 
         // Restore
@@ -173,7 +170,6 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
 
         backupBtn.setOnClickListener { startBackup() }
         restoreBtn.setOnClickListener { startRestore() }
-        sidecarBtn.setOnClickListener { saveSidecar() }
         renderOptions()
     }
 
@@ -206,7 +202,7 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         for (e in BackupPlan.EXCLUSIONS) {
             val credBox = e.id == "creds"
             exclBox.addView(CheckBox(ctx).apply {
-                text = if (credBox) "Include " + e.label.lowercase(Locale.ROOT) else e.label
+                text = if (credBox) tr(R.string.backup_include_creds) else e.label
                 setTextColor(NC.ON_SURFACE)
                 textSize = 13f
                 buttonTintList = ColorStateList.valueOf(NC.PRIMARY)
@@ -217,7 +213,7 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                     runEstimate()
                 }
             })
-            if (credBox) exclBox.addView(text(11f, NC.TERTIARY_CON).apply { text = e.warn ?: ""; setPadding(dp(32), 0, 0, dp(4)) })
+            if (credBox) exclBox.addView(text(11f, NC.TERTIARY_CON).apply { text = tr(R.string.backup_creds_warn); setPadding(dp(32), 0, 0, dp(4)) })
         }
         updateEstimateText()
     }
@@ -279,7 +275,6 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         resultTitle.text = title
         resultTitle.setTextColor(if (ok) NC.PRIMARY else NC.ERROR)
         resultTv.text = body
-        sidecarBtn.visibility = View.GONE
         reveal(resultCard)
     }
 
@@ -310,7 +305,15 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         bg.execute {
             val res = try {
                 ctx.contentResolver.openOutputStream(uri, "w")?.use { out ->
-                    BackupService.backup(ctx, out, sc, pat, j) { p -> ui.post { progress(p, est?.let { (it / 2).coerceAtLeast(p) /* compressed size is about half the raw estimate here; the bar is a guide */ }) } }
+                    val r = BackupService.backup(ctx, out, sc, pat, j) { p -> ui.post { progress(p, est?.let { (it / 2).coerceAtLeast(p) /* compressed size is about half the raw estimate here; the bar is a guide */ }) } }
+                    if (r.ok) {
+                        // one file: the manifest (checksum, CLI versions) rides inside the archive as its trailer
+                        ui.post { progressTitle.text = tr(R.string.backup_recording_versions); bar.isIndeterminate = true }
+                        val comps = mapOf("appVersionCode" to BuildConfig.VERSION_CODE.toString(), "guest" to ProjectPathResolver.DEFAULT_DISTRO, "method" to "proot", "android" to android.os.Build.VERSION.SDK_INT.toString()) +
+                            BackupService.cliVersions(ctx) + (if (r.app) mapOf(BackupPlan.COMPONENT_CHAT to "1") else emptyMap())
+                        BackupService.appendManifest(out, Manifest(BackupPlan.FORMAT, BuildConfig.VERSION_NAME, BackupPlan.isoNow(), r.sha256, r.bytes, r.files, sc.name, pat, comps))
+                    }
+                    r
                 } ?: com.zenithblue.nativecode.backup.BackupResult(false, "", 0, 0, tr(R.string.backup_could_not_open_the_destination), false)
             } catch (e: Exception) {
                 com.zenithblue.nativecode.backup.BackupResult(false, "", 0, 0, e.message ?: e.javaClass.simpleName, j.cancelled)
@@ -321,31 +324,8 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                     showResult(false, if (res.cancelled) tr(R.string.backup_backup_cancelled) else tr(R.string.backup_backup_failed), (res.message ?: "") + "\nThe partial file was removed.")
                     return@post
                 }
-                val m = Manifest(
-                    BackupPlan.FORMAT, BuildConfig.VERSION_NAME, BackupPlan.isoNow(), res.sha256, res.bytes, res.files, sc.name, pat,
-                    mapOf("appVersionCode" to BuildConfig.VERSION_CODE.toString(), "guest" to ProjectPathResolver.DEFAULT_DISTRO, "method" to "proot", "android" to android.os.Build.VERSION.SDK_INT.toString()),
-                )
-                lastManifest = m; lastArchiveName = name
-                showResult(true, tr(R.string.backup_backup_saved), "$name\n${BackupPlan.formatBytes(res.bytes)}, ${res.files} files\nsha256 ${res.sha256}" + (res.message?.let { "\n$it" } ?: "") + "\n\nSave the checksum file next to the backup so a restore can verify it.")
-                sidecarBtn.visibility = View.VISIBLE
-                saveSidecar()
-            }
-        }
-    }
-
-    private fun saveSidecar() {
-        val m = lastManifest ?: return
-        host.createDocument(BackupPlan.sidecarName(lastArchiveName)) { uri ->
-            if (uri == null) return@createDocument
-            bg.execute {
-                val err = try {
-                    ctx.contentResolver.openOutputStream(uri, "w")?.use { it.write(BackupPlan.manifestJson(m).toByteArray()) } ?: error("could not open file")
-                    null
-                } catch (e: Exception) { e.message ?: "failed" }
-                ui.post {
-                    if (err == null) { sidecarBtn.visibility = View.GONE; resultTv.append("\nChecksum file saved.") }
-                    else resultTv.append("\nChecksum file failed: $err")
-                }
+                showResult(true, tr(R.string.backup_backup_saved), "$name\n${BackupPlan.formatBytes(res.bytes)}, ${res.files} files\nsha256 ${res.sha256}" + (res.message?.let { "\n$it" } ?: "") +
+                    (if (res.app) "\n" + tr(R.string.backup_chat_included) else "") + "\n\n" + tr(R.string.backup_one_file_saved))
             }
         }
     }
@@ -360,10 +340,11 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
             showResult(false, tr(R.string.backup_close_ai_sessions_first), tr(R.string.backup_a_restore_changes_files_that))
             return
         }
-        host.openDocument { uri -> if (uri != null) askChecksum(uri) }
+        host.openDocument { uri -> if (uri != null) runVerify(uri) }
     }
 
-    private fun askChecksum(archive: Uri) {
+    /** Old two-file archives (no embedded manifest): optionally check them against the `.json` saved beside them. */
+    private fun askChecksum(actual: String, then: (checked: Boolean, manifest: Manifest?) -> Unit) {
         AlertDialog.Builder(ctx, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle(tr(R.string.backup_verify_checksum))
             .setMessage(tr(R.string.backup_pick_the_json_checksum_file))
@@ -371,16 +352,19 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                 host.openDocument { s ->
                     if (s == null) return@openDocument
                     val m = try { ctx.contentResolver.openInputStream(s)?.use { BackupPlan.parseManifest(it.readBytes().toString(Charsets.UTF_8)) } } catch (_: Exception) { null }
-                    if (m == null) showResult(false, "Not a checksum file", "That file is not a NativeCode backup checksum (.json).")
-                    else runVerify(archive, m.sha256)
+                    when {
+                        m == null -> showResult(false, "Not a checksum file", "That file is not a NativeCode backup checksum (.json).")
+                        m.sha256 != actual -> showResult(false, "Checksum mismatch", "The archive does not match its checksum file, so it is corrupt or was modified.\nexpected ${m.sha256}\ngot      $actual\nNothing was changed.")
+                        else -> then(true, m)
+                    }
                 }
             }
-            .setNeutralButton(tr(R.string.backup_continue_without)) { _, _ -> runVerify(archive, null) }
+            .setNeutralButton(tr(R.string.backup_continue_without)) { _, _ -> then(false, null) }
             .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(ctx)
     }
 
-    private fun runVerify(archive: Uri, expected: String?) {
+    private fun runVerify(archive: Uri) {
         val size = docSize(archive)
         val free = try { StatFs(ctx.filesDir.absolutePath).availableBytes } catch (_: Exception) { Long.MAX_VALUE }
         if (size != null && free < size * 3 + 100L * 1024 * 1024) {
@@ -394,18 +378,23 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                 ctx.contentResolver.openInputStream(archive)?.use { ins -> BackupService.verify(ctx, ins, j) { p -> ui.post { progress(p, size) } } }
             } catch (e: Exception) { null }
             ui.post {
+                val m = res?.manifest
                 when {
                     res == null -> showResult(false, "Could not read the backup", "The file could not be opened.")
                     res.cancelled -> showResult(false, "Restore cancelled", tr(R.string.backup_nothing_was_changed))
                     !res.ok -> showResult(false, tr(R.string.backup_backup_rejected), (res.message ?: "") + "\nNothing was changed.")
-                    expected != null && expected != res.sha256 -> showResult(false, "Checksum mismatch", "The archive does not match its checksum file, so it is corrupt or was modified.\nexpected $expected\ngot      ${res.sha256}\nNothing was changed.")
-                    else -> { setBusy(false); chooseEntries(archive, size, res.topLevel, res.sha256, expected != null, res.members) }
+                    m != null && m.sha256 != res.sha256 -> showResult(false, "Checksum mismatch", "The archive does not match its embedded checksum, so it is corrupt or was modified.\nexpected ${m.sha256}\ngot      ${res.sha256}\nNothing was changed.")
+                    m != null -> { setBusy(false); chooseEntries(archive, size, res.topLevel, res.sha256, true, res.members, m) }
+                    else -> { setBusy(false); askChecksum(res.sha256) { checked, sidecar -> chooseEntries(archive, size, res.topLevel, res.sha256, checked, res.members, sidecar) } }
                 }
             }
         }
     }
 
-    private fun chooseEntries(archive: Uri, size: Long?, top: List<String>, sha: String, checked: Boolean, members: Long) {
+    private fun chooseEntries(archive: Uri, size: Long?, all: List<String>, sha: String, checked: Boolean, members: Long, manifest: Manifest?) {
+        val top = all.filter { it != BackupPlan.APP_DIR }
+        val hasChat = BackupPlan.APP_DIR in all
+        var chatOn = true
         val home = ProjectPathResolver.guestHomeDir(ctx, "proot")
         val modes = HashMap<String, EntryMode>().apply { top.forEach { put(it, EntryMode.MERGE) } }
         val on = HashSet<String>(top)
@@ -413,6 +402,13 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
         list.addView(text(12f, NC.ON_SURF_VAR, mono = true).apply {
             text = (if (checked) "Checksum verified. " else "No checksum file: sha256 ${sha.take(16)}... ") + "$members entries."
             setPadding(0, 0, 0, dp(8))
+        })
+        if (hasChat) list.addView(CheckBox(ctx).apply {
+            text = tr(R.string.backup_chat_entry)
+            setTextColor(NC.ON_SURFACE); textSize = 13f
+            buttonTintList = ColorStateList.valueOf(NC.PRIMARY)
+            isChecked = true; minHeight = dp(44)
+            setOnCheckedChangeListener { _, c -> chatOn = c }
         })
         for (n in top) {
             val exists = DirModel.validName(n) && java.nio.file.Files.exists(File(home, n).toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS)
@@ -446,13 +442,14 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
             .setView(scroll)
             .setPositiveButton(tr(R.string.backup_restore)) { _, _ ->
                 val plans = top.filter { it in on }.map { EntryPlan(it, modes[it]!!) }
-                if (plans.isEmpty()) showResult(false, tr(R.string.backup_nothing_selected), tr(R.string.backup_nothing_was_changed)) else runRestore(archive, size, plans)
+                val chat = hasChat && chatOn
+                if (plans.isEmpty() && !chat) showResult(false, tr(R.string.backup_nothing_selected), tr(R.string.backup_nothing_was_changed)) else runRestore(archive, size, plans, chat, manifest)
             }
             .setNegativeButton(tr(R.string.x11_cancel), null)
             .create().showThemed(ctx)
     }
 
-    private fun runRestore(archive: Uri, size: Long?, plans: List<EntryPlan>) {
+    private fun runRestore(archive: Uri, size: Long?, plans: List<EntryPlan>, chat: Boolean, manifest: Manifest?) {
         if (host.aiSessionsOpen()) {
             showResult(false, tr(R.string.backup_close_ai_sessions_first), tr(R.string.backup_nothing_was_changed))
             return
@@ -480,15 +477,76 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                 ui.post { showResult(false, "Restore cancelled", tr(R.string.backup_nothing_was_changed)) }
                 return@execute
             }
+            var threads = 0
+            val appStaged = File(staging, BackupPlan.APP_DIR)
+            if (chat && appStaged.isDirectory) {
+                // chat history first (one transaction, never replaces a local thread); a failure leaves the home untouched
+                val latch = java.util.concurrent.CountDownLatch(1)
+                var failure: Throwable? = null
+                AppDataBackup.restore(ctx, appStaged) { r -> r.onSuccess { threads = it }.onFailure { failure = it }; latch.countDown() }
+                latch.await(10, java.util.concurrent.TimeUnit.MINUTES)
+                failure?.let { f ->
+                    runCatching { DirModel.deleteTree(home, staging) }
+                    ui.post { showResult(false, tr(R.string.backup_restore_failed_chat, f.message ?: f.javaClass.simpleName), tr(R.string.backup_nothing_was_changed)) }
+                    return@execute
+                }
+            }
             val sw = RestoreSwap.apply(home, staging, plans, stamp)
             if (!sw.ok) runCatching { DirModel.deleteTree(home, staging) }
             ui.post {
                 if (sw.ok) {
                     showResult(true, tr(R.string.backup_restore_complete), "${sw.moved} items restored, ${sw.kept} existing files kept." +
+                        (if (chat) "\n" + tr(R.string.backup_chat_threads_restored, threads) else "") +
                         (sw.replacedDir?.let { "\nReplaced items are in ${BackupPlan.GUEST_HOME}/${it.name}. Delete that folder when you are happy with the result." } ?: ""))
+                    offerCliUpdate(manifest)
                 } else showResult(false, tr(R.string.backup_restore_rolled_back), "${sw.error}\nYour files are as they were.")
             }
         }
+    }
+
+    /**
+     * Restored files bring old CLI versions back only if the CLI binaries were in the archive (they are left out by default):
+     * compare what is installed now with the versions recorded in the backup and offer the existing CLI updater.
+     */
+    private fun offerCliUpdate(m: Manifest?) {
+        val manifest = m ?: return
+        val ids = manifest.components.keys.filter { it.startsWith("cli.") }.map { it.removePrefix("cli.") }
+        if (ids.isEmpty() || ctx !is android.app.Activity) return
+        bg.execute {
+            val installed = ids.associateWith { id -> com.zenithblue.nativecode.cliauth.CliVersionCheck.check(ctx, id, force = true)?.takeIf { it.canUpdate }?.installed }
+            val deltas = BackupPlan.outdatedClis(manifest, installed)
+            if (deltas.isNotEmpty()) ui.post { askUpdateClis(deltas) }
+        }
+    }
+
+    private fun askUpdateClis(deltas: List<BackupPlan.CliDelta>) {
+        fun name(id: String) = com.zenithblue.nativecode.cliauth.CliVersionCheck.def(id)?.displayName ?: id
+        AlertDialog.Builder(ctx, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle(tr(R.string.backup_update_clis_title))
+            .setMessage(tr(R.string.backup_update_clis_msg) + "\n\n" + deltas.joinToString("\n") { "${name(it.toolId)}  ${it.installed} -> ${it.backup}" })
+            .setPositiveButton(tr(R.string.backup_update_all)) { _, _ -> updateClis(deltas.map { it.toolId }) }
+            .setNegativeButton(tr(R.string.backup_later), null)
+            .create().showThemed(ctx)
+    }
+
+    /** One CLI after the other through [com.zenithblue.nativecode.cliauth.CliVersionCheck.update] (the same runner as Settings > CLI tools > Update all). */
+    private fun updateClis(ids: List<String>) {
+        val activity = ctx as? android.app.Activity ?: return
+        val lines = ArrayList<String>()
+        setBusy(true, tr(R.string.backup_updating_clis))
+        fun next(i: Int) {
+            if (i >= ids.size) { showResult(true, tr(R.string.backup_clis_updated), lines.joinToString("\n")); return }
+            com.zenithblue.nativecode.cliauth.CliVersionCheck.update(activity, ids[i]) { st ->
+                when (st) {
+                    is com.zenithblue.nativecode.cliauth.CliVersionCheck.State.Running -> progressTv.text = st.text
+                    is com.zenithblue.nativecode.cliauth.CliVersionCheck.State.Done -> {
+                        lines += (com.zenithblue.nativecode.cliauth.CliVersionCheck.def(ids[i])?.displayName ?: ids[i]) + ": " + st.message
+                        next(i + 1)
+                    }
+                }
+            }
+        }
+        next(0)
     }
 
     // endregion

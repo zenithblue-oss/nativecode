@@ -125,6 +125,14 @@ class ChatStore(ctx: Context) {
     /** Rows only (cascade). Use [com.zenithblue.nativecode.agent.chat.AgentChats.deleteThread] to also stop the process and prune refs. */
     fun deleteThread(id: String) = apply(ChatWrite.DeleteThread(id))
 
+    /** Bulk import (backup restore): runs [block] on the writer, then listeners get the thread ids it returns. [then] gets the outcome. */
+    fun importWith(block: (SQLiteDatabase) -> Set<String>, then: (Result<Set<String>>) -> Unit) = writer.execute {
+        val r = runCatching { block(db()) }
+        // imported rows may be mid-run (backup taken while a chat ran): close them out the way a cold start does
+        r.getOrNull()?.takeIf { it.isNotEmpty() }?.let { ids -> recover(); listeners.forEach { runCatching { it.onChanged(ids) } } }
+        then(r)
+    }
+
     // ---------------- internals ----------------
 
     private fun db(): SQLiteDatabase = helper.writableDatabase

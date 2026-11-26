@@ -1,5 +1,6 @@
 package com.zenithblue.nativecode.backup
 
+import com.zenithblue.nativecode.agent.chat.core.ChatFailures
 import com.zenithblue.nativecode.terminal.ShellQuoting
 import org.json.JSONArray
 import org.json.JSONObject
@@ -51,10 +52,31 @@ object BackupPlan {
         Exclusion(
             "creds", "Credentials and SSH keys",
             listOf(".codex/auth.json", ".claude/.credentials.json", ".config/gh/hosts.yml", ".hermes/auth.json", ".hermes/.env", ".ssh"),
-            // excluded unless the user ticks "include", see [excludePatterns]
-            false, warn = "Archive will hold login tokens and private keys. Keep it private; a restore on another device may not work.",
+            // ticking "include" (on by default, [INCLUDE_CREDENTIALS_DEFAULT]) lifts this exclusion, see [excludePatterns]
+            false, warn = "Archive then holds sign-in tokens and private keys. Keep it private; a restore on another device may not work.",
         ),
     )
+
+    /** "Include credentials" starts ticked: a restore brings the CLI sign-ins back. */
+    const val INCLUDE_CREDENTIALS_DEFAULT = true
+
+    /** Top-level archive entry holding the app's own data (chat history), staged in the guest home for tar. */
+    const val APP_DIR = "nativecode-app"
+
+    /** Manifest `components` keys: `cli.<tool id>` = CLI version at backup time; `chat` = the archive holds [APP_DIR]. */
+    const val COMPONENT_CHAT = "chat"
+    fun cliKey(toolId: String) = "cli.$toolId"
+
+    /** A CLI whose installed version is older than the one recorded in the backup. */
+    data class CliDelta(val toolId: String, val installed: String, val backup: String)
+
+    /** Tools in [m] whose [installed] version (null = not installed / unknown) is below the backup's: the "Update CLIs" offer. */
+    fun outdatedClis(m: Manifest, installed: Map<String, String?>): List<CliDelta> =
+        m.components.filterKeys { it.startsWith("cli.") }.mapNotNull { (k, v) ->
+            val id = k.removePrefix("cli.")
+            val now = installed[id]
+            if (now != null && ChatFailures.versionTooOld(now, v)) CliDelta(id, now, v) else null
+        }.sortedBy { it.toolId }
 
     /** Staging and rollback folders this feature creates; never archived. */
     private val ALWAYS = listOf(".restore-*", ".replaced-*")
@@ -96,10 +118,11 @@ object BackupPlan {
         "set --; for p in ${inc.joinToString(" ") { q(it) }}; do [ -d \"\$p\" ] && set -- \"\$@\" \"\$p\"; done; [ \$# -gt 0 ] || $onNone; "
 
     /** Guest shell: tar the scope to stdout as zstd. Exit 3 = nothing to back up. */
-    fun createCommand(scope: BackupScope, patterns: List<String>, extra: List<String> = emptyList()): String {
+    fun createCommand(scope: BackupScope, patterns: List<String>, extra: List<String> = emptyList(), app: Boolean = false): String {
         val inc = includes(scope, extra)
         val guard = if (scope == BackupScope.PROJECTS) existingIncludes(inc, "exit 3") else ""
-        val args = if (scope == BackupScope.PROJECTS) "\"\$@\"" else inc.joinToString(" ") { q(it) }
+        // Home scope already covers the staged [APP_DIR] (it sits in the home); Projects scope adds it after the guard.
+        val args = if (scope == BackupScope.PROJECTS) "\"\$@\"" + (if (app) " ${q(APP_DIR)}" else "") else inc.joinToString(" ") { q(it) }
         return "cd $GUEST_HOME || exit 2; $guard" +
             "ZSTD_NBTHREADS=0 tar --zstd -cvf - ${excludeArgs(patterns)} -- $args"
     }

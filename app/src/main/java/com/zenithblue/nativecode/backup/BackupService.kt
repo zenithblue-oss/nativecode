@@ -2,7 +2,12 @@ package com.zenithblue.nativecode.backup
 
 import android.content.Context
 import com.zenithblue.nativecode.terminal.LinuxCommandBuilder
+import com.zenithblue.nativecode.cliauth.CliToolCatalog
+import com.zenithblue.nativecode.cliauth.CliVersionCheck
+import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import com.zenithblue.nativecode.terminal.ShellCommandRunner
+import java.io.File
+import java.util.concurrent.Executors
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -18,8 +23,9 @@ class BackupJob {
     fun cancel() { cancelled = true; proc?.destroyForcibly() }
 }
 
-data class BackupResult(val ok: Boolean, val sha256: String, val bytes: Long, val files: Long, val message: String?, val cancelled: Boolean)
-data class VerifyResult(val ok: Boolean, val sha256: String, val bytes: Long, val members: Long, val topLevel: List<String>, val message: String?, val cancelled: Boolean)
+data class BackupResult(val ok: Boolean, val sha256: String, val bytes: Long, val files: Long, val message: String?, val cancelled: Boolean, val app: Boolean = false)
+/** [sha256] = hash of the archive without its embedded trailer; [manifest] = the embedded manifest, null for an old two-file archive. */
+data class VerifyResult(val ok: Boolean, val sha256: String, val bytes: Long, val members: Long, val topLevel: List<String>, val message: String?, val cancelled: Boolean, val manifest: Manifest? = null)
 data class ExtractResult(val ok: Boolean, val message: String?, val cancelled: Boolean)
 
 /**
@@ -84,11 +90,37 @@ object BackupService {
      * The caller deletes the destination document when the result is not ok.
      */
     fun backup(ctx: Context, out: OutputStream, scope: BackupScope, patterns: List<String>, job: BackupJob, onProgress: (Long) -> Unit): BackupResult {
+        // the app's chat data is staged into the guest home so the same tar archives it; always removed again
+        val appDir = File(ProjectPathResolver.guestHomeDir(ctx, METHOD), BackupPlan.APP_DIR)
+        val app = AppDataBackup.stage(ctx, appDir)
+        try {
+            return tarBackup(ctx, out, scope, patterns, app, job, onProgress)
+        } finally {
+            appDir.deleteRecursively()
+        }
+    }
+
+    /** Appends the manifest as the archive's trailer (one-file backup). Call once, after a successful [backup], on the same stream. */
+    fun appendManifest(out: OutputStream, m: Manifest) {
+        out.write(BackupTrailer.encode(BackupPlan.manifestJson(m)))
+        out.flush()
+    }
+
+    /** `cli.<id>` -> version for every CLI with a readable `--version`, recorded in the manifest so a restore can offer an update. Blocking. */
+    fun cliVersions(ctx: Context): Map<String, String> {
+        val pool = Executors.newFixedThreadPool(3)
+        try {
+            val jobs = CliToolCatalog.ALL.map { d -> pool.submit<Pair<String, String?>> { d.id to runCatching { CliVersionCheck.check(ctx, d.id)?.installed }.getOrNull() } }
+            return jobs.mapNotNull { f -> runCatching { f.get() }.getOrNull() }.filter { it.second != null }.associate { BackupPlan.cliKey(it.first) to it.second!! }
+        } finally { pool.shutdown() }
+    }
+
+    private fun tarBackup(ctx: Context, out: OutputStream, scope: BackupScope, patterns: List<String>, app: Boolean, job: BackupJob, onProgress: (Long) -> Unit): BackupResult {
         val md = MessageDigest.getInstance("SHA-256")
         var total = 0L
         var drain: ErrDrain? = null
         try {
-            val p = start(ctx, BackupPlan.createCommand(scope, patterns, extraProjects(ctx)), mergeStderr = false)
+            val p = start(ctx, BackupPlan.createCommand(scope, patterns, extraProjects(ctx), app), mergeStderr = false)
             job.attach(p)
             p.outputStream.close()
             drain = ErrDrain(p.errorStream)
@@ -118,7 +150,7 @@ object BackupService {
                 exit == 3 -> "There is no repos folder to back up."
                 else -> "tar failed (exit $exit)" + drain.text().let { if (it.isBlank()) "" else ": $it" }
             }
-            return BackupResult(ok, hex(md), total, drain.lines, msg, false)
+            return BackupResult(ok, hex(md), total, drain.lines, msg, false, app)
         } catch (e: Exception) {
             return BackupResult(false, "", total, 0, if (job.cancelled) "Cancelled" else (e.message ?: e.javaClass.simpleName), job.cancelled)
         }
@@ -129,7 +161,7 @@ object BackupService {
      * Rejects absolute paths and `..` members; returns the top-level entry names.
      */
     fun verify(ctx: Context, input: InputStream, job: BackupJob, onProgress: (Long) -> Unit): VerifyResult {
-        val md = MessageDigest.getInstance("SHA-256")
+        val scan = BackupTrailer.Scanner()
         var total = 0L
         val members = AtomicLong()
         val top = LinkedHashSet<String>()
@@ -155,7 +187,7 @@ object BackupService {
                 val n = input.read(buf)
                 if (n < 0) break
                 if (job.cancelled) break
-                md.update(buf, 0, n)
+                scan.update(buf, 0, n)
                 total += n
                 if (pipeOpen) try { sink.write(buf, 0, n) } catch (_: Exception) { pipeOpen = false } // tar exited early: keep hashing
                 val now = System.nanoTime()
@@ -172,7 +204,8 @@ object BackupService {
                 exit != 0 -> "Not a valid .tar.zst archive" + drain.text().let { if (it.isBlank()) "" else ": $it" }
                 else -> null
             }
-            return VerifyResult(msg == null, hex(md), total, members.get(), synchronized(top) { top.toList() }, msg, false)
+            val found = scan.finish()
+            return VerifyResult(msg == null, found.sha256, total, members.get(), synchronized(top) { top.toList() }, msg, false, found.json?.let(BackupPlan::parseManifest))
         } catch (e: Exception) {
             return VerifyResult(false, "", total, 0, emptyList(), if (job.cancelled) "Cancelled" else (e.message ?: e.javaClass.simpleName), job.cancelled)
         }
