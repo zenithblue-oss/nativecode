@@ -28,6 +28,22 @@ class ModelPickTest {
         assertNull(ModelCache.decode("""{"models":[]}"""))
     }
 
+    @Test fun cacheStaleWhenCliVersionChanged() {
+        val e = cached.copy(cli = "1.5.8")
+        assertEquals(e, ModelCache.decode(ModelCache.encode(e)))
+        assertTrue(!ModelCache.stale(e, null)) // version not probed yet: keep
+        assertTrue(!ModelCache.stale(e, "1.5.8"))
+        assertTrue(ModelCache.stale(e, "1.5.16")) // agy 1.5.8 -> 1.5.16 added Gemini 4 Hydrogen
+        assertTrue(ModelCache.stale(cached, "1.5.16")) // unstamped legacy entry
+    }
+
+    @Test fun unseedDropsStaleSeed() {
+        val r = ChatReducer(thread, 0, 0)
+        r.seedModels(cached)
+        r.unseedModels()
+        assertTrue(r.state.models.isEmpty())
+    }
+
     @Test fun seededPickerBeforeSessionAndLiveListWins() {
         val r = ChatReducer(thread, 0, 0)
         assertTrue(r.state.models.isEmpty())

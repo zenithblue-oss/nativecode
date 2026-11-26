@@ -81,7 +81,11 @@ class ChatThreadController internal constructor(
         ModelCache.load(ctx, initial.tool)?.let { c -> reducer.seedModels(c.copy(caps = ChatRuntimes.staticCaps(initial.tool) ?: c.caps)) } // picker usable before the first send
         state = reducer.state
         // Warm the version gate: the first send then finds the installed version cached.
-        if (AgentChats.gate != null && CliVersionCheck.cached(initial.tool) == null) AgentChats.checkpoints.execute { runCatching { CliVersionCheck.check(ctx, initial.tool) } }
+        // A cached list from another CLI version is dropped once the version is known: the picker then loads the live one.
+        if (AgentChats.gate != null && CliVersionCheck.cached(initial.tool) == null) AgentChats.checkpoints.execute {
+            runCatching { CliVersionCheck.check(ctx, initial.tool) }
+            if (ModelCache.load(ctx, initial.tool) == null) AgentChats.post { if (!ready) { reducer.unseedModels(); commit() } }
+        }
     }
 
     fun addListener(l: (ChatLiveState) -> Unit) { listeners += l }

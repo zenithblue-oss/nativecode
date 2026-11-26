@@ -240,6 +240,9 @@ class ChatReducer(
             commands = state.commands.ifEmpty { c.commands })
     }
 
+    /** Drops a [seedModels] list that turned out stale (CLI updated) while no session has reported one. */
+    fun unseedModels() { state = state.copy(models = emptyList(), commands = emptyList()) }
+
     /** t3code `/clear`: forget the native session (the next turn starts a new one); earlier rows stay visible. */
     fun freshSession() {
         thread = thread.copy(nativeId = null)

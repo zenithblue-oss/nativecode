@@ -12,16 +12,21 @@ import java.io.File
 /**
  * Last-known model list + caps per tool (`filesDir/agent/models-<tool>.json`), so a new thread's model picker
  * works before its first message (t3code lists provider models before a session exists). Written whenever a
- * session reports a non-empty `SessionState.models`; a live list always replaces the cached one.
+ * session reports a non-empty `SessionState.models`; a live list always replaces the cached one. An entry stamped with another
+ * CLI version than the installed one (a CLI update changes its model list) is dropped on load: the picker re-lists live.
  */
 object ModelCache {
     /** [commands] = last-known provider commands + skills, so the slash popup works before the session starts. */
-    data class Entry(val models: List<ModelInfo>, val defaultModel: String?, val caps: RuntimeCaps?, val commands: List<SlashCommand> = emptyList())
+    data class Entry(val models: List<ModelInfo>, val defaultModel: String?, val caps: RuntimeCaps?, val commands: List<SlashCommand> = emptyList(), val cli: String? = null)
 
     private fun file(ctx: Context, tool: String) = File(ctx.filesDir, "agent/models-${tool.replace(Regex("[^A-Za-z0-9._-]"), "_")}.json")
 
+    /** [installed] unknown (version not probed yet) = keep; an unstamped (pre-stamp) entry counts as stale once the version is known. */
+    fun stale(e: Entry, installed: String?): Boolean = installed != null && e.cli != installed
+
     /** claude: a list cached from a signed-out or older CLI (bare "Opus", no previous models) is completed on load. */
     fun load(ctx: Context, tool: String): Entry? = runCatching { decode(file(ctx, tool).readText()) }.getOrNull()
+        ?.takeUnless { stale(it, com.zenithblue.nativecode.cliauth.CliVersionCheck.cached(tool)?.installed) }
         ?.let { e -> if (tool.startsWith("claude")) e.copy(models = com.zenithblue.nativecode.agent.chat.claude.ClaudeModels.merge(e.models)) else e }
 
     fun save(ctx: Context, tool: String, e: Entry) {
@@ -30,13 +35,14 @@ object ModelCache {
             val f = file(ctx, tool)
             f.parentFile?.mkdirs()
             val tmp = File(f.path + ".tmp")
-            tmp.writeText(encode(e))
+            tmp.writeText(encode(e.copy(cli = e.cli ?: com.zenithblue.nativecode.cliauth.CliVersionCheck.cached(tool)?.installed)))
             tmp.renameTo(f)
         }
     }
 
     fun encode(e: Entry): String = JSONObject()
         .put("default", e.defaultModel)
+        .put("cli", e.cli)
         .put("models", JSONArray(e.models.map { m ->
             JSONObject().put("id", m.id).put("name", m.name).put("provider", m.providerId).put("free", m.free)
                 .put("variants", JSONArray(m.variants)).put("ctx", m.contextLimit).put("detail", m.detail)
@@ -81,6 +87,6 @@ object ModelCache {
             SlashCommand(c.optString("name").ifEmpty { return@mapNotNull null }, c.optString("description").ifEmpty { null },
                 c.optString("hint").ifEmpty { null }, runCatching { SlashCommand.Kind.valueOf(c.optString("kind")) }.getOrDefault(SlashCommand.Kind.PROVIDER))
         }
-        return Entry(models, o.optString("default").ifEmpty { null }, caps, commands)
+        return Entry(models, o.optString("default").ifEmpty { null }, caps, commands, o.optString("cli").ifEmpty { null })
     }
 }
