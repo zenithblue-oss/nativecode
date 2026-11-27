@@ -249,7 +249,9 @@ internal fun ChatScreen(v: AgentChatView, threadId: String, embedded: Boolean = 
                     }
                 }
                 items(rows, key = { it.key }, contentType = { it::class }) { r ->
-                    TimelineRow(v, t, r, liveRunId, live?.ttftRunId, live?.ttftMs,(r as? Row.Meta)?.run?.id?.let { lastText[it] })
+                    androidx.compose.runtime.CompositionLocalProvider(LocalShowThinking provides showThinking) {
+                        TimelineRow(v, t, r, liveRunId, live?.ttftRunId, live?.ttftMs,(r as? Row.Meta)?.run?.id?.let { lastText[it] })
+                    }
                 }
                 if (live?.phase == AgentEvent.Phase.STARTING) item("starting") { StartingRow(t.tool) }
                 item("pad") { Box(Modifier.height(if (running) 88.dp else S.l)) }

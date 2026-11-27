@@ -23,6 +23,12 @@ class FlavorConfigTest {
         assertFalse(BuildConfig.TELEMETRY_AVAILABLE)
     }
 
+    @Test fun rootedShellStaysButChrootStaysOff() {
+        assertEquals("root", com.zenithblue.nativecode.terminal.LinuxCommandBuilder.sessionUserForType("shell-root"))
+        assertEquals("flux", com.zenithblue.nativecode.terminal.LinuxCommandBuilder.sessionUserForType("shell"))
+        assertTrue(ProotOnly.ON) // chroot gate untouched
+    }
+
     @Test fun hostPrefixFollowsTheApplicationId() {
         assertEquals("/data/data/com.zenithblue.nativecode.fdroid/files/usr", TermuxHostPaths.PREFIX)
     }

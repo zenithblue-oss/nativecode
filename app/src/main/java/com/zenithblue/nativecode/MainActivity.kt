@@ -18394,11 +18394,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     /**
      * ONE shared login status row for every AI CLI card (terminal grid, workspace hub, Settings list):
      * hairline divider, state dot + label, and a LOGIN action on the right. 48dp touch target.
-     * Returns null when the CLI works without login ([CliToolDef.loginOptional]) and is not signed in.
+     * Login-optional CLIs (opencode) show the same row with an "optional" label; sign-in is never required.
      */
     private fun cliLoginControl(id: String, state: AuthState, onClick: () -> Unit): View? {
         val signedIn = state == AuthState.SIGNED_IN
-        if (!signedIn && CliToolCatalog.byId(id)?.loginOptional == true) return null
+        val optional = !signedIn && CliToolCatalog.byId(id)?.loginOptional == true
         val name = cliAuthName(id)
         fun label(t: String, color: Int, size: Float, bold: Boolean) = TextView(this).apply {
             text = t
@@ -18428,7 +18428,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             setPadding(0, dp(1), 0, 0)
             isClickable = true
             isFocusable = true
-            contentDescription = if (signedIn) "Signed in to $name. Open login page" else "Log in to $name"
+            contentDescription = if (signedIn) "Signed in to $name. Open login page" else if (optional) "Log in to $name (optional)" else "Log in to $name"
             tooltipText = contentDescription
             setOnClickListener { onClick() }
             addView(View(context).apply {
@@ -18436,7 +18436,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(dotColor) }
             })
             addView(label(
-                when (state) { AuthState.SIGNED_IN -> tr(R.string.main_signed_in); AuthState.SIGNED_OUT -> tr(R.string.main_not_signed_in_2); AuthState.UNKNOWN -> tr(R.string.main_unknown) },
+                when (state) {
+                    AuthState.SIGNED_IN -> tr(R.string.main_signed_in)
+                    AuthState.SIGNED_OUT -> tr(if (optional) R.string.main_not_signed_in_optional else R.string.main_not_signed_in_2)
+                    AuthState.UNKNOWN -> if (optional) tr(R.string.cli_page_login_optional).uppercase() else tr(R.string.main_unknown)
+                },
                 NC.ON_SURF_VAR, 10f, false
             ).apply {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)

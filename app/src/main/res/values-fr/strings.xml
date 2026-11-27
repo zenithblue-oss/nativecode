@@ -1680,4 +1680,5 @@
     <string name="fd_ssh_server">SERVEUR SSH</string>
     <string name="fd_ssh_subtitle">Serveur SSH · hôtes distants · clés</string>
     <string name="fd_ssh_footer">SERVEUR · CLIENT · CLÉS</string>
+    <string name="main_not_signed_in_optional">NON CONNECTÉ · FACULTATIF</string>
 </resources>

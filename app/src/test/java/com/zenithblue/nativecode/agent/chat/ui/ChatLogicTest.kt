@@ -18,6 +18,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatLogicTest {
+    @Test fun thinkingBlocksFollowTheShowThinkingPref() {
+        assertTrue(ChatLogic.reasoningOpen(null, true))
+        assertFalse(ChatLogic.reasoningOpen(null, false))
+        assertFalse(ChatLogic.reasoningOpen(false, true)) // user collapsed it
+        assertTrue(ChatLogic.reasoningOpen(true, false)) // user expanded it
+    }
+
     @Test fun signInBannerNeverForLoginOptionalTools() {
         assertTrue(ChatLogic.showSignInBanner(ready = true, modelCount = 0, loginOptional = false))
         assertFalse(ChatLogic.showSignInBanner(ready = true, modelCount = 0, loginOptional = true)) // opencode: free models, lazy list

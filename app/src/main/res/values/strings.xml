@@ -1723,4 +1723,5 @@
     <string name="fd_ssh_server">SSH SERVER</string>
     <string name="fd_ssh_subtitle">SSH server · remote hosts · keys</string>
     <string name="fd_ssh_footer">SERVER · CLIENT · KEYS</string>
+    <string name="main_not_signed_in_optional">NOT SIGNED IN · OPTIONAL</string>
 </resources>

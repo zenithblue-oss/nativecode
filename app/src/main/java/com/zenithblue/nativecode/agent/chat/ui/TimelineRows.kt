@@ -231,13 +231,17 @@ private fun decodeThumb(path: String): ImageBitmap? = FileThumbs.image(java.io.F
 internal fun Spinner(size: Dp = 12.dp, color: Color = C.primary) =
     CircularProgressIndicator(Modifier.size(size), color = color, strokeWidth = 1.5.dp, trackColor = Color.Transparent)
 
+/** The "Show thinking" pref (provided by ChatScreen); thinking blocks start expanded when on. */
+internal val LocalShowThinking = androidx.compose.runtime.compositionLocalOf { false }
+
 @Composable
 private fun Reasoning(p: ItemPayload.Reasoning, running: Boolean, modifier: Modifier) {
-    var open by rememberSaveable { mutableStateOf(false) }
+    var userOpen by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    val open = ChatLogic.reasoningOpen(userOpen, LocalShowThinking.current)
     val secs = p.durationMs?.let { (it + 500) / 1000 }
     Column(modifier.animateContentSize()) {
         Row(
-            Modifier.heightIn(min = 32.dp).clickable(enabled = p.text.isNotBlank(), onClickLabel = if (open) tr(R.string.chat_hide_reasoning) else tr(R.string.chat_show_reasoning)) { open = !open },
+            Modifier.heightIn(min = 32.dp).clickable(enabled = p.text.isNotBlank(), onClickLabel = if (open) tr(R.string.chat_hide_reasoning) else tr(R.string.chat_show_reasoning)) { userOpen = !open },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NcIcon(Ic.Lightbulb, null, tint = if (running) C.primary else C.outline, size = 14.dp)

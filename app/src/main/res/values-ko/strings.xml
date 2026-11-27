@@ -1680,4 +1680,5 @@
     <string name="fd_ssh_server">SSH 서버</string>
     <string name="fd_ssh_subtitle">SSH 서버 · 원격 호스트 · 키</string>
     <string name="fd_ssh_footer">서버 · 클라이언트 · 키</string>
+    <string name="main_not_signed_in_optional">로그인 안 됨 · 선택 사항</string>
 </resources>

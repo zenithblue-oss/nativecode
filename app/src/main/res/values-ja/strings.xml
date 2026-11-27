@@ -1680,4 +1680,5 @@
     <string name="fd_ssh_server">SSHサーバー</string>
     <string name="fd_ssh_subtitle">SSHサーバー · リモートホスト · キー</string>
     <string name="fd_ssh_footer">サーバー · クライアント · キー</string>
+    <string name="main_not_signed_in_optional">未サインイン · 任意</string>
 </resources>

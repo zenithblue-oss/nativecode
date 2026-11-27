@@ -1680,4 +1680,5 @@
     <string name="fd_ssh_server">SSH 服务器</string>
     <string name="fd_ssh_subtitle">SSH 服务器 · 远程主机 · 密钥</string>
     <string name="fd_ssh_footer">服务器 · 客户端 · 密钥</string>
+    <string name="main_not_signed_in_optional">未登录 · 可选</string>
 </resources>

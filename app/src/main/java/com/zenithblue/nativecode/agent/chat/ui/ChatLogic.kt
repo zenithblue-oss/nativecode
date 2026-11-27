@@ -31,6 +31,8 @@ sealed class Row {
 object ChatLogic {
     const val PREF_BETA = "pref_chat_view_beta"
     const val PREF_THINKING = "pref_chat_show_thinking" // default off
+    /** Thinking block open state: the user's own toggle wins, else it follows "Show thinking" (on = expanded by default). */
+    fun reasoningOpen(userOpen: Boolean?, showThinking: Boolean): Boolean = userOpen ?: showThinking
     const val PREF_MODE_APP = "pref_terminal_mode_app"
     const val PREF_MODE_WS = "pref_terminal_mode_ws"
     const val MODE_TERMINAL = "terminal"

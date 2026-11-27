@@ -23,7 +23,7 @@ object LinuxCommandBuilder {
 
     /** Guest user for session type. Rooted shell → root; everything else → flux. */
     fun sessionUserForType(type: String): String =
-        if (!com.zenithblue.nativecode.ProotOnly.ON && type == "shell-root") "root" else "flux"
+        if (type == "shell-root") "root" else "flux" // rooted shell stays in fdroid (proot as guest root); only chroot is gated
 
     private fun effectiveMethod(method: String): String =
         if (com.zenithblue.nativecode.ProotOnly.ON) "proot" else method
