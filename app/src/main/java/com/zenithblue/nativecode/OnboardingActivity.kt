@@ -316,7 +316,7 @@ class OnboardingActivity : AppCompatActivity() {
         card.addView(
             bullet(
                 tr(R.string.onb_01_no_nativecode_cloud),
-                tr(R.string.onb_no_ads_and_no_nativecode)
+                if (BuildConfig.FDROID) tr(R.string.fd_privacy_no_telemetry) else tr(R.string.onb_no_ads_and_no_nativecode)
             )
         )
         card.addView(

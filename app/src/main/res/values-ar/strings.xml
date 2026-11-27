@@ -1666,4 +1666,5 @@
     <string name="fd_download_from_github">نزّل من GitHub</string>
     <string name="fd_download_runtime_info">GitHub Releases: بيئة Alpaquita (نحو 1.26 غيغابايت) وحزمة التحديث (نحو 317 ميغابايت)، بتحقق SHA-256.</string>
     <string name="fd_requesting_github">جارٍ الاتصال بـ GitHub Releases…</string>
+    <string name="fd_privacy_no_telemetry">بلا إعلانات ولا تحليلات ولا تقارير أعطال ولا خوادم لـ NativeCode.</string>
 </resources>

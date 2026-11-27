@@ -1666,4 +1666,5 @@
     <string name="fd_download_from_github">GitHub üzerinden indir</string>
     <string name="fd_download_runtime_info">GitHub Releases: Alpaquita çalışma zamanı (yaklaşık 1,26 GB) ve güncelleme paketi (yaklaşık 317 MB), SHA-256 doğrulamalı.</string>
     <string name="fd_requesting_github">GitHub Releases bağlantısı kuruluyor…</string>
+    <string name="fd_privacy_no_telemetry">Reklam yok, analiz yok, çökme raporu yok ve NativeCode sunucusu yok.</string>
 </resources>

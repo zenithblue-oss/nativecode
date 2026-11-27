@@ -1666,4 +1666,5 @@
     <string name="fd_download_from_github">Descargar de GitHub</string>
     <string name="fd_download_runtime_info">GitHub Releases: runtime Alpaquita (unos 1,26 GB) y paquete de actualización (unos 317 MB), verificados con SHA-256.</string>
     <string name="fd_requesting_github">Conectando con GitHub Releases…</string>
+    <string name="fd_privacy_no_telemetry">Sin anuncios, sin analítica, sin informes de fallos y sin servidores de NativeCode.</string>
 </resources>

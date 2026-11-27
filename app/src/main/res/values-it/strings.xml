@@ -1666,4 +1666,5 @@
     <string name="fd_download_from_github">Scarica da GitHub</string>
     <string name="fd_download_runtime_info">GitHub Releases: runtime Alpaquita (circa 1,26 GB) e pacchetto di aggiornamento (circa 317 MB), verificati con SHA-256.</string>
     <string name="fd_requesting_github">Connessione a GitHub Releases…</string>
+    <string name="fd_privacy_no_telemetry">Nessuna pubblicità, nessuna analisi, nessun report di crash e nessun server NativeCode.</string>
 </resources>

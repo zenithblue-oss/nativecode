@@ -1666,4 +1666,5 @@
     <string name="fd_download_from_github">从 GitHub 下载</string>
     <string name="fd_download_runtime_info">GitHub Releases：Alpaquita 运行时（约 1.26 GB）和更新包（约 317 MB），已通过 SHA-256 校验。</string>
     <string name="fd_requesting_github">正在连接 GitHub Releases…</string>
+    <string name="fd_privacy_no_telemetry">没有广告、统计分析、崩溃报告，也没有 NativeCode 服务器。</string>
 </resources>

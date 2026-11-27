@@ -1666,4 +1666,5 @@
     <string name="fd_download_from_github">GitHub からダウンロード</string>
     <string name="fd_download_runtime_info">GitHub Releases: Alpaquita ランタイム(約 1.26 GB)と更新パック(約 317 MB)、SHA-256 検証済み。</string>
     <string name="fd_requesting_github">GitHub Releases に接続中…</string>
+    <string name="fd_privacy_no_telemetry">広告、分析、クラッシュレポート、NativeCode のサーバーはありません。</string>
 </resources>

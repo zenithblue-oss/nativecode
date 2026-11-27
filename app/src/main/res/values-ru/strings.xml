@@ -1666,4 +1666,5 @@
     <string name="fd_download_from_github">Скачать с GitHub</string>
     <string name="fd_download_runtime_info">GitHub Releases: среда Alpaquita (около 1,26 ГБ) и пакет обновления (около 317 МБ), проверка SHA-256.</string>
     <string name="fd_requesting_github">Подключение к GitHub Releases…</string>
+    <string name="fd_privacy_no_telemetry">Без рекламы, аналитики, отчётов о сбоях и серверов NativeCode.</string>
 </resources>
