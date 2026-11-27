@@ -18,5 +18,7 @@ android {
 
 dependencies {
     implementation("androidx.annotation:annotation:1.11.0")
-    compileOnly(files("${rootProject.projectDir}/app/libs/terminal-emulator-v0.118.0-16k.aar"))
+    // Prebuilt 16k aar (play) when present; the public source-only repo builds terminal-emulator from source.
+    val prebuiltEmulator = file("${rootProject.projectDir}/app/libs/terminal-emulator-v0.118.0-16k.aar")
+    if (prebuiltEmulator.exists()) compileOnly(files(prebuiltEmulator)) else compileOnly(project(":terminal-emulator"))
 }

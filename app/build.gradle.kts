@@ -233,16 +233,13 @@ dependencies {
     implementation("com.google.guava:guava:33.8.0-jre")
 }
 
+// Prebuilt play-only inputs are absent in the public (source-only) repo: check whichever exist.
+val elfCheckPaths = listOf("src/play/jniLibs", "libs/terminal-emulator-v0.118.0-16k.aar", "src/fdroid/jniLibs")
+    .map { file(it) }.filter { it.exists() }.map { it.absolutePath }
 tasks.register<Exec>("checkJni16kbAlignment") {
     workingDir = rootProject.projectDir
-    commandLine(
-        listOf(
-            "python3",
-            rootProject.file("scripts/check_elf_16k.py").absolutePath,
-            file("src/play/jniLibs").absolutePath,
-            file("libs/terminal-emulator-v0.118.0-16k.aar").absolutePath
-        ) + file("src/fdroid/jniLibs").takeIf { it.isDirectory }.let { listOfNotNull(it?.absolutePath) }
-    )
+    onlyIf { elfCheckPaths.isNotEmpty() }
+    commandLine(listOf("python3", rootProject.file("scripts/check_elf_16k.py").absolutePath) + elfCheckPaths)
 }
 
 tasks.named("preBuild").configure { dependsOn("checkJni16kbAlignment") }
