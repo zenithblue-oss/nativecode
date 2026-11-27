@@ -14,6 +14,7 @@ object GpuRuntimeStatus {
         val glVersion: String,
         val glslVersion: String,
         val vulkanVersion: String,
+        val guestVulkan: String,
         val modeHint: String,
         val backend: String,
         val method: String,
@@ -79,6 +80,9 @@ object GpuRuntimeStatus {
             glVersion = gl.glVersion,
             glslVersion = gl.glslVersion,
             vulkanVersion = gl.vulkanVersion,
+            guestVulkan = com.zenithblue.nativecode.HardwareStatus.icdApiVersion(
+                if (icd.startsWith("/")) readTrim(File(rootfs, icd.removePrefix("/"))) else null
+            ) ?: "n/a",
             modeHint = detect.mode,
             backend = effectiveBackend,
             method = method,

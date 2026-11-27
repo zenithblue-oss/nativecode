@@ -12,6 +12,10 @@ object HardwareStatus {
         else -> Driver.UP_TO_DATE
     }
 
+    /** `ICD.api_version` from a guest Vulkan ICD manifest (the Vulkan API the installed driver advertises), or null. */
+    fun icdApiVersion(json: String?): String? =
+        json?.let { Regex("\"api_version\"\\s*:\\s*\"([0-9][0-9.]*)\"").find(it)?.groupValues?.get(1) }
+
     fun shortSha(sha: String?): String = sha?.take(8) ?: "none"
 
     enum class Rendezvous { OK, STALE, MISSING }

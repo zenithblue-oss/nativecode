@@ -1714,4 +1714,8 @@
     <string name="hw_venus_not_bundled">Venus: このビルドには含まれません。PanVKとTurnipには不要です。</string>
     <string name="hw_pulse_port">TCPポート %1$s、%2$sシンク</string>
     <string name="hw_pulse_turnip_blurb">PulseAudio TCP。VenusはMali専用で、AdrenoはTurnip/KGSLを使います。</string>
+    <string name="hw_gpu_host_vulkan">ホストの Vulkan (Android): %1$s</string>
+    <string name="hw_gpu_guest_driver">ゲストのドライバー: %1$s</string>
+    <string name="hw_gpu_guest_vulkan">ゲストの Vulkan (ドライバー ICD): %1$s</string>
+    <string name="main_component_installed">インストール済み %1$s (%2$s)</string>
 </resources>

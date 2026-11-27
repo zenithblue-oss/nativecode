@@ -5103,7 +5103,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             typeface = Typeface.MONOSPACE
             setPadding(0, dp(top), 0, 0)
         }
-        card.addView(mono(u.fromTo.uppercase(), NC.PRIMARY, 10))
+        val fromToTv = mono(u.fromTo.uppercase(), NC.PRIMARY, 10)
+        card.addView(fromToTv)
         card.addView(mono(u.size))
         card.addView(TextView(this).apply {
             text = u.changes
@@ -5149,6 +5150,16 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 btn.visibility = View.VISIBLE
             }
             refreshComponentUpdates(cards = false) // banner + dot only: this card keeps its done/failed state
+            if (ok && (u.id == "panvk" || u.id == "turnip")) executor.execute {
+                // The "installed <old sha> to ..." line is stale now: show what is installed.
+                val turnip = u.id == "turnip"
+                val sha = HardwareStatus.shortSha(if (turnip) TurnipDriverUpdate.installedSha(this) else PanvkDriverUpdate.installedSha(this))
+                val label = if (turnip) TurnipDriverUpdate.VERSION_LABEL else PanvkDriverUpdate.VERSION_LABEL
+                runOnUiThread {
+                    fromToTv.text = tr(R.string.main_component_installed, label, sha).uppercase()
+                    refreshHardwareProbes() // Hardware page driver badge/sha
+                }
+            }
         }
         btn.setOnClickListener {
             if (!busyUpdates.add(u.id)) return@setOnClickListener
@@ -17996,7 +18007,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             append("GL vendor: ${gpu.glVendor}\n")
             append("OpenGL: ${gpu.glVersion}\n")
             append("GLSL: ${gpu.glslVersion}\n")
-            append("Vulkan: ${gpu.vulkanVersion}\n")
+            append(tr(R.string.hw_gpu_host_vulkan, gpu.vulkanVersion)).append('\n')
+            append(tr(R.string.hw_gpu_guest_driver, when {
+                GpuAccelDetector.isTurnip() -> TurnipDriverUpdate.VERSION_LABEL
+                GpuAccelDetector.isPanvk() -> PanvkDriverUpdate.VERSION_LABEL
+                else -> "n/a"
+            })).append('\n')
+            append(tr(R.string.hw_gpu_guest_vulkan, gpu.guestVulkan)).append('\n')
             append("Vendor: ${gpu.vendor}\n")
             append("SoC: ${gpu.soc}\n")
             append("Method: ${gpu.method}\n")

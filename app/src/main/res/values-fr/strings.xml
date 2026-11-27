@@ -1714,4 +1714,8 @@
     <string name="hw_venus_not_bundled">Venus : absent de cette version. PanVK et Turnip n’en ont pas besoin.</string>
     <string name="hw_pulse_port">Port TCP %1$s, sortie %2$s</string>
     <string name="hw_pulse_turnip_blurb">PulseAudio TCP. Venus est réservé à Mali ; Adreno utilise Turnip/KGSL.</string>
+    <string name="hw_gpu_host_vulkan">Vulkan hôte (Android) : %1$s</string>
+    <string name="hw_gpu_guest_driver">Pilote invité : %1$s</string>
+    <string name="hw_gpu_guest_vulkan">Vulkan invité (ICD du pilote) : %1$s</string>
+    <string name="main_component_installed">installé %1$s (%2$s)</string>
 </resources>

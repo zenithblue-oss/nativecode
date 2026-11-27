@@ -19,6 +19,12 @@ class HardwareStatusTest {
         assertEquals("0123abcd", HardwareStatus.shortSha("0123abcdffff"))
     }
 
+    @Test fun icdApiVersion() {
+        assertEquals("1.4.363", HardwareStatus.icdApiVersion("{\"ICD\": {\n \"api_version\": \"1.4.363\",\n \"library_arch\": \"64\"}}"))
+        assertEquals(null, HardwareStatus.icdApiVersion("{}"))
+        assertEquals(null, HardwareStatus.icdApiVersion(null))
+    }
+
     @Test fun rendezvous() {
         assertEquals(Rendezvous.MISSING, HardwareStatus.rendezvous(null, "{}"))
         assertEquals(Rendezvous.OK, HardwareStatus.rendezvous("{}", "{}"))
