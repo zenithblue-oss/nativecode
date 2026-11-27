@@ -47,19 +47,26 @@ LINKER=""
 PA_BIN="$TERMUX_PREFIX/bin/pulseaudio"
 PA_CMD="$PA_BIN"
 [ -n "$LINKER" ] && [ -f "$PA_BIN" ] && PA_CMD="$LINKER $PA_BIN"
+# Non-Play builds (NC_PULSE_AAUDIO, from fluxlinux-host.env): the stock sles sink cannot load via linker64, play through AAudio
+# and keep system libs ahead of PREFIX/lib (it shadows Xzs_Construct for the AAudio module).
+PA_EXTRA=""
+if [ -n "${NC_PULSE_AAUDIO:-}" ]; then
+  PA_CMD="env LD_LIBRARY_PATH=/system/lib64:$LD_LIBRARY_PATH $PA_CMD"
+  PA_EXTRA="--load=module-aaudio-sink"
+fi
 
 if ! "$TB" pidof pulseaudio >/dev/null 2>&1; then
   echo "FluxLinux: Starting PulseAudio..."
   if $IS_ROOT; then
     $PA_CMD --system --start --dl-search-path="$TERMUX_PREFIX/lib/pulseaudio/modules" \
-      --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1${NC_PULSE_PORT:+ port=$NC_PULSE_PORT}" \
+      --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1${NC_PULSE_PORT:+ port=$NC_PULSE_PORT}" $PA_EXTRA \
       --exit-idle-time=-1 2>/dev/null || \
     $PA_CMD --start --dl-search-path="$TERMUX_PREFIX/lib/pulseaudio/modules" \
-      --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1${NC_PULSE_PORT:+ port=$NC_PULSE_PORT}" \
+      --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1${NC_PULSE_PORT:+ port=$NC_PULSE_PORT}" $PA_EXTRA \
       --exit-idle-time=-1 2>/dev/null || true
   else
     $PA_CMD --start --dl-search-path="$TERMUX_PREFIX/lib/pulseaudio/modules" \
-      --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1${NC_PULSE_PORT:+ port=$NC_PULSE_PORT}" \
+      --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1${NC_PULSE_PORT:+ port=$NC_PULSE_PORT}" $PA_EXTRA \
       --exit-idle-time=-1 2>/dev/null || true
   fi
 else

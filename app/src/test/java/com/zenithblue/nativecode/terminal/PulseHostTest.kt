@@ -40,7 +40,7 @@ class PulseHostTest {
         val base = "export A=\"1\"\nexport B=\"2\"\n"
         assertEquals(base, TermuxHostPaths.withPulseEnv(base, 4713))
         val fd = TermuxHostPaths.withPulseEnv(base, 4813)
-        assertEquals(base + "export NC_PULSE_PORT=\"4813\"\nexport NC_PULSE_SERVER=\"127.0.0.1:4813\"\n", fd)
+        assertEquals(base + "export NC_PULSE_PORT=\"4813\"\nexport NC_PULSE_SERVER=\"127.0.0.1:4813\"\nexport NC_PULSE_AAUDIO=\"1\"\n", fd)
         assertEquals(fd, TermuxHostPaths.withPulseEnv(fd, 4813)) // idempotent
         assertEquals(base, TermuxHostPaths.withPulseEnv(fd, 4713)) // back to Play
     }

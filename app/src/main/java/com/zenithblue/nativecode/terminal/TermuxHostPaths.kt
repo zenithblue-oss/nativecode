@@ -73,7 +73,7 @@ object TermuxHostPaths {
     /** Non-Play builds only (Play keeps its stock port): start_gui.sh and the guest session read these. */
     internal fun pulseEnvLines(port: Int = PulseHost.PORT): List<String> =
         if (port == PulseHost.DEFAULT_PORT) emptyList()
-        else listOf("export NC_PULSE_PORT=\"$port\"", "export NC_PULSE_SERVER=\"${PulseHost.server(port)}\"")
+        else listOf("export NC_PULSE_PORT=\"$port\"", "export NC_PULSE_SERVER=\"${PulseHost.server(port)}\"", "export NC_PULSE_AAUDIO=\"1\"")
 
     /** [env] with the NC_PULSE_* lines replaced by [pulseEnvLines]; every other line is kept as is. */
     internal fun withPulseEnv(env: String, port: Int = PulseHost.PORT): String {
