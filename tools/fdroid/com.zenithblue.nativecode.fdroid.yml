@@ -27,9 +27,9 @@ RepoType: git
 Repo: https://github.com/zenithblue-oss/nativecode.git   # ASSUMPTION (see SourceCode)
 
 Builds:
-  - versionName: 1.8.3   # app/build.gradle.kts defaultConfig (flavor fdroid)
-    versionCode: 24      # app/build.gradle.kts defaultConfig
-    commit: v1.8.3       # ASSUMPTION: tag name; create it on the release commit
+  - versionName: 1.8.4   # app/build.gradle.kts defaultConfig (flavor fdroid)
+    versionCode: 25      # app/build.gradle.kts defaultConfig
+    commit: v1.8.4       # ASSUMPTION: tag name; create it on the release commit
     submodules: false
     sudo:
       # Termux build deps (termux-packages scripts/setup-ubuntu.sh, trimmed to tools/fdroid/package-lists)
@@ -67,5 +67,5 @@ AllowedAPKSigningKeys: TBD   # TODO: sha256 of the release cert (reproducible-bu
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.8.3
-CurrentVersionCode: 24
+CurrentVersion: 1.8.4
+CurrentVersionCode: 25

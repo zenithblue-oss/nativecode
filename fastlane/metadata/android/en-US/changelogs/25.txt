@@ -1,0 +1,6 @@
+1.8.4
+- Rooted shell works again in the F-Droid build
+- opencode login status marked optional
+- "Show thinking" expands thinking blocks by default
+- Mesa PanVK 26.3.1 (Mali) and LFDev Turnip 27.0.0 (Adreno)
+- Download consent states clearly that you choose to bypass F-Droid's checks
