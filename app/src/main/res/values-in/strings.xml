@@ -1652,7 +1652,6 @@
     <string name="fd_mobile_data_message">Anda memakai koneksi berkuota. Unduhan ini berukuran %1$s. Disarankan memakai Wi-Fi.</string>
     <string name="fd_mobile_data_continue">Tetap unduh</string>
     <string name="fd_mobile_data_wait">Tunggu Wi-Fi</string>
-    <string name="fd_desktop_coming_later">Desktop Linux memerlukan server tampilan X11, yang hadir di rilis F-Droid berikutnya.</string>
     <string name="fd_consent_title">Unduhan eksternal</string>
     <string name="fd_consent_intro">Aplikasi F-Droid ini tidak menyertakan sistem Linux. Dengan persetujuan Anda, aplikasi mengunduh berkas berikut dari GitHub Releases. Berkas ini adalah program yang belum ditinjau F-Droid. Setiap berkas diperiksa dengan SHA-256 yang tertanam di aplikasi ini sebelum dipakai.</string>
     <string name="fd_consent_rootfs">Sistem berkas root Linux: sekitar 1,26 GB</string>
@@ -1667,4 +1666,11 @@
     <string name="fd_download_runtime_info">GitHub Releases: runtime Alpaquita (sekitar 1,26 GB) dan paket pembaruan (sekitar 317 MB), diverifikasi SHA-256.</string>
     <string name="fd_requesting_github">Menghubungkan ke GitHub Releases…</string>
     <string name="fd_privacy_no_telemetry">Tanpa iklan, tanpa analitik, tanpa laporan kerusakan, dan tanpa server NativeCode.</string>
+    <string name="fd_sdk_pack_optional">UNDUHAN OPSIONAL · ~69 MB dari GitHub Releases</string>
+    <string name="fd_components_subtitle">// KOMPONEN PENGEMBANGAN YANG DIUNDUH</string>
+    <string name="fd_components_badge">GITHUB</string>
+    <string name="fd_marketplace_unavailable">Marketplace tidak tersedia di build ini</string>
+    <string name="fd_panvk_download">Mengunduh sekitar 21 MB dari GitHub Releases</string>
+    <string name="fd_gpu_driver_failed">Unduhan driver GPU gagal: %1$s</string>
+    <string name="fd_consent_gpu">Driver GPU (opsional, nanti): sekitar 21 MB</string>
 </resources>

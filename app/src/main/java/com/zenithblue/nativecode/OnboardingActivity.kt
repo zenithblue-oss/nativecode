@@ -1522,7 +1522,7 @@ class OnboardingActivity : AppCompatActivity() {
         }
         root.addView(card(tr(R.string.fd_consent_intro)))
         root.addView(card(
-            tr(R.string.fd_consent_rootfs), tr(R.string.fd_consent_update), tr(R.string.fd_consent_devpack),
+            tr(R.string.fd_consent_rootfs), tr(R.string.fd_consent_update), tr(R.string.fd_consent_devpack), tr(R.string.fd_consent_gpu),
             tr(R.string.fd_consent_host), bold = true
         ))
         root.addView(card(tr(R.string.fd_consent_later), tr(R.string.fd_consent_report)))

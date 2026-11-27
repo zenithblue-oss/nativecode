@@ -98,6 +98,8 @@ esac
 
 # --- Required host binaries on PATH under our prefix ---
 required_bins=(proot-distro pulseaudio python)
+# The F-Droid bootstrap ships no PulseAudio/VirGL: audio and host GPU servers are optional there.
+case "$PKG" in *.fdroid) required_bins=(proot-distro python) ;; esac
 for bin in "${required_bins[@]}"; do
     bin_path="$(command -v "$bin" 2>/dev/null || true)"
     if [ -z "$bin_path" ]; then

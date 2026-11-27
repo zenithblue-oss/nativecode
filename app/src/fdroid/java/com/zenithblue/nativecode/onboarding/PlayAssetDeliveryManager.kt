@@ -21,6 +21,8 @@ object PlayAssetDeliveryManager {
     const val PACK_RUNTIME = "nativecode_runtime"
     const val PACK_ANDROID_DEV = "nativecode_android_dev"
     const val PACK_UPDATE_CORE = "nativecode_update_core"
+    /** The PanVK (Mali) driver .so, fetched on the first GPU driver update (see PanvkSoSource). */
+    const val PACK_GPU_DRIVER = "nativecode_gpu_driver"
 
     private const val MAX_ATTEMPTS = 3
     private val main = Handler(Looper.getMainLooper())

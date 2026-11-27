@@ -47,3 +47,4 @@ termux-packages/*
 # F-Droid build outputs (bootstrap + native libs built for the .fdroid prefix) and the Play-only Firebase config
 app/src/play/google-services.json
 tools/fdroid/out/
+app/src/fdroid/jniLibs/

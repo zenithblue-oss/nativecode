@@ -58,7 +58,7 @@ object CliToolsInstaller {
         onDone: (Int) -> Unit
     ) {
         if (com.zenithblue.nativecode.ProotOnly.ON) {
-            onLine("Chroot is unavailable in the Google Play build.\n")
+            onLine("Chroot is unavailable in this build.\n")
             onDone(-1)
             return
         }

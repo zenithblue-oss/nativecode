@@ -34,16 +34,6 @@ if (wantsPlay && file("src/play/google-services.json").exists()) {
     apply(plugin = "com.google.firebase.crashlytics")
 }
 
-// F-Droid build outputs (bootstrap prefix = the fdroid applicationId): <out>/jniLibs/arm64-v8a/*.so, <out>/assets/bootstrap.tar.
-val fdroidOut = rootProject.file(providers.gradleProperty("nativecode.fdroid.out").orElse("tools/fdroid/out").get())
-
-androidComponents {
-    // The X11 server (prebuilt libXlorie) is not part of the F-Droid v1 core: desktop is gated "coming later".
-    onVariants(selector().withFlavor("store" to "fdroid")) { v ->
-        v.packaging.jniLibs.excludes.add("**/libXlorie.so")
-    }
-}
-
 androidComponents {
     onVariants { v ->
         v.buildConfigFields?.put("GIT_COMMIT", gitCommit.map {
@@ -78,17 +68,15 @@ android {
             buildConfigField("boolean", "MONETISATION_ENFORCE", "true")
             buildConfigField("boolean", "FDROID", "false")
             buildConfigField("boolean", "ROOT_FEATURES", "true")
-            buildConfigField("boolean", "DESKTOP_AVAILABLE", "true")
             buildConfigField("boolean", "TELEMETRY_AVAILABLE", "true")
         }
         create("fdroid") {
             dimension = "store"
             applicationIdSuffix = ".fdroid"
-            // FOSS build: Pro is always on (every gate allows), no billing UI, no telemetry, proot only, no X11 yet.
+            // FOSS build: Pro is always on (every gate allows), no billing UI, no telemetry, proot only.
             buildConfigField("boolean", "MONETISATION_ENFORCE", "false")
             buildConfigField("boolean", "FDROID", "true")
             buildConfigField("boolean", "ROOT_FEATURES", "false")
-            buildConfigField("boolean", "DESKTOP_AVAILABLE", "false")
             buildConfigField("boolean", "TELEMETRY_AVAILABLE", "false")
         }
     }
@@ -162,10 +150,8 @@ android {
                 "../nativecode_android_dev/src/main/assets"
             )
         }
-        maybeCreate("fdroid").apply {
-            jniLibs.srcDir(File(fdroidOut, "jniLibs"))
-            assets.srcDir(File(fdroidOut, "assets"))
-        }
+        // fdroid: src/fdroid/jniLibs (proot, loader, bash, termux-exec, fast_pty_guard, libXlorie) and
+        // src/fdroid/assets/bootstrap.tar are built from source by tools/fdroid/build_*.sh --install (gitignored).
     }
 
     // Play-only on-demand packs (AAB). fdroid downloads the same files from GitHub Releases instead.
@@ -220,7 +206,9 @@ dependencies {
         exclude(group = "com.github.termux.termux-app", module = "terminal-view")
     }
     implementation(project(":terminal-view"))
-    implementation(files("libs/terminal-emulator-v0.118.0-16k.aar"))
+    // play: prebuilt 16k aar; fdroid: terminal-emulator built from source (termux-app/terminal-emulator).
+    "playImplementation"(files("libs/terminal-emulator-v0.118.0-16k.aar"))
+    "fdroidImplementation"(project(":terminal-emulator"))
     // Fix listenable future conflict
     implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")
 
@@ -252,9 +240,8 @@ tasks.register<Exec>("checkJni16kbAlignment") {
             "python3",
             rootProject.file("scripts/check_elf_16k.py").absolutePath,
             file("src/play/jniLibs").absolutePath,
-            file("../termux-x11/src/main/jniLibs/arm64-v8a").absolutePath,
             file("libs/terminal-emulator-v0.118.0-16k.aar").absolutePath
-        ) + File(fdroidOut, "jniLibs/arm64-v8a").takeIf { it.isDirectory }.let { listOfNotNull(it?.absolutePath) }
+        ) + file("src/fdroid/jniLibs").takeIf { it.isDirectory }.let { listOfNotNull(it?.absolutePath) }
     )
 }
 

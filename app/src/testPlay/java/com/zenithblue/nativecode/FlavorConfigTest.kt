@@ -14,7 +14,6 @@ class FlavorConfigTest {
         assertTrue(BuildConfig.ROOT_FEATURES)
         assertFalse(ProotOnly.ON)
         assertTrue(BuildConfig.TELEMETRY_AVAILABLE)
-        assertTrue(BuildConfig.DESKTOP_AVAILABLE)
         assertEquals("/data/data/com.zenithblue.nativecode/files/usr", TermuxHostPaths.PREFIX)
     }
 }

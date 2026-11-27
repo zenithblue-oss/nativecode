@@ -6,7 +6,7 @@ import java.io.File
 
 /**
  * One-off in-app update of the PanVK (Mali) driver inside the installed guest rootfs.
- * Touches ONLY the 3 files below. Bundled in assets/panvk-rc3. Background thread only.
+ * Touches ONLY the 3 files below. Small files bundled in assets/panvk-rc3; the .so comes from [PanvkSoSource] (play: asset, fdroid: GitHub download). Background thread only.
  */
 object PanvkDriverUpdate {
     private const val ASSET_DIR = "panvk-rc3"
@@ -70,10 +70,11 @@ object PanvkDriverUpdate {
     /** Copy bundled files over the 3 target paths. Returns (ok, message). */
     fun update(ctx: Context): Pair<Boolean, String> {
         if (desktopActive()) return false to tr(R.string.app_desktop_running_stop_the_desktop)
+        PanvkSoSource.ensure(ctx)?.let { return false to it }
         val stage = File(ctx.filesDir, "panvk_stage").apply { deleteRecursively(); mkdirs() }
         try {
             for ((name, _) in FILES) {
-                ctx.assets.open("$ASSET_DIR/$name").use { i -> File(stage, name).outputStream().use { i.copyTo(it) } }
+                (if (name.endsWith(".so")) PanvkSoSource.open(ctx) else ctx.assets.open("$ASSET_DIR/$name")).use { i -> File(stage, name).outputStream().use { i.copyTo(it) } }
             }
             stage.setReadable(true, false); stage.setExecutable(true, false)
             stage.listFiles()?.forEach { it.setReadable(true, false) }

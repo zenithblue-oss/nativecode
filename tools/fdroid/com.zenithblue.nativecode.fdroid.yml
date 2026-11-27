@@ -51,7 +51,6 @@ Builds:
     scandelete:
       - app/libs
       - app/src/play
-      - termux-x11/src/main/jniLibs
       - termux-app/app/dev_keystore.jks
       - termux-app/gradle/wrapper/gradle-wrapper.jar
       - shell-loader-debug.apk

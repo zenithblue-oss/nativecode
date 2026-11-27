@@ -21,7 +21,6 @@ class FlavorConfigTest {
         assertFalse(BuildConfig.ROOT_FEATURES)
         assertTrue(ProotOnly.ON)
         assertFalse(BuildConfig.TELEMETRY_AVAILABLE)
-        assertFalse(BuildConfig.DESKTOP_AVAILABLE)
     }
 
     @Test fun hostPrefixFollowsTheApplicationId() {
@@ -41,6 +40,8 @@ class FlavorConfigTest {
         assertEquals(RuntimeUpdatePack.PINNED_SHA256, update.sha256)
         assertEquals(AndroidDevPackManager.PINNED_SHA256, dev.sha256)
         assertEquals("https://github.com/ZenithBlue-Dev/nativecode-runtime/releases/download/runtime-1.8.0/alpaquita_rootfs.tar.zst", rootfs.url)
-        assertTrue(listOf(rootfs, update, dev).all { it.sizeBytes > 1_000_000L && it.url.startsWith("https://") })
+        val gpu = ReleasePins.pinFor(PlayAssetDeliveryManager.PACK_GPU_DRIVER, ReleasePins.BASE_URL)
+        assertEquals("96e925761ed23994f8e3ba9f72cbbcc988b69b4166947e58fea4f96b699604b0", gpu.sha256) // = panvk .so.sha256
+        assertTrue(listOf(rootfs, update, dev, gpu).all { it.sizeBytes > 1_000_000L && it.url.startsWith("https://") })
     }
 }

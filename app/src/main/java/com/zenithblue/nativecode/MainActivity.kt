@@ -4800,7 +4800,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         sdkStatusTv?.text = when {
             applied -> tr(R.string.main_ready_platform_36_arm64_aapt2)
             archive != null -> "PACK READY · apply to Alpaquita"
-            else -> tr(R.string.main_optional_play_asset_pack_76)
+            else -> tr(if (BuildConfig.FDROID) R.string.fd_sdk_pack_optional else R.string.main_optional_play_asset_pack_76)
         }
         sdkActionBtn?.text = when {
             applied -> tr(R.string.main_reapply_sdk)
@@ -4835,7 +4835,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             text = when {
                 applied -> tr(R.string.main_ready_platform_36_arm64_aapt2)
                 archive != null -> "PACK READY · apply to Alpaquita"
-                else -> tr(R.string.main_optional_play_asset_pack_76)
+                else -> tr(if (BuildConfig.FDROID) R.string.fd_sdk_pack_optional else R.string.main_optional_play_asset_pack_76)
             }
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
@@ -4875,7 +4875,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             if (AndroidDevPackManager.resolveArchive(this) != null) {
                 applyPack(force = AndroidDevPackManager.isApplied(this))
             } else {
-                status.text = tr(R.string.onb_requesting_nativecode_android_dev_fr)
+                status.text = tr(if (BuildConfig.FDROID) R.string.fd_requesting_github else R.string.onb_requesting_nativecode_android_dev_fr)
                 var listener: Any? = null
                 listener = PlayAssetDeliveryManager.requestDownload(
                     this,
@@ -4929,10 +4929,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         page.addView(
             buildSubPageHeader(
                 title = tr(R.string.main_components),
-                subtitle = tr(R.string.main_caps_play_delivered_development_components),
+                subtitle = tr(if (BuildConfig.FDROID) R.string.fd_components_subtitle else R.string.main_caps_play_delivered_development_components),
                 iconRes = R.drawable.ic_download,
                 pageId = ID_COMPONENTS
-            ) { badge -> badge.text = tr(R.string.main_play) }
+            ) { badge -> badge.text = tr(if (BuildConfig.FDROID) R.string.fd_components_badge else R.string.main_play) }
         )
 
         val rootfs = ProjectPathResolver.prootRootfsDir(this)
@@ -4990,7 +4990,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         if (panvk) add(ComponentUpdate(
             "panvk", R.drawable.ic_display, tr(R.string.main_panvk_gpu_driver),
             "installed ${(PanvkDriverUpdate.installedSha(this@MainActivity) ?: "unknown").take(8)} to rc3-lowmem ${PanvkDriverUpdate.bundledSha(this@MainActivity).take(8)}",
-            tr(R.string.main_bundled_in_the_app_no),
+            tr(if (BuildConfig.FDROID) R.string.fd_panvk_download else R.string.main_bundled_in_the_app_no),
             "New PanVK Vulkan driver for Mali GPUs (lowmem mode) and the matching GPU env scripts. Stop the desktop first; the old driver is kept as .so.bak."))
     }
 
@@ -13360,7 +13360,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
      */
     private fun openMarketplace() {
         if (com.zenithblue.nativecode.ProotOnly.ON) {
-            Toast.makeText(this, tr(R.string.main_marketplace_is_unavailable_in_the), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, tr(if (BuildConfig.FDROID) R.string.fd_marketplace_unavailable else R.string.main_marketplace_is_unavailable_in_the), Toast.LENGTH_SHORT).show()
             return
         }
         if (MarketplaceConsent.isAccepted(this)) {

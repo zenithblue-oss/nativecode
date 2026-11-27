@@ -1652,7 +1652,6 @@
     <string name="fd_mobile_data_message">当前为计费网络。此次下载大小为 %1$s。建议使用 Wi-Fi。</string>
     <string name="fd_mobile_data_continue">仍然下载</string>
     <string name="fd_mobile_data_wait">等待 Wi-Fi</string>
-    <string name="fd_desktop_coming_later">Linux 桌面需要 X11 显示服务器，将在后续 F-Droid 版本中提供。</string>
     <string name="fd_consent_title">外部下载</string>
     <string name="fd_consent_intro">此 F-Droid 应用不内置 Linux 系统。经你同意后，它会从 GitHub Releases 下载以下文件。这些是 F-Droid 未审核的可执行文件。每个文件在使用前都会与本应用内固定的 SHA-256 核对。</string>
     <string name="fd_consent_rootfs">Linux 根文件系统：约 1.26 GB</string>
@@ -1667,4 +1666,11 @@
     <string name="fd_download_runtime_info">GitHub Releases：Alpaquita 运行时（约 1.26 GB）和更新包（约 317 MB），已通过 SHA-256 校验。</string>
     <string name="fd_requesting_github">正在连接 GitHub Releases…</string>
     <string name="fd_privacy_no_telemetry">没有广告、统计分析、崩溃报告，也没有 NativeCode 服务器。</string>
+    <string name="fd_sdk_pack_optional">可选下载 · 来自 GitHub Releases，约 69 MB</string>
+    <string name="fd_components_subtitle">// 已下载的开发组件</string>
+    <string name="fd_components_badge">GITHUB</string>
+    <string name="fd_marketplace_unavailable">此版本不提供应用市场</string>
+    <string name="fd_panvk_download">从 GitHub Releases 下载约 21 MB</string>
+    <string name="fd_gpu_driver_failed">GPU 驱动下载失败：%1$s</string>
+    <string name="fd_consent_gpu">GPU 驱动（可选，稍后）：约 21 MB</string>
 </resources>

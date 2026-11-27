@@ -1652,7 +1652,6 @@
     <string name="fd_mobile_data_message">Estás en una conexión de datos limitados. Esta descarga es de %1$s. Se recomienda Wi-Fi.</string>
     <string name="fd_mobile_data_continue">Descargar igualmente</string>
     <string name="fd_mobile_data_wait">Esperar al Wi-Fi</string>
-    <string name="fd_desktop_coming_later">El escritorio Linux necesita el servidor gráfico X11, que llegará en una versión posterior de F-Droid.</string>
     <string name="fd_consent_title">Descargas externas</string>
     <string name="fd_consent_intro">Esta app de F-Droid no incluye el sistema Linux. Con tu consentimiento descarga los archivos siguientes de GitHub Releases. Son ejecutables que F-Droid no ha revisado. Cada archivo se comprueba con un SHA-256 fijado en esta app antes de usarlo.</string>
     <string name="fd_consent_rootfs">Sistema de archivos raíz de Linux: unos 1,26 GB</string>
@@ -1667,4 +1666,11 @@
     <string name="fd_download_runtime_info">GitHub Releases: runtime Alpaquita (unos 1,26 GB) y paquete de actualización (unos 317 MB), verificados con SHA-256.</string>
     <string name="fd_requesting_github">Conectando con GitHub Releases…</string>
     <string name="fd_privacy_no_telemetry">Sin anuncios, sin analítica, sin informes de fallos y sin servidores de NativeCode.</string>
+    <string name="fd_sdk_pack_optional">DESCARGA OPCIONAL · ~69 MB desde GitHub Releases</string>
+    <string name="fd_components_subtitle">// COMPONENTES DE DESARROLLO DESCARGADOS</string>
+    <string name="fd_components_badge">GITHUB</string>
+    <string name="fd_marketplace_unavailable">El mercado no está disponible en esta versión</string>
+    <string name="fd_panvk_download">Descarga unos 21 MB desde GitHub Releases</string>
+    <string name="fd_gpu_driver_failed">Falló la descarga del controlador de GPU: %1$s</string>
+    <string name="fd_consent_gpu">Controlador de GPU (opcional, más adelante): unos 21 MB</string>
 </resources>

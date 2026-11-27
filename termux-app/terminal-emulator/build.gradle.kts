@@ -5,11 +5,10 @@ plugins {
 android {
     namespace = "com.termux.terminal"
     compileSdk = 36
-    ndkVersion = "27.2.12479018"
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         minSdk = 26
-        targetSdk = 36
         externalNativeBuild {
             ndkBuild {
                 cFlags("-std=c11", "-Wall", "-Wextra", "-Werror", "-Os", "-fno-stack-protector", "-Wl,--gc-sections")

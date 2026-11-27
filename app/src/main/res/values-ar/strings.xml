@@ -1652,7 +1652,6 @@
     <string name="fd_mobile_data_message">أنت على اتصال محدود. حجم هذا التنزيل %1$s. يُنصح باستخدام Wi-Fi.</string>
     <string name="fd_mobile_data_continue">نزّل على أي حال</string>
     <string name="fd_mobile_data_wait">انتظر Wi-Fi</string>
-    <string name="fd_desktop_coming_later">يحتاج سطح مكتب لينكس إلى خادم العرض X11، وسيتوفر في إصدار لاحق من F-Droid.</string>
     <string name="fd_consent_title">تنزيلات خارجية</string>
     <string name="fd_consent_intro">لا يتضمن تطبيق F-Droid هذا نظام لينكس. بموافقتك ينزّل الملفات التالية من GitHub Releases. هذه ملفات تنفيذية لم يراجعها F-Droid. يُفحص كل ملف قبل استخدامه مقابل SHA-256 مثبّت في هذا التطبيق.</string>
     <string name="fd_consent_rootfs">نظام ملفات لينكس الجذري: نحو 1.26 غيغابايت</string>
@@ -1667,4 +1666,11 @@
     <string name="fd_download_runtime_info">GitHub Releases: بيئة Alpaquita (نحو 1.26 غيغابايت) وحزمة التحديث (نحو 317 ميغابايت)، بتحقق SHA-256.</string>
     <string name="fd_requesting_github">جارٍ الاتصال بـ GitHub Releases…</string>
     <string name="fd_privacy_no_telemetry">بلا إعلانات ولا تحليلات ولا تقارير أعطال ولا خوادم لـ NativeCode.</string>
+    <string name="fd_sdk_pack_optional">تنزيل اختياري · نحو 69 ميغابايت من GitHub Releases</string>
+    <string name="fd_components_subtitle">// مكونات التطوير المُنزَّلة</string>
+    <string name="fd_components_badge">GITHUB</string>
+    <string name="fd_marketplace_unavailable">المتجر غير متاح في هذا الإصدار</string>
+    <string name="fd_panvk_download">يُنزِّل نحو 21 ميغابايت من GitHub Releases</string>
+    <string name="fd_gpu_driver_failed">فشل تنزيل تعريف وحدة معالجة الرسومات: %1$s</string>
+    <string name="fd_consent_gpu">تعريف وحدة معالجة الرسومات (اختياري، لاحقًا): نحو 21 ميغابايت</string>
 </resources>

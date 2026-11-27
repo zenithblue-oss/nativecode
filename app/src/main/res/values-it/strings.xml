@@ -1652,7 +1652,6 @@
     <string name="fd_mobile_data_message">Sei su una connessione a consumo. Questo download è di %1$s. Si consiglia il Wi-Fi.</string>
     <string name="fd_mobile_data_continue">Scarica comunque</string>
     <string name="fd_mobile_data_wait">Attendi il Wi-Fi</string>
-    <string name="fd_desktop_coming_later">Il desktop Linux richiede il server grafico X11, in arrivo in una prossima versione F-Droid.</string>
     <string name="fd_consent_title">Download esterni</string>
     <string name="fd_consent_intro">Questa app F-Droid non include il sistema Linux. Con il tuo consenso scarica i file seguenti da GitHub Releases. Sono eseguibili che F-Droid non ha esaminato. Ogni file viene confrontato con uno SHA-256 fissato in questa app prima dell\'uso.</string>
     <string name="fd_consent_rootfs">File system root di Linux: circa 1,26 GB</string>
@@ -1667,4 +1666,11 @@
     <string name="fd_download_runtime_info">GitHub Releases: runtime Alpaquita (circa 1,26 GB) e pacchetto di aggiornamento (circa 317 MB), verificati con SHA-256.</string>
     <string name="fd_requesting_github">Connessione a GitHub Releases…</string>
     <string name="fd_privacy_no_telemetry">Nessuna pubblicità, nessuna analisi, nessun report di crash e nessun server NativeCode.</string>
+    <string name="fd_sdk_pack_optional">DOWNLOAD FACOLTATIVO · ~69 MB da GitHub Releases</string>
+    <string name="fd_components_subtitle">// COMPONENTI DI SVILUPPO SCARICATI</string>
+    <string name="fd_components_badge">GITHUB</string>
+    <string name="fd_marketplace_unavailable">Il marketplace non è disponibile in questa build</string>
+    <string name="fd_panvk_download">Scarica circa 21 MB da GitHub Releases</string>
+    <string name="fd_gpu_driver_failed">Download del driver GPU non riuscito: %1$s</string>
+    <string name="fd_consent_gpu">Driver GPU (facoltativo, più tardi): circa 21 MB</string>
 </resources>

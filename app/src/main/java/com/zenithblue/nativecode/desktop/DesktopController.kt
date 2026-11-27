@@ -97,10 +97,6 @@ class DesktopController(
     /** Gate, then start. Card flips to STOP on the first healthy log line. */
     fun start() {
         if (running || starting) return
-        if (!BuildConfig.DESKTOP_AVAILABLE) { // fdroid v1: the X11 display server is not shipped yet
-            Toast.makeText(activity, tr(R.string.fd_desktop_coming_later), Toast.LENGTH_LONG).show()
-            return
-        }
         if (!host.desktopInstalled()) {
             Toast.makeText(activity, "Phosh desktop is not installed yet", Toast.LENGTH_LONG).show()
             return

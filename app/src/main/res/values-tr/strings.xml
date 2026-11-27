@@ -1652,7 +1652,6 @@
     <string name="fd_mobile_data_message">Kotalı bir bağlantıdasınız. Bu indirme %1$s boyutunda. Wi-Fi önerilir.</string>
     <string name="fd_mobile_data_continue">Yine de indir</string>
     <string name="fd_mobile_data_wait">Wi-Fi bekle</string>
-    <string name="fd_desktop_coming_later">Linux masaüstü X11 görüntü sunucusuna ihtiyaç duyar; bu, sonraki bir F-Droid sürümünde gelecek.</string>
     <string name="fd_consent_title">Harici indirmeler</string>
     <string name="fd_consent_intro">Bu F-Droid uygulaması Linux sistemini içermez. Onayınızla aşağıdaki dosyaları GitHub Releases üzerinden indirir. Bunlar F-Droid tarafından incelenmemiş çalıştırılabilir dosyalardır. Her dosya kullanılmadan önce bu uygulamada sabitlenmiş bir SHA-256 ile doğrulanır.</string>
     <string name="fd_consent_rootfs">Linux kök dosya sistemi: yaklaşık 1,26 GB</string>
@@ -1667,4 +1666,11 @@
     <string name="fd_download_runtime_info">GitHub Releases: Alpaquita çalışma zamanı (yaklaşık 1,26 GB) ve güncelleme paketi (yaklaşık 317 MB), SHA-256 doğrulamalı.</string>
     <string name="fd_requesting_github">GitHub Releases bağlantısı kuruluyor…</string>
     <string name="fd_privacy_no_telemetry">Reklam yok, analiz yok, çökme raporu yok ve NativeCode sunucusu yok.</string>
+    <string name="fd_sdk_pack_optional">İSTEĞE BAĞLI İNDİRME · GitHub Releases üzerinden ~69 MB</string>
+    <string name="fd_components_subtitle">// İNDİRİLEN GELİŞTİRME BİLEŞENLERİ</string>
+    <string name="fd_components_badge">GITHUB</string>
+    <string name="fd_marketplace_unavailable">Pazar yeri bu sürümde kullanılamıyor</string>
+    <string name="fd_panvk_download">GitHub Releases üzerinden yaklaşık 21 MB indirir</string>
+    <string name="fd_gpu_driver_failed">GPU sürücüsü indirilemedi: %1$s</string>
+    <string name="fd_consent_gpu">GPU sürücüsü (isteğe bağlı, daha sonra): yaklaşık 21 MB</string>
 </resources>
