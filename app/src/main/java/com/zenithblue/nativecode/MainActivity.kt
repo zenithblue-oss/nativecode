@@ -7412,6 +7412,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val videoView = android.widget.VideoView(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH, Gravity.CENTER)
             setVideoPath(file.absolutePath)
+            // Tapping a chat video card should play it, not park on a black frame waiting for a hidden play button.
+            setOnPreparedListener { it.start() }
         }
         val mediaController = android.widget.MediaController(this)
         mediaController.setAnchorView(videoView)
