@@ -18,12 +18,12 @@ object ReleasePins {
     private const val UPDATE_BYTES = 316_974_152L
     private const val DEV_BYTES = 69_451_708L
     // Mesa PanVK 26.3.1 glibc .so (zenithblue-oss/panvk-kbase-android panvk-kbase-v26.3.1): same bytes as
-    // app/src/play/assets/panvk-26.3.1 (sha = libvulkan_panfrost_kbase.so.sha256).
+    // app/src/play/assets/panvk-26.3.1 (sha = libvulkan_panfrost_kbase.sha256).
     private const val GPU_FILE = "panvk-26.3.1-libvulkan_panfrost_kbase.so"
     private const val GPU_SHA256 = "063bcf0cacd6605458f01530e7fc4f4de43cda7d7a995d9518e1a6e38f5d0db6"
     private const val GPU_BYTES = 33_917_432L
     // LFDev Mesa Turnip 27.0.0-devel-20261025-r2 (lfdevs/mesa-for-android-container, debian_trixie build; MIT):
-    // same bytes as app/src/play/assets/turnip-27.0.0-r2 (sha = libvulkan_freedreno.so.sha256).
+    // same bytes as app/src/play/assets/turnip-27.0.0-r2 (sha = libvulkan_freedreno.sha256).
     private const val TURNIP_FILE = "turnip-27.0.0-r2-libvulkan_freedreno.so"
     private const val TURNIP_SHA256 = "33b4acfbc04205d34e57178301b32f06df1539568fcb1e9b37688a3e777163ab"
     private const val TURNIP_BYTES = 16_912_208L

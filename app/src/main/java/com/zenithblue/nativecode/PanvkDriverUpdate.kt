@@ -26,7 +26,7 @@ object PanvkDriverUpdate {
     )
 
     fun bundledSha(ctx: Context): String =
-        ctx.assets.open("$ASSET_DIR/libvulkan_panfrost_kbase.so.sha256").bufferedReader().readText().trim()
+        ctx.assets.open("$ASSET_DIR/libvulkan_panfrost_kbase.sha256").bufferedReader().readText().trim()
 
     internal fun rootfs(ctx: Context): String = ProjectPathResolver.prootRootfsDir(ctx).absolutePath
 

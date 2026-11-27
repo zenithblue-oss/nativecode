@@ -16,7 +16,7 @@ object TurnipDriverUpdate {
     const val VERSION_LABEL = "LFDev Turnip 27.0.0-r2"
 
     fun bundledSha(ctx: Context): String =
-        ctx.assets.open("$ASSET_DIR/libvulkan_freedreno.so.sha256").bufferedReader().readText().trim()
+        ctx.assets.open("$ASSET_DIR/libvulkan_freedreno.sha256").bufferedReader().readText().trim()
 
     fun installedSha(ctx: Context): String? {
         val so = PanvkDriverUpdate.q("${PanvkDriverUpdate.rootfs(ctx)}/$SO")

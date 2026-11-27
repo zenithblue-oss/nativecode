@@ -1,0 +1,2 @@
+less less-704.tar.gz 20a0b0a2bb2525fa53c7eee9beb854b4c9cf172eabb209af7020743547bfe9fb https://sources.buildroot.net/less/less-704.tar.gz https://distfiles.gentoo.org/distfiles/4f/less-704.tar.gz
+pkg-config pkg-config-0.29.2.tar.gz 6fc69c01688c9458a57eb9a1664c9aba372ccda420a02bf4429fe610e7e7d591 https://ftp.netbsd.org/pub/pkgsrc/distfiles/pkg-config-0.29.2.tar.gz https://deb.debian.org/debian/pool/main/p/pkg-config/pkg-config_0.29.2.orig.tar.gz

@@ -47,10 +47,10 @@ class FlavorConfigTest {
         assertEquals(AndroidDevPackManager.PINNED_SHA256, dev.sha256)
         assertEquals("https://github.com/zenithblue-oss/nativecode-runtime/releases/download/runtime-1.8.0/alpaquita_rootfs.tar.zst", rootfs.url)
         val gpu = ReleasePins.pinFor(PlayAssetDeliveryManager.PACK_GPU_DRIVER, ReleasePins.BASE_URL)
-        assertEquals("063bcf0cacd6605458f01530e7fc4f4de43cda7d7a995d9518e1a6e38f5d0db6", gpu.sha256) // = panvk .so.sha256
+        assertEquals("063bcf0cacd6605458f01530e7fc4f4de43cda7d7a995d9518e1a6e38f5d0db6", gpu.sha256) // = panvk libvulkan_panfrost_kbase.sha256
         assertEquals(33_917_432L, gpu.sizeBytes)
         val tn = ReleasePins.pinFor(PlayAssetDeliveryManager.PACK_TURNIP_DRIVER, ReleasePins.BASE_URL)
-        assertEquals("33b4acfbc04205d34e57178301b32f06df1539568fcb1e9b37688a3e777163ab", tn.sha256) // = turnip .so.sha256
+        assertEquals("33b4acfbc04205d34e57178301b32f06df1539568fcb1e9b37688a3e777163ab", tn.sha256) // = turnip libvulkan_freedreno.sha256
         assertEquals(16_912_208L, tn.sizeBytes)
         assertTrue(listOf(rootfs, update, dev, gpu, tn).all { it.sizeBytes > 1_000_000L && it.url.startsWith("https://") })
     }
