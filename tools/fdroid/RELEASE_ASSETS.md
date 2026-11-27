@@ -1,7 +1,7 @@
 # F-Droid runtime release assets
 
 The fdroid flavor downloads these files from one GitHub release (`ReleasePins.BASE_URL`,
-currently `https://github.com/ZenithBlue-Dev/nativecode-runtime/releases/download/runtime-1.8.0`; repo name still TBD).
+currently `https://github.com/zenithblue-oss/nativecode-runtime/releases/download/runtime-1.8.0`).
 Each file is accepted only if its size and SHA-256 match `app/src/fdroid/java/com/zenithblue/nativecode/onboarding/ReleasePins.kt`.
 Never overwrite a published asset: new bytes = new file name + new pin.
 

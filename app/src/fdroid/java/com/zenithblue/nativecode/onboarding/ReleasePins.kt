@@ -11,7 +11,7 @@ import java.io.File
  */
 object ReleasePins {
     /** Single constant: the GitHub release that holds the packs for this app version (repo name still TBD). */
-    const val BASE_URL = "https://github.com/ZenithBlue-Dev/nativecode-runtime/releases/download/runtime-1.8.0"
+    const val BASE_URL = "https://github.com/zenithblue-oss/nativecode-runtime/releases/download/runtime-1.8.0"
     const val HOST = "github.com"
 
     private const val ROOTFS_BYTES = 1_356_467_533L

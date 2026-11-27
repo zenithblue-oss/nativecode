@@ -45,7 +45,7 @@ class FlavorConfigTest {
         assertEquals(RootfsSourceResolver.PINNED_ALPAQUITA_SHA256, rootfs.sha256)
         assertEquals(RuntimeUpdatePack.PINNED_SHA256, update.sha256)
         assertEquals(AndroidDevPackManager.PINNED_SHA256, dev.sha256)
-        assertEquals("https://github.com/ZenithBlue-Dev/nativecode-runtime/releases/download/runtime-1.8.0/alpaquita_rootfs.tar.zst", rootfs.url)
+        assertEquals("https://github.com/zenithblue-oss/nativecode-runtime/releases/download/runtime-1.8.0/alpaquita_rootfs.tar.zst", rootfs.url)
         val gpu = ReleasePins.pinFor(PlayAssetDeliveryManager.PACK_GPU_DRIVER, ReleasePins.BASE_URL)
         assertEquals("063bcf0cacd6605458f01530e7fc4f4de43cda7d7a995d9518e1a6e38f5d0db6", gpu.sha256) // = panvk .so.sha256
         assertEquals(33_917_432L, gpu.sizeBytes)

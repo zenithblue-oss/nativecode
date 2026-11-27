@@ -13,11 +13,11 @@
   <img alt="Platform" src="https://img.shields.io/badge/platform-android-3DDC84">
   <img alt="Language" src="https://img.shields.io/badge/language-kotlin-7F52FF">
   <img alt="Linux" src="https://img.shields.io/badge/os-debian%2013%20(trixie)-A81D33">
-  <img alt="License" src="https://img.shields.io/badge/license-proprietary-lightgrey">
+  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue">
 </p>
 
 <p align="center">
-  <a href="https://github.com/zenithblue-oss/nativecode-ai"><img alt="App Repo" src="https://img.shields.io/badge/App-Repo-7F52FF?logo=github"></a>
+  <a href="https://github.com/zenithblue-oss/nativecode"><img alt="App Repo" src="https://img.shields.io/badge/App-Repo-7F52FF?logo=github"></a>
   <a href="https://github.com/zenithblue-oss/nativecode-marketplace"><img alt="Marketplace" src="https://img.shields.io/badge/Marketplace-nativecode--marketplace-3DDC84?logo=github"></a>
 </p>
 
@@ -141,4 +141,4 @@ fastlane/       Store metadata
 
 ## License
 
-Proprietary. See `docs/privacy-policy.md` for privacy details.
+GPL-3.0-or-later. See `LICENSE`. See `docs/privacy-policy.md` for privacy details.
