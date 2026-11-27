@@ -32,6 +32,9 @@ if [ -d "$TERMUX_PREFIX/share/xkeyboard-config-2" ]; then
 else
   export XKB_CONFIG_ROOT="$TERMUX_PREFIX/share/X11/xkb"
 fi
+# The F-Droid bootstrap ships no xkeyboard-config: use the guest's (the Phosh desktop needs it anyway).
+[ -d "$XKB_CONFIG_ROOT" ] || XKB_CONFIG_ROOT="$TERMUX_PREFIX/var/lib/proot-distro/containers/${DISTRO}/rootfs/usr/share/X11/xkb"
+export XKB_CONFIG_ROOT
 
 # Configure PulseAudio (use home to avoid root-owned stale tmp dirs)
 export PULSE_RUNTIME_PATH="${HOME}/.pulse"
@@ -191,7 +194,7 @@ fi
 if ! $X11_RUNNING; then
   echo "FluxLinux: Starting termux-x11 server via app_process..."
   TMPDIR="$TMPDIR" \
-  XKB_CONFIG_ROOT="$TERMUX_PREFIX/share/xkeyboard-config-2" \
+  XKB_CONFIG_ROOT="$XKB_CONFIG_ROOT" \
   LD_LIBRARY_PATH="" LD_PRELOAD="" \
   CLASSPATH="$TERMUX_PREFIX/libexec/termux-x11/loader.apk" \
   TERMUX_X11_APK_PATH="$TERMUX_X11_APK_PATH" \
