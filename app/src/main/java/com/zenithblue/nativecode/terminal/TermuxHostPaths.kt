@@ -70,6 +70,26 @@ object TermuxHostPaths {
     fun rewriteStockPaths(text: String): String =
         text.replace(STOCK_DATA_ROOT, DATA_ROOT)
 
+    /** Non-Play builds only (Play keeps its stock port): start_gui.sh and the guest session read these. */
+    internal fun pulseEnvLines(port: Int = PulseHost.PORT): List<String> =
+        if (port == PulseHost.DEFAULT_PORT) emptyList()
+        else listOf("export NC_PULSE_PORT=\"$port\"", "export NC_PULSE_SERVER=\"${PulseHost.server(port)}\"")
+
+    /** [env] with the NC_PULSE_* lines replaced by [pulseEnvLines]; every other line is kept as is. */
+    internal fun withPulseEnv(env: String, port: Int = PulseHost.PORT): String {
+        val rest = env.lines().filterNot { it.startsWith("export NC_PULSE_") }.joinToString("\n").trimEnd('\n')
+        return rest + "\n" + pulseEnvLines(port).joinToString("") { it + "\n" }
+    }
+
+    /** An existing env file (written by an older build, sentinel already set) gains this build's pulse port without a full rewrite. */
+    private fun syncPulseEnv(filesDir: File) {
+        val f = hostEnvFile(filesDir)
+        if (!f.isFile) return
+        val cur = f.readText()
+        val next = withPulseEnv(cur)
+        if (next != cur) f.writeText(next)
+    }
+
     /**
      * Write `usr/etc/fluxlinux-host.env` for shell scripts to source.
      * Generated from this object only — do not hand-edit on device.
@@ -91,6 +111,7 @@ object TermuxHostPaths {
             appendLine("export TMPDIR=\"$TMPDIR\"")
             appendLine("export PROOT_TMP_DIR=\"$TMPDIR\"")
             appendLine("export TERMUX_VERSION=\"$TERMUX_VERSION\"")
+            pulseEnvLines().forEach { appendLine(it) }
             appendLine("export SSL_CERT_FILE=\"$SSL_CERT\"")
             appendLine("export CURL_CA_BUNDLE=\"$SSL_CERT\"")
             if (prootBin.isNotEmpty()) {
@@ -119,6 +140,7 @@ object TermuxHostPaths {
     fun applyPackageToExtractedPrefix(filesDir: File, ctx: Context? = null, force: Boolean = false): Int {
         val sentinel = File(filesDir, "usr/etc/.paths_rewritten")
         if (!force && sentinel.exists()) {
+            runCatching { syncPulseEnv(filesDir) }
             return 0
         }
         var rewritten = 0

@@ -123,6 +123,15 @@ apply_overlays() {
   # (other packages still name python-tkinter in Depends, so keep the subpackage but without tcl/tk deps)
   sed -i 's|^TERMUX_SUBPKG_DEPENDS="tcl, tk"|TERMUX_SUBPKG_DEPENDS="zlib"|' "$TP/packages/python/python-tkinter.subpackage.sh"
   ! grep -q '_tkinter\|="tk"' "$TP/packages/python/build.sh"
+  # PulseAudio as a headless TCP/OpenSL server: no D-Bus (its libx11/xorg chain), no GLib mainloop (glib pulls the
+  # gobject-introspection cross toolchain) no `check` (-> pkg-config -> glib) for unit tests the build never runs, and no man pages (xmltoman).
+  git -C "$TP" checkout -- packages/pulseaudio   # re-runs start from the pristine recipe
+  sed -i -e 's|^TERMUX_PKG_DEPENDS="dbus, |TERMUX_PKG_DEPENDS="|' \
+         -e 's|^TERMUX_PKG_BUILD_DEPENDS="libtool, glib, check"|TERMUX_PKG_BUILD_DEPENDS="libtool"|' \
+         -e 's|^-D gtk=disabled$|-D gtk=disabled\n-D glib=disabled\n-D dbus=disabled\n-D tests=false\n-D man=false|' "$TP/packages/pulseaudio/build.sh"
+  # pulseaudio-glib stays (other packages name it in Depends) but is empty and depends on libc++ instead of glib.
+  sed -i 's|^TERMUX_SUBPKG_DEPENDS="glib"|TERMUX_SUBPKG_DEPENDS="libc++"|' "$TP/packages/pulseaudio/pulseaudio-glib.subpackage.sh"
+  grep -q '^-D dbus=disabled' "$TP/packages/pulseaudio/build.sh" && ! grep -q 'dbus, ' "$TP/packages/pulseaudio/build.sh"
 }
 
 # --- source mirrors (some upstreams answer curl with HTTP 403/418) -----------

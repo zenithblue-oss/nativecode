@@ -2,8 +2,9 @@
 # resolved from the built debs' Depends: (assemble_bootstrap.py), build deps by termux.
 # Kept because the app still needs them: python + proot-distro (rootfs install
 # runs `python proot-distro install`), proot, shell + coreutils-class tools.
-# Dropped vs the Play bootstrap: pulseaudio, virglrenderer-android, xkeyboard-config,
-# libx11 family, dbus, termux-am.
+# Dropped vs the Play bootstrap: virglrenderer-android, xkeyboard-config, libx11 family, termux-am.
+# pulseaudio is kept (desktop audio: the guest talks to it over TCP, module-sles-sink plays on Android);
+# its runtime deps (dbus, libsndfile, libsoxr, speexdsp, webrtc-audio-processing...) come along from the built debs.
 bash
 termux-exec
 coreutils
@@ -24,3 +25,4 @@ termux-core
 proot
 proot-distro
 python
+pulseaudio

@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 object HostServerController {
     private const val TAG = "HostServerController"
     private const val LINKER = "/system/bin/linker64"
-    private const val TCP_MODULE = "module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1"
+    private val TCP_MODULE get() = "module-native-protocol-tcp ${PulseHost.tcpArgs()}"
 
     enum class Kind { VENUS, PULSE }
 
@@ -273,7 +273,7 @@ object HostServerController {
                 "--dl-search-path", "${TermuxHostPaths.LIB}/pulseaudio/modules",
                 "--load", TCP_MODULE,
                 "--exit-idle-time=-1"
-            )
+            ) + if (PulseHost.USES_AAUDIO) listOf("--load", "module-aaudio-sink") else emptyList()
         )
     }
 
@@ -318,7 +318,7 @@ object HostServerController {
         if (pacmd.isFile) {
             val p2 = spawn(
                 ctx,
-                withLinker(listOf(pacmd.absolutePath, "load-module", "module-native-protocol-tcp", "auth-ip-acl=127.0.0.1", "auth-anonymous=1"))
+                withLinker(listOf(pacmd.absolutePath, "load-module", "module-native-protocol-tcp") + PulseHost.tcpArgs().split(" "))
             )
             p2.waitFor(4, TimeUnit.SECONDS)
         }
@@ -358,7 +358,8 @@ object HostServerController {
             it.endsWith("pulseaudio") || it.endsWith("/pacmd") || it.endsWith("/pactl")
         }
         if (isPulse) {
-            env["LD_LIBRARY_PATH"] = TermuxHostPaths.LIB
+            // PREFIX/lib alone shadows system libs the AAudio module pulls in (Xzs_Construct): system first off-Play.
+            env["LD_LIBRARY_PATH"] = if (PulseHost.USES_AAUDIO) "/system/lib64:${TermuxHostPaths.LIB}" else TermuxHostPaths.LIB
         } else {
             // PREFIX/lib shadows Android libEGL/libvulkan and breaks vtest (Xzs_Construct).
             env["LD_LIBRARY_PATH"] = "/system/lib64:${TermuxHostPaths.PREFIX}/opt/virglrenderer-android/lib"

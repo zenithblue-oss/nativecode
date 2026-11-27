@@ -127,7 +127,7 @@ object ProotCommandBuilder {
                 appendLine("export ANDROID_TZDATA_ROOT='/apex/com.android.tzdata'")
                 appendLine("export EXTERNAL_STORAGE='/sdcard'")
                 appendLine("export MOZ_FAKE_NO_SANDBOX='1'")
-                appendLine("export PULSE_SERVER='127.0.0.1'")
+                appendLine("export PULSE_SERVER='${PulseHost.server()}'")
             }
             target.writeText(content)
         } catch (_: Exception) {}
@@ -343,7 +343,7 @@ object ProotCommandBuilder {
             put("ANDROID_SDK_ROOT", "/opt/android-sdk")
 
             put("MOZ_FAKE_NO_SANDBOX", "1")
-            put("PULSE_SERVER", "127.0.0.1")
+            put("PULSE_SERVER", PulseHost.server())
             put("EXTERNAL_STORAGE", "/sdcard")
             put("TMPDIR", "/tmp")
             put("XDG_RUNTIME_DIR", "/tmp")

@@ -42,6 +42,7 @@ object LinuxGuestDefaults {
             installFont(context, rootfs)
             installFontAlias(rootfs)
             renameLegacyHostProfile(rootfs)
+            retargetPulseServer(rootfs)
             pinXfceTerminalFont(rootfs)
             AgentConfigInstaller.install(context)
             // Gate files (PATH profile, gate-last blocks, shims) are fixed on app update only (applyOnUpdate);
@@ -70,6 +71,16 @@ object LinuxGuestDefaults {
     private fun installFontAlias(rootfs: File) {
         val configDir = File(rootfs, "etc/fonts/conf.d").also { it.mkdirs() }
         writeIfChanged(File(configDir, "40-nativecode-monospace.conf"), fontConfig)
+    }
+
+    /** Guest files baked with PULSE_SERVER=127.0.0.1 (stock port) follow this app's own PulseAudio port; Play stays untouched. */
+    internal fun retargetPulseServer(rootfs: File, port: Int = com.zenithblue.nativecode.terminal.PulseHost.PORT) {
+        if (port == com.zenithblue.nativecode.terminal.PulseHost.DEFAULT_PORT) return
+        for (rel in listOf("etc/profile.d/nativecode-host.sh", "etc/profile.d/termux-profile.sh", "home/flux/.vnc/xstartup", "root/.vnc/xstartup")) {
+            val f = File(rootfs, rel)
+            if (!f.isFile || java.nio.file.Files.isSymbolicLink(f.toPath())) continue
+            writeIfChanged(f, com.zenithblue.nativecode.terminal.PulseHost.retarget(f.readText(), port))
+        }
     }
 
     private fun renameLegacyHostProfile(rootfs: File) {
