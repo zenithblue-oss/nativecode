@@ -45,6 +45,8 @@ class AgentBridgeServer(
         private const val TAG = "AgentBridgeServer"
         const val PRIMARY_SOCKET_NAME = "nativecode.agent.v1"
         const val SOCKET_NAME_PREFIX = "nativecode.agent.v1."
+        /** CLI names of the `cmd` values handled in handleClient (shown on the Hardware page; keep in sync). */
+        val COMMANDS = listOf("ping", "toast", "notify", "status", "telemetry", "open-link", "install-apk", "share-file", "dismiss-alert")
         const val NOTIFICATION_CHANNEL_ID = "agent_notifications"
         const val NOTIFICATION_CHANNEL_NAME = "Agent Alerts & Progress"
 

@@ -95,7 +95,7 @@ object GpuRuntimeStatus {
 
     private fun guestRoot(ctx: Context): File {
         val method = LinuxCommandBuilder.currentMethod
-        return if (method == "chroot") {
+        return if (method == "chroot" && !com.zenithblue.nativecode.ProotOnly.ON) { // chroot is gated off in F-Droid/Play
             File(ChrootCommandBuilder.CHROOT_PATH)
         } else {
             ProjectPathResolver.prootRootfsDir(ctx)

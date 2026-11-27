@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">Décodeurs : chargement...</string>
     <string name="main_encoders_loading">Encodeurs : chargement...</string>
     <string name="main_nativecode_host_ipc_bridge">PONT IPC HÔTE NATIVECODE</string>
-    <string name="main_bridge_active_abstract_af_unix">Pont : actif (AF_UNIX abstrait)</string>
     <string name="main_test_ping">TESTER LE PING</string>
     <string name="main_testing_nativecode_agent_v1_ping">Test du ping @nativecode.agent.v1...</string>
     <string name="main_agent_ping_ok_ms">Ping de l\'agent OK (%1$sms)</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">Installation d\'APK par l\'agent : OK (%1$s)</string>
     <string name="main_bridge_status_ready">État du pont : prêt</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s method=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">Sockets du pont AF_UNIX :\n• Pont d\'agent : sondage...\n• Pont média VPU : sondage...\n• UID du pair : %1$s (sécurité appliquée)</string>
     <string name="main_active_live">● ACTIF (en direct)</string>
     <string name="main_offline_2">○ HORS LIGNE</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">Sockets du pont AF_UNIX :\n• Pont d\'agent : @nativecode.agent.v1 (%1$s)\n• Pont média VPU : @nativecode.media.v1 (%2$s)\n• UID du pair : %3$s (sécurité appliquée)</string>
     <string name="main_restart">REDÉMARRER</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio TCP (style FluxLinux). Sans root.</string>
     <string name="main_harmful_content">Contenu nuisible</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">Serveur SSH · hôtes distants · clés</string>
     <string name="fd_ssh_footer">SERVEUR · CLIENT · CLÉS</string>
     <string name="main_not_signed_in_optional">NON CONNECTÉ · FACULTATIF</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">PILOTE GPU</string>
+    <string name="hw_driver_badge_ok">À JOUR</string>
+    <string name="hw_driver_badge_update">MISE À JOUR</string>
+    <string name="hw_driver_badge_missing">NON INSTALLÉ</string>
+    <string name="hw_driver_na_detail">Aucun paquet de pilote Vulkan pour ce GPU. L’invité utilise Venus, VirGL ou le rendu logiciel.</string>
+    <string name="hw_driver_detail">%1$s\nInstallé : %2$s\nFourni : %3$s\nSource : %4$s</string>
+    <string name="hw_driver_missing_detail">%1$s n’est pas encore dans le rootfs invité. Terminez d’abord la configuration Linux.</string>
+    <string name="hw_driver_update_hint">Un pilote plus récent est prêt. Arrêtez le bureau, puis mettez-le à jour dans Composants.</string>
+    <string name="hw_driver_open_components">OUVRIR COMPOSANTS</string>
+    <string name="hw_src_bundled">intégré à l’appli</string>
+    <string name="hw_src_download">GitHub Releases (taille et sha256 vérifiés)</string>
+    <string name="hw_checking">Vérification...</string>
+    <string name="hw_bridge_not_started">NON DÉMARRÉ</string>
+    <string name="hw_rdv_ok">OK (uid %1$s)</string>
+    <string name="hw_rdv_stale">OBSOLÈTE (redémarrez l’appli)</string>
+    <string name="hw_rdv_missing">ABSENT</string>
+    <string name="hw_features_title">FONCTIONS DU PONT</string>
+    <string name="hw_device_line">RAM libre : %1$s sur %2$s Mo\nBatterie : %3$s, thermique : %4$s</string>
+    <string name="hw_guest_proot">Invité : PRoot, sans root (le shell root est un faux root PRoot)</string>
+    <string name="hw_guest_chroot">Invité : chroot (nécessite root)</string>
+    <string name="hw_x11_prebuilt">X11 : Termux:X11 libXlorie, précompilé</string>
+    <string name="hw_x11_source">X11 : Termux:X11 libXlorie, compilé depuis les sources</string>
+    <string name="hw_x11_missing">X11 : libXlorie introuvable</string>
+    <string name="hw_feat_commands">Commandes de l’agent : %1$s</string>
+    <string name="hw_feat_chat">Routage du chat : une CLI lancée depuis un chat envoie ses cartes à ce fil (NC_CHAT_THREAD). Les fichiers partagés s’ouvrent dans la visionneuse (image, vidéo, audio, PDF).</string>
+    <string name="hw_feat_mcp_up">MCP des outils : 127.0.0.1:%1$s, loopback uniquement, jeton bearer par fil de chat</string>
+    <string name="hw_feat_mcp_idle">MCP des outils : démarre avec le premier chat</string>
+    <string name="hw_feat_browser">Navigateur de l’agent : WebView intégré, piloté par les outils browser_*</string>
+    <string name="hw_feat_preview_found">Aperçu : serveur de dev à l’écoute sur %1$s</string>
+    <string name="hw_feat_preview_none">Aperçu : aucun serveur de dev à l’écoute</string>
+    <string name="hw_feat_skills">Skills : %1$s’intégrées</string>
+    <string name="hw_host_not_bundled">NON INCLUS</string>
+    <string name="hw_venus_not_bundled">Venus : absent de cette version. PanVK et Turnip n’en ont pas besoin.</string>
+    <string name="hw_pulse_port">Port TCP %1$s, sortie %2$s</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio TCP. Venus est réservé à Mali ; Adreno utilise Turnip/KGSL.</string>
 </resources>

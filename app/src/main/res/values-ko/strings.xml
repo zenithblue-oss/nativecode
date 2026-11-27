@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">디코더: 불러오는 중...</string>
     <string name="main_encoders_loading">인코더: 불러오는 중...</string>
     <string name="main_nativecode_host_ipc_bridge">NATIVECODE 호스트 IPC 브리지</string>
-    <string name="main_bridge_active_abstract_af_unix">브리지: 활성 (Abstract AF_UNIX)</string>
     <string name="main_test_ping">핑 테스트</string>
     <string name="main_testing_nativecode_agent_v1_ping">@nativecode.agent.v1 핑 테스트 중...</string>
     <string name="main_agent_ping_ok_ms">에이전트 핑 정상 (%1$sms)</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">에이전트 APK 설치: 정상 (%1$s)</string>
     <string name="main_bridge_status_ready">브리지 상태: 준비됨</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s method=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">AF_UNIX 브리지 소켓:\n• 에이전트 브리지: 확인 중...\n• 미디어 VPU 브리지: 확인 중...\n• 피어 UID: %1$s (보안 적용)</string>
     <string name="main_active_live">● 활성 (실시간)</string>
     <string name="main_offline_2">○ 오프라인</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">AF_UNIX 브리지 소켓:\n• 에이전트 브리지: @nativecode.agent.v1 (%1$s)\n• 미디어 VPU 브리지: @nativecode.media.v1 (%2$s)\n• 피어 UID: %3$s (보안 적용)</string>
     <string name="main_restart">다시 시작</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio TCP (FluxLinux 방식). 루트 불필요.</string>
     <string name="main_harmful_content">유해 콘텐츠</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">SSH 서버 · 원격 호스트 · 키</string>
     <string name="fd_ssh_footer">서버 · 클라이언트 · 키</string>
     <string name="main_not_signed_in_optional">로그인 안 됨 · 선택 사항</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">GPU 드라이버</string>
+    <string name="hw_driver_badge_ok">최신</string>
+    <string name="hw_driver_badge_update">업데이트</string>
+    <string name="hw_driver_badge_missing">설치 안 됨</string>
+    <string name="hw_driver_na_detail">이 GPU용 Vulkan 드라이버 패키지가 없습니다. 게스트는 Venus, VirGL 또는 소프트웨어 렌더링을 사용합니다.</string>
+    <string name="hw_driver_detail">%1$s\n설치됨: %2$s\n포함됨: %3$s\n출처: %4$s</string>
+    <string name="hw_driver_missing_detail">%1$s이(가) 아직 게스트 rootfs에 없습니다. 먼저 Linux 설정을 완료하세요.</string>
+    <string name="hw_driver_update_hint">새 드라이버가 준비되었습니다. 데스크톱을 중지한 뒤 구성 요소에서 업데이트하세요.</string>
+    <string name="hw_driver_open_components">구성 요소 열기</string>
+    <string name="hw_src_bundled">앱에 포함됨</string>
+    <string name="hw_src_download">GitHub Releases (크기 및 sha256 확인)</string>
+    <string name="hw_checking">확인 중...</string>
+    <string name="hw_bridge_not_started">시작 안 됨</string>
+    <string name="hw_rdv_ok">OK (uid %1$s)</string>
+    <string name="hw_rdv_stale">오래됨 (앱 재시작)</string>
+    <string name="hw_rdv_missing">없음</string>
+    <string name="hw_features_title">브리지 기능</string>
+    <string name="hw_device_line">여유 RAM: %2$s MB 중 %1$s MB\n배터리: %3$s, 온도 상태: %4$s</string>
+    <string name="hw_guest_proot">게스트: PRoot, root 불필요 (root 셸은 PRoot 가짜 root)</string>
+    <string name="hw_guest_chroot">게스트: chroot (root 필요)</string>
+    <string name="hw_x11_prebuilt">X11: Termux:X11 libXlorie, 빌드 완료본</string>
+    <string name="hw_x11_source">X11: Termux:X11 libXlorie, 소스에서 빌드</string>
+    <string name="hw_x11_missing">X11: libXlorie를 찾을 수 없음</string>
+    <string name="hw_feat_commands">에이전트 명령: %1$s</string>
+    <string name="hw_feat_chat">채팅 라우팅: 채팅에서 시작한 CLI는 해당 스레드로 카드를 보냅니다 (NC_CHAT_THREAD). 공유된 파일은 뷰어에서 열립니다 (이미지, 동영상, 오디오, PDF).</string>
+    <string name="hw_feat_mcp_up">도구 MCP: 127.0.0.1:%1$s, 루프백 전용, 채팅 스레드별 Bearer 토큰</string>
+    <string name="hw_feat_mcp_idle">도구 MCP: 첫 채팅과 함께 시작</string>
+    <string name="hw_feat_browser">에이전트 브라우저: 앱 내 WebView, browser_* 도구로 제어</string>
+    <string name="hw_feat_preview_found">미리보기: 개발 서버가 %1$s에서 대기 중</string>
+    <string name="hw_feat_preview_none">미리보기: 대기 중인 개발 서버 없음</string>
+    <string name="hw_feat_skills">스킬: %1$s개 내장</string>
+    <string name="hw_host_not_bundled">미포함</string>
+    <string name="hw_venus_not_bundled">Venus: 이 빌드에는 없습니다. PanVK와 Turnip에는 필요하지 않습니다.</string>
+    <string name="hw_pulse_port">TCP 포트 %1$s, %2$s 싱크</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio TCP. Venus는 Mali 전용이며 Adreno는 Turnip/KGSL을 사용합니다.</string>
 </resources>

@@ -238,6 +238,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     private lateinit var vpuEncodersTv: TextView
     private lateinit var bridgeStatusTv: TextView
     private lateinit var bridgeLogTv: TextView
+    private lateinit var hwDriverBadge: TextView
+    private lateinit var hwDriverTv: TextView
+    private lateinit var hwDriverBtn: View
+    private lateinit var hwFeaturesTv: TextView
     /** Repairs page: host | guest | chroot */
     private var repairsSelectedTab: String = "host"
     private var repairsRootOk: Boolean? = null
@@ -17513,6 +17517,42 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         pageLayout.addView(spacer(16))
 
+        // GPU driver card: PanVK (Mali) / Turnip (Adreno) package state, same check as the Components update cards.
+        pageLayout.addView(glassCard().apply {
+            val titleRow = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            titleRow.addView(TextView(this@MainActivity).apply {
+                text = tr(R.string.hw_driver_title)
+                textSize = 14f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
+            })
+            hwDriverBadge = textBadge(tr(R.string.hw_checking), NC.SURFACE_HIGHEST, NC.ON_SURF_VAR)
+            titleRow.addView(hwDriverBadge)
+            addView(titleRow)
+            hwDriverTv = TextView(this@MainActivity).apply {
+                text = tr(R.string.hw_checking)
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setPadding(0, dp(6), 0, 0)
+            }
+            addView(hwDriverTv)
+            hwDriverBtn = secondaryButton(tr(R.string.hw_driver_open_components)) {
+                pageStack.push(ID_COMPONENTS); navigateToPage(ID_COMPONENTS)
+            }.apply {
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) }
+                textSize = 11f
+                visibility = View.GONE
+            }
+            addView(hwDriverBtn)
+        })
+
+        pageLayout.addView(spacer(16))
+
         pageLayout.addView(glassCard().apply {
             addView(TextView(this@MainActivity).apply {
                 text = tr(R.string.main_host_servers)
@@ -17645,7 +17685,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             })
 
             bridgeStatusTv = TextView(this@MainActivity).apply {
-                text = tr(R.string.main_bridge_active_abstract_af_unix)
+                text = tr(R.string.hw_checking)
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)
                 typeface = Typeface.MONOSPACE
@@ -17923,6 +17963,26 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             addView(bridgeLogTv)
         })
+
+        pageLayout.addView(spacer(16))
+
+        pageLayout.addView(glassCard().apply {
+            addView(TextView(this@MainActivity).apply {
+                text = tr(R.string.hw_features_title)
+                textSize = 14f
+                setTextColor(NC.PRIMARY)
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, 0, 0, dp(4))
+            })
+            hwFeaturesTv = TextView(this@MainActivity).apply {
+                text = tr(R.string.hw_checking)
+                textSize = 11f
+                setTextColor(NC.ON_SURF_VAR)
+                typeface = Typeface.MONOSPACE
+                setLineSpacing(dp(2).toFloat(), 1.1f)
+            }
+            addView(hwFeaturesTv)
+        })
     }
 
     private fun refreshHardwarePage() {
@@ -17960,7 +18020,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         )
 
         val soc = "${Build.MANUFACTURER} ${Build.MODEL} (${Build.HARDWARE})"
-        vpuSocDetailTv.text = "Device: $soc\nAndroid API: ${Build.VERSION.SDK_INT}"
+        vpuSocDetailTv.text = "Device: $soc\nSoC: ${gpu.soc}\nAndroid API: ${Build.VERSION.SDK_INT}"
 
         val avcDec = MediaCodecSelector.selectHardwareDecoder("video/avc")?.name ?: "None"
         val hevcDec = MediaCodecSelector.selectHardwareDecoder("video/hevc")?.name ?: "None"
@@ -17977,17 +18037,104 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         vpuDecodersTv.text = "Hardware Decoders:\n• H.264 / AVC: $avcDec\n• HEVC / H.265: $hevcDec\n• AV1: $av1Dec\n• VP9: $vp9Dec"
         vpuEncodersTv.text = "Hardware Encoders:\n• H.264: $avcEnc\n• HEVC: $hevcEnc"
 
-        bridgeStatusTv.text = tr(R.string.main_af_unix_bridge_sockets_agent, android.os.Process.myUid())
+        bridgeStatusTv.text = tr(R.string.hw_checking)
+        refreshHardwareProbes()
+    }
 
-        Thread {
-            val agentLive = probeLocalSocket("nativecode.agent.v1") || probeLocalSocket("nativecode.agent.v1.${android.os.Process.myUid()}")
-            val mediaLive = probeLocalSocket("nativecode.media.v1") || probeLocalSocket("nativecode.media.v1.${android.os.Process.myUid()}")
-            runOnUiThread {
-                val agentStatus = if (agentLive) tr(R.string.main_active_live) else tr(R.string.main_offline_2)
-                val mediaStatus = if (mediaLive) tr(R.string.main_active_live) else tr(R.string.main_offline_2)
-                bridgeStatusTv.text = tr(R.string.main_af_unix_bridge_sockets_agent_2, agentStatus, mediaStatus, android.os.Process.myUid())
+    /** Hardware page probes that touch files / sockets / hashes: off the main thread, painted when done. */
+    private fun refreshHardwareProbes() {
+        val uid = android.os.Process.myUid()
+        executor.execute {
+            // Bound socket names, not "plain or uid": with Play + F-Droid side by side the plain name can be the OTHER app's.
+            val agentName = NativeCodeBridge.agentSocketName()
+            val mediaName = NativeCodeBridge.mediaSocketName()
+            fun live(name: String?) = when {
+                name == null -> tr(R.string.hw_bridge_not_started)
+                probeLocalSocket(name) -> tr(R.string.main_active_live)
+                else -> tr(R.string.main_offline_2)
             }
-        }.start()
+            val rdvText = try {
+                File(ProjectPathResolver.prootRootfsDir(this), "run/${com.zenithblue.nativecode.agent.BridgeRendezvous.FILE_NAME}")
+                    .takeIf { it.isFile }?.readText()
+            } catch (_: Exception) { null }
+            val rdv = when (HardwareStatus.rendezvous(rdvText, com.zenithblue.nativecode.agent.BridgeRendezvous.json(uid))) {
+                HardwareStatus.Rendezvous.OK -> tr(R.string.hw_rdv_ok, uid)
+                HardwareStatus.Rendezvous.STALE -> tr(R.string.hw_rdv_stale)
+                HardwareStatus.Rendezvous.MISSING -> tr(R.string.hw_rdv_missing)
+            }
+            val bridgeText = "Agent socket: @${agentName ?: "-"}  ${live(agentName)}\n" +
+                "Media socket: @${mediaName ?: "-"}  ${live(mediaName)}\n" +
+                "Rendezvous: /run/${com.zenithblue.nativecode.agent.BridgeRendezvous.FILE_NAME}  $rdv\n" +
+                "Peer UID: $uid (SO_PEERCRED)"
+
+            // GPU driver package: same installed-sha / needsUpdate check as the Components update cards.
+            val turnip = GpuAccelDetector.isTurnip()
+            val applicable = turnip || GpuAccelDetector.isPanvk()
+            val label = if (turnip) TurnipDriverUpdate.VERSION_LABEL else PanvkDriverUpdate.VERSION_LABEL
+            var installed: String? = null
+            var shipped: String? = null
+            var needs = false
+            if (applicable) try {
+                installed = if (turnip) TurnipDriverUpdate.installedSha(this) else PanvkDriverUpdate.installedSha(this)
+                shipped = if (turnip) TurnipDriverUpdate.bundledSha(this) else PanvkDriverUpdate.bundledSha(this)
+                needs = if (turnip) TurnipDriverUpdate.needsUpdate(this) else PanvkDriverUpdate.needsUpdate(this)
+            } catch (_: Exception) { }
+            val drv = HardwareStatus.driver(applicable, installed, needs)
+            val source = tr(if (BuildConfig.FDROID) R.string.hw_src_download else R.string.hw_src_bundled)
+            val drvText = when (drv) {
+                HardwareStatus.Driver.NOT_APPLICABLE -> tr(R.string.hw_driver_na_detail)
+                HardwareStatus.Driver.MISSING -> tr(R.string.hw_driver_missing_detail, label)
+                else -> tr(R.string.hw_driver_detail, label, HardwareStatus.shortSha(installed), HardwareStatus.shortSha(shipped), source) +
+                    if (drv == HardwareStatus.Driver.UPDATE) "\n" + tr(R.string.hw_driver_update_hint) else ""
+            }
+
+            // Bridge features and system lines.
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            val mem = android.app.ActivityManager.MemoryInfo().also { am?.getMemoryInfo(it) }
+            val bat = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val batPct = bat?.let {
+                val lv = it.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                val sc = it.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                if (lv >= 0 && sc > 0) "${lv * 100 / sc}%" else null
+            } ?: "n/a"
+            val thermal = (getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager)
+                ?.let { HardwareStatus.thermal(it.currentThermalStatus) } ?: "UNKNOWN"
+            val xlorie = File(applicationInfo.nativeLibraryDir, "libXlorie.so").isFile
+            val mcpPort = com.zenithblue.nativecode.agent.chat.tools.NcMcp.port()
+            val ports = com.zenithblue.nativecode.preview.PortProbe.probe()
+            val skills = try { com.zenithblue.nativecode.skills.SkillsCatalog.all().size } catch (_: Throwable) { 0 }
+            val features = listOf(
+                tr(R.string.hw_device_line, mem.availMem / (1024 * 1024), mem.totalMem / (1024 * 1024), batPct, thermal),
+                tr(if (!ProotOnly.ON && LinuxCommandBuilder.currentMethod == "chroot") R.string.hw_guest_chroot else R.string.hw_guest_proot),
+                tr(if (!xlorie) R.string.hw_x11_missing else if (BuildConfig.FDROID) R.string.hw_x11_source else R.string.hw_x11_prebuilt),
+                tr(R.string.hw_feat_commands, AgentBridgeServer.COMMANDS.joinToString(", ")),
+                tr(R.string.hw_feat_chat),
+                if (mcpPort > 0) tr(R.string.hw_feat_mcp_up, mcpPort) else tr(R.string.hw_feat_mcp_idle),
+                tr(R.string.hw_feat_browser),
+                if (ports.isEmpty()) tr(R.string.hw_feat_preview_none) else tr(R.string.hw_feat_preview_found, ports.joinToString(", ")),
+                tr(R.string.hw_feat_skills, skills)
+            ).joinToString("\n")
+
+            runOnUiThread {
+                bridgeStatusTv.text = bridgeText
+                hwDriverBadge.text = when (drv) {
+                    HardwareStatus.Driver.UP_TO_DATE -> tr(R.string.hw_driver_badge_ok)
+                    HardwareStatus.Driver.UPDATE -> tr(R.string.hw_driver_badge_update)
+                    HardwareStatus.Driver.MISSING -> tr(R.string.hw_driver_badge_missing)
+                    HardwareStatus.Driver.NOT_APPLICABLE -> "N/A"
+                }
+                hwDriverBadge.setTextColor(
+                    when (drv) {
+                        HardwareStatus.Driver.UP_TO_DATE -> NC.PRIMARY
+                        HardwareStatus.Driver.MISSING -> NC.ERROR
+                        else -> NC.ON_SURF_VAR
+                    }
+                )
+                hwDriverTv.text = drvText
+                hwDriverBtn.visibility = if (drv == HardwareStatus.Driver.UPDATE) View.VISIBLE else View.GONE
+                hwFeaturesTv.text = features
+            }
+        }
     }
 
     private fun hostServerButtonRow(kind: HostServerController.Kind): LinearLayout {
@@ -18031,33 +18178,38 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         if (::hostServersBlurbTv.isInitialized) {
             hostServersBlurbTv.text = if (turnip) {
-                "PulseAudio TCP (FluxLinux style). Venus is Mali-only; Adreno uses Turnip/KGSL."
+                tr(R.string.hw_pulse_turnip_blurb)
             } else {
                 tr(R.string.main_venus_vtest_pulseaudio_tcp_fluxlinux)
             }
         }
         val venus = HostServerController.status(HostServerController.Kind.VENUS)
         val pulse = HostServerController.status(HostServerController.Kind.PULSE)
-        fun paint(badge: TextView, detail: TextView, st: HostServerController.Status, title: String) {
-            val label = when {
-                !st.binaryExists -> "MISSING"
-                st.running -> "RUNNING"
-                else -> tr(R.string.ssh_stopped)
+        fun paint(badge: TextView, detail: TextView, st: HostServerController.Status, title: String, optional: Boolean, extra: String = "") {
+            val state = HardwareStatus.host(st.binaryExists, st.running, optional)
+            badge.text = when (state) {
+                HardwareStatus.Host.RUNNING -> "RUNNING"
+                HardwareStatus.Host.MISSING -> "MISSING"
+                HardwareStatus.Host.NOT_BUNDLED -> tr(R.string.hw_host_not_bundled)
+                HardwareStatus.Host.STOPPED -> tr(R.string.ssh_stopped)
             }
-            badge.text = label
             badge.setTextColor(
-                when (label) {
-                    "RUNNING" -> NC.PRIMARY
-                    "MISSING" -> NC.ERROR
+                when (state) {
+                    HardwareStatus.Host.RUNNING -> NC.PRIMARY
+                    HardwareStatus.Host.MISSING -> NC.ERROR
                     else -> NC.ON_SURF_VAR
                 }
             )
-            detail.text = "$title: ${st.detail}"
+            detail.text = if (state == HardwareStatus.Host.NOT_BUNDLED) tr(R.string.hw_venus_not_bundled) else "$title: ${st.detail}$extra"
         }
+        // Venus is optional: F-Droid builds may not ship the host server (PanVK/Turnip do not need it).
         if (!turnip && ::venusServerBadge.isInitialized) {
-            paint(venusServerBadge, venusServerDetailTv, venus, "Venus")
+            paint(venusServerBadge, venusServerDetailTv, venus, "Venus", optional = BuildConfig.FDROID)
         }
-        paint(pulseServerBadge, pulseServerDetailTv, pulse, "PulseAudio")
+        paint(
+            pulseServerBadge, pulseServerDetailTv, pulse, "PulseAudio", optional = false,
+            extra = "\n" + tr(R.string.hw_pulse_port, PulseHost.PORT, if (PulseHost.USES_AAUDIO) "AAudio" else "OpenSL ES")
+        )
     }
 
     private fun probeLocalSocket(name: String): Boolean {

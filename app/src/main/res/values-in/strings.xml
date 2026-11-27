@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">Decoder: Memuat...</string>
     <string name="main_encoders_loading">Encoder: Memuat...</string>
     <string name="main_nativecode_host_ipc_bridge">JEMBATAN IPC HOST NATIVECODE</string>
-    <string name="main_bridge_active_abstract_af_unix">Jembatan: Aktif (Abstract AF_UNIX)</string>
     <string name="main_test_ping">UJI PING</string>
     <string name="main_testing_nativecode_agent_v1_ping">Menguji ping @nativecode.agent.v1...</string>
     <string name="main_agent_ping_ok_ms">Ping Agen OK (%1$sms)</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">Pasang APK Agen: OK (%1$s)</string>
     <string name="main_bridge_status_ready">Status jembatan: Siap</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s metode=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">Socket Jembatan AF_UNIX:\n• Jembatan Agen: Memeriksa...\n• Jembatan Media VPU: Memeriksa...\n• Peer UID: %1$s (Keamanan Diterapkan)</string>
     <string name="main_active_live">● AKTIF (Langsung)</string>
     <string name="main_offline_2">○ OFFLINE</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">Socket Jembatan AF_UNIX:\n• Jembatan Agen: @nativecode.agent.v1 (%1$s)\n• Jembatan Media VPU: @nativecode.media.v1 (%2$s)\n• Peer UID: %3$s (Keamanan Diterapkan)</string>
     <string name="main_restart">MULAI ULANG</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio TCP (gaya FluxLinux). Tanpa root.</string>
     <string name="main_harmful_content">Konten berbahaya</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">Server SSH · host jarak jauh · kunci</string>
     <string name="fd_ssh_footer">SERVER · KLIEN · KUNCI</string>
     <string name="main_not_signed_in_optional">BELUM MASUK · OPSIONAL</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">DRIVER GPU</string>
+    <string name="hw_driver_badge_ok">TERBARU</string>
+    <string name="hw_driver_badge_update">PEMBARUAN</string>
+    <string name="hw_driver_badge_missing">BELUM TERPASANG</string>
+    <string name="hw_driver_na_detail">Tidak ada paket driver Vulkan untuk GPU ini. Guest memakai Venus, VirGL, atau rendering perangkat lunak.</string>
+    <string name="hw_driver_detail">%1$s\nTerpasang: %2$s\nDisertakan: %3$s\nSumber: %4$s</string>
+    <string name="hw_driver_missing_detail">%1$s belum ada di rootfs guest. Selesaikan dulu penyiapan Linux.</string>
+    <string name="hw_driver_update_hint">Driver yang lebih baru tersedia. Hentikan desktop, lalu perbarui di Komponen.</string>
+    <string name="hw_driver_open_components">BUKA KOMPONEN</string>
+    <string name="hw_src_bundled">dibundel di dalam aplikasi</string>
+    <string name="hw_src_download">GitHub Releases (ukuran dan sha256 diperiksa)</string>
+    <string name="hw_checking">Memeriksa...</string>
+    <string name="hw_bridge_not_started">BELUM DIMULAI</string>
+    <string name="hw_rdv_ok">OK (uid %1$s)</string>
+    <string name="hw_rdv_stale">USANG (mulai ulang aplikasi)</string>
+    <string name="hw_rdv_missing">HILANG</string>
+    <string name="hw_features_title">FITUR BRIDGE</string>
+    <string name="hw_device_line">RAM bebas: %1$s dari %2$s MB\nBaterai: %3$s, suhu: %4$s</string>
+    <string name="hw_guest_proot">Guest: PRoot, tanpa root (shell root adalah root palsu PRoot)</string>
+    <string name="hw_guest_chroot">Guest: chroot (perlu root)</string>
+    <string name="hw_x11_prebuilt">X11: Termux:X11 libXlorie, prebuilt</string>
+    <string name="hw_x11_source">X11: Termux:X11 libXlorie, dibangun dari kode sumber</string>
+    <string name="hw_x11_missing">X11: libXlorie tidak ditemukan</string>
+    <string name="hw_feat_commands">Perintah agen: %1$s</string>
+    <string name="hw_feat_chat">Perutean chat: CLI yang dijalankan dari chat mengirim kartu ke thread itu (NC_CHAT_THREAD). File yang dibagikan terbuka di penampil (gambar, video, audio, PDF).</string>
+    <string name="hw_feat_mcp_up">MCP alat: 127.0.0.1:%1$s, hanya loopback, token bearer per thread chat</string>
+    <string name="hw_feat_mcp_idle">MCP alat: mulai bersama chat pertama</string>
+    <string name="hw_feat_browser">Browser agen: WebView dalam aplikasi, dikendalikan oleh alat browser_*</string>
+    <string name="hw_feat_preview_found">Pratinjau: server dev mendengarkan di %1$s</string>
+    <string name="hw_feat_preview_none">Pratinjau: tidak ada server dev yang mendengarkan</string>
+    <string name="hw_feat_skills">Skills: %1$s bawaan</string>
+    <string name="hw_host_not_bundled">TIDAK DIBUNDEL</string>
+    <string name="hw_venus_not_bundled">Venus: tidak ada di build ini. PanVK dan Turnip tidak membutuhkannya.</string>
+    <string name="hw_pulse_port">Port TCP %1$s, sink %2$s</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio TCP. Venus hanya untuk Mali; Adreno memakai Turnip/KGSL.</string>
 </resources>

@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">解码器：加载中...</string>
     <string name="main_encoders_loading">编码器：加载中...</string>
     <string name="main_nativecode_host_ipc_bridge">NATIVECODE 宿主 IPC 桥接</string>
-    <string name="main_bridge_active_abstract_af_unix">桥接：已启用（抽象 AF_UNIX）</string>
     <string name="main_test_ping">测试 PING</string>
     <string name="main_testing_nativecode_agent_v1_ping">正在测试 @nativecode.agent.v1 ping...</string>
     <string name="main_agent_ping_ok_ms">智能体 Ping 正常（%1$sms）</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">智能体安装 APK：正常（%1$s）</string>
     <string name="main_bridge_status_ready">桥接状态：就绪</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s method=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">AF_UNIX 桥接套接字：\n• 智能体桥接：探测中...\n• 媒体 VPU 桥接：探测中...\n• 对端 UID：%1$s（已强制安全校验）</string>
     <string name="main_active_live">● 已启用（运行中）</string>
     <string name="main_offline_2">○ 离线</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">AF_UNIX 桥接套接字：\n• 智能体桥接：@nativecode.agent.v1（%1$s）\n• 媒体 VPU 桥接：@nativecode.media.v1（%2$s）\n• 对端 UID：%3$s（已强制安全校验）</string>
     <string name="main_restart">重启</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio TCP（FluxLinux 方式）。无需 root。</string>
     <string name="main_harmful_content">有害内容</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">SSH 服务器 · 远程主机 · 密钥</string>
     <string name="fd_ssh_footer">服务器 · 客户端 · 密钥</string>
     <string name="main_not_signed_in_optional">未登录 · 可选</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">GPU 驱动</string>
+    <string name="hw_driver_badge_ok">已是最新</string>
+    <string name="hw_driver_badge_update">有更新</string>
+    <string name="hw_driver_badge_missing">未安装</string>
+    <string name="hw_driver_na_detail">此 GPU 没有 Vulkan 驱动包。客户系统使用 Venus、VirGL 或软件渲染。</string>
+    <string name="hw_driver_detail">%1$s\n已安装：%2$s\n内置：%3$s\n来源：%4$s</string>
+    <string name="hw_driver_missing_detail">%1$s 尚未在客户系统 rootfs 中。请先完成 Linux 设置。</string>
+    <string name="hw_driver_update_hint">有更新的驱动。请先停止桌面，再到组件中更新。</string>
+    <string name="hw_driver_open_components">打开组件</string>
+    <string name="hw_src_bundled">内置于应用</string>
+    <string name="hw_src_download">GitHub Releases（已校验大小和 sha256）</string>
+    <string name="hw_checking">检查中...</string>
+    <string name="hw_bridge_not_started">未启动</string>
+    <string name="hw_rdv_ok">OK (uid %1$s)</string>
+    <string name="hw_rdv_stale">已过期（请重启应用）</string>
+    <string name="hw_rdv_missing">缺失</string>
+    <string name="hw_features_title">桥接功能</string>
+    <string name="hw_device_line">可用 RAM：%1$s MB / %2$s MB\n电池：%3$s，温控：%4$s</string>
+    <string name="hw_guest_proot">客户系统：PRoot，无需 root（root shell 是 PRoot 的模拟 root）</string>
+    <string name="hw_guest_chroot">客户系统：chroot（需要 root）</string>
+    <string name="hw_x11_prebuilt">X11：Termux:X11 libXlorie，预编译</string>
+    <string name="hw_x11_source">X11：Termux:X11 libXlorie，从源码构建</string>
+    <string name="hw_x11_missing">X11：未找到 libXlorie</string>
+    <string name="hw_feat_commands">代理命令：%1$s</string>
+    <string name="hw_feat_chat">聊天路由：从聊天启动的 CLI 会把卡片发送到该会话 (NC_CHAT_THREAD)。共享的文件在查看器中打开（图片、视频、音频、PDF）。</string>
+    <string name="hw_feat_mcp_up">工具 MCP：127.0.0.1:%1$s，仅限回环，每个聊天会话一个 Bearer 令牌</string>
+    <string name="hw_feat_mcp_idle">工具 MCP：随第一个聊天启动</string>
+    <string name="hw_feat_browser">代理浏览器：应用内 WebView，由 browser_* 工具驱动</string>
+    <string name="hw_feat_preview_found">预览：开发服务器正在监听 %1$s</string>
+    <string name="hw_feat_preview_none">预览：没有开发服务器在监听</string>
+    <string name="hw_feat_skills">Skills：内置 %1$s 个</string>
+    <string name="hw_host_not_bundled">未内置</string>
+    <string name="hw_venus_not_bundled">Venus：此版本不包含。PanVK 和 Turnip 不需要它。</string>
+    <string name="hw_pulse_port">TCP 端口 %1$s，%2$s 输出</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio TCP。Venus 仅适用于 Mali；Adreno 使用 Turnip/KGSL。</string>
 </resources>

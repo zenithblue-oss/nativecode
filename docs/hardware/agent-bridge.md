@@ -12,7 +12,7 @@ The Agent Bridge allows coding agents, background tasks, and guest CLI scripts i
 ---
 
 ## Security & Transport
-- **Socket:** `AF_UNIX` Linux abstract namespace: `@nativecode.agent.v1` (with fallback to `@nativecode.agent.v1.<uid>`).
+- **Socket:** `AF_UNIX` Linux abstract namespace: `@nativecode.agent.v1` (with fallback to `@nativecode.agent.v1.<uid>` when another NativeCode build already owns the plain name; see the rendezvous file below).
 - **Authentication:** Kernel-level peer credentials (`SO_PEERCRED`). The server verifies `peer.uid == Process.myUid()`. Sockets reject any unauthorized user IDs or host processes.
 - **Framing:** 4-byte big-endian length prefix preceding UTF-8 JSON payloads (max 64 KiB).
 - **Rate Limiting:** In-memory Token Bucket rate limiters protect the Android UI from floods (5 notifications/sec max, 1 toast / 2 sec max, 1 alert dialog / sec max).
@@ -165,3 +165,21 @@ nativecode-agent dismiss-alert
   }
   ```
 - Aliases: `nativecode-agent cancel-alert`, `nativecode-agent dismiss`
+
+### 9. Share a File
+```bash
+nativecode-agent share-file out/report.pdf --title "Report" --message "Build output"
+```
+- Positional `PATH` or `--path`. Alias: `nativecode-agent send-file`.
+- Started from a chat (env `NC_CHAT_THREAD`): a share card appears in that chat thread; images, video, audio and PDF open in the in-app viewer. Started from a terminal: posts a notification instead.
+- Output has `"chat_card": true` or `"notified": true`.
+
+## Finding the socket (rendezvous)
+Play and F-Droid builds can run side by side and share the abstract namespace: the first app binds `@nativecode.agent.v1` / `@nativecode.media.v1`, the other binds the `.<uid>` names. Each app writes `/run/nativecode_bridge.json` in its own guest:
+```json
+{ "v": 1, "host_uid": 10322, "agent_socket": "@nativecode.agent.v1.10322", "media_socket": "@nativecode.media.v1.10322" }
+```
+`nativecode-agent` and `nativecode-media` read it first and fall back to the plain names. Settings -> HARDWARE shows the bound names, live state and whether this file is current.
+
+## Tools MCP (chat)
+Chats get a loopback MCP server (`127.0.0.1:<port>/mcp`, bearer token per chat thread) with `nc_*` orchestration tools and `browser_*` tools for the in-app browser.

@@ -1,6 +1,15 @@
 # NativeCode GPU acceleration
 
-Guest Linux GL/Vulkan uses baked Mesa. The Android app never downloads GPU drivers and never executes GPU setup scripts from the Hardware page (Play: no remote executable code).
+Guest Linux GL/Vulkan uses baked Mesa. The Hardware page never executes GPU setup scripts.
+
+## Driver packages
+
+| GPU | Driver | Play | F-Droid |
+|---|---|---|---|
+| Mali (`/dev/mali0`) | Mesa PanVK 26.3.1 (`/opt/nativecode/panvk`) | bundled asset | GitHub Releases, size + sha256 checked, after the download consent |
+| Adreno (KGSL) | LFDev Turnip 27.0.0-devel-20261025-r2 (`/opt/nativecode-turnip`) | bundled asset | same |
+
+Settings -> HARDWARE -> GPU DRIVER shows installed vs shipped sha256 (UP TO DATE / UPDATE / NOT INSTALLED / N/A). An update is applied from Settings -> Components (stop the desktop first; the old .so is kept as `.so.bak`).
 
 ## Backends
 
@@ -16,12 +25,12 @@ Runtime choice is guest `gpu-launch --auto` (functional probes). Host `GpuAccelD
 
 ## Host servers (Hardware page)
 
-Settings → HARDWARE → HOST SERVERS. Start/stop/restart run the baked host binaries as the **app user** (FluxLinux style). The Android app does not download GPU drivers.
+Settings → HARDWARE → HOST SERVERS. Start/stop/restart run the host binaries as the **app user** (FluxLinux style). Venus is optional (not bundled in F-Droid builds; the page then says NOT BUNDLED).
 
 | Server | Binary | How |
 |---|---|---|
 | Venus | `usr/bin/virgl_test_server_android --venus --socket-path $PREFIX/tmp/.virgl_test` | Guest virtio ICD talks to this socket |
-| PulseAudio | `usr/bin/pulseaudio --start --load=module-native-protocol-tcp ... --exit-idle-time=-1` | Guest `PULSE_SERVER=127.0.0.1` |
+| PulseAudio | `usr/bin/pulseaudio --start --load=module-native-protocol-tcp ... --exit-idle-time=-1` | Guest `PULSE_SERVER=127.0.0.1` (Play, port 4713) or `127.0.0.1:<port>` (other builds, own port, AAudio sink) |
 
 Both packages are built for `com.zenithblue.nativecode` (`scripts/build_nativecode_host_servers.sh`) and assembled into `bootstrap.tar`.
 
@@ -80,7 +89,7 @@ Shipped in the prebuilt rootfs (`/usr/local/bin/gpu-launch`). Not launched by th
 
 ## Play policy
 
-- No curl/wget of Turnip/Mesa tarballs
+- Play: drivers are bundled assets, no download of executable code
 - No marketplace-style remote `install.sh` for GPU
 - Hardware UI is Kotlin file/property reads only
 - Venus host server starts only from the existing XFCE `start_gui.sh` path

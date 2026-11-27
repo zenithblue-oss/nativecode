@@ -29,6 +29,10 @@ object NativeCodeBridge {
             agentServer?.uiDelegate = value
         }
 
+    /** Abstract socket names this app actually bound (plain or uid-suffixed); null = server not running. */
+    fun agentSocketName(): String? = agentServer?.socketName
+    fun mediaSocketName(): String? = mediaServer?.socketName
+
     @Synchronized
     fun start(context: Context) {
         val appContext = context.applicationContext

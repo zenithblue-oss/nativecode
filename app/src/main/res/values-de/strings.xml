@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">Decoder: Wird geladen...</string>
     <string name="main_encoders_loading">Encoder: Wird geladen...</string>
     <string name="main_nativecode_host_ipc_bridge">NATIVECODE-HOST-IPC-BRIDGE</string>
-    <string name="main_bridge_active_abstract_af_unix">Bridge: Aktiv (Abstract AF_UNIX)</string>
     <string name="main_test_ping">PING TESTEN</string>
     <string name="main_testing_nativecode_agent_v1_ping">@nativecode.agent.v1-Ping wird getestet...</string>
     <string name="main_agent_ping_ok_ms">Agent-Ping OK (%1$sms)</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">Agent-APK-Installation: OK (%1$s)</string>
     <string name="main_bridge_status_ready">Bridge-Status: Bereit</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s method=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">AF_UNIX-Bridge-Sockets:\n• Agent-Bridge: Wird geprüft...\n• Media-VPU-Bridge: Wird geprüft...\n• Peer-UID: %1$s (Sicherheit erzwungen)</string>
     <string name="main_active_live">● AKTIV (Live)</string>
     <string name="main_offline_2">○ OFFLINE</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">AF_UNIX-Bridge-Sockets:\n• Agent-Bridge: @nativecode.agent.v1 (%1$s)\n• Media-VPU-Bridge: @nativecode.media.v1 (%2$s)\n• Peer-UID: %3$s (Sicherheit erzwungen)</string>
     <string name="main_restart">NEUSTART</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio-TCP (FluxLinux-Stil). Kein Root.</string>
     <string name="main_harmful_content">Schädliche Inhalte</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">SSH-Server · Remote-Hosts · Schlüssel</string>
     <string name="fd_ssh_footer">SERVER · CLIENT · SCHLÜSSEL</string>
     <string name="main_not_signed_in_optional">NICHT ANGEMELDET · OPTIONAL</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">GPU-TREIBER</string>
+    <string name="hw_driver_badge_ok">AKTUELL</string>
+    <string name="hw_driver_badge_update">UPDATE</string>
+    <string name="hw_driver_badge_missing">NICHT INSTALLIERT</string>
+    <string name="hw_driver_na_detail">Kein Vulkan-Treiberpaket für diese GPU. Der Gast nutzt Venus, VirGL oder Software-Rendering.</string>
+    <string name="hw_driver_detail">%1$s\nInstalliert: %2$s\nMitgeliefert: %3$s\nQuelle: %4$s</string>
+    <string name="hw_driver_missing_detail">%1$s ist noch nicht im Gast-Rootfs. Schließe zuerst die Linux-Einrichtung ab.</string>
+    <string name="hw_driver_update_hint">Ein neuerer Treiber ist bereit. Desktop stoppen und dann unter Komponenten aktualisieren.</string>
+    <string name="hw_driver_open_components">KOMPONENTEN ÖFFNEN</string>
+    <string name="hw_src_bundled">in der App enthalten</string>
+    <string name="hw_src_download">GitHub Releases (Größe und sha256 geprüft)</string>
+    <string name="hw_checking">Wird geprüft...</string>
+    <string name="hw_bridge_not_started">NICHT GESTARTET</string>
+    <string name="hw_rdv_ok">OK (UID %1$s)</string>
+    <string name="hw_rdv_stale">VERALTET (App neu starten)</string>
+    <string name="hw_rdv_missing">FEHLT</string>
+    <string name="hw_features_title">BRIDGE-FUNKTIONEN</string>
+    <string name="hw_device_line">RAM frei: %1$s von %2$s MB\nAkku: %3$s, Temperatur: %4$s</string>
+    <string name="hw_guest_proot">Gast: PRoot, kein Root nötig (die Root-Shell ist ein PRoot-Fake-Root)</string>
+    <string name="hw_guest_chroot">Gast: chroot (benötigt Root)</string>
+    <string name="hw_x11_prebuilt">X11: Termux:X11 libXlorie, vorkompiliert</string>
+    <string name="hw_x11_source">X11: Termux:X11 libXlorie, aus Quellcode gebaut</string>
+    <string name="hw_x11_missing">X11: libXlorie nicht gefunden</string>
+    <string name="hw_feat_commands">Agent-Befehle: %1$s</string>
+    <string name="hw_feat_chat">Chat-Routing: Eine CLI, die aus einem Chat gestartet wird, sendet Karten an diesen Thread (NC_CHAT_THREAD). Geteilte Dateien öffnen sich im Viewer (Bild, Video, Audio, PDF).</string>
+    <string name="hw_feat_mcp_up">Tools-MCP: 127.0.0.1:%1$s, nur Loopback, Bearer-Token pro Chat-Thread</string>
+    <string name="hw_feat_mcp_idle">Tools-MCP: startet mit dem ersten Chat</string>
+    <string name="hw_feat_browser">Agent-Browser: In-App-WebView, gesteuert über browser_*-Tools</string>
+    <string name="hw_feat_preview_found">Vorschau: Dev-Server lauscht auf %1$s</string>
+    <string name="hw_feat_preview_none">Vorschau: kein Dev-Server aktiv</string>
+    <string name="hw_feat_skills">Skills: %1$s integriert</string>
+    <string name="hw_host_not_bundled">NICHT ENTHALTEN</string>
+    <string name="hw_venus_not_bundled">Venus: nicht in diesem Build. PanVK und Turnip brauchen es nicht.</string>
+    <string name="hw_pulse_port">TCP-Port %1$s, %2$s-Sink</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio-TCP. Venus gibt es nur für Mali; Adreno nutzt Turnip/KGSL.</string>
 </resources>

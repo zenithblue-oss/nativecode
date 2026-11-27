@@ -44,4 +44,7 @@ object NcMcp {
     }.getOrNull()
 
     fun revoke(threadId: String) { server?.revoke(threadId) }
+
+    /** Loopback port, or -1 while the server has not been started (it binds on the first chat spawn). */
+    fun port(): Int = server?.port ?: -1
 }

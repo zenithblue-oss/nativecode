@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">デコーダー: 読み込み中...</string>
     <string name="main_encoders_loading">エンコーダー: 読み込み中...</string>
     <string name="main_nativecode_host_ipc_bridge">NativeCodeホストIPCブリッジ</string>
-    <string name="main_bridge_active_abstract_af_unix">ブリッジ: 有効（Abstract AF_UNIX）</string>
     <string name="main_test_ping">テストping</string>
     <string name="main_testing_nativecode_agent_v1_ping">@nativecode.agent.v1 のpingをテスト中...</string>
     <string name="main_agent_ping_ok_ms">エージェントping OK (%1$sms)</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">エージェントAPKインストール: OK (%1$s)</string>
     <string name="main_bridge_status_ready">ブリッジの状態: 準備完了</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s method=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">AF_UNIXブリッジソケット:\n• エージェントブリッジ: 確認中...\n• メディアVPUブリッジ: 確認中...\n• ピアUID: %1$s（セキュリティ適用）</string>
     <string name="main_active_live">● 有効（稼働中）</string>
     <string name="main_offline_2">○ オフライン</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">AF_UNIXブリッジソケット:\n• エージェントブリッジ: @nativecode.agent.v1 (%1$s)\n• メディアVPUブリッジ: @nativecode.media.v1 (%2$s)\n• ピアUID: %3$s（セキュリティ適用）</string>
     <string name="main_restart">再起動</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio TCP（FluxLinuxスタイル）。rootは不要です。</string>
     <string name="main_harmful_content">有害なコンテンツ</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">SSHサーバー · リモートホスト · キー</string>
     <string name="fd_ssh_footer">サーバー · クライアント · キー</string>
     <string name="main_not_signed_in_optional">未サインイン · 任意</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">GPUドライバー</string>
+    <string name="hw_driver_badge_ok">最新</string>
+    <string name="hw_driver_badge_update">更新あり</string>
+    <string name="hw_driver_badge_missing">未インストール</string>
+    <string name="hw_driver_na_detail">このGPU向けのVulkanドライバーパッケージはありません。ゲストはVenus、VirGL、またはソフトウェアレンダリングを使います。</string>
+    <string name="hw_driver_detail">%1$s\nインストール済み: %2$s\n同梱: %3$s\n提供元: %4$s</string>
+    <string name="hw_driver_missing_detail">%1$s はまだゲストのrootfsにありません。先にLinuxのセットアップを完了してください。</string>
+    <string name="hw_driver_update_hint">新しいドライバーがあります。デスクトップを停止してから、コンポーネントで更新してください。</string>
+    <string name="hw_driver_open_components">コンポーネントを開く</string>
+    <string name="hw_src_bundled">アプリに同梱</string>
+    <string name="hw_src_download">GitHub Releases（サイズとsha256を検証）</string>
+    <string name="hw_checking">確認中...</string>
+    <string name="hw_bridge_not_started">未起動</string>
+    <string name="hw_rdv_ok">OK (uid %1$s)</string>
+    <string name="hw_rdv_stale">古い（アプリを再起動）</string>
+    <string name="hw_rdv_missing">なし</string>
+    <string name="hw_features_title">ブリッジ機能</string>
+    <string name="hw_device_line">空きRAM: %2$s MB中 %1$s MB\nバッテリー: %3$s、温度状態: %4$s</string>
+    <string name="hw_guest_proot">ゲスト: PRoot、root不要（rootシェルはPRootの疑似root）</string>
+    <string name="hw_guest_chroot">ゲスト: chroot（root必須）</string>
+    <string name="hw_x11_prebuilt">X11: Termux:X11 libXlorie、ビルド済み</string>
+    <string name="hw_x11_source">X11: Termux:X11 libXlorie、ソースからビルド</string>
+    <string name="hw_x11_missing">X11: libXlorieが見つかりません</string>
+    <string name="hw_feat_commands">エージェントコマンド: %1$s</string>
+    <string name="hw_feat_chat">チャットルーティング: チャットから起動したCLIは、そのスレッドにカードを送ります（NC_CHAT_THREAD）。共有ファイルはビューアで開きます（画像、動画、音声、PDF）。</string>
+    <string name="hw_feat_mcp_up">ツールMCP: 127.0.0.1:%1$s、ループバックのみ、チャットスレッドごとのBearerトークン</string>
+    <string name="hw_feat_mcp_idle">ツールMCP: 最初のチャットで起動</string>
+    <string name="hw_feat_browser">エージェントブラウザ: アプリ内WebView、browser_*ツールで操作</string>
+    <string name="hw_feat_preview_found">プレビュー: 開発サーバーが %1$s で待機中</string>
+    <string name="hw_feat_preview_none">プレビュー: 待機中の開発サーバーなし</string>
+    <string name="hw_feat_skills">スキル: %1$s 件内蔵</string>
+    <string name="hw_host_not_bundled">未同梱</string>
+    <string name="hw_venus_not_bundled">Venus: このビルドには含まれません。PanVKとTurnipには不要です。</string>
+    <string name="hw_pulse_port">TCPポート %1$s、%2$sシンク</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio TCP。VenusはMali専用で、AdrenoはTurnip/KGSLを使います。</string>
 </resources>

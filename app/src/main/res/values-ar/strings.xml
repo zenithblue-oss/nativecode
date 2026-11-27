@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">أجهزة فك الترميز: جارٍ التحميل...</string>
     <string name="main_encoders_loading">أجهزة الترميز: جارٍ التحميل...</string>
     <string name="main_nativecode_host_ipc_bridge">جسر IPC لمضيف NATIVECODE</string>
-    <string name="main_bridge_active_abstract_af_unix">الجسر: نشط (Abstract AF_UNIX)</string>
     <string name="main_test_ping">اختبار PING</string>
     <string name="main_testing_nativecode_agent_v1_ping">جارٍ اختبار ping لـ @nativecode.agent.v1...</string>
     <string name="main_agent_ping_ok_ms">Agent Ping ناجح (%1$sms)</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">Agent Install APK: ناجح (%1$s)</string>
     <string name="main_bridge_status_ready">حالة الجسر: جاهز</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s method=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">مقابس جسر AF_UNIX:\n• جسر الوكيل: جارٍ الفحص...\n• جسر Media VPU: جارٍ الفحص...\n• Peer UID: %1$s (أمان مُفعَّل)</string>
     <string name="main_active_live">● نشط (مباشر)</string>
     <string name="main_offline_2">○ غير متصل</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">مقابس جسر AF_UNIX:\n• جسر الوكيل: @nativecode.agent.v1 (%1$s)\n• جسر Media VPU: @nativecode.media.v1 (%2$s)\n• Peer UID: %3$s (أمان مُفعَّل)</string>
     <string name="main_restart">إعادة التشغيل</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio TCP (بأسلوب FluxLinux). بدون root.</string>
     <string name="main_harmful_content">محتوى ضار</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">خادم SSH · المضيفون البعيدون · المفاتيح</string>
     <string name="fd_ssh_footer">الخادم · العميل · المفاتيح</string>
     <string name="main_not_signed_in_optional">لم يتم تسجيل الدخول · اختياري</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">برنامج تشغيل GPU</string>
+    <string name="hw_driver_badge_ok">محدّث</string>
+    <string name="hw_driver_badge_update">تحديث</string>
+    <string name="hw_driver_badge_missing">غير مثبّت</string>
+    <string name="hw_driver_na_detail">لا توجد حزمة تشغيل Vulkan لهذا المعالج الرسومي. يستخدم النظام الضيف Venus أو VirGL أو العرض البرمجي.</string>
+    <string name="hw_driver_detail">%1$s\nالمثبّت: %2$s\nالمرفق: %3$s\nالمصدر: %4$s</string>
+    <string name="hw_driver_missing_detail">%1$s غير موجود بعد في rootfs الخاص بالنظام الضيف. أكمل إعداد Linux أولاً.</string>
+    <string name="hw_driver_update_hint">يتوفر برنامج تشغيل أحدث. أوقف سطح المكتب ثم حدّثه من المكوّنات.</string>
+    <string name="hw_driver_open_components">فتح المكوّنات</string>
+    <string name="hw_src_bundled">مضمّن في التطبيق</string>
+    <string name="hw_src_download">GitHub Releases (تم التحقق من الحجم وsha256)</string>
+    <string name="hw_checking">جارٍ الفحص...</string>
+    <string name="hw_bridge_not_started">لم يبدأ</string>
+    <string name="hw_rdv_ok">OK (uid %1$s)</string>
+    <string name="hw_rdv_stale">قديم (أعد تشغيل التطبيق)</string>
+    <string name="hw_rdv_missing">مفقود</string>
+    <string name="hw_features_title">ميزات الجسر</string>
+    <string name="hw_device_line">الذاكرة الحرة: %1$s من %2$s ميغابايت\nالبطارية: %3$s، الحرارة: %4$s</string>
+    <string name="hw_guest_proot">الضيف: PRoot، بدون root (صدفة root هي root وهمي من PRoot)</string>
+    <string name="hw_guest_chroot">الضيف: chroot (يتطلب root)</string>
+    <string name="hw_x11_prebuilt">X11: Termux:X11 libXlorie، جاهز مسبقًا</string>
+    <string name="hw_x11_source">X11: Termux:X11 libXlorie، مبني من المصدر</string>
+    <string name="hw_x11_missing">X11: لم يتم العثور على libXlorie</string>
+    <string name="hw_feat_commands">أوامر الوكيل: %1$s</string>
+    <string name="hw_feat_chat">توجيه الدردشة: أي CLI يبدأ من دردشة يرسل البطاقات إلى ذلك الخيط (NC_CHAT_THREAD). تُفتح الملفات المشتركة في العارض (صورة، فيديو، صوت، PDF).</string>
+    <string name="hw_feat_mcp_up">MCP الأدوات: 127.0.0.1:%1$s، حلقة محلية فقط، رمز Bearer لكل خيط دردشة</string>
+    <string name="hw_feat_mcp_idle">MCP الأدوات: يبدأ مع أول دردشة</string>
+    <string name="hw_feat_browser">متصفح الوكيل: WebView داخل التطبيق، يُدار بأدوات browser_*</string>
+    <string name="hw_feat_preview_found">المعاينة: خادم التطوير يستمع على %1$s</string>
+    <string name="hw_feat_preview_none">المعاينة: لا يوجد خادم تطوير يستمع</string>
+    <string name="hw_feat_skills">Skills: %1$s مضمّنة</string>
+    <string name="hw_host_not_bundled">غير مضمّن</string>
+    <string name="hw_venus_not_bundled">Venus: غير موجود في هذا الإصدار. لا يحتاجه PanVK ولا Turnip.</string>
+    <string name="hw_pulse_port">منفذ TCP %1$s، مخرج %2$s</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio TCP. Venus لأجهزة Mali فقط؛ يستخدم Adreno حزمة Turnip/KGSL.</string>
 </resources>

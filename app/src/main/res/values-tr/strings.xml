@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">Kod çözücüler: Yükleniyor...</string>
     <string name="main_encoders_loading">Kodlayıcılar: Yükleniyor...</string>
     <string name="main_nativecode_host_ipc_bridge">NATIVECODE ANA SİSTEM IPC KÖPRÜSÜ</string>
-    <string name="main_bridge_active_abstract_af_unix">Köprü: Etkin (Soyut AF_UNIX)</string>
     <string name="main_test_ping">PING TESTİ</string>
     <string name="main_testing_nativecode_agent_v1_ping">@nativecode.agent.v1 ping testi yapılıyor...</string>
     <string name="main_agent_ping_ok_ms">Ajan Ping TAMAM (%1$sms)</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">Ajan APK Kurulumu: TAMAM (%1$s)</string>
     <string name="main_bridge_status_ready">Köprü durumu: Hazır</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s yöntem=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">AF_UNIX Köprü Soketleri:\n• Ajan Köprüsü: Yoklanıyor...\n• Medya VPU Köprüsü: Yoklanıyor...\n• Eş UID: %1$s (Güvenlik Uygulanıyor)</string>
     <string name="main_active_live">● ETKİN (Canlı)</string>
     <string name="main_offline_2">○ ÇEVRİMDIŞI</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">AF_UNIX Köprü Soketleri:\n• Ajan Köprüsü: @nativecode.agent.v1 (%1$s)\n• Medya VPU Köprüsü: @nativecode.media.v1 (%2$s)\n• Eş UID: %3$s (Güvenlik Uygulanıyor)</string>
     <string name="main_restart">YENİDEN BAŞLAT</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio TCP (FluxLinux tarzı). Root yok.</string>
     <string name="main_harmful_content">Zararlı içerik</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">SSH sunucusu · uzak ana bilgisayarlar · anahtarlar</string>
     <string name="fd_ssh_footer">SUNUCU · İSTEMCİ · ANAHTARLAR</string>
     <string name="main_not_signed_in_optional">GİRİŞ YAPILMADI · İSTEĞE BAĞLI</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">GPU SÜRÜCÜSÜ</string>
+    <string name="hw_driver_badge_ok">GÜNCEL</string>
+    <string name="hw_driver_badge_update">GÜNCELLEME</string>
+    <string name="hw_driver_badge_missing">YÜKLÜ DEĞİL</string>
+    <string name="hw_driver_na_detail">Bu GPU için Vulkan sürücü paketi yok. Konuk sistem Venus, VirGL veya yazılım oluşturma kullanır.</string>
+    <string name="hw_driver_detail">%1$s\nYüklü: %2$s\nPaketle gelen: %3$s\nKaynak: %4$s</string>
+    <string name="hw_driver_missing_detail">%1$s henüz konuk rootfs içinde değil. Önce Linux kurulumunu tamamlayın.</string>
+    <string name="hw_driver_update_hint">Daha yeni bir sürücü hazır. Masaüstünü durdurun, sonra Bileşenler bölümünden güncelleyin.</string>
+    <string name="hw_driver_open_components">BİLEŞENLERİ AÇ</string>
+    <string name="hw_src_bundled">uygulamayla birlikte gelir</string>
+    <string name="hw_src_download">GitHub Releases (boyut ve sha256 doğrulandı)</string>
+    <string name="hw_checking">Denetleniyor...</string>
+    <string name="hw_bridge_not_started">BAŞLATILMADI</string>
+    <string name="hw_rdv_ok">OK (uid %1$s)</string>
+    <string name="hw_rdv_stale">ESKİ (uygulamayı yeniden başlatın)</string>
+    <string name="hw_rdv_missing">EKSİK</string>
+    <string name="hw_features_title">KÖPRÜ ÖZELLİKLERİ</string>
+    <string name="hw_device_line">Boş RAM: %2$s MB içinde %1$s MB\nPil: %3$s, ısı: %4$s</string>
+    <string name="hw_guest_proot">Konuk: PRoot, root gerekmez (root kabuğu PRoot sahte rootudur)</string>
+    <string name="hw_guest_chroot">Konuk: chroot (root gerekir)</string>
+    <string name="hw_x11_prebuilt">X11: Termux:X11 libXlorie, hazır derleme</string>
+    <string name="hw_x11_source">X11: Termux:X11 libXlorie, kaynaktan derlendi</string>
+    <string name="hw_x11_missing">X11: libXlorie bulunamadı</string>
+    <string name="hw_feat_commands">Ajan komutları: %1$s</string>
+    <string name="hw_feat_chat">Sohbet yönlendirme: bir sohbetten başlatılan CLI kartları o konuya gönderir (NC_CHAT_THREAD). Paylaşılan dosyalar görüntüleyicide açılır (görsel, video, ses, PDF).</string>
+    <string name="hw_feat_mcp_up">Araçlar MCP: 127.0.0.1:%1$s, yalnızca loopback, sohbet konusu başına bearer belirteci</string>
+    <string name="hw_feat_mcp_idle">Araçlar MCP: ilk sohbetle başlar</string>
+    <string name="hw_feat_browser">Ajan tarayıcısı: uygulama içi WebView, browser_* araçlarıyla yönetilir</string>
+    <string name="hw_feat_preview_found">Önizleme: geliştirme sunucusu %1$s üzerinde dinliyor</string>
+    <string name="hw_feat_preview_none">Önizleme: dinleyen geliştirme sunucusu yok</string>
+    <string name="hw_feat_skills">Skills: %1$s yerleşik</string>
+    <string name="hw_host_not_bundled">PAKETE DAHİL DEĞİL</string>
+    <string name="hw_venus_not_bundled">Venus: bu sürümde yok. PanVK ve Turnip’in buna ihtiyacı yok.</string>
+    <string name="hw_pulse_port">TCP bağlantı noktası %1$s, %2$s çıkışı</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio TCP. Venus yalnızca Mali içindir; Adreno Turnip/KGSL kullanır.</string>
 </resources>

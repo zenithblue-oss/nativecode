@@ -1369,7 +1369,6 @@
     <string name="main_decoders_loading">Декодеры: загрузка...</string>
     <string name="main_encoders_loading">Энкодеры: загрузка...</string>
     <string name="main_nativecode_host_ipc_bridge">МОСТ HOST IPC NATIVECODE</string>
-    <string name="main_bridge_active_abstract_af_unix">Мост: активен (Abstract AF_UNIX)</string>
     <string name="main_test_ping">ТЕСТ PING</string>
     <string name="main_testing_nativecode_agent_v1_ping">Проверка ping @nativecode.agent.v1...</string>
     <string name="main_agent_ping_ok_ms">Agent Ping OK (%1$sms)</string>
@@ -1391,10 +1390,8 @@
     <string name="main_agent_install_apk_ok">Agent Install APK: OK (%1$s)</string>
     <string name="main_bridge_status_ready">Состояние моста: готов</string>
     <string name="main_gpu_gl_vk_method">GPU=%1$s GL=%2$s VK=%3$s method=%4$s</string>
-    <string name="main_af_unix_bridge_sockets_agent">Сокеты моста AF_UNIX:\n• Agent Bridge: проверка...\n• Media VPU Bridge: проверка...\n• Peer UID: %1$s (защита включена)</string>
     <string name="main_active_live">● АКТИВЕН (онлайн)</string>
     <string name="main_offline_2">○ ОФЛАЙН</string>
-    <string name="main_af_unix_bridge_sockets_agent_2">Сокеты моста AF_UNIX:\n• Agent Bridge: @nativecode.agent.v1 (%1$s)\n• Media VPU Bridge: @nativecode.media.v1 (%2$s)\n• Peer UID: %3$s (защита включена)</string>
     <string name="main_restart">ПЕРЕЗАПУСК</string>
     <string name="main_venus_vtest_pulseaudio_tcp_fluxlinux">Venus vtest + PulseAudio TCP (в стиле FluxLinux). Без root.</string>
     <string name="main_harmful_content">Вредный контент</string>
@@ -1681,4 +1678,40 @@
     <string name="fd_ssh_subtitle">SSH-сервер · удалённые хосты · ключи</string>
     <string name="fd_ssh_footer">СЕРВЕР · КЛИЕНТ · КЛЮЧИ</string>
     <string name="main_not_signed_in_optional">ВХОД НЕ ВЫПОЛНЕН · НЕ ОБЯЗАТЕЛЬНО</string>
+    <!-- Hardware page: GPU driver, bridge status, bridge features -->
+    <string name="hw_driver_title">ДРАЙВЕР GPU</string>
+    <string name="hw_driver_badge_ok">АКТУАЛЕН</string>
+    <string name="hw_driver_badge_update">ОБНОВЛЕНИЕ</string>
+    <string name="hw_driver_badge_missing">НЕ УСТАНОВЛЕН</string>
+    <string name="hw_driver_na_detail">Для этого GPU нет пакета драйвера Vulkan. Гость использует Venus, VirGL или программный рендеринг.</string>
+    <string name="hw_driver_detail">%1$s\nУстановлен: %2$s\nВ комплекте: %3$s\nИсточник: %4$s</string>
+    <string name="hw_driver_missing_detail">%1$s ещё нет в rootfs гостя. Сначала завершите настройку Linux.</string>
+    <string name="hw_driver_update_hint">Доступен более новый драйвер. Остановите рабочий стол и обновите его в разделе Компоненты.</string>
+    <string name="hw_driver_open_components">ОТКРЫТЬ КОМПОНЕНТЫ</string>
+    <string name="hw_src_bundled">входит в приложение</string>
+    <string name="hw_src_download">GitHub Releases (проверены размер и sha256)</string>
+    <string name="hw_checking">Проверка...</string>
+    <string name="hw_bridge_not_started">НЕ ЗАПУЩЕН</string>
+    <string name="hw_rdv_ok">OK (uid %1$s)</string>
+    <string name="hw_rdv_stale">УСТАРЕЛ (перезапустите приложение)</string>
+    <string name="hw_rdv_missing">ОТСУТСТВУЕТ</string>
+    <string name="hw_features_title">ФУНКЦИИ МОСТА</string>
+    <string name="hw_device_line">Свободно RAM: %1$s из %2$s МБ\nБатарея: %3$s, температура: %4$s</string>
+    <string name="hw_guest_proot">Гость: PRoot, root не нужен (root-оболочка это поддельный root PRoot)</string>
+    <string name="hw_guest_chroot">Гость: chroot (нужен root)</string>
+    <string name="hw_x11_prebuilt">X11: Termux:X11 libXlorie, готовая сборка</string>
+    <string name="hw_x11_source">X11: Termux:X11 libXlorie, собрана из исходников</string>
+    <string name="hw_x11_missing">X11: libXlorie не найдена</string>
+    <string name="hw_feat_commands">Команды агента: %1$s</string>
+    <string name="hw_feat_chat">Маршрутизация чата: CLI, запущенный из чата, отправляет карточки в этот тред (NC_CHAT_THREAD). Общие файлы открываются во встроенном просмотрщике (изображение, видео, аудио, PDF).</string>
+    <string name="hw_feat_mcp_up">MCP инструментов: 127.0.0.1:%1$s, только loopback, bearer-токен на каждый тред чата</string>
+    <string name="hw_feat_mcp_idle">MCP инструментов: запускается с первым чатом</string>
+    <string name="hw_feat_browser">Браузер агента: встроенный WebView, управляется инструментами browser_*</string>
+    <string name="hw_feat_preview_found">Предпросмотр: dev-сервер слушает на %1$s</string>
+    <string name="hw_feat_preview_none">Предпросмотр: нет работающего dev-сервера</string>
+    <string name="hw_feat_skills">Skills: встроено %1$s</string>
+    <string name="hw_host_not_bundled">НЕ ВКЛЮЧЁН</string>
+    <string name="hw_venus_not_bundled">Venus: нет в этой сборке. PanVK и Turnip он не нужен.</string>
+    <string name="hw_pulse_port">TCP-порт %1$s, приёмник %2$s</string>
+    <string name="hw_pulse_turnip_blurb">PulseAudio TCP. Venus только для Mali; Adreno использует Turnip/KGSL.</string>
 </resources>
