@@ -1,0 +1,14 @@
+--- a/src/GNUmakefile
++++ b/src/GNUmakefile
+@@ -15,10 +15,11 @@
+ OBJDUMP  ?= $(CROSS_COMPILE)objdump
+
+ CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -I. -I$(VPATH)
+-CFLAGS   += -Wall -Wextra -O2
++PROOT_OPT_LEVEL ?= -O2
++CFLAGS   += -Wall -Wextra $(PROOT_OPT_LEVEL)
+ LDFLAGS  += -ltalloc -Wl,-z,noexecstack
+ ifdef PROOT_WITH_LIBANDROID_SHMEM
+   CFLAGS += -DWITH_LIBANDROID_SHMEM
+   LDFLAGS += -landroid-shmem
+ endif

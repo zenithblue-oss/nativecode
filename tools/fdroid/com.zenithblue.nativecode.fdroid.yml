@@ -1,0 +1,77 @@
+# DRAFT fdroiddata metadata (metadata/com.zenithblue.nativecode.fdroid.yml). Not submitted.
+# Everything marked TODO is open; see tools/fdroid/*.sh for what `build:` runs:
+#   build_native.sh (jniLibs: proot/loader/bash/termux-exec/fast_pty_guard), build_bootstrap.sh
+#   (bootstrap.tar + loader.apk), build_xlorie.sh (libXlorie.so). Outputs land in app/src/fdroid/.
+AntiFeatures:
+  NonFreeNet:
+    en-US: Talks to proprietary AI vendor services (OpenAI, Anthropic, Google, xAI and others) when the user signs in to and uses their command line tools.
+  NonFreeAdd:
+    en-US: Can install proprietary AI command line tools (Claude Code, Antigravity, Grok, Kiro) inside the Linux environment on explicit user request.
+  TetheredNet:
+    en-US: Downloads the Linux root filesystem (about 1.4 GB), runtime update and Android SDK packs from GitHub Releases after an in-app opt-in.
+Categories:
+  - Development
+  - System
+License: GPL-3.0-or-later   # TODO(license): pending owner confirmation
+AuthorName: ZenithBlue
+AuthorEmail: zenithblue.dev@gmail.com
+WebSite: https://zenithblue-dev.github.io/nativecode-ai/
+SourceCode: TBD    # TODO: public repo not created yet
+IssueTracker: TBD  # TODO
+AutoName: NativeCode
+
+RepoType: git
+Repo: TBD          # TODO: public repo URL
+
+Builds:
+  - versionName: TBD   # TODO: release version (flavor fdroid)
+    versionCode: 0     # TODO
+    commit: TBD        # TODO: tag
+    submodules: false
+    sudo:
+      # Termux build deps (termux-packages scripts/setup-ubuntu.sh, trimmed to tools/fdroid/package-lists)
+      # plus libXlorie (cmake, ninja, bison, patch). openjdk-17 from bookworm: termux-am's gradle build
+      # hardcodes the JDK 17 path. fuse-overlayfs: termux mounts the NDK toolchain with it (/dev/fuse).
+      # TODO: trim after a `fdroid build` run in registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie.
+      - echo "deb https://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list
+      - apt-get update
+      - apt-get install -y --no-install-recommends openjdk-17-jdk-headless autoconf autoconf-archive
+        automake autopoint bison bzip2 clang cmake curl ed file flex fuse-overlayfs g++ gawk gettext
+        git gperf groff help2man intltool jq libbz2-dev libffi-dev liblzma-dev libltdl-dev
+        libreadline-dev libsqlite3-dev libssl-dev libtool-bin lld lzip m4 make ninja-build pandoc
+        patch perl pkg-config python-is-python3 python3 python3-setuptools rsync tcl texinfo unzip
+        xz-utils zip zlib1g-dev zstd
+      # termux-packages hardcodes the install prefix; the build user must own it.
+      - mkdir -p /data/data/com.zenithblue.nativecode.fdroid/files/usr
+      - chown -R vagrant:vagrant /data
+    gradle:
+      - fdroid
+    # Prebuilt blobs in the tree that the fdroid flavor does not use; the scanner would
+    # flag them (.so/.aar/.zip/.tar.gz/.jar). Replace with `git rm` before submission.
+    scandelete:
+      - app/libs
+      - app/src/play
+      - termux-x11/src/main/jniLibs
+      - termux-app/app/dev_keystore.jks
+      - termux-app/gradle/wrapper/gradle-wrapper.jar
+      - shell-loader-debug.apk
+      - packages/phosh-lite
+      - tools/rootfs/overlay
+      - docs/skills
+      - app/src/main/assets/xfce
+    # Prefer an empty scanignore; add only paths the scanner proves unavoidable.
+    scanignore: []
+    # `build:` runs after the scanner: nothing built here has to be in git.
+    build:
+      - umask 022
+      - NDK=$$NDK$$ tools/fdroid/build_native.sh --install
+      - NDK=$$NDK$$ tools/fdroid/build_bootstrap.sh --install
+      - NDK=$$NDK$$ tools/fdroid/build_xlorie.sh --install
+    ndk: r29
+
+AllowedAPKSigningKeys: TBD   # TODO: sha256 of the release cert (reproducible-build verification)
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: TBD
+CurrentVersionCode: 0

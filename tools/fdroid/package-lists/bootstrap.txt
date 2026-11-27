@@ -1,0 +1,26 @@
+# Top-level host packages for the F-Droid bootstrap.tar. Runtime dependencies are
+# resolved from the built debs' Depends: (assemble_bootstrap.py), build deps by termux.
+# Kept because the app still needs them: python + proot-distro (rootfs install
+# runs `python proot-distro install`), proot, shell + coreutils-class tools.
+# Dropped vs the Play bootstrap: pulseaudio, virglrenderer-android, xkeyboard-config,
+# libx11 family, dbus, termux-am.
+bash
+termux-exec
+coreutils
+findutils
+grep
+sed
+gawk
+psmisc
+procps
+tar
+xz-utils
+gzip
+diffutils
+curl
+ca-certificates
+termux-tools
+termux-core
+proot
+proot-distro
+python

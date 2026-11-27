@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Stand-in for pandoc when it is not installed. termux-tools only uses it to render
+# its man page (`pandoc --standalone --to man --output termux.1 termux.1.md`); man
+# pages are stripped from bootstrap.tar, so an empty page is output-neutral.
+# Never used on the F-Droid buildserver (pandoc is in the recipe's apt list).
+out=""; while [ $# -gt 0 ]; do case "$1" in --output|-o) out="$2"; shift 2;; *) shift;; esac; done
+[ -n "$out" ] && : > "$out"

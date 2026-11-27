@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Stand-in for fuse-overlayfs when it is not installed (no root, no /dev/fuse).
+# termux_setup_toolchain_29.sh only needs a writable copy of the NDK toolchain at
+#   fuse-overlayfs <mountpoint> -o lowerdir=<ndk toolchain> -o upperdir=.. -o workdir=..
+# so copy it once (reflink on btrfs/xfs). Never used on the F-Droid buildserver.
+set -euo pipefail
+mnt="$1"; shift
+lower=""
+while [ $# -gt 0 ]; do
+  case "$1" in -o) case "$2" in lowerdir=*) lower="${2#lowerdir=}";; esac; shift 2;; *) shift;; esac
+done
+[ -n "$lower" ] || { echo "fuse-overlayfs shim: no lowerdir" >&2; exit 1; }
+[ -e "$mnt/bin/clang" ] && exit 0
+cp -a --reflink=auto "$lower"/. "$mnt"/

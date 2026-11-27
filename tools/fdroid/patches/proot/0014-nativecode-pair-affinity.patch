@@ -1,0 +1,578 @@
+Source patch for app/src/main/jniLibs/arm64-v8a/libproot.so (NativeCode 1.8.0).
+
+Base: termux/proot 7266fb3e8516535682f5a9c8f3a7e70f6506eddb, plus termux-lib
+third_party/proot/patches-common and profile/0012-u11-rootfd-candidate.patch.
+Build: termux-lib scripts/build_proot_android.sh --variant upstream-u11-rootfd
+(NDK 29.0.14206865, API 24) with this patch applied and
+CPPFLAGS += -DNATIVECODE_PROOT_AFFINITY.  Opt out at run time: PROOT_NO_AFFINITY=1.
+
+diff --git a/src/GNUmakefile b/src/GNUmakefile
+index 1e4f442..8b11f38 100644
+--- a/src/GNUmakefile
++++ b/src/GNUmakefile
+@@ -54,6 +54,7 @@ OBJECTS += \
+ 	tracee/tracee.o		\
+ 	tracee/mem.o		\
+ 	tracee/reg.o		\
++	tracee/affinity.o	\
+ 	tracee/event.o		\
+ 	tracee/seccomp.o        \
+ 	tracee/statx.o		\
+diff --git a/src/syscall/enter.c b/src/syscall/enter.c
+index 93f4306..9b3cfff 100644
+--- a/src/syscall/enter.c
++++ b/src/syscall/enter.c
+@@ -45,6 +45,7 @@
+ #include <netpacket/packet.h> /* struct sockaddr_ll (AF_PACKET) */
+ #include <sys/ioctl.h>   /* ioctl(2): SIOCGIFMTU / SIOCGIFHWADDR */
+ #include <sys/time.h>    /* struct timeval, for SO_RCVTIMEO */
++#include "tracee/affinity.h"
+ #include "syscall/pipe_shadow.h"
+ 
+ /* ABI-stable rtnetlink constants we synthesise for the loopback reply.
+@@ -1849,6 +1850,21 @@ int translate_syscall_enter(Tracee *tracee)
+ 		status = translate_execve_enter(tracee);
+ 		break;
+ 
++#ifdef NATIVECODE_PROOT_AFFINITY
++	case PR_sched_getaffinity:
++	case PR_sched_setaffinity: {
++		pid_t target_pid = (pid_t) peek_reg(tracee, CURRENT, SYSARG_1);
++		Tracee *target = target_pid == 0 ? tracee : get_tracee(tracee, target_pid, false);
++
++		if (syscall_number == PR_sched_getaffinity)
++			nc_aff_guest_query(target);
++		else
++			nc_aff_guest_set(target);
++		status = 0;
++		break;
++	}
++#endif
++
+ 	case PR_execveat:
+ 		if ((int) peek_reg(tracee, CURRENT, SYSARG_1) == AT_FDCWD) {
+ 			set_sysnum(tracee, PR_execve);
+diff --git a/src/syscall/seccomp.c b/src/syscall/seccomp.c
+index 2f8930e..ebea61b 100644
+--- a/src/syscall/seccomp.c
++++ b/src/syscall/seccomp.c
+@@ -334,6 +334,10 @@ static FilteredSysnum proot_sysnums[] = {
+ 	{ PR_access,		0 },
+ 	{ PR_acct,		0 },
+ 	{ PR_bind,		0 },
++#ifdef NATIVECODE_PROOT_AFFINITY
++	{ PR_sched_getaffinity,	0 },
++	{ PR_sched_setaffinity,	0 },
++#endif
+ 	{ PR_brk,		FILTER_SYSEXIT },
+ 	{ PR_chdir,		FILTER_SYSEXIT },
+ 	{ PR_chmod,		0 },
+diff --git a/src/tracee/affinity.c b/src/tracee/affinity.c
+new file mode 100644
+index 0000000..10d4d6e
+--- /dev/null
++++ b/src/tracee/affinity.c
+@@ -0,0 +1,398 @@
++/* NativeCode: co-locate syscall-dense tracees with the tracer.
++ *
++ * Every traced syscall is a tracee -> tracer -> tracee round trip.  When the
++ * two run on different CPUs each hop is a cross-CPU wake-up (idle exit, cold
++ * cache, low DVFS point); on big.LITTLE phones that costs 2-3x on
++ * metadata-heavy work (git, find, tar, npm).  A tracee that issues traced
++ * syscalls back to back is therefore pinned to the tracer's CPU, and released
++ * as soon as it goes quiet, so compute threads keep every core.
++ *
++ * The guest never observes the pin: sched_getaffinity(2) on a pinned tracee
++ * releases it first, and a tracee that calls sched_setaffinity(2) is never
++ * touched again.  Set PROOT_NO_AFFINITY=1 to disable.
++ */
++#ifdef NATIVECODE_PROOT_AFFINITY
++
++#define _GNU_SOURCE
++#include <sched.h>
++#include <pthread.h>
++#include <semaphore.h>
++#include <signal.h>
++#include <stdatomic.h>
++#include <stdbool.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#include <unistd.h>
++#include <errno.h>
++
++#include "tracee/tracee.h"
++#include "tracee/affinity.h"
++
++#define AFF_DENSE_GAP_NS  300000ULL   /* ran < 0.3 ms between two stops: dense */
++#define AFF_DENSE_EVENTS  16          /* consecutive dense stops before pinning */
++#define AFF_IDLE_NS       3000000ULL  /* pinned and silent for 3 ms: release */
++#define AFF_SWEEP_NS      2000000L    /* helper period while something is pinned */
++#define AFF_RETRY_NS      1000000000ULL
++#define AFF_SLOTS         128
++#define AFF_MAX_CPUS      64
++
++/* Slot word: generation (bumped on every pin) | state in the low 2 bits.
++ * The generation lets the helper's CAS fail when the slot was recycled
++ * after it read the tid.  RELEASING: the helper is restoring the mask.  */
++enum { SLOT_FREE = 0, SLOT_PINNED = 1, SLOT_RELEASED = 2, SLOT_RELEASING = 3 };
++#define ST(w)     ((w) & 3u)
++#define GEN(w)    ((w) & ~3u)
++#define GEN_STEP  4u
++
++typedef struct {
++	_Atomic unsigned state;
++	_Atomic pid_t tid;
++	_Atomic uint64_t resume_ns;   /* last restart */
++} Slot;
++
++static Slot slots[AFF_SLOTS];
++static _Atomic int pinned_count;
++static int state;                     /* 0: not initialised, 1: ready, -1: disabled */
++static int big_cpus[AFF_MAX_CPUS];
++static int big_count;
++static int pin_cpu = -1;
++static _Atomic bool tracer_pinned;
++static pid_t tracer_tid;
++static bool ever_pinned;
++static uint64_t retry_after_ns;
++static cpu_set_t all_cpus;
++static sem_t helper_sem;
++static bool helper_started;
++
++static uint64_t now_ns(void)
++{
++	struct timespec ts;
++	clock_gettime(CLOCK_MONOTONIC, &ts);
++	return (uint64_t) ts.tv_sec * 1000000000ULL + (uint64_t) ts.tv_nsec;
++}
++
++static int set_one(pid_t tid, int cpu)
++{
++	cpu_set_t set;
++	CPU_ZERO(&set);
++	CPU_SET(cpu, &set);
++	return sched_setaffinity(tid, sizeof(set), &set);
++}
++
++static void set_all(pid_t tid)
++{
++	(void) sched_setaffinity(tid, sizeof(all_cpus), &all_cpus);
++}
++
++/* Release pinned tracees that went quiet (computing, or blocked in the
++ * kernel): they produce no event, so the event loop cannot notice.  Touches
++ * nothing but the slot table, and sleeps while nothing is pinned.  */
++static void *helper_main(void *unused)
++{
++	const struct timespec period = { 0, AFF_SWEEP_NS };
++	(void) unused;
++
++	while (1) {
++		int active;
++
++		while (sem_wait(&helper_sem) < 0 && errno == EINTR)
++			;
++		do {
++			uint64_t now;
++			int i;
++
++			nanosleep(&period, NULL);
++			now = now_ns();
++			active = 0;
++			for (i = 0; i < AFF_SLOTS; i++) {
++				unsigned w = atomic_load(&slots[i].state);
++				uint64_t resumed;
++				pid_t tid;
++
++				if (ST(w) != SLOT_PINNED)
++					continue;
++				resumed = atomic_load(&slots[i].resume_ns);
++				tid = atomic_load(&slots[i].tid);
++				if (now < resumed || now - resumed < AFF_IDLE_NS) {
++					active++;
++					continue;
++				}
++				/* Fails if the slot was freed or recycled since
++				 * @w was read; forget_slot() waits out RELEASING.  */
++				if (atomic_compare_exchange_strong(&slots[i].state, &w, GEN(w) | SLOT_RELEASING)) {
++					set_all(tid);
++					atomic_store(&slots[i].state, GEN(w) | SLOT_RELEASED);
++				}
++			}
++		} while (active > 0);
++
++		/* Nothing left to pair with: give the tracer its CPUs back.
++		 * The event loop pins it again with the next dense tracee.  */
++		if (atomic_exchange(&tracer_pinned, false))
++			set_all(tracer_tid);
++	}
++	return NULL;
++}
++
++static void start_helper(void)
++{
++	sigset_t all, old;
++	pthread_attr_t attr;
++	pthread_t thread;
++
++	if (helper_started)
++		return;
++	helper_started = true;
++
++	if (sem_init(&helper_sem, 0, 0) < 0) {
++		state = -1;
++		return;
++	}
++	/* The helper must never run a tracer signal handler.  */
++	sigfillset(&all);
++	pthread_sigmask(SIG_BLOCK, &all, &old);
++	pthread_attr_init(&attr);
++	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
++	if (pthread_create(&thread, &attr, helper_main, NULL) != 0)
++		state = -1;
++	pthread_attr_destroy(&attr);
++	pthread_sigmask(SIG_SETMASK, &old, NULL);
++}
++
++static void init(void)
++{
++	cpu_set_t allowed;
++	long capacity[AFF_MAX_CPUS];
++	long max_capacity = 0;
++	int cpu;
++
++	state = -1;
++	if (getenv("PROOT_NO_AFFINITY") != NULL)
++		return;
++	if (sched_getaffinity(0, sizeof(allowed), &allowed) < 0 || CPU_COUNT(&allowed) < 2)
++		return;
++
++	for (cpu = 0; cpu < AFF_MAX_CPUS; cpu++) {
++		char path[64];
++		FILE *file;
++
++		capacity[cpu] = -1;
++		if (!CPU_ISSET(cpu, &allowed))
++			continue;
++		capacity[cpu] = 0;
++		snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpu_capacity", cpu);
++		file = fopen(path, "r");
++		if (file != NULL) {
++			if (fscanf(file, "%ld", &capacity[cpu]) != 1)
++				capacity[cpu] = 0;
++			fclose(file);
++		}
++		if (capacity[cpu] > max_capacity)
++			max_capacity = capacity[cpu];
++	}
++
++	/* Fast cores only: one slow core is worse than no pinning.  Without
++	 * capacity information every allowed CPU is as good as another.  */
++	big_count = 0;
++	for (cpu = 0; cpu < AFF_MAX_CPUS; cpu++) {
++		if (capacity[cpu] < 0)
++			continue;
++		if (capacity[cpu] * 5 >= max_capacity * 4)
++			big_cpus[big_count++] = cpu;
++	}
++	if (big_count == 0)
++		return;
++
++	/* Restoring "every CPU" lets the kernel clamp to the current cpuset,
++	 * which Android changes behind our back (foreground/background).  */
++	memset(&all_cpus, 0xff, sizeof(all_cpus));
++
++	tracer_tid = gettid();
++	state = 1;
++	start_helper();   /* back to -1 on failure */
++}
++
++/* Pick the CPU for the next tracer pin: keep the tracer where the scheduler
++ * put it when that is a fast core, else spread tracers by pid.  */
++static int choose_cpu(void)
++{
++	int current = sched_getcpu();
++	int i;
++
++	for (i = 0; i < big_count; i++)
++		if (big_cpus[i] == current)
++			return current;
++	return big_cpus[(unsigned) getpid() % (unsigned) big_count];
++}
++
++static void unpin_tracer_if_idle(void)
++{
++	if (atomic_load(&pinned_count) == 0 && atomic_exchange(&tracer_pinned, false))
++		set_all(0);
++}
++
++static void forget_slot(Tracee *tracee)
++{
++	_Atomic unsigned *word = &slots[tracee->aff_slot].state;
++
++	/* Let an in-flight helper set_all() land first, so it cannot
++	 * override a mask installed after this (ours or the guest's).  */
++	for (;;) {
++		unsigned w = atomic_load(word);
++
++		if (ST(w) == SLOT_RELEASING)
++			sched_yield();
++		else if (atomic_compare_exchange_strong(word, &w, GEN(w) | SLOT_FREE))
++			break;
++	}
++	atomic_fetch_sub(&pinned_count, 1);
++	tracee->aff_pinned = false;
++	tracee->aff_dense = 0;
++}
++
++static void unpin(Tracee *tracee)
++{
++	if (!tracee->aff_pinned)
++		return;
++	forget_slot(tracee);
++	set_all(tracee->pid);
++	unpin_tracer_if_idle();
++}
++
++/* Book @tracee as pinned; @apply is false when the kernel mask is already
++ * the pin (inherited through clone(2)).  */
++static void pin(Tracee *tracee, bool apply, uint64_t now)
++{
++	int i;
++
++	if (!atomic_load(&tracer_pinned)) {
++		if (apply)
++			pin_cpu = choose_cpu();
++		if (pin_cpu < 0 || set_one(0, pin_cpu) < 0) {
++			retry_after_ns = now + AFF_RETRY_NS;
++			if (!apply)
++				set_all(tracee->pid);
++			return;
++		}
++		atomic_store(&tracer_pinned, true);
++	}
++
++	for (i = 0; i < AFF_SLOTS; i++)
++		if (ST(atomic_load(&slots[i].state)) == SLOT_FREE)
++			break;
++	if (i == AFF_SLOTS || (apply && set_one(tracee->pid, pin_cpu) < 0)) {
++		if (i != AFF_SLOTS)
++			retry_after_ns = now + AFF_RETRY_NS;
++		else if (!apply)
++			set_all(tracee->pid);
++		tracee->aff_dense = 0;
++		unpin_tracer_if_idle();
++		return;
++	}
++
++	atomic_store(&slots[i].tid, tracee->pid);
++	atomic_store(&slots[i].resume_ns, now);
++	atomic_store(&slots[i].state, (GEN(atomic_load(&slots[i].state)) + GEN_STEP) | SLOT_PINNED);
++	tracee->aff_slot = i;
++	tracee->aff_pinned = true;
++	ever_pinned = true;
++	atomic_fetch_add(&pinned_count, 1);
++	sem_post(&helper_sem);
++}
++
++void nc_aff_on_stop(Tracee *tracee)
++{
++	uint64_t now;
++	uint64_t gap;
++
++	if (state < 0 || tracee->aff_user)
++		return;
++	now = now_ns();
++
++	if (state == 0) {
++		init();
++		if (state != 1)
++			return;
++	}
++
++	/* A child created by a pinned tracee starts with the pinned mask:
++	 * adopt it, so that it is released like any other.  */
++	if (!tracee->aff_checked) {
++		tracee->aff_checked = true;
++		if (ever_pinned && !tracee->aff_pinned) {
++			cpu_set_t mask;
++			if (sched_getaffinity(tracee->pid, sizeof(mask), &mask) == 0
++			    && CPU_COUNT(&mask) == 1) {
++				if (CPU_ISSET(pin_cpu, &mask))
++					pin(tracee, false, now);
++				else   /* the pin moved since its parent forked */
++					set_all(tracee->pid);
++			}
++		}
++	}
++
++	if (tracee->aff_pinned) {
++		Slot *slot = &slots[tracee->aff_slot];
++
++		if (ST(atomic_load(&slot->state)) != SLOT_PINNED) {
++			/* The helper let it go (or is doing so).  */
++			unpin(tracee);
++		} else if (!atomic_load(&tracer_pinned) && set_one(0, pin_cpu) == 0) {
++			/* The helper released the tracer just before this
++			 * tracee was pinned.  */
++			atomic_store(&tracer_pinned, true);
++		}
++	}
++
++	gap = tracee->aff_resume_ns != 0 && now > tracee->aff_resume_ns
++		? now - tracee->aff_resume_ns : UINT64_MAX;
++	if (gap < AFF_DENSE_GAP_NS) {
++		if (tracee->aff_dense < AFF_DENSE_EVENTS)
++			tracee->aff_dense++;
++	} else {
++		tracee->aff_dense = 0;
++		if (tracee->aff_pinned && gap >= AFF_IDLE_NS)
++			unpin(tracee);
++	}
++
++	if (!tracee->aff_pinned && tracee->aff_dense >= AFF_DENSE_EVENTS && now >= retry_after_ns)
++		pin(tracee, true, now);
++}
++
++void nc_aff_on_resume(Tracee *tracee)
++{
++	if (state != 1 || tracee->aff_user)
++		return;
++	tracee->aff_resume_ns = now_ns();
++	if (tracee->aff_pinned)
++		atomic_store(&slots[tracee->aff_slot].resume_ns, tracee->aff_resume_ns);
++}
++
++void nc_aff_forget(Tracee *tracee)
++{
++	if (!tracee->aff_pinned)
++		return;
++	forget_slot(tracee);
++	unpin_tracer_if_idle();
++}
++
++void nc_aff_guest_query(Tracee *target)
++{
++	if (target != NULL)
++		unpin(target);
++}
++
++void nc_aff_guest_set(Tracee *target)
++{
++	if (target == NULL)
++		return;
++	/* Restore the full mask first: if the kernel rejects the guest's
++	 * mask, the tracee must not keep the pin.  */
++	unpin(target);
++	target->aff_user = true;
++}
++
++#endif /* NATIVECODE_PROOT_AFFINITY */
+diff --git a/src/tracee/affinity.h b/src/tracee/affinity.h
+new file mode 100644
+index 0000000..d9c48bb
+--- /dev/null
++++ b/src/tracee/affinity.h
+@@ -0,0 +1,20 @@
++#ifndef NC_AFFINITY_H
++#define NC_AFFINITY_H
++
++#include "tracee/tracee.h"
++
++#ifdef NATIVECODE_PROOT_AFFINITY
++void nc_aff_on_stop(Tracee *tracee);      /* tracee reported an event */
++void nc_aff_on_resume(Tracee *tracee);    /* tracee was restarted */
++void nc_aff_forget(Tracee *tracee);       /* tracee is being destroyed */
++void nc_aff_guest_query(Tracee *target);  /* guest sched_getaffinity(target) */
++void nc_aff_guest_set(Tracee *target);    /* guest sched_setaffinity(target) */
++#else
++#define nc_aff_on_stop(t)     ((void) 0)
++#define nc_aff_on_resume(t)   ((void) 0)
++#define nc_aff_forget(t)      ((void) 0)
++#define nc_aff_guest_query(t) ((void) 0)
++#define nc_aff_guest_set(t)   ((void) 0)
++#endif
++
++#endif
+diff --git a/src/tracee/event.c b/src/tracee/event.c
+index df953ee..483c67f 100644
+--- a/src/tracee/event.c
++++ b/src/tracee/event.c
+@@ -45,6 +45,7 @@
+ #include "syscall/syscall.h"
+ #include "syscall/seccomp.h"
+ #include "syscall/pipe_shadow.h"
++#include "tracee/affinity.h"
+ #include "ptrace/wait.h"
+ #include "extension/extension.h"
+ #include "execve/elf.h"
+@@ -418,6 +419,7 @@ int event_loop()
+ 		assert(tracee != NULL);
+ 
+ 		tracee->running = false;
++		nc_aff_on_stop(tracee);
+ 
+ 		status = notify_extensions(tracee, NEW_STATUS, tracee_status, 0);
+ 		if (status != 0)
+@@ -894,6 +896,7 @@ bool restart_tracee(Tracee *tracee, int signal)
+ 	tracee->last_restart_how = tracee->restart_how;
+ 	tracee->restart_how = 0;
+ 	tracee->running = true;
++	nc_aff_on_resume(tracee);
+ 
+ 	return true;
+ }
+diff --git a/src/tracee/tracee.c b/src/tracee/tracee.c
+index dedd859..c767ed1 100644
+--- a/src/tracee/tracee.c
++++ b/src/tracee/tracee.c
+@@ -35,6 +35,7 @@
+ #include <inttypes.h>   /* PRI*, */
+ 
+ #include "tracee/tracee.h"
++#include "tracee/affinity.h"
+ #include "tracee/reg.h"
+ #include "tracee/mem.h"
+ #include "path/binding.h"
+@@ -108,6 +109,7 @@ static int remove_tracee(Tracee *tracee)
+ 	Tracee *ptracer;
+ 	int event;
+ 
++	nc_aff_forget(tracee);
+ 	LIST_REMOVE(tracee, link);
+ 
+ 	/* Clean objects that are linked to this tracee's life
+@@ -440,6 +442,9 @@ int new_child(Tracee *parent, word_t clone_flags)
+ 		note(parent, WARNING, SYSTEM, "running out of memory");
+ 		return -ENOMEM;
+ 	}
++#ifdef NATIVECODE_PROOT_AFFINITY
++	child->aff_user = parent->aff_user;
++#endif
+ 
+ 	/* Sanity checks.  */
+ 	assert(child != NULL
+diff --git a/src/tracee/tracee.h b/src/tracee/tracee.h
+index 0dab702..eee6084 100644
+--- a/src/tracee/tracee.h
++++ b/src/tracee/tracee.h
+@@ -96,6 +96,16 @@ typedef struct tracee {
+ 	/* Is it currently running or not?  */
+ 	bool running;
+ 
++#ifdef NATIVECODE_PROOT_AFFINITY
++	/* See tracee/affinity.c.  */
++	uint64_t aff_resume_ns;
++	int aff_slot;
++	uint8_t aff_dense;
++	bool aff_pinned;
++	bool aff_user;
++	bool aff_checked;
++#endif
++
+ 	/* Is this tracee ready to be freed?  TODO: move to a list
+ 	 * dedicated to terminated tracees instead.  */
+ 	bool terminated;

@@ -1,0 +1,5 @@
+fast_pty_guard/ and loader/ are original NativeCode (ZenithBlue) sources, copied from the project's
+own termux-lib (fast_pty_guard.cpp, native_container_lock.*) and FluxLinux (loader/Loader.java) trees.
+They carry no license header of their own; they follow the repository license
+(TODO: GPL-3.0-or-later, pending owner confirmation).
+patches/proot/*.patch apply to termux/proot (GPL-2.0-or-later) and are distributed under the same terms.

@@ -1,0 +1,258 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NativeCode <nativecode@example.invalid>
+Date: Mon, 31 Aug 2026 00:00:00 +0530
+Subject: [PATCH] u11: use a lifecycle-owned rootfd for rootfs lstat
+
+Keep one directory descriptor per filesystem namespace and use fstatat(2)
+for host paths below the configured rootfs.  The descriptor is opened after
+bindings are initialized, duplicated for copied namespaces, and closed by
+the namespace destructor.  Failure to open or duplicate it keeps the
+existing lstat path.
+
+The string-prefix check intentionally limits this candidate to the stable
+rootfs base.  Paths outside that base continue through the existing path
+walk and binding logic.
+---
+ src/extension/fake_id0/chroot.c |  3 +++
+ src/path/binding.c              | 31 +++++++++++++++++++++++++++++++
+ src/path/binding.h              |  4 ++++
+ src/path/canon.c                | 34 ++++++++++++++++++++++++++++++++++
+ src/tracee/tracee.c             | 34 ++++++++++++++++++++++++++++++++++
+ src/tracee/tracee.h             |  6 ++++++
+ 6 files changed, 112 insertions(+)
+
+diff --git a/src/tracee/tracee.h b/src/tracee/tracee.h
+index 1111111..2222222 100644
+--- a/src/tracee/tracee.h
++++ b/src/tracee/tracee.h
+@@ -26,0 +27,1 @@
++#include <limits.h>    /* PATH_MAX, */
+@@ -63,2 +63,8 @@
+ 	/* Current working directory, à la /proc/self/pwd.  */
+ 	char *cwd;
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++	/* Stable host root for the lifetime of this filesystem namespace. */
++	int nativecode_rootfd;
++	char nativecode_root_path[PATH_MAX];
++	bool nativecode_rootfs_bindings_clean;
++#endif
+@@ -398,6 +404,9 @@ extern int new_child(Tracee *parent, word_t clone_flags);
+ extern Tracee *new_dummy_tracee(TALLOC_CTX *context);
+ extern void terminate_tracee(Tracee *tracee);
+ extern void free_terminated_tracees();
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++extern void nativecode_init_fs(FileSystemNameSpace *fs);
++#endif
+ extern int swap_config(Tracee *tracee1, Tracee *tracee2);
+ extern void kill_all_tracees();
+ 
+diff --git a/src/tracee/tracee.c b/src/tracee/tracee.c
+index 1111111..2222222 100644
+--- a/src/tracee/tracee.c
++++ b/src/tracee/tracee.c
+@@ -20,6 +20,7 @@
+  */
+ 
+ #include <sched.h>      /* CLONE_*,  */
++#include <fcntl.h>      /* dup(2),  */
+ #include <sys/types.h>  /* pid_t, size_t, */
+ #include <stdlib.h>     /* NULL, */
+ #include <assert.h>     /* assert(3), */
+@@ -48,6 +50,25 @@
+ 
+ static Tracees tracees;
+ 
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++static int nativecode_fs_destructor(FileSystemNameSpace *fs)
++{
++	if (fs->nativecode_rootfd >= 0) {
++		close(fs->nativecode_rootfd);
++		fs->nativecode_rootfd = -1;
++	}
++	return 0;
++}
++
++void nativecode_init_fs(FileSystemNameSpace *fs)
++{
++	fs->nativecode_rootfd = -1;
++	fs->nativecode_root_path[0] = '\0';
++	talloc_set_destructor(fs, nativecode_fs_destructor);
++	fs->nativecode_rootfs_bindings_clean = true;
++}
++#endif
++
+ /**
+  * Return the tracee associated with @pid, or NULL if it doesn't exist.
+  */
+@@ -193,4 +214,7 @@ Tracee *new_dummy_tracee(TALLOC_CTX *context)
+ 	 * name-space and heap.  */
+ 	tracee->fs = talloc_zero(tracee, FileSystemNameSpace);
+ 	tracee->heap = talloc_zero(tracee, Heap);
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++	nativecode_init_fs(tracee->fs);
++#endif
+ 	tracee->auxv_fd = -1;
+@@ -534,5 +558,18 @@ int new_child(Tracee *parent, word_t clone_flags)
+ 		child->fs = talloc_zero(child, FileSystemNameSpace);
+ 		if (child->fs == NULL)
+ 			return -ENOMEM;
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++		nativecode_init_fs(child->fs);
++		if (parent->fs->nativecode_rootfd >= 0) {
++			int fd = dup(parent->fs->nativecode_rootfd);
++			if (fd >= 0) {
++				child->fs->nativecode_rootfd = fd;
++				strcpy(child->fs->nativecode_root_path,
++				       parent->fs->nativecode_root_path);
++			}
++				child->fs->nativecode_rootfs_bindings_clean =
++				       parent->fs->nativecode_rootfs_bindings_clean;
++		}
++#endif
+ 
+ 		child->fs->cwd = talloc_strdup(child->fs, parent->fs->cwd);
+diff --git a/src/path/binding.h b/src/path/binding.h
+index 1111111..2222222 100644
+--- a/src/path/binding.h
++++ b/src/path/binding.h
+@@ -48,5 +48,8 @@ extern Binding *insort_binding3(const Tracee *tracee, const TALLOC_CTX *context,
+ extern Binding *new_binding(Tracee *tracee, const char *host, const char *guest, bool must_exist);
+ extern int initialize_bindings(Tracee *tracee);
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++extern void nativecode_prepare_rootfd(Tracee *tracee);
++#endif
+ extern const char *get_path_binding(const Tracee* tracee, Side side, const char path[PATH_MAX]);
+ extern Binding *get_binding(const Tracee *tracee, Side side, const char path[PATH_MAX]);
+ extern const char *get_root(const Tracee* tracee);
+
+diff --git a/src/path/binding.c b/src/path/binding.c
+index 1111111..2222222 100644
+--- a/src/path/binding.c
++++ b/src/path/binding.c
+@@ -20,5 +20,6 @@
+  */
+ 
+ #include <sys/stat.h> /* lstat(2), */
++#include <fcntl.h>    /* open(2), O_*, */
+ #include <unistd.h>   /* getcwd(2), lstat(2), */
+ #include <string.h>   /* string(3),  */
+@@ -706,6 +707,40 @@ static void initialize_binding(Tracee *tracee, Binding *binding)
+ 	}
+ }
+ 
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++void nativecode_prepare_rootfd(Tracee *tracee)
++{
++	const char *root = get_root(tracee);
++	Binding *binding;
++	size_t root_length;
++	int fd;
++
++	if (root == NULL || root[0] != '/' || strcmp(root, "/") == 0)
++		return;
++
++	root_length = strlen(root);
++	tracee->fs->nativecode_rootfs_bindings_clean = true;
++	CIRCLEQ_FOREACH_(tracee, binding, HOST) {
++		if (strcmp(binding->guest.path, "/") == 0
++		    && strcmp(binding->host.path, root) == 0)
++			continue;
++		if (strncmp(binding->host.path, root, root_length) == 0
++		    && (binding->host.path[root_length] == '\0'
++			|| binding->host.path[root_length] == '/')) {
++			tracee->fs->nativecode_rootfs_bindings_clean = false;
++			return;
++		}
++	}
++
++	fd = open(root, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
++	if (fd < 0)
++		return;
++
++	tracee->fs->nativecode_rootfd = fd;
++	strcpy(tracee->fs->nativecode_root_path, root);
++}
++#endif
++
+ /**
+  * Allocate @tracee->fs->bindings.guest and
+  * @tracee->fs->bindings.host, then call initialize_binding() on each
+@@ -761,5 +790,9 @@ int initialize_bindings(Tracee *tracee)
+ 
+ 	TALLOC_FREE(tracee->fs->bindings.pending);
+ 
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++	nativecode_prepare_rootfd(tracee);
++#endif
++
+ 	if (tracee->verbose > 0)
+ 		print_bindings(tracee);
+
+diff --git a/src/path/canon.c b/src/path/canon.c
+index 1111111..2222222 100644
+--- a/src/path/canon.c
++++ b/src/path/canon.c
+@@ -24,4 +24,7 @@
+ #include <limits.h>    /* PATH_MAX, */
+ #include <sys/param.h> /* MAXSYMLINKS, */
+ #include <errno.h>     /* E*, */
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++#include <fcntl.h>     /* fstatat(2), AT_SYMLINK_NOFOLLOW, */
++#endif
+ #include <sys/stat.h>  /* lstat(2), S_ISREG(), */
+@@ -128,5 +131,31 @@ static inline Finality next_component(char component[NAME_MAX], const char **cursor)
+ 	return NOT_FINAL;
+ }
+ 
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++static int nativecode_rootfs_lstat(const Tracee *tracee, const char *path,
++		struct stat *statl)
++{
++	const char *root = tracee->fs->nativecode_root_path;
++	size_t root_length = strlen(root);
++	const char *relative;
++
++	if (tracee->fs->nativecode_rootfd < 0
++	    || !tracee->fs->nativecode_rootfs_bindings_clean
++	    || root_length == 0
++	    || strcmp(root, "/") == 0
++	    || strncmp(path, root, root_length) != 0
++	    || (path[root_length] != '\0' && path[root_length] != '/'))
++		return lstat(path, statl);
++
++	relative = path + root_length;
++	while (*relative == '/')
++		relative++;
++	if (*relative == '\0')
++		relative = ".";
++	return fstatat(tracee->fs->nativecode_rootfd, relative, statl,
++			AT_SYMLINK_NOFOLLOW);
++}
++#endif
++
+ /**
+  * Resolve bindings (if any) in @guest_path and copy the translated
+@@ -162,5 +196,9 @@ static inline int substitute_binding_stat(Tracee *tracee, Finality finality, unsigned int recursion_level, bool deref_final,
+ 		did_lstat = true;
+ 		NC_PROFILE_HOST_LSTAT(host_path, recursion_level);
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++		status = nativecode_rootfs_lstat(tracee, host_path, &statl);
++#else
+ 		status = lstat(host_path, &statl);
++#endif
+ 		/* /linkerconfig directory is present and accessible on Android,
+ 		 * but cannot be stat()'d, use hardcoded stat if access was denied
+
+diff --git a/src/extension/fake_id0/chroot.c b/src/extension/fake_id0/chroot.c
+index 1111111..2222222 100644
+--- a/src/extension/fake_id0/chroot.c
++++ b/src/extension/fake_id0/chroot.c
+@@ -103,5 +103,8 @@ int handle_chroot_exit_end(Tracee *tracee, Config *config, bool from_sigsys) {
+ 		/* Replace tracee bindings */
+ 		talloc_unlink(tracee, tracee->fs);
+ 		tracee->fs = talloc_zero(tracee, FileSystemNameSpace);
++#ifdef NATIVECODE_PROOT_U11_ROOTFD
++		nativecode_init_fs(tracee->fs);
++#endif
+ 		binding = new_binding(tracee, path_host_absolute, "/", true);
+ 		initialize_bindings(tracee);

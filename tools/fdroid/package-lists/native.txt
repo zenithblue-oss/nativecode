@@ -1,0 +1,4 @@
+# Packages whose binaries become jniLibs (libbash/libproot/libloader/libtermux-exec).
+bash
+termux-exec
+proot
