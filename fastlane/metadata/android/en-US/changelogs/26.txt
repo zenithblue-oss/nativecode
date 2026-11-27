@@ -1,0 +1,8 @@
+1.8.5
+- Agent bridge works with the Play and F-Droid builds installed side by side; share-file takes a plain path
+- Videos from chat cards start when opened
+- PulseAudio in the F-Droid build, on its own port
+- Phosh GPU fix (stale kbase_shim preload)
+- Hardware page shows GPU driver state and updates
+- Clipboard sync between Phosh and Android
+- Display fixes
