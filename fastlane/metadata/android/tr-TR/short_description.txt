@@ -1,1 +1,1 @@
-Android'de Alpaquita Linux masaüstü ve yapay zeka kodlama araçları
+Android'de Linux masaüstü, terminal ve yapay zekâ kodlama ajanları. Root yok.

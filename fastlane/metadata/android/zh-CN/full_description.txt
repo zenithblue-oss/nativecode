@@ -1,16 +1,17 @@
-NativeCode 将您的手机或平板变成便携式 Linux 工作站和 AI 开发环境，无需电脑。
+NativeCode 把 Android 手机或平板变成便携的 Linux 工作站。无需电脑，也无需 root。
 
-主要功能：
+- PRoot 中的 Alpaquita Linux：glibc 用户空间，带 apk 包管理器、Bash、Node.js、Python、GCC 和 Git。
+- 带标签页和额外按键行的终端。
+- 通过 Termux:X11 在屏幕上显示 Linux 桌面 (Phosh)；设备支持时，可使用 Mesa PanVK (Mali) 或 Turnip (Adreno) 进行 GPU 加速。
+- 在聊天视图或终端中使用 AI 编程助手：opencode (开源)，并可按需安装其他助手命令行工具。
+- Git 工作区：项目树、差异视图和分支切换。
+- 用于登录手机的 SSH 服务器，以及远程主机和密钥。
+- 备份项目和设置。
 
-- Alpaquita Linux 容器 — 原生 glibc 用户空间，带 apk 和完整的开发环境
-- 两种隔离模式 — PRoot（无需 root，推荐）和 Chroot（内核空间，适用于已 root 设备）
-- XFCE4 桌面图形界面 — 集成 Termux-X11 显示服务，支持 VirGL GPU 加速
-- AI CLI 引擎 — 在原生终端中运行 Claude Code、Codex、OpenCode、Agy、Grok、Qwen 和 Kiro
-- 软件市场 — 从应用内目录浏览并安装精选软件包
-- Git 工作区 — 多仓库项目树、实时状态、可视化差异查看、分支切换、GitHub CLI 集成
-- 预配置运行时 — Node.js 26 LTS、Python 3.12、GCC 和常用包管理器
-- CLI 配置 — 引导式安装和凭据管理，支持各 AI 厂商工具
+一切免费。没有付费墙、广告、统计分析或崩溃报告，NativeCode 也不运行自己的服务器。应用内可选的报告只发送你选择的内容。
 
-首次设置由引导向导带您完成：设备检查，并一键安装无 root 的 Alpaquita PRoot 环境，实时显示进度。
+下载：在应用中同意后，Linux 根文件系统 (约 1.26 GB) 和运行时更新包 (约 317 MB) 将从 GitHub Releases 下载。之后仅在你要求时，才会以同样方式下载 Android SDK 包 (约 69 MB) 和 GPU 驱动 (17 至 34 MB)。每个文件都会按固定的大小和 SHA-256 校验。建议使用 Wi-Fi 并预留约 10 GB 可用空间。
 
-把您的手机或平板变成便携式 Linux 与 AI 工作站，随时编程和开发软件。
+反特性：除 opencode 外的 AI 工具 (Claude Code、Antigravity、Grok、Kiro 等) 是专有软件。NativeCode 不包含它们；仅在你要求时才从其厂商服务器安装，它们使用的 AI 服务是专有的网络服务。
+
+需要 arm64 设备上的 Android 8.0 或更高版本。

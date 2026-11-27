@@ -1,1 +1,1 @@
-Desktop Alpaquita Linux e ferramentas de programação com IA no Android
+Desktop Linux, terminal e agentes de IA para programar no Android. Sem root.

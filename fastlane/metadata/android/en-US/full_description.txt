@@ -1,16 +1,17 @@
-NativeCode turns your phone or tablet into a portable Linux workstation and AI development environment — no PC required.
+NativeCode turns an Android phone or tablet into a portable Linux workstation. No PC and no root needed.
 
-Key Features:
+- Alpaquita Linux in PRoot: glibc userland with the apk package manager, Bash, Node.js, Python, GCC and Git.
+- Terminal with tabs and an extra-keys row.
+- Linux desktop (Phosh) on screen through Termux:X11, with GPU acceleration from Mesa PanVK (Mali) or Turnip (Adreno) where the device allows it.
+- AI coding agents in a chat view or in the terminal: opencode (open source) and, on request, other agent command line tools.
+- Git workspace with a project tree, diff view and branch switching.
+- SSH server for logging in to the phone, plus remote hosts and keys.
+- Backup of your projects and settings.
 
-- Alpaquita Linux container — native glibc userland with apk and a complete development environment
-- Two isolation modes — PRoot (no root required, recommended) and Chroot (kernel-space, for rooted devices)
-- XFCE4 desktop GUI — integrated Termux-X11 display server with VirGL GPU acceleration
-- AI CLI engine — run Claude Code, Codex, OpenCode, Agy, Grok, Qwen and Kiro in the native terminal
-- Software marketplace — browse and install curated packages from an in-app catalog
-- Git workspace — multi-repo project tree, real-time status, visual diff inspector, branch switching, GitHub CLI integration
-- Pre-configured runtimes — Node.js 26 LTS, Python 3.12, GCC and standard package managers
-- CLI provisioning — guided install and credential management for AI vendor tools
+Everything is free. There is no paywall, no ads, no analytics and no crash reporting, and NativeCode runs no servers of its own. The optional in-app report sends only what you choose.
 
-An onboarding wizard guides first-time setup: device checks and one-tap installation of the rootless Alpaquita PRoot environment with live progress.
+Downloads: the Linux root filesystem (about 1.26 GB) and a runtime update pack (about 317 MB) are fetched from GitHub Releases after you agree in the app. Later, and only when you ask, the Android SDK pack (about 69 MB) and a GPU driver (17 to 34 MB) are fetched the same way. Each file is checked against a pinned size and SHA-256. Wi-Fi and about 10 GB of free storage are recommended.
 
-Transform your phone or tablet into a portable Linux & AI workstation for coding and software development.
+Anti-features: the AI agent tools other than opencode (Claude Code, Antigravity, Grok, Kiro and others) are proprietary software. NativeCode does not bundle them; they are installed from their vendors' servers only when you ask, and the AI services they use are proprietary network services.
+
+Requires Android 8.0 or newer on an arm64 device.

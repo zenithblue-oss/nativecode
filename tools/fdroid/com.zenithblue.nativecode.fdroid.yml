@@ -1,4 +1,6 @@
 # DRAFT fdroiddata metadata (metadata/com.zenithblue.nativecode.fdroid.yml). Not submitted.
+# ASSUMPTION markers: values derived from the repo (versionCode/Name from app/build.gradle.kts) or planned
+# (public repo github.com/zenithblue-oss/nativecode-ai, tag v<versionName>); confirm before submitting.
 # Everything marked TODO is open; see tools/fdroid/*.sh for what `build:` runs:
 #   build_native.sh (jniLibs: proot/loader/bash/termux-exec/fast_pty_guard), build_bootstrap.sh
 #   (bootstrap.tar + loader.apk), build_xlorie.sh (libXlorie.so). Outputs land in app/src/fdroid/.
@@ -8,25 +10,26 @@ AntiFeatures:
   NonFreeAdd:
     en-US: Can install proprietary AI command line tools (Claude Code, Antigravity, Grok, Kiro) inside the Linux environment on explicit user request.
   TetheredNet:
-    en-US: Downloads the Linux root filesystem (about 1.4 GB), runtime update and Android SDK packs from GitHub Releases after an in-app opt-in.
+    en-US: Downloads the Linux root filesystem (about 1.26 GB), the runtime update pack, the Android SDK pack and the GPU drivers (Mesa PanVK, Turnip) from GitHub Releases after an in-app opt-in.
 Categories:
   - Development
   - System
-License: GPL-3.0-or-later   # TODO(license): pending owner confirmation
+License: GPL-3.0-or-later   # ASSUMPTION: owner-stated; confirm LICENSE file in the public repo
 AuthorName: ZenithBlue
 AuthorEmail: zenithblue.dev@gmail.com
 WebSite: https://zenithblue-dev.github.io/nativecode-ai/
-SourceCode: TBD    # TODO: public repo not created yet
-IssueTracker: TBD  # TODO
+SourceCode: https://github.com/zenithblue-oss/nativecode-ai   # ASSUMPTION: repo exists but is still private; make it public before submitting
+IssueTracker: https://github.com/zenithblue-oss/nativecode-ai/issues   # ASSUMPTION
+Changelog: https://github.com/zenithblue-oss/nativecode-ai/releases   # ASSUMPTION
 AutoName: NativeCode
 
 RepoType: git
-Repo: TBD          # TODO: public repo URL
+Repo: https://github.com/zenithblue-oss/nativecode-ai.git   # ASSUMPTION (see SourceCode)
 
 Builds:
-  - versionName: TBD   # TODO: release version (flavor fdroid)
-    versionCode: 0     # TODO
-    commit: TBD        # TODO: tag
+  - versionName: 1.8.3   # app/build.gradle.kts defaultConfig (flavor fdroid)
+    versionCode: 24      # app/build.gradle.kts defaultConfig
+    commit: v1.8.3       # ASSUMPTION: tag name; create it on the release commit
     submodules: false
     sudo:
       # Termux build deps (termux-packages scripts/setup-ubuntu.sh, trimmed to tools/fdroid/package-lists)
@@ -72,5 +75,5 @@ AllowedAPKSigningKeys: TBD   # TODO: sha256 of the release cert (reproducible-bu
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: TBD
-CurrentVersionCode: 0
+CurrentVersion: 1.8.3
+CurrentVersionCode: 24

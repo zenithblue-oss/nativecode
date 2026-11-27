@@ -1,16 +1,17 @@
-NativeCode mengubah ponsel atau tablet Anda menjadi workstation Linux portabel dan lingkungan pengembangan AI — tanpa perlu PC.
+NativeCode mengubah ponsel atau tablet Android menjadi workstation Linux portabel. Tanpa PC dan tanpa root.
 
-Fitur Utama:
+- Alpaquita Linux di PRoot: userland glibc dengan manajer paket apk, Bash, Node.js, Python, GCC, dan Git.
+- Terminal dengan tab dan baris tombol tambahan.
+- Desktop Linux (Phosh) di layar lewat Termux:X11, dengan akselerasi GPU dari Mesa PanVK (Mali) atau Turnip (Adreno) jika perangkat mendukung.
+- Agen pengodean AI di tampilan obrolan atau terminal: opencode (sumber terbuka) dan, jika diminta, alat baris perintah agen lainnya.
+- Ruang kerja Git dengan pohon proyek, tampilan diff, dan pergantian branch.
+- Server SSH untuk masuk ke ponsel, serta host jarak jauh dan kunci.
+- Pencadangan proyek dan pengaturan Anda.
 
-- Kontainer Alpaquita Linux — userland glibc native dengan apk dan lingkungan pengembangan lengkap
-- Dua mode isolasi — PRoot (tanpa root, direkomendasikan) dan Chroot (tingkat kernel, untuk perangkat ber-root)
-- GUI desktop XFCE4 — server tampilan Termux-X11 terintegrasi dengan akselerasi GPU VirGL
-- Mesin CLI AI — jalankan Claude Code, Codex, OpenCode, Agy, Grok, Qwen, dan Kiro di terminal native
-- Marketplace perangkat lunak — jelajahi dan pasang paket pilihan dari katalog dalam aplikasi
-- Workspace Git — pohon proyek multi-repo, status real-time, inspektur diff visual, pergantian branch, integrasi GitHub CLI
-- Runtime yang sudah dikonfigurasi — Node.js 26 LTS, Python 3.12, GCC, dan pengelola paket standar
-- Penyediaan CLI — instalasi terpandu dan pengelolaan kredensial untuk alat vendor AI
+Semuanya gratis. Tidak ada paywall, iklan, analitik, atau laporan crash, dan NativeCode tidak menjalankan server sendiri. Laporan opsional di dalam aplikasi hanya mengirim apa yang Anda pilih.
 
-Wizard onboarding memandu penyiapan pertama: pemeriksaan perangkat dan instalasi satu ketukan lingkungan Alpaquita PRoot tanpa root dengan progres langsung.
+Unduhan: sistem berkas root Linux (sekitar 1,26 GB) dan paket pembaruan runtime (sekitar 317 MB) diunduh dari GitHub Releases setelah Anda setuju di aplikasi. Nanti, dan hanya jika diminta, paket Android SDK (sekitar 69 MB) dan driver GPU (17 sampai 34 MB) diunduh dengan cara yang sama. Setiap berkas diperiksa terhadap ukuran dan SHA-256 yang ditetapkan. Disarankan Wi-Fi dan ruang kosong sekitar 10 GB.
 
-Ubah ponsel atau tablet Anda menjadi workstation Linux & AI portabel untuk coding dan pengembangan perangkat lunak.
+Fitur yang tidak diinginkan: alat AI selain opencode (Claude Code, Antigravity, Grok, Kiro, dan lainnya) adalah perangkat lunak proprietari. NativeCode tidak menyertakannya; alat itu dipasang dari server vendornya hanya jika Anda memintanya, dan layanan AI yang mereka pakai adalah layanan jaringan proprietari.
+
+Memerlukan Android 8.0 atau lebih baru pada perangkat arm64.

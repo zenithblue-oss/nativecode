@@ -1,16 +1,17 @@
-NativeCode, telefonunuzu veya tabletinizi taşınabilir bir Linux iş istasyonuna ve yapay zeka geliştirme ortamına dönüştürür — bilgisayara gerek yok.
+NativeCode, Android telefonunuzu veya tabletinizi taşınabilir bir Linux iş istasyonuna dönüştürür. PC ve root gerekmez.
 
-Öne Çıkan Özellikler:
+- PRoot içinde Alpaquita Linux: apk paket yöneticisi, Bash, Node.js, Python, GCC ve Git ile glibc kullanıcı alanı.
+- Sekmeli ve ek tuş satırlı terminal.
+- Termux:X11 ile ekranda Linux masaüstü (Phosh); cihaz izin veriyorsa Mesa PanVK (Mali) veya Turnip (Adreno) ile GPU hızlandırma.
+- Sohbet görünümünde veya terminalde yapay zekâ kodlama ajanları: opencode (açık kaynak) ve istenirse diğer ajan komut satırı araçları.
+- Proje ağacı, fark görünümü ve dal değiştirme sunan Git çalışma alanı.
+- Telefona giriş için SSH sunucusu, ayrıca uzak ana bilgisayarlar ve anahtarlar.
+- Projelerinizin ve ayarlarınızın yedeği.
 
-- Alpaquita Linux kapsayıcısı — apk ve eksiksiz bir geliştirme ortamı içeren yerel glibc kullanıcı alanı
-- İki yalıtım modu — PRoot (root gerekmez, önerilir) ve Chroot (çekirdek alanı, root'lu cihazlar için)
-- XFCE4 masaüstü arayüzü — VirGL GPU hızlandırmalı entegre Termux-X11 ekran sunucusu
-- Yapay zeka CLI motoru — Claude Code, Codex, OpenCode, Agy, Grok, Qwen ve Kiro'yu yerel terminalde çalıştırın
-- Yazılım pazar yeri — uygulama içi katalogdan seçilmiş paketlere göz atın ve kurun
-- Git çalışma alanı — çoklu depo proje ağacı, gerçek zamanlı durum, görsel diff denetçisi, dal değiştirme, GitHub CLI entegrasyonu
-- Önceden yapılandırılmış çalışma zamanları — Node.js 26 LTS, Python 3.12, GCC ve standart paket yöneticileri
-- CLI hazırlama — yapay zeka sağlayıcı araçları için rehberli kurulum ve kimlik bilgisi yönetimi
+Her şey ücretsizdir. Ödeme duvarı, reklam, analiz ve çökme raporu yoktur; NativeCode kendi sunucularını işletmez. Uygulama içi isteğe bağlı rapor yalnızca seçtiklerinizi gönderir.
 
-Bir karşılama sihirbazı ilk kurulumda size rehberlik eder: cihaz denetimleri ve rootsuz Alpaquita PRoot ortamının canlı ilerlemeyle tek dokunuşla kurulumu.
+İndirmeler: Linux kök dosya sistemi (yaklaşık 1,26 GB) ve çalışma ortamı güncelleme paketi (yaklaşık 317 MB), uygulamada onayınızdan sonra GitHub Releases'tan indirilir. Daha sonra ve yalnızca siz isterseniz Android SDK paketi (yaklaşık 69 MB) ve bir GPU sürücüsü (17 ile 34 MB) aynı şekilde indirilir. Her dosya sabit bir boyut ve SHA-256 ile doğrulanır. Wi-Fi ve yaklaşık 10 GB boş alan önerilir.
 
-Telefonunuzu veya tabletinizi kodlama ve yazılım geliştirme için taşınabilir bir Linux ve yapay zeka iş istasyonuna dönüştürün.
+İstenmeyen özellikler: opencode dışındaki yapay zekâ araçları (Claude Code, Antigravity, Grok, Kiro ve diğerleri) tescilli yazılımdır. NativeCode bunları içermez; yalnızca siz isterseniz üreticilerinin sunucularından kurulur ve kullandıkları yapay zekâ hizmetleri tescilli ağ hizmetleridir.
+
+arm64 cihazda Android 8.0 veya üstü gerekir.

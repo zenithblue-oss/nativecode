@@ -1,1 +1,1 @@
-AndroidでAlpaquita LinuxデスクトップとAIコーディングツールを利用
+AndroidでLinuxデスクトップ、ターミナル、AIコーディングエージェントを。root不要。

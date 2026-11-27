@@ -1,1 +1,1 @@
-Android에서 쓰는 Alpaquita Linux 데스크톱과 AI 코딩 도구
+Android에서 Linux 데스크톱, 터미널, AI 코딩 에이전트를. 루트 불필요.

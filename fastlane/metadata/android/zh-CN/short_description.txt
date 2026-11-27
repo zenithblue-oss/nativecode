@@ -1,1 +1,1 @@
-在 Android 上运行 Alpaquita Linux 桌面和 AI 编程工具
+在 Android 上使用 Linux 桌面、终端和 AI 编程助手，无需 root。

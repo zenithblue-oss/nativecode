@@ -1,1 +1,1 @@
-Alpaquita Linux desktop and AI coding tools on Android
+Linux desktop, terminal and AI coding agents on Android. No root needed.

@@ -1,16 +1,17 @@
-NativeCode verwandelt Ihr Smartphone oder Tablet in eine portable Linux-Workstation und KI-Entwicklungsumgebung — ganz ohne PC.
+NativeCode macht aus einem Android-Handy oder -Tablet eine mobile Linux-Workstation. Ohne PC und ohne Root.
 
-Hauptfunktionen:
+- Alpaquita Linux in PRoot: glibc-Userland mit dem Paketmanager apk, Bash, Node.js, Python, GCC und Git.
+- Terminal mit Tabs und einer Zusatztasten-Leiste.
+- Linux-Desktop (Phosh) über Termux:X11, mit GPU-Beschleunigung durch Mesa PanVK (Mali) oder Turnip (Adreno), wo das Gerät es erlaubt.
+- KI-Coding-Agenten im Chat oder im Terminal: opencode (Open Source) und auf Wunsch weitere Agenten-Kommandozeilentools.
+- Git-Arbeitsbereich mit Projektbaum, Diff-Ansicht und Branch-Wechsel.
+- SSH-Server zum Anmelden am Handy sowie Remote-Hosts und Schlüssel.
+- Sicherung deiner Projekte und Einstellungen.
 
-- Alpaquita-Linux-Container — natives glibc-Userland mit apk und einer vollständigen Entwicklungsumgebung
-- Zwei Isolationsmodi — PRoot (ohne Root, empfohlen) und Chroot (Kernel-Ebene, für gerootete Geräte)
-- XFCE4-Desktopoberfläche — integrierter Termux-X11-Anzeigeserver mit VirGL-GPU-Beschleunigung
-- KI-CLI-Engine — Claude Code, Codex, OpenCode, Agy, Grok, Qwen und Kiro im nativen Terminal ausführen
-- Software-Marktplatz — kuratierte Pakete aus einem In-App-Katalog durchsuchen und installieren
-- Git-Workspace — Projektbaum für mehrere Repos, Echtzeit-Status, visueller Diff-Inspektor, Branch-Wechsel, GitHub-CLI-Integration
-- Vorkonfigurierte Laufzeiten — Node.js 26 LTS, Python 3.12, GCC und gängige Paketmanager
-- CLI-Bereitstellung — geführte Installation und Verwaltung der Zugangsdaten für KI-Anbieter-Tools
+Alles ist kostenlos. Es gibt keine Bezahlschranke, keine Werbung, keine Analyse und keine Absturzberichte, und NativeCode betreibt keine eigenen Server. Der optionale In-App-Bericht sendet nur, was du auswählst.
 
-Ein Onboarding-Assistent führt durch die Ersteinrichtung: Gerätechecks und Ein-Tipp-Installation der rootlosen Alpaquita-PRoot-Umgebung mit Live-Fortschritt.
+Downloads: Das Linux-Root-Dateisystem (ca. 1,26 GB) und ein Laufzeit-Update-Paket (ca. 317 MB) werden nach deiner Zustimmung in der App von GitHub Releases geladen. Später und nur auf Wunsch folgen das Android-SDK-Paket (ca. 69 MB) und ein GPU-Treiber (17 bis 34 MB). Jede Datei wird gegen eine feste Größe und SHA-256 geprüft. Empfohlen: WLAN und ca. 10 GB freier Speicher.
 
-Machen Sie aus Ihrem Smartphone oder Tablet eine portable Linux- und KI-Workstation für Coding und Softwareentwicklung.
+Anti-Features: Die KI-Agenten außer opencode (Claude Code, Antigravity, Grok, Kiro und andere) sind proprietäre Software. NativeCode enthält sie nicht; sie werden nur auf Wunsch von den Servern der Hersteller installiert, und die KI-Dienste, die sie nutzen, sind proprietäre Netzwerkdienste.
+
+Benötigt Android 8.0 oder neuer auf einem arm64-Gerät.

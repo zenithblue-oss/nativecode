@@ -1,0 +1,5 @@
+First F-Droid release (1.8.3)
+- Linux desktop, terminal and AI agent chat, all rootless
+- Mesa PanVK 26.3.1 (Mali) and LFDev Turnip 27.0.0 (Adreno) GPU drivers, downloaded on request
+- Downloads checked by size and SHA-256; asks before using mobile data
+- No ads, analytics, crash reporting or paywall

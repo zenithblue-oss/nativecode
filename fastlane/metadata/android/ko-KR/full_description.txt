@@ -1,16 +1,17 @@
-NativeCode는 휴대폰이나 태블릿을 PC 없이도 쓸 수 있는 휴대용 Linux 워크스테이션이자 AI 개발 환경으로 바꿔 줍니다.
+NativeCode는 Android 휴대폰이나 태블릿을 휴대용 Linux 워크스테이션으로 바꿔 줍니다. PC도 루트도 필요 없습니다.
 
-주요 기능:
+- PRoot 위의 Alpaquita Linux: glibc 사용자 영역, apk 패키지 관리자, Bash, Node.js, Python, GCC, Git.
+- 탭과 추가 키 줄이 있는 터미널.
+- Termux:X11을 통해 화면에 표시되는 Linux 데스크톱(Phosh). 기기가 지원하면 Mesa PanVK(Mali) 또는 Turnip(Adreno)으로 GPU 가속.
+- 채팅 화면이나 터미널에서 쓰는 AI 코딩 에이전트: opencode(오픈 소스), 요청 시 다른 에이전트 명령줄 도구.
+- 프로젝트 트리, 차이 보기, 브랜치 전환을 갖춘 Git 작업 공간.
+- 휴대폰에 로그인하기 위한 SSH 서버, 원격 호스트와 키.
+- 프로젝트와 설정 백업.
 
-- Alpaquita Linux 컨테이너 — apk를 지원하는 네이티브 glibc 유저랜드와 완전한 개발 환경
-- 두 가지 격리 모드 — PRoot(루트 불필요, 권장)와 Chroot(커널 공간, 루팅된 기기용)
-- XFCE4 데스크톱 GUI — VirGL GPU 가속을 지원하는 내장 Termux-X11 디스플레이 서버
-- AI CLI 엔진 — Claude Code, Codex, OpenCode, Agy, Grok, Qwen, Kiro를 네이티브 terminal에서 실행
-- 소프트웨어 마켓플레이스 — 앱 내 카탈로그에서 엄선된 패키지를 찾아 설치
-- Git 워크스페이스 — 멀티 저장소 프로젝트 트리, 실시간 상태, 시각적 diff 검사기, 브랜치 전환, GitHub CLI 연동
-- 사전 구성된 런타임 — Node.js 26 LTS, Python 3.12, GCC 및 표준 패키지 관리자
-- CLI 프로비저닝 — AI 업체 도구의 안내식 설치 및 자격 증명 관리
+모두 무료입니다. 유료 결제 장벽, 광고, 분석, 충돌 보고가 없으며 NativeCode는 자체 서버를 운영하지 않습니다. 앱 내 선택형 보고서는 사용자가 고른 내용만 보냅니다.
 
-온보딩 마법사가 처음 설정을 안내합니다. 기기를 점검하고, 루트가 필요 없는 Alpaquita PRoot 환경을 진행 상황을 실시간으로 보며 한 번의 탭으로 설치합니다.
+다운로드: Linux 루트 파일 시스템(약 1.26 GB)과 런타임 업데이트 팩(약 317 MB)은 앱에서 동의한 후 GitHub Releases에서 받습니다. 나중에 요청할 때만 Android SDK 팩(약 69 MB)과 GPU 드라이버(17~34 MB)도 같은 방식으로 받습니다. 모든 파일은 고정된 크기와 SHA-256으로 검증합니다. Wi-Fi와 약 10 GB의 여유 공간을 권장합니다.
 
-휴대폰이나 태블릿을 코딩과 소프트웨어 개발을 위한 휴대용 Linux & AI 워크스테이션으로 만들어 보세요.
+안티 기능: opencode 외의 AI 도구(Claude Code, Antigravity, Grok, Kiro 등)는 독점 소프트웨어입니다. NativeCode에 포함되어 있지 않으며, 요청할 때만 각 제공업체의 서버에서 설치되고, 이들이 사용하는 AI 서비스는 독점 네트워크 서비스입니다.
+
+arm64 기기의 Android 8.0 이상이 필요합니다.

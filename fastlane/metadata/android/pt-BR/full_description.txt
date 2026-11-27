@@ -1,16 +1,17 @@
-O NativeCode transforma seu celular ou tablet em uma estação de trabalho Linux portátil e em um ambiente de desenvolvimento com IA — sem precisar de PC.
+O NativeCode transforma um celular ou tablet Android em uma estação de trabalho Linux portátil. Sem PC e sem root.
 
-Principais recursos:
+- Alpaquita Linux no PRoot: ambiente glibc com o gerenciador de pacotes apk, Bash, Node.js, Python, GCC e Git.
+- Terminal com abas e uma linha de teclas extras.
+- Desktop Linux (Phosh) na tela via Termux:X11, com aceleração de GPU do Mesa PanVK (Mali) ou Turnip (Adreno) quando o aparelho permite.
+- Agentes de IA para programar em um chat ou no terminal: opencode (código aberto) e, sob demanda, outras ferramentas de linha de comando de agentes.
+- Espaço de trabalho Git com árvore de projetos, visualização de diferenças e troca de branch.
+- Servidor SSH para entrar no celular, além de hosts remotos e chaves.
+- Backup dos seus projetos e configurações.
 
-- Contêiner Alpaquita Linux — userland glibc nativo com apk e um ambiente de desenvolvimento completo
-- Dois modos de isolamento — PRoot (não requer root, recomendado) e Chroot (espaço de kernel, para dispositivos com root)
-- Interface gráfica do desktop XFCE4 — servidor de vídeo Termux-X11 integrado com aceleração de GPU VirGL
-- Motor de CLI de IA — execute Claude Code, Codex, OpenCode, Agy, Grok, Qwen e Kiro no terminal nativo
-- Marketplace de software — navegue e instale pacotes selecionados de um catálogo dentro do app
-- Workspace Git — árvore de projetos com vários repositórios, status em tempo real, inspetor visual de diffs, troca de branches e integração com o GitHub CLI
-- Runtimes pré-configurados — Node.js 26 LTS, Python 3.12, GCC e gerenciadores de pacotes padrão
-- Provisionamento de CLIs — instalação guiada e gerenciamento de credenciais das ferramentas dos fornecedores de IA
+Tudo é gratuito. Não há paywall, anúncios, análises nem relatórios de falhas, e o NativeCode não mantém servidores próprios. O relatório opcional no app envia apenas o que você escolher.
 
-Um assistente de introdução orienta a primeira configuração: verificações do dispositivo e instalação com um toque do ambiente Alpaquita PRoot sem root, com progresso em tempo real.
+Downloads: o sistema de arquivos raiz do Linux (cerca de 1,26 GB) e um pacote de atualização do runtime (cerca de 317 MB) são baixados do GitHub Releases depois que você concorda no app. Mais tarde, e só quando você pedir, o pacote do Android SDK (cerca de 69 MB) e um driver de GPU (17 a 34 MB) são baixados da mesma forma. Cada arquivo é conferido por um tamanho e um SHA-256 fixos. Recomendam-se Wi-Fi e cerca de 10 GB livres.
 
-Transforme seu celular ou tablet em uma estação de trabalho portátil de Linux e IA para programar e desenvolver software.
+Características indesejáveis: as ferramentas de IA além do opencode (Claude Code, Antigravity, Grok, Kiro e outras) são software proprietário. O NativeCode não as inclui; elas são instaladas dos servidores dos fabricantes somente quando você pedir, e os serviços de IA que usam são serviços de rede proprietários.
+
+Requer Android 8.0 ou superior em um aparelho arm64.
