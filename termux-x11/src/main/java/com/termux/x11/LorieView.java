@@ -345,7 +345,10 @@ public class LorieView extends SurfaceView implements InputStub {
     }
 
     private ClipboardManager clipboard;
-    private long lastClipboardTimestamp = System.currentTimeMillis();
+    // Last text seen on the Android clipboard (announced to X, or set from X). ClipDescription.getTimestamp() is not in the
+    // currentTimeMillis timebase on every Android version, so the old timestamp gate could never open: Android -> X11
+    // (and so Android -> Phosh) never synced. Compare content instead.
+    private String lastClipboardText = null;
     private static boolean clipboardSyncEnabled = false;
     private static boolean hardwareKbdScancodesWorkaround = false;
     private final InputMethodManager mIMM = (InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -821,7 +824,7 @@ public class LorieView extends SurfaceView implements InputStub {
         // Android does not send PrimaryClipChanged event to the window which posted event
         // But in the case we are owning focus and clipboard is unchanged it will be replaced by the same value on X server side.
         // Not cool in the case if user installed some clipboard manager, clipboard content will be doubled.
-        lastClipboardTimestamp = System.currentTimeMillis() + 150;
+        lastClipboardText = text;
     }
 
     /** @noinspection unused*/ // It is used in native code
@@ -846,11 +849,14 @@ public class LorieView extends SurfaceView implements InputStub {
     public void checkForClipboardChange() {
         ClipDescription desc = clipboard.getPrimaryClipDescription();
         if (clipboardSyncEnabled && desc != null &&
-                lastClipboardTimestamp < desc.getTimestamp() &&
                 desc.getMimeTypeCount() == 1 &&
                 (desc.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
                         desc.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML))) {
-            lastClipboardTimestamp = desc.getTimestamp();
+            CharSequence text = clipboard.getText();
+            if (text == null || text.length() == 0) return;
+            String s = text.toString();
+            if (s.equals(lastClipboardText)) return;
+            lastClipboardText = s;
             sendClipboardAnnounce();
             Log.d("CLIP", "sending clipboard announce");
         }

@@ -274,6 +274,8 @@ class DesktopController(
         executor.execute {
             host.ensureBootstrapExtracted()
             host.deployScripts()
+            // Clipboard bridge daemon goes straight into the guest rootfs (refreshes older copies on app update).
+            runCatching { if (ClipSync.status(app) != ClipSync.Status.NOT_INSTALLED) ClipSync.deploy(app) }
 
             val method = method()
             if (method == "chroot" && !ProjectPathResolver.isChrootInstalled()) {

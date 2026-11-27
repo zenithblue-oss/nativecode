@@ -1718,4 +1718,13 @@
     <string name="hw_gpu_guest_driver">Pilote invité : %1$s</string>
     <string name="hw_gpu_guest_vulkan">Vulkan invité (ICD du pilote) : %1$s</string>
     <string name="main_component_installed">installé %1$s (%2$s)</string>
+    <string name="x11_clipsync_title">Synchro du presse-papiers (Phosh ↔ Android)</string>
+    <string name="x11_clipsync_summary">Copiez et collez du texte entre les applis Phosh et Android. Nécessite le paquet Python GObject dans l\'invité Linux.</string>
+    <string name="x11_clipsync_install">INSTALLER</string>
+    <string name="x11_clipsync_installing">INSTALLATION...</string>
+    <string name="x11_clipsync_status_missing">Non installé</string>
+    <string name="x11_clipsync_status_ready">Installé</string>
+    <string name="x11_clipsync_failed">Échec de l\'installation. Vérifiez le réseau et réessayez.</string>
+    <string name="x11_clipsync_enable">Synchroniser le presse-papiers avec Phosh</string>
+    <string name="x11_clipsync_enable_summary">S\'exécute avec le bureau. Pris en compte au prochain démarrage du bureau.</string>
 </resources>

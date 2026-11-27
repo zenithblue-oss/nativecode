@@ -55,7 +55,7 @@ internal fun Context.brutalistBg(
 
 /** ── NC brutalist dialog kit (replaces stock Material AlertDialog) ── */
 
-private fun Context.ncPressable(
+internal fun Context.ncPressable(
     label: String,
     fill: Int,
     stroke: Int,

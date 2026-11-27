@@ -13,6 +13,7 @@ import android.widget.TextView
 import com.zenithblue.nativecode.NC
 import com.zenithblue.nativecode.R
 import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.desktop.ClipSync
 
 /**
  * Native X11 Settings page. Every control reads the real Termux:X11
@@ -59,6 +60,7 @@ class X11SettingsPage(
         view.addView(body)
         body.addView(header())
         body.addView(outputCard())
+        body.addView(clipSyncCard())
         body.addView(windowCard())
         body.addView(touchCard())
         body.addView(keyboardCard())
@@ -156,6 +158,56 @@ class X11SettingsPage(
     }
 
     // Section cards
+
+    /** Phosh <-> Android clipboard bridge: INSTALL the guest package, then an on/off switch (default on). */
+    private fun clipSyncCard(): LinearLayout = ctx.sectionCard().apply {
+        val c = ctx
+        var installing = false
+        addView(c.sectionHeader(tr(R.string.x11_clipsync_title)))
+        val status = TextView(c).apply {
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, 0, 0, c.dp(10))
+        }
+        addView(TextView(c).apply {
+            text = tr(R.string.x11_clipsync_summary)
+            textSize = 11f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, 0, 0, c.dp(8))
+        })
+        addView(status)
+        val install = c.ncPressable(tr(R.string.x11_clipsync_install), NC.PRIMARY, NC.PRIMARY, Color.parseColor("#0A0A0A")) {}
+        val toggle = c.switchRow(
+            title = tr(R.string.x11_clipsync_enable),
+            summary = tr(R.string.x11_clipsync_enable_summary),
+            get = { ClipSync.status(c) != ClipSync.Status.OFF },
+            set = { ClipSync.setEnabled(c, it) }
+        )
+        fun sync() {
+            val st = ClipSync.status(c)
+            val missing = st == ClipSync.Status.NOT_INSTALLED
+            if (!installing) status.text = tr(if (missing) R.string.x11_clipsync_status_missing else R.string.x11_clipsync_status_ready)
+            install.visibility = if (missing) View.VISIBLE else View.GONE
+            toggle.visibility = if (missing) View.GONE else View.VISIBLE
+        }
+        install.setOnClickListener {
+            if (installing) return@setOnClickListener
+            installing = true
+            install.text = tr(R.string.x11_clipsync_installing)
+            ClipSync.install(c, onLine = { status.text = it.take(120) }) { ok ->
+                installing = false
+                install.text = tr(R.string.x11_clipsync_install)
+                refreshRows(this)
+                if (!ok) status.text = tr(R.string.x11_clipsync_failed)
+            }
+        }
+        addView(install)
+        addView(toggle)
+        tag = { sync() }
+        sync()
+    }
 
     private fun outputCard(): LinearLayout = ctx.sectionCard().apply {
         addView(ctx.sectionHeader(tr(R.string.x11_output)))

@@ -1718,4 +1718,13 @@
     <string name="hw_gpu_guest_driver">Controlador del invitado: %1$s</string>
     <string name="hw_gpu_guest_vulkan">Vulkan del invitado (ICD del controlador): %1$s</string>
     <string name="main_component_installed">instalado %1$s (%2$s)</string>
+    <string name="x11_clipsync_title">Sincronizar portapapeles (Phosh ↔ Android)</string>
+    <string name="x11_clipsync_summary">Copia y pega texto entre las apps de Phosh y Android. Requiere el paquete Python GObject en el invitado Linux.</string>
+    <string name="x11_clipsync_install">INSTALAR</string>
+    <string name="x11_clipsync_installing">INSTALANDO...</string>
+    <string name="x11_clipsync_status_missing">No instalado</string>
+    <string name="x11_clipsync_status_ready">Instalado</string>
+    <string name="x11_clipsync_failed">Falló la instalación. Revisa la red e inténtalo de nuevo.</string>
+    <string name="x11_clipsync_enable">Sincronizar portapapeles con Phosh</string>
+    <string name="x11_clipsync_enable_summary">Se ejecuta con el escritorio. Se aplica en el próximo inicio del escritorio.</string>
 </resources>

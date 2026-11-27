@@ -1718,4 +1718,13 @@
     <string name="hw_gpu_guest_driver">Gast-Treiber: %1$s</string>
     <string name="hw_gpu_guest_vulkan">Gast-Vulkan (Treiber-ICD): %1$s</string>
     <string name="main_component_installed">installiert %1$s (%2$s)</string>
+    <string name="x11_clipsync_title">Zwischenablage-Sync (Phosh ↔ Android)</string>
+    <string name="x11_clipsync_summary">Text zwischen Phosh-Apps und Android kopieren und einfügen. Benötigt das Python-GObject-Paket im Linux-Gast.</string>
+    <string name="x11_clipsync_install">INSTALLIEREN</string>
+    <string name="x11_clipsync_installing">WIRD INSTALLIERT...</string>
+    <string name="x11_clipsync_status_missing">Nicht installiert</string>
+    <string name="x11_clipsync_status_ready">Installiert</string>
+    <string name="x11_clipsync_failed">Installation fehlgeschlagen. Netzwerk prüfen und erneut versuchen.</string>
+    <string name="x11_clipsync_enable">Zwischenablage mit Phosh synchronisieren</string>
+    <string name="x11_clipsync_enable_summary">Läuft mit dem Desktop. Gilt ab dem nächsten Desktop-Start.</string>
 </resources>

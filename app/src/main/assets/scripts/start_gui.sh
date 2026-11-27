@@ -364,6 +364,11 @@ else
         eval $(dbus-launch --sh-syntax)
       fi
 
+      # Phosh <-> Android clipboard bridge (deployed by the app once py3-gobject3 is installed; off switch: /etc/nativecode/clipsync_off).
+      # It waits for phoc (wayland-0) and the X server itself, so it can start before the compositor exists.
+      if [ -x /usr/local/bin/nativecode-clipsync ] && [ ! -e /etc/nativecode/clipsync_off ] && python3 -c "import gi" >/dev/null 2>&1; then
+        WAYLAND_DISPLAY=wayland-0 nohup /usr/local/bin/nativecode-clipsync >/tmp/nativecode-clipsync.log 2>&1 &
+      fi
       if [ -x /usr/local/bin/nativecode-desktop ]; then
         # Older baked rootfs: nativecode-desktop preloads kbase_shim.so, which makes PanVK 26.x misread the Mali gpu_id
         # ("Unknown gpu_id 0xa8671030") -> 0 Vulkan devices -> software GL. Drop that line.

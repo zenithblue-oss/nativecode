@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+# nativecode-clipsync: text clipboard bridge  Wayland (phoc, wlr-data-control)  <->  X11 CLIPBOARD (Termux:X11 :0).
+# Termux:X11 mirrors the X11 CLIPBOARD with Android; phoc on the X11 backend never bridges Wayland -> X11 itself.
+# Needs python3 + py3-gobject3 (GTK3 is already in the rootfs). Text only (ponytail: no images, no PRIMARY).
+import os, sys, socket, struct, time, threading
+os.environ["GDK_BACKEND"] = "x11"
+os.environ.setdefault("DISPLAY", ":0")
+import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gtk, Gdk, GLib
+
+MAX = 1 << 20
+MIMES = ["text/plain;charset=utf-8", "UTF8_STRING", "text/plain", "STRING", "TEXT"]
+
+
+def log(*a):
+    print(time.strftime("%H:%M:%S"), *a, file=sys.stderr, flush=True)
+
+
+def pstr(s):
+    b = s.encode() + b"\0"
+    return struct.pack("<I", len(b)) + b + b"\0" * (-len(b) % 4)
+
+
+class Wl:
+    """Minimal Wayland client: only wl_registry, wl_seat and zwlr_data_control_*_v1 (manager v1)."""
+
+    def __init__(self, path, on_text):
+        self.on_text = on_text
+        self.s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.s.connect(path)
+        self.buf = b""
+        self.fds = []
+        self.nid = 3
+        self.glob = {}
+        self.kind = {}      # object id -> "offer" | "source" | ...
+        self.mimes = {}     # offer id -> [mime]
+        self.src = None
+        self.text = ""
+        self.mgr = self.dev = 0
+        self.send(1, 1, struct.pack("<I", 2))            # wl_display.get_registry(2)
+        self.send(1, 0, struct.pack("<I", 3))            # wl_display.sync(3)
+        self.nid = 4
+        GLib.io_add_watch(self.s.fileno(), GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self.readable)
+
+    def new(self):
+        self.nid += 1
+        return self.nid - 1
+
+    def send(self, oid, op, payload=b"", fd=None):
+        msg = struct.pack("<II", oid, ((8 + len(payload)) << 16) | op) + payload
+        if fd is None:
+            self.s.sendall(msg)
+        else:
+            socket.send_fds(self.s, [msg], [fd])
+
+    def readable(self, *_):
+        try:
+            data, fds, _f, _a = socket.recv_fds(self.s, 65536, 8)
+        except OSError:
+            data = b""
+        if not data:
+            log("wayland closed")
+            sys.exit(0)
+        self.fds += fds
+        self.buf += data
+        while len(self.buf) >= 8:
+            oid, so = struct.unpack_from("<II", self.buf)
+            size, op = so >> 16, so & 0xFFFF
+            if len(self.buf) < size:
+                break
+            body, self.buf = self.buf[8:size], self.buf[size:]
+            try:
+                self.event(oid, op, body)
+            except Exception as e:  # never die on one bad event
+                log("event error", oid, op, repr(e))
+        return True
+
+    @staticmethod
+    def rstr(b, o):
+        n = struct.unpack_from("<I", b, o)[0]
+        return b[o + 4:o + 4 + n - 1].decode(errors="replace"), o + 4 + ((n + 3) & ~3)
+
+    def event(self, oid, op, b):
+        if oid == 1 and op == 0:
+            log("wl error", struct.unpack_from("<II", b), self.rstr(b, 8)[0])
+        elif oid == 2 and op == 0:                        # registry.global
+            name = struct.unpack_from("<I", b)[0]
+            iface, o = self.rstr(b, 4)
+            self.glob[iface] = (name, struct.unpack_from("<I", b, o)[0])
+        elif oid == 3 and op == 0:                        # sync done -> bind
+            self.bind()
+        elif oid == self.dev:
+            if op == 0:                                   # data_offer(new_id)
+                o = struct.unpack_from("<I", b)[0]
+                self.kind[o] = "offer"
+                self.mimes[o] = []
+            elif op == 1:                                 # selection(offer|0)
+                o = struct.unpack_from("<I", b)[0]
+                if o:
+                    self.read_offer(o)
+            elif op == 2:
+                log("device finished")
+        elif self.kind.get(oid) == "offer" and op == 0:   # offer.offer(mime)
+            self.mimes[oid].append(self.rstr(b, 0)[0])
+        elif self.kind.get(oid) == "source":
+            if op == 0:                                   # send(mime, fd)
+                fd = self.fds.pop(0)
+                threading.Thread(target=self.write_fd, args=(fd, self.text), daemon=True).start()
+            elif op == 1:                                 # cancelled
+                self.send(oid, 1)
+                del self.kind[oid]
+                if self.src == oid:
+                    self.src = None
+
+    def bind(self):
+        need = ("wl_seat", "zwlr_data_control_manager_v1")
+        if any(n not in self.glob for n in need):
+            log("compositor lacks", [n for n in need if n not in self.glob])
+            sys.exit(2)
+        seat, mgr = self.new(), self.new()
+        for iface, oid in (("wl_seat", seat), ("zwlr_data_control_manager_v1", mgr)):
+            name, _v = self.glob[iface]
+            self.send(2, 0, struct.pack("<I", name) + pstr(iface) + struct.pack("<II", 1, oid))
+        self.mgr = mgr
+        self.dev = self.new()
+        self.send(mgr, 1, struct.pack("<II", self.dev, seat))   # get_data_device(dev, seat)
+        log("wayland data-control ready")
+
+    def read_offer(self, o):
+        mime = next((m for m in MIMES if m in self.mimes.get(o, [])), None)
+        if mime is None:
+            self.send(o, 1)
+            return
+        r, w = os.pipe()
+        self.send(o, 0, pstr(mime), fd=w)                 # offer.receive(mime, fd)
+        os.close(w)
+        self.send(o, 1)                                   # destroy
+        chunks = []
+
+        def rd(fd, cond):
+            d = os.read(fd, 65536)
+            if d:
+                chunks.append(d)
+                if sum(map(len, chunks)) <= MAX:
+                    return True
+            os.close(fd)
+            txt = b"".join(chunks)[:MAX].decode(errors="replace")
+            if txt:
+                self.on_text(txt)
+            return False
+
+        GLib.io_add_watch(r, GLib.IO_IN | GLib.IO_HUP, rd)
+
+    @staticmethod
+    def write_fd(fd, text):
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(text.encode())
+        except OSError:
+            pass
+
+    def set_text(self, text):
+        if not self.dev:
+            return
+        self.text = text
+        old = self.src
+        src = self.new()
+        self.kind[src] = "source"
+        self.send(self.mgr, 0, struct.pack("<I", src))   # create_data_source(src)
+        for m in MIMES:
+            self.send(src, 0, pstr(m))                   # source.offer(m)
+        self.send(self.dev, 0, struct.pack("<I", src))   # device.set_selection(src)
+        self.src = src
+        if old:
+            self.send(old, 1)
+            self.kind.pop(old, None)
+
+
+class Sync:
+    last = None
+
+    wl = None
+
+    def attach(self):                                     # needs a live X display
+        self.cb = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        self.cb.connect("owner-change", self.x_changed)
+        GLib.idle_add(lambda: self.x_changed(self.cb, None))   # pick up what Android already copied before we started
+
+    def x_changed(self, cb, ev):
+        cb.request_text(lambda c, t: self.from_x(t))
+
+    def from_x(self, t):
+        if t and t != self.last:
+            if not self.wl.dev:                           # data-control not bound yet
+                GLib.timeout_add(300, lambda: self.from_x(t) and False)
+                return
+            self.last = t
+            log("X11 -> Wayland", len(t))
+            self.wl.set_text(t)
+
+    def from_wl(self, t):
+        if t != self.last:
+            self.last = t
+            log("Wayland -> X11", len(t))
+            self.cb.set_text(t, -1)
+            self.cb.store()
+
+
+def main():
+    wl_path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp/runtime-flux"), os.environ.get("WAYLAND_DISPLAY", "wayland-0"))
+    st = Sync()
+    wl = None
+    for _ in range(120):                                  # phoc / X server may still be starting (or a stale socket)
+        try:
+            if Gtk.init_check()[0] and Gdk.Display.get_default() is not None:
+                wl = Wl(wl_path, lambda t: st.from_wl(t))
+                break
+        except OSError:
+            pass
+        time.sleep(1)
+    if wl is None:
+        log("no X11 display / wayland socket")
+        return 1
+    st.attach()
+    st.wl = wl
+    log("running, wayland", wl_path, "x11", os.environ["DISPLAY"])
+    Gtk.main()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

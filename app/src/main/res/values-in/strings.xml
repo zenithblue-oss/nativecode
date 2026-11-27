@@ -1718,4 +1718,13 @@
     <string name="hw_gpu_guest_driver">Driver guest: %1$s</string>
     <string name="hw_gpu_guest_vulkan">Vulkan guest (ICD driver): %1$s</string>
     <string name="main_component_installed">terpasang %1$s (%2$s)</string>
+    <string name="x11_clipsync_title">Sinkron papan klip (Phosh ↔ Android)</string>
+    <string name="x11_clipsync_summary">Salin dan tempel teks antara aplikasi Phosh dan Android. Membutuhkan paket Python GObject di guest Linux.</string>
+    <string name="x11_clipsync_install">INSTAL</string>
+    <string name="x11_clipsync_installing">MENGINSTAL...</string>
+    <string name="x11_clipsync_status_missing">Belum diinstal</string>
+    <string name="x11_clipsync_status_ready">Terinstal</string>
+    <string name="x11_clipsync_failed">Instalasi gagal. Periksa jaringan dan coba lagi.</string>
+    <string name="x11_clipsync_enable">Sinkronkan papan klip dengan Phosh</string>
+    <string name="x11_clipsync_enable_summary">Berjalan bersama desktop. Berlaku pada awal desktop berikutnya.</string>
 </resources>

@@ -1718,4 +1718,13 @@
     <string name="hw_gpu_guest_driver">게스트 드라이버: %1$s</string>
     <string name="hw_gpu_guest_vulkan">게스트 Vulkan (드라이버 ICD): %1$s</string>
     <string name="main_component_installed">설치됨 %1$s (%2$s)</string>
+    <string name="x11_clipsync_title">클립보드 동기화 (Phosh ↔ Android)</string>
+    <string name="x11_clipsync_summary">Phosh 앱과 Android 사이에서 텍스트를 복사하고 붙여넣습니다. Linux 게스트에 Python GObject 패키지가 필요합니다.</string>
+    <string name="x11_clipsync_install">설치</string>
+    <string name="x11_clipsync_installing">설치 중...</string>
+    <string name="x11_clipsync_status_missing">설치되지 않음</string>
+    <string name="x11_clipsync_status_ready">설치됨</string>
+    <string name="x11_clipsync_failed">설치에 실패했습니다. 네트워크를 확인하고 다시 시도하세요.</string>
+    <string name="x11_clipsync_enable">Phosh와 클립보드 동기화</string>
+    <string name="x11_clipsync_enable_summary">데스크톱과 함께 실행됩니다. 다음 데스크톱 시작 시 적용됩니다.</string>
 </resources>

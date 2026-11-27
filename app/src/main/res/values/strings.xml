@@ -1761,4 +1761,13 @@
     <string name="hw_gpu_guest_driver">Guest driver: %1$s</string>
     <string name="hw_gpu_guest_vulkan">Guest Vulkan (driver ICD): %1$s</string>
     <string name="main_component_installed">installed %1$s (%2$s)</string>
+    <string name="x11_clipsync_title">Clipboard sync (Phosh ↔ Android)</string>
+    <string name="x11_clipsync_summary">Copy and paste text between Phosh apps and Android. Needs the Python GObject package in the Linux guest.</string>
+    <string name="x11_clipsync_install">INSTALL</string>
+    <string name="x11_clipsync_installing">INSTALLING...</string>
+    <string name="x11_clipsync_status_missing">Not installed</string>
+    <string name="x11_clipsync_status_ready">Installed</string>
+    <string name="x11_clipsync_failed">Install failed. Check the network and try again.</string>
+    <string name="x11_clipsync_enable">Sync clipboard with Phosh</string>
+    <string name="x11_clipsync_enable_summary">Runs with the desktop. Applies on the next desktop start.</string>
 </resources>

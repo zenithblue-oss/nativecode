@@ -1718,4 +1718,13 @@
     <string name="hw_gpu_guest_driver">客户机驱动: %1$s</string>
     <string name="hw_gpu_guest_vulkan">客户机 Vulkan (驱动 ICD): %1$s</string>
     <string name="main_component_installed">已安装 %1$s (%2$s)</string>
+    <string name="x11_clipsync_title">剪贴板同步（Phosh ↔ Android）</string>
+    <string name="x11_clipsync_summary">在 Phosh 应用与 Android 之间复制粘贴文本。需要 Linux 客户系统中的 Python GObject 包。</string>
+    <string name="x11_clipsync_install">安装</string>
+    <string name="x11_clipsync_installing">正在安装...</string>
+    <string name="x11_clipsync_status_missing">未安装</string>
+    <string name="x11_clipsync_status_ready">已安装</string>
+    <string name="x11_clipsync_failed">安装失败。请检查网络后重试。</string>
+    <string name="x11_clipsync_enable">与 Phosh 同步剪贴板</string>
+    <string name="x11_clipsync_enable_summary">随桌面运行，下次启动桌面时生效。</string>
 </resources>

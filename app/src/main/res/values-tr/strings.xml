@@ -1718,4 +1718,13 @@
     <string name="hw_gpu_guest_driver">Konuk sürücüsü: %1$s</string>
     <string name="hw_gpu_guest_vulkan">Konuk Vulkan (sürücü ICD): %1$s</string>
     <string name="main_component_installed">kurulu %1$s (%2$s)</string>
+    <string name="x11_clipsync_title">Pano eşitleme (Phosh ↔ Android)</string>
+    <string name="x11_clipsync_summary">Phosh uygulamaları ile Android arasında metin kopyalayıp yapıştırın. Linux konuğunda Python GObject paketi gerekir.</string>
+    <string name="x11_clipsync_install">YÜKLE</string>
+    <string name="x11_clipsync_installing">YÜKLENİYOR...</string>
+    <string name="x11_clipsync_status_missing">Yüklü değil</string>
+    <string name="x11_clipsync_status_ready">Yüklü</string>
+    <string name="x11_clipsync_failed">Yükleme başarısız. Ağı kontrol edip tekrar deneyin.</string>
+    <string name="x11_clipsync_enable">Panoyu Phosh ile eşitle</string>
+    <string name="x11_clipsync_enable_summary">Masaüstüyle birlikte çalışır. Sonraki masaüstü başlangıcında geçerli olur.</string>
 </resources>
