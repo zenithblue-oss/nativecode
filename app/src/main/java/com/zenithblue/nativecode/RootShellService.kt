@@ -385,7 +385,7 @@ object RootShell {
      */
     private fun buildChrootHelperCmd(user: String, b64: String, chrootPath: String): String {
         val helper = ChrootCommandBuilder.CHROOT_HELPER
-        val pkg = "com.zenithblue.nativecode"
+        val pkg = com.zenithblue.nativecode.terminal.TermuxHostPaths.PACKAGE
         val envPrefix =
             if (chrootPath == ChrootCommandBuilder.CHROOT_PATH) ""
             else "NC_CHROOT='$chrootPath' "

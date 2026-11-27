@@ -71,7 +71,6 @@ import com.zenithblue.nativecode.telemetry.Telemetry
 import com.zenithblue.nativecode.onboarding.AndroidDevPackManager
 import com.zenithblue.nativecode.onboarding.RuntimeUpdatePack
 import com.zenithblue.nativecode.onboarding.PlayAssetDeliveryManager
-import com.google.android.play.core.assetpacks.AssetPackStateUpdateListener
 import android.view.ContextMenu
 import android.view.MenuItem
 import android.net.Uri
@@ -732,8 +731,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         showExtraKeys = prefs.getBoolean("pref_show_extra_keys", true)
         keepAwake = prefs.getBoolean("pref_keep_awake", false)
         val storedMethod = prefs.getString("linux_method", "proot") ?: "proot"
-        LinuxCommandBuilder.currentMethod = if (BuildConfig.PLAY_STORE_BUILD) "proot" else storedMethod
-        if (BuildConfig.PLAY_STORE_BUILD && storedMethod != "proot") {
+        LinuxCommandBuilder.currentMethod = if (com.zenithblue.nativecode.ProotOnly.ON) "proot" else storedMethod
+        if (com.zenithblue.nativecode.ProotOnly.ON && storedMethod != "proot") {
             prefs.edit()
                 .putString("linux_method", "proot")
                 .remove("ai_cli_tools_provisioned_chroot")
@@ -917,7 +916,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
      * @return effective method used after optional recovery
      */
     private fun applyProjectIsolation(path: String, preferredMethod: String): String {
-        var method = if (BuildConfig.PLAY_STORE_BUILD) "proot" else preferredMethod
+        var method = if (com.zenithblue.nativecode.ProotOnly.ON) "proot" else preferredMethod
         val found = ProjectManager.detectRepoMethod(this, path, method)
         if (found != null && found != preferredMethod) {
             method = found
@@ -956,7 +955,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             QuickActions.parse(it)?.let { a -> it.removeExtra(QuickActions.EXTRA); handleQuickAction(a) }
             // Chroot uninstall script deep-link: nativecode://callback?result=success&name=distro_uninstall_...
             val data = it.data
-            if (!BuildConfig.PLAY_STORE_BUILD && data != null && data.scheme == "nativecode" && data.host == "callback") {
+            if (!com.zenithblue.nativecode.ProotOnly.ON && data != null && data.scheme == "nativecode" && data.host == "callback") {
                 val name = data.getQueryParameter("name").orEmpty()
                 val result = data.getQueryParameter("result").orEmpty()
                 if (name.contains("uninstall", ignoreCase = true) && result == "success") {
@@ -1357,7 +1356,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             }
             ID_SETTINGS -> {
                 settingsHubScrollView.visibility = View.VISIBLE
-                if (!BuildConfig.PLAY_STORE_BUILD) refreshChrootSettingsHubRootGate(force = false)
+                if (!com.zenithblue.nativecode.ProotOnly.ON) refreshChrootSettingsHubRootGate(force = false)
                 refreshSettingsGithubCard()
             }
             ID_PROOT_SETTINGS -> {
@@ -1374,7 +1373,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
                 prootFilesPage?.refresh()
             }
-            ID_CHROOT_SETTINGS -> if (!BuildConfig.PLAY_STORE_BUILD) {
+            ID_CHROOT_SETTINGS -> if (!com.zenithblue.nativecode.ProotOnly.ON) {
                 if (::chrootSettingsScrollView.isInitialized) {
                     chrootSettingsScrollView.visibility = View.VISIBLE
                 }
@@ -1390,7 +1389,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 }
                 refreshSoftwareManagerPage(force = false)
             }
-            ID_MARKETPLACE -> if (!BuildConfig.PLAY_STORE_BUILD) {
+            ID_MARKETPLACE -> if (!com.zenithblue.nativecode.ProotOnly.ON) {
                 if (::marketplaceScrollView.isInitialized) {
                     marketplaceScrollView.visibility = View.VISIBLE
                 }
@@ -2116,11 +2115,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         buildProotFilesPage()
         buildX11SettingsPage()
         buildSkillsPage()
-        if (!BuildConfig.PLAY_STORE_BUILD) buildChrootSettingsPage()
+        if (!com.zenithblue.nativecode.ProotOnly.ON) buildChrootSettingsPage()
         buildSoftwareManagerPage()
-        if (!BuildConfig.PLAY_STORE_BUILD) buildMarketplacePage()
+        if (!com.zenithblue.nativecode.ProotOnly.ON) buildMarketplacePage()
         buildAppsPage()
-        if (!BuildConfig.PLAY_STORE_BUILD) buildMarketplaceInstallerLayout()
+        if (!com.zenithblue.nativecode.ProotOnly.ON) buildMarketplaceInstallerLayout()
         buildScriptInstallLayout()
         buildProjectCreateLayout()
         buildProjectsListLayout()
@@ -2150,11 +2149,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         contentFrame.addView(skillsScrollView)
         contentFrame.addView(prootSettingsScrollView)
         contentFrame.addView(prootFilesScrollView)
-        if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(chrootSettingsScrollView)
+        if (!com.zenithblue.nativecode.ProotOnly.ON) contentFrame.addView(chrootSettingsScrollView)
         contentFrame.addView(softwareManagerScrollView)
-        if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(marketplaceScrollView)
+        if (!com.zenithblue.nativecode.ProotOnly.ON) contentFrame.addView(marketplaceScrollView)
         contentFrame.addView(appsScrollView)
-        if (!BuildConfig.PLAY_STORE_BUILD) contentFrame.addView(mpInstallerLayout)
+        if (!com.zenithblue.nativecode.ProotOnly.ON) contentFrame.addView(mpInstallerLayout)
         contentFrame.addView(scriptInstallLayout)
         contentFrame.addView(projectCreateContainer)
         contentFrame.addView(projectsListContainer)
@@ -2198,7 +2197,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             val type = buffer[156].toInt().toChar()
             val linkName = parseString(157, 100)
 
-            val relPath = name.replace("^data/data/com.zenithblue.nativecode/files/".toRegex(), "").trimStart('/')
+            val relPath = name.replace("^data/data/${Regex.escape(com.zenithblue.nativecode.terminal.TermuxHostPaths.PACKAGE)}/files/".toRegex(), "").trimStart('/')
             if (relPath.isEmpty()) {
                 val dataBlocks = Math.ceil(size.toDouble() / 512.0).toLong()
                 skipBytes(inputStream, dataBlocks * 512L)
@@ -2333,11 +2332,11 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             ).show()
             return
         }
-        if (!BuildConfig.PLAY_STORE_BUILD && type == "codex" && LinuxCommandBuilder.currentMethod == "chroot") {
+        if (!com.zenithblue.nativecode.ProotOnly.ON && type == "codex" && LinuxCommandBuilder.currentMethod == "chroot") {
             Toast.makeText(this, tr(R.string.main_codex_unavailable_in_chroot), Toast.LENGTH_SHORT).show()
             return
         }
-        if (!BuildConfig.PLAY_STORE_BUILD && type == "shell-root" && LinuxCommandBuilder.currentMethod == "chroot") {
+        if (!com.zenithblue.nativecode.ProotOnly.ON && type == "shell-root" && LinuxCommandBuilder.currentMethod == "chroot") {
             executor.execute {
                 val rootOk = RootShell.isRootAvailable()
                 mainHandler.post {
@@ -2371,7 +2370,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         sshTabCommand = null; sshTabTitle = null
         val user = LinuxCommandBuilder.sessionUserForType(type)
         // Warm RootShell su cache so ChrootCommandBuilder.shellRootCommand uses discovered path
-        if (!BuildConfig.PLAY_STORE_BUILD && ticket.method == "chroot") {
+        if (!com.zenithblue.nativecode.ProotOnly.ON && ticket.method == "chroot") {
             executor.execute { try { RootShell.isRootAvailable() } catch (_: Exception) {} }
         }
         executor.execute {
@@ -4624,8 +4623,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(spacer(16))
 
         // NativeCode Pro — status + Upgrade / Restore / Manage sheet
-        settingsHubLayout.addView(buildProCard())
-        settingsHubLayout.addView(spacer(16))
+        if (BuildConfig.MONETISATION_ENFORCE) { // fdroid: Pro is always on, no plans / purchase UI
+            settingsHubLayout.addView(buildProCard())
+            settingsHubLayout.addView(spacer(16))
+        }
 
         // Graphical Desktop card
         settingsHubLayout.addView(buildGuiLaunchCard())
@@ -4745,8 +4746,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         settingsHubLayout.addView(buildPrivacyPolicyCard())
         settingsHubLayout.addView(spacer(16))
         // Opt-in crash reports / usage statistics (telemetry/ConsentSheet)
-        settingsHubLayout.addView(secondaryButton(tr(R.string.main_crash_reports_usage_stats)) { ConsentSheet.show(this) })
-        settingsHubLayout.addView(spacer(20))
+        if (BuildConfig.TELEMETRY_AVAILABLE) {
+            settingsHubLayout.addView(secondaryButton(tr(R.string.main_crash_reports_usage_stats)) { ConsentSheet.show(this) })
+            settingsHubLayout.addView(spacer(20))
+        }
 
         // App version code + commit from gradle BuildConfig
         settingsHubLayout.addView(buildSettingsVersionFooter())
@@ -4873,7 +4876,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 applyPack(force = AndroidDevPackManager.isApplied(this))
             } else {
                 status.text = tr(R.string.onb_requesting_nativecode_android_dev_fr)
-                var listener: AssetPackStateUpdateListener? = null
+                var listener: Any? = null
                 listener = PlayAssetDeliveryManager.requestDownload(
                     this,
                     PlayAssetDeliveryManager.PACK_ANDROID_DEV
@@ -6761,8 +6764,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 // Host-level chroot script (full debug build only).
                 args = arrayOf("/system/bin/sh", "-c", RootShell.shellRootCommand("sh $scriptPath"))
                 envMap = HashMap(System.getenv()).apply {
-                    put("PATH", "/system/bin:/system/xbin:/sbin:$nld:/data/data/com.zenithblue.nativecode/files/usr/bin")
-                    put("HOME", "/data/data/com.zenithblue.nativecode/files/home")
+                    put("PATH", "/system/bin:/system/xbin:/sbin:$nld:${com.zenithblue.nativecode.terminal.TermuxHostPaths.BIN}")
+                    put("HOME", com.zenithblue.nativecode.terminal.TermuxHostPaths.HOME)
                     put("TERM", "xterm-256color")
                 }
             }
@@ -6787,8 +6790,8 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 val shCmd = RootShell.shellRootCommand(rootInner)
                 args = arrayOf("/system/bin/sh", "-c", shCmd)
                 envMap = HashMap(System.getenv()).apply {
-                    put("PATH", "/system/bin:/system/xbin:/sbin:$nld:/data/data/com.zenithblue.nativecode/files/usr/bin")
-                    put("HOME", "/data/data/com.zenithblue.nativecode/files/home")
+                    put("PATH", "/system/bin:/system/xbin:/sbin:$nld:${com.zenithblue.nativecode.terminal.TermuxHostPaths.BIN}")
+                    put("HOME", com.zenithblue.nativecode.terminal.TermuxHostPaths.HOME)
                     put("TERM", "xterm-256color")
                 }
             }
@@ -6798,9 +6801,9 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     val gpu = GpuAccelDetector.fluxGpuEnv()
                     getSharedPreferences("nativecode_prefs", MODE_PRIVATE).edit()
                         .putString("flux_gpu", gpu).apply()
-                    "env FLUX_GPU=$gpu bash /data/data/com.zenithblue.nativecode/files/home/$scriptName"
+                    "env FLUX_GPU=$gpu bash ${com.zenithblue.nativecode.terminal.TermuxHostPaths.HOME}/$scriptName"
                 } else {
-                    "bash /data/data/com.zenithblue.nativecode/files/home/$scriptName"
+                    "bash ${com.zenithblue.nativecode.terminal.TermuxHostPaths.HOME}/$scriptName"
                 }
                 val (a, e) = LinuxCommandBuilder.buildGuestBash(this, scriptCmd, user = "root")
                 args = a; envMap = e
@@ -10156,7 +10159,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun buildEnvironmentCard(): LinearLayout {
-        if (BuildConfig.PLAY_STORE_BUILD) return buildPlayEnvironmentCard()
+        if (com.zenithblue.nativecode.ProotOnly.ON) return buildPlayEnvironmentCard()
         val card = glassCard()
         card.addView(sectionHeader(R.drawable.ic_laptop_thick, tr(R.string.main_linux_isolation_mode), NC.PRIMARY))
 
@@ -13334,7 +13337,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun confirmMarketplaceUninstall(aptOrId: String) {
-        if (BuildConfig.PLAY_STORE_BUILD) return
+        if (com.zenithblue.nativecode.ProotOnly.ON) return
         val env = currentLinuxEnv()
         val entry = InstallRegistry.forEnv(this, env).find {
             it.id == aptOrId || it.aptProvides.any { p -> p.equals(aptOrId, true) }
@@ -13356,7 +13359,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
      * Home + Settings entries call this; already-accepted skips dialog.
      */
     private fun openMarketplace() {
-        if (BuildConfig.PLAY_STORE_BUILD) {
+        if (com.zenithblue.nativecode.ProotOnly.ON) {
             Toast.makeText(this, tr(R.string.main_marketplace_is_unavailable_in_the), Toast.LENGTH_SHORT).show()
             return
         }
@@ -13383,7 +13386,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun goToMarketplace() {
-        if (BuildConfig.PLAY_STORE_BUILD) return
+        if (com.zenithblue.nativecode.ProotOnly.ON) return
         if (pageStack.isEmpty() || pageStack.peek() != ID_MARKETPLACE) {
             pageStack.push(ID_MARKETPLACE)
         }
@@ -13391,7 +13394,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun refreshMarketplacePage(force: Boolean) {
-        if (BuildConfig.PLAY_STORE_BUILD) return
+        if (com.zenithblue.nativecode.ProotOnly.ON) return
         mpEnvBadge?.text = envBadgeLabel()
         if (!MarketplaceConsent.isAccepted(this)) {
             mpStatusTv?.text = tr(R.string.main_consent_required)
@@ -13959,7 +13962,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
      * Prepare stage + open repairs script-runner terminal for marketplace install.
      */
     private fun runMarketplaceInstall(id: String) {
-        if (BuildConfig.PLAY_STORE_BUILD) return
+        if (com.zenithblue.nativecode.ProotOnly.ON) return
         if (!MarketplaceConsent.isAccepted(this)) {
             openMarketplace()
             return
@@ -13994,7 +13997,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
     }
 
     private fun runMarketplaceUninstall(id: String) {
-        if (BuildConfig.PLAY_STORE_BUILD) return
+        if (com.zenithblue.nativecode.ProotOnly.ON) return
         val cat = mpCatalog
         if (cat == null) {
             InstallRegistry.remove(this, currentLinuxEnv(), id)
@@ -14630,7 +14633,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                 "chroot_size.sh",
                 "nativecode_chroot.sh"
             ).let { all ->
-                if (BuildConfig.PLAY_STORE_BUILD) {
+                if (com.zenithblue.nativecode.ProotOnly.ON) {
                     all.filter { it in setOf("setup_termux.sh", "flux_install.sh", "start_gui.sh", "stop_gui.sh") }
                         .toTypedArray()
                 } else all
@@ -14703,7 +14706,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     private fun isXfceInstalled(): Boolean {
         val method = getSharedPreferences("nativecode_prefs", MODE_PRIVATE).getString("linux_method", "proot") ?: "proot"
-        val checkDirs = if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+        val checkDirs = if (!com.zenithblue.nativecode.ProotOnly.ON && method == "chroot") {
             listOf(File(ChrootCommandBuilder.CHROOT_PATH))
         } else {
             listOf(
@@ -17034,7 +17037,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                         "· AI keys/sessions: AI CLI tools → LOGOUT / CLEAR ALL\n" +
                         "· Full wipe: Android App info → Clear storage\n" +
                         "· Uninstall removes app private data" +
-                        if (BuildConfig.PLAY_STORE_BUILD) "" else
+                        if (com.zenithblue.nativecode.ProotOnly.ON) "" else
                             "\n· Chroot on shared storage: Chroot Settings uninstall"
                 textSize = 11f
                 setTextColor(NC.ON_SURF_VAR)

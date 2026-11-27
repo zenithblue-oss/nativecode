@@ -20,11 +20,28 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Firebase is live only with app/google-services.json (Firebase console, package
+// Store flavors: `play` (Play Billing, Play Asset Delivery, Firebase) and `fdroid` (FOSS: none of those).
+// An fdroid-only invocation never touches Firebase/Play: no plugins, no asset packs, no google-services.json.
+val requestedTasks = gradle.startParameter.taskNames
+val fdroidOnly = requestedTasks.any { it.contains("fdroid", ignoreCase = true) } &&
+    requestedTasks.none { it.contains("play", ignoreCase = true) }
+val wantsPlay = requestedTasks.any { it.contains("play", ignoreCase = true) }
+
+// Firebase is live only for an explicit play task with app/src/play/google-services.json (Firebase console, package
 // com.zenithblue.nativecode). Without it the build still succeeds and Telemetry is a no-op.
-if (file("google-services.json").exists()) {
+if (wantsPlay && file("src/play/google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
     apply(plugin = "com.google.firebase.crashlytics")
+}
+
+// F-Droid build outputs (bootstrap prefix = the fdroid applicationId): <out>/jniLibs/arm64-v8a/*.so, <out>/assets/bootstrap.tar.
+val fdroidOut = rootProject.file(providers.gradleProperty("nativecode.fdroid.out").orElse("tools/fdroid/out").get())
+
+androidComponents {
+    // The X11 server (prebuilt libXlorie) is not part of the F-Droid v1 core: desktop is gated "coming later".
+    onVariants(selector().withFlavor("store" to "fdroid")) { v ->
+        v.packaging.jniLibs.excludes.add("**/libXlorie.so")
+    }
 }
 
 androidComponents {
@@ -46,12 +63,33 @@ android {
         versionCode = 24
         versionName = "1.8.3"
         buildConfigField("boolean", "PLAY_STORE_BUILD", "false")
-        // Freemium gates (docs/monetisation/plan.md). On with Play Billing (PR5).
-        buildConfigField("boolean", "MONETISATION_ENFORCE", "true")
         buildConfigField("String", "REPORT_ENDPOINT", "\"$nativeCodeReportUrl\"")
         // 16 KB page-size devices (Android 15+): never ship 32-bit or extra-ABI JNI.
         ndk {
             abiFilters += "arm64-v8a"
+        }
+    }
+
+    flavorDimensions += "store"
+    productFlavors {
+        create("play") {
+            dimension = "store"
+            // Freemium gates (docs/monetisation/plan.md). On with Play Billing (PR5).
+            buildConfigField("boolean", "MONETISATION_ENFORCE", "true")
+            buildConfigField("boolean", "FDROID", "false")
+            buildConfigField("boolean", "ROOT_FEATURES", "true")
+            buildConfigField("boolean", "DESKTOP_AVAILABLE", "true")
+            buildConfigField("boolean", "TELEMETRY_AVAILABLE", "true")
+        }
+        create("fdroid") {
+            dimension = "store"
+            applicationIdSuffix = ".fdroid"
+            // FOSS build: Pro is always on (every gate allows), no billing UI, no telemetry, proot only, no X11 yet.
+            buildConfigField("boolean", "MONETISATION_ENFORCE", "false")
+            buildConfigField("boolean", "FDROID", "true")
+            buildConfigField("boolean", "ROOT_FEATURES", "false")
+            buildConfigField("boolean", "DESKTOP_AVAILABLE", "false")
+            buildConfigField("boolean", "TELEMETRY_AVAILABLE", "false")
         }
     }
 
@@ -119,14 +157,21 @@ android {
     }
 
     sourceSets {
-        getByName("debug") {
+        maybeCreate("playDebug").apply {
             assets.srcDirs(
                 "../nativecode_android_dev/src/main/assets"
             )
         }
+        maybeCreate("fdroid").apply {
+            jniLibs.srcDir(File(fdroidOut, "jniLibs"))
+            assets.srcDir(File(fdroidOut, "assets"))
+        }
     }
 
-    assetPacks += listOf(":nativecode_runtime", ":nativecode_android_dev", ":nativecode_update_core")
+    // Play-only on-demand packs (AAB). fdroid downloads the same files from GitHub Releases instead.
+    if (!fdroidOnly) {
+        assetPacks += listOf(":nativecode_runtime", ":nativecode_android_dev", ":nativecode_update_core")
+    }
 
     // Per-app language: every language ships in the base APK (a Play language split would hide it from the picker).
     bundle {
@@ -182,18 +227,19 @@ dependencies {
     // Termux X11 module
     implementation(project(":termux-x11"))
 
+    // Non-free: play flavor only (src/play holds the code that imports them; src/fdroid has stubs / a GitHub downloader).
     // Play Asset Delivery
-    implementation("com.google.android.play:asset-delivery-ktx:2.3.0")
+    "playImplementation"("com.google.android.play:asset-delivery-ktx:2.3.0")
 
     // Play Billing (NativeCode Pro)
-    implementation("com.android.billingclient:billing-ktx:9.1.0")
+    "playImplementation"("com.android.billingclient:billing-ktx:9.1.0")
 
     // Firebase (opt-in; collection off in the manifest until consent). Only telemetry/Telemetry.kt imports it.
     // BoM 35.x ships Kotlin 2.4 metadata: needs the Kotlin 2.4 plugin pinned in the root build.gradle.kts.
-    implementation(platform("com.google.firebase:firebase-bom:35.2.0"))
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-crashlytics")
-    implementation("com.google.firebase:firebase-crashlytics-ndk")
+    "playImplementation"(platform("com.google.firebase:firebase-bom:35.2.0"))
+    "playImplementation"("com.google.firebase:firebase-analytics")
+    "playImplementation"("com.google.firebase:firebase-crashlytics")
+    "playImplementation"("com.google.firebase:firebase-crashlytics-ndk")
     // Analytics pulls guava 31.1-android over termux-shared's 24.1-jre; the android flavour lacks
     // com.google.common.io.MoreFiles (termux FileUtils.clearDirectory). Keep a -jre flavour on top.
     implementation("com.google.guava:guava:33.8.0-jre")
@@ -202,11 +248,13 @@ dependencies {
 tasks.register<Exec>("checkJni16kbAlignment") {
     workingDir = rootProject.projectDir
     commandLine(
-        "python3",
-        rootProject.file("scripts/check_elf_16k.py").absolutePath,
-        file("src/main/jniLibs").absolutePath,
-        file("../termux-x11/src/main/jniLibs/arm64-v8a").absolutePath,
-        file("libs/terminal-emulator-v0.118.0-16k.aar").absolutePath
+        listOf(
+            "python3",
+            rootProject.file("scripts/check_elf_16k.py").absolutePath,
+            file("src/play/jniLibs").absolutePath,
+            file("../termux-x11/src/main/jniLibs/arm64-v8a").absolutePath,
+            file("libs/terminal-emulator-v0.118.0-16k.aar").absolutePath
+        ) + File(fdroidOut, "jniLibs/arm64-v8a").takeIf { it.isDirectory }.let { listOfNotNull(it?.absolutePath) }
     )
 }
 

@@ -1645,4 +1645,25 @@
     <string name="cli_login_open_page">Abrir página de inicio de sesión</string>
     <string name="cli_login_code">Tu código</string>
     <string name="cli_login_use_key">Usar una clave API</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">Primero se necesita el consentimiento para descargar.</string>
+    <string name="fd_mobile_data_title">Datos móviles</string>
+    <string name="fd_mobile_data_message">Estás en una conexión de datos limitados. Esta descarga es de %1$s. Se recomienda Wi-Fi.</string>
+    <string name="fd_mobile_data_continue">Descargar igualmente</string>
+    <string name="fd_mobile_data_wait">Esperar al Wi-Fi</string>
+    <string name="fd_desktop_coming_later">El escritorio Linux necesita el servidor gráfico X11, que llegará en una versión posterior de F-Droid.</string>
+    <string name="fd_consent_title">Descargas externas</string>
+    <string name="fd_consent_intro">Esta app de F-Droid no incluye el sistema Linux. Con tu consentimiento descarga los archivos siguientes de GitHub Releases. Son ejecutables que F-Droid no ha revisado. Cada archivo se comprueba con un SHA-256 fijado en esta app antes de usarlo.</string>
+    <string name="fd_consent_rootfs">Sistema de archivos raíz de Linux: unos 1,26 GB</string>
+    <string name="fd_consent_update">Paquete de actualización del runtime: unos 317 MB</string>
+    <string name="fd_consent_devpack">Paquete Android SDK (opcional, más tarde): unos 69 MB</string>
+    <string name="fd_consent_host">Servidor: github.com (objects.githubusercontent.com). Se recomienda Wi-Fi y unos 4 GB de espacio libre.</string>
+    <string name="fd_consent_later">Más adelante, solo si lo pides: las herramientas de IA de línea de comandos (Claude Code, Antigravity, Grok, Kiro) se instalan desde los servidores de sus fabricantes. Son software propietario y los servicios de IA que usan son servicios de red propietarios.</string>
+    <string name="fd_consent_report">El informe opcional dentro de la app solo envía lo que elijas a api.nativecode.app. No hay analítica ni informes de fallos.</string>
+    <string name="fd_consent_check">Acepto descargar estos archivos de GitHub Releases.</string>
+    <string name="fd_consent_need_check">Marca la casilla para continuar.</string>
+    <string name="fd_download_from_github">Descargar de GitHub</string>
+    <string name="fd_download_runtime_info">GitHub Releases: runtime Alpaquita (unos 1,26 GB) y paquete de actualización (unos 317 MB), verificados con SHA-256.</string>
+    <string name="fd_requesting_github">Conectando con GitHub Releases…</string>
 </resources>

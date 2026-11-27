@@ -70,7 +70,7 @@ object PlayAssetDeliveryManager {
         activity: Activity,
         packName: String = PACK_RUNTIME,
         onStateChange: (DownloadState) -> Unit
-    ): AssetPackStateUpdateListener {
+    ): Any {
         val manager = AssetPackManagerFactory.getInstance(activity)
 
         val listener = object : AssetPackStateUpdateListener {
@@ -161,9 +161,9 @@ object PlayAssetDeliveryManager {
         }.onFailure { Log.w(TAG, "removePack($packName) failed: ${it.message}") }
     }
 
-    fun unregisterListener(context: Context, listener: AssetPackStateUpdateListener) {
+    fun unregisterListener(context: Context, listener: Any) {
         try {
-            AssetPackManagerFactory.getInstance(context).unregisterListener(listener)
+            AssetPackManagerFactory.getInstance(context).unregisterListener(listener as AssetPackStateUpdateListener)
         } catch (e: Exception) {
             Log.w(TAG, "unregisterListener error: ${e.message}")
         }

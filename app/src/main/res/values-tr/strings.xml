@@ -1645,4 +1645,25 @@
     <string name="cli_login_open_page">Giriş sayfasını aç</string>
     <string name="cli_login_code">Kodunuz</string>
     <string name="cli_login_use_key">Bunun yerine API anahtarı kullan</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">Önce indirme onayı gerekli.</string>
+    <string name="fd_mobile_data_title">Mobil veri</string>
+    <string name="fd_mobile_data_message">Kotalı bir bağlantıdasınız. Bu indirme %1$s boyutunda. Wi-Fi önerilir.</string>
+    <string name="fd_mobile_data_continue">Yine de indir</string>
+    <string name="fd_mobile_data_wait">Wi-Fi bekle</string>
+    <string name="fd_desktop_coming_later">Linux masaüstü X11 görüntü sunucusuna ihtiyaç duyar; bu, sonraki bir F-Droid sürümünde gelecek.</string>
+    <string name="fd_consent_title">Harici indirmeler</string>
+    <string name="fd_consent_intro">Bu F-Droid uygulaması Linux sistemini içermez. Onayınızla aşağıdaki dosyaları GitHub Releases üzerinden indirir. Bunlar F-Droid tarafından incelenmemiş çalıştırılabilir dosyalardır. Her dosya kullanılmadan önce bu uygulamada sabitlenmiş bir SHA-256 ile doğrulanır.</string>
+    <string name="fd_consent_rootfs">Linux kök dosya sistemi: yaklaşık 1,26 GB</string>
+    <string name="fd_consent_update">Çalışma zamanı güncelleme paketi: yaklaşık 317 MB</string>
+    <string name="fd_consent_devpack">Android SDK paketi (isteğe bağlı, sonra): yaklaşık 69 MB</string>
+    <string name="fd_consent_host">Sunucu: github.com (objects.githubusercontent.com). Wi-Fi ve yaklaşık 4 GB boş alan önerilir.</string>
+    <string name="fd_consent_later">Daha sonra, yalnızca siz isterseniz: yapay zeka komut satırı araçları (Claude Code, Antigravity, Grok, Kiro) üreticilerinin kendi sunucularından kurulur. Bunlar tescilli yazılımdır ve kullandıkları yapay zeka hizmetleri tescilli ağ hizmetleridir.</string>
+    <string name="fd_consent_report">İsteğe bağlı uygulama içi rapor yalnızca sizin seçtiğinizi api.nativecode.app adresine gönderir. Analiz ve çökme raporu yoktur.</string>
+    <string name="fd_consent_check">Bu dosyaları GitHub Releases üzerinden indirmeyi kabul ediyorum.</string>
+    <string name="fd_consent_need_check">Devam etmek için kutuyu işaretleyin.</string>
+    <string name="fd_download_from_github">GitHub üzerinden indir</string>
+    <string name="fd_download_runtime_info">GitHub Releases: Alpaquita çalışma zamanı (yaklaşık 1,26 GB) ve güncelleme paketi (yaklaşık 317 MB), SHA-256 doğrulamalı.</string>
+    <string name="fd_requesting_github">GitHub Releases bağlantısı kuruluyor…</string>
 </resources>

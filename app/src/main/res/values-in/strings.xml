@@ -1645,4 +1645,25 @@
     <string name="cli_login_open_page">Buka halaman masuk</string>
     <string name="cli_login_code">Kode Anda</string>
     <string name="cli_login_use_key">Gunakan kunci API</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">Persetujuan unduhan diperlukan terlebih dahulu.</string>
+    <string name="fd_mobile_data_title">Data seluler</string>
+    <string name="fd_mobile_data_message">Anda memakai koneksi berkuota. Unduhan ini berukuran %1$s. Disarankan memakai Wi-Fi.</string>
+    <string name="fd_mobile_data_continue">Tetap unduh</string>
+    <string name="fd_mobile_data_wait">Tunggu Wi-Fi</string>
+    <string name="fd_desktop_coming_later">Desktop Linux memerlukan server tampilan X11, yang hadir di rilis F-Droid berikutnya.</string>
+    <string name="fd_consent_title">Unduhan eksternal</string>
+    <string name="fd_consent_intro">Aplikasi F-Droid ini tidak menyertakan sistem Linux. Dengan persetujuan Anda, aplikasi mengunduh berkas berikut dari GitHub Releases. Berkas ini adalah program yang belum ditinjau F-Droid. Setiap berkas diperiksa dengan SHA-256 yang tertanam di aplikasi ini sebelum dipakai.</string>
+    <string name="fd_consent_rootfs">Sistem berkas root Linux: sekitar 1,26 GB</string>
+    <string name="fd_consent_update">Paket pembaruan runtime: sekitar 317 MB</string>
+    <string name="fd_consent_devpack">Paket Android SDK (opsional, nanti): sekitar 69 MB</string>
+    <string name="fd_consent_host">Host: github.com (objects.githubusercontent.com). Disarankan Wi-Fi dan ruang kosong sekitar 4 GB.</string>
+    <string name="fd_consent_later">Nanti, hanya jika Anda meminta: alat AI baris perintah (Claude Code, Antigravity, Grok, Kiro) dipasang dari server pembuatnya. Itu perangkat lunak proprietari dan layanan AI yang dipakai adalah layanan jaringan proprietari.</string>
+    <string name="fd_consent_report">Laporan opsional dalam aplikasi hanya mengirim yang Anda pilih ke api.nativecode.app. Tidak ada analitik dan tidak ada laporan kerusakan.</string>
+    <string name="fd_consent_check">Saya setuju mengunduh berkas ini dari GitHub Releases.</string>
+    <string name="fd_consent_need_check">Centang kotak untuk melanjutkan.</string>
+    <string name="fd_download_from_github">Unduh dari GitHub</string>
+    <string name="fd_download_runtime_info">GitHub Releases: runtime Alpaquita (sekitar 1,26 GB) dan paket pembaruan (sekitar 317 MB), diverifikasi SHA-256.</string>
+    <string name="fd_requesting_github">Menghubungkan ke GitHub Releases…</string>
 </resources>

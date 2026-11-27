@@ -1645,4 +1645,25 @@
     <string name="cli_login_open_page">Abrir página de entrada</string>
     <string name="cli_login_code">Seu código</string>
     <string name="cli_login_use_key">Usar uma chave de API</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">O consentimento para baixar é necessário primeiro.</string>
+    <string name="fd_mobile_data_title">Dados móveis</string>
+    <string name="fd_mobile_data_message">Você está em uma conexão limitada. Este download tem %1$s. Recomenda-se Wi-Fi.</string>
+    <string name="fd_mobile_data_continue">Baixar mesmo assim</string>
+    <string name="fd_mobile_data_wait">Aguardar o Wi-Fi</string>
+    <string name="fd_desktop_coming_later">A área de trabalho Linux precisa do servidor gráfico X11, que chega em uma versão futura do F-Droid.</string>
+    <string name="fd_consent_title">Downloads externos</string>
+    <string name="fd_consent_intro">Este app do F-Droid não inclui o sistema Linux. Com o seu consentimento, ele baixa os arquivos abaixo do GitHub Releases. São executáveis que o F-Droid não revisou. Cada arquivo é conferido com um SHA-256 fixado neste app antes de ser usado.</string>
+    <string name="fd_consent_rootfs">Sistema de arquivos raiz do Linux: cerca de 1,26 GB</string>
+    <string name="fd_consent_update">Pacote de atualização do runtime: cerca de 317 MB</string>
+    <string name="fd_consent_devpack">Pacote Android SDK (opcional, depois): cerca de 69 MB</string>
+    <string name="fd_consent_host">Servidor: github.com (objects.githubusercontent.com). Recomendam-se Wi-Fi e cerca de 4 GB de espaço livre.</string>
+    <string name="fd_consent_later">Depois, somente se você pedir: as ferramentas de IA de linha de comando (Claude Code, Antigravity, Grok, Kiro) são instaladas dos servidores de seus fabricantes. São software proprietário e os serviços de IA usados são serviços de rede proprietários.</string>
+    <string name="fd_consent_report">O relatório opcional no app envia apenas o que você escolher para api.nativecode.app. Não há análise de uso nem relatórios de falha.</string>
+    <string name="fd_consent_check">Concordo em baixar estes arquivos do GitHub Releases.</string>
+    <string name="fd_consent_need_check">Marque a caixa para continuar.</string>
+    <string name="fd_download_from_github">Baixar do GitHub</string>
+    <string name="fd_download_runtime_info">GitHub Releases: runtime Alpaquita (cerca de 1,26 GB) e pacote de atualização (cerca de 317 MB), verificados com SHA-256.</string>
+    <string name="fd_requesting_github">Conectando ao GitHub Releases…</string>
 </resources>

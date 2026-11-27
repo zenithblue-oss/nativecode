@@ -1645,4 +1645,25 @@
     <string name="cli_login_open_page">فتح صفحة تسجيل الدخول</string>
     <string name="cli_login_code">الرمز الخاص بك</string>
     <string name="cli_login_use_key">استخدام مفتاح API بدلاً من ذلك</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">يلزم أولاً الموافقة على التنزيل.</string>
+    <string name="fd_mobile_data_title">بيانات الجوال</string>
+    <string name="fd_mobile_data_message">أنت على اتصال محدود. حجم هذا التنزيل %1$s. يُنصح باستخدام Wi-Fi.</string>
+    <string name="fd_mobile_data_continue">نزّل على أي حال</string>
+    <string name="fd_mobile_data_wait">انتظر Wi-Fi</string>
+    <string name="fd_desktop_coming_later">يحتاج سطح مكتب لينكس إلى خادم العرض X11، وسيتوفر في إصدار لاحق من F-Droid.</string>
+    <string name="fd_consent_title">تنزيلات خارجية</string>
+    <string name="fd_consent_intro">لا يتضمن تطبيق F-Droid هذا نظام لينكس. بموافقتك ينزّل الملفات التالية من GitHub Releases. هذه ملفات تنفيذية لم يراجعها F-Droid. يُفحص كل ملف قبل استخدامه مقابل SHA-256 مثبّت في هذا التطبيق.</string>
+    <string name="fd_consent_rootfs">نظام ملفات لينكس الجذري: نحو 1.26 غيغابايت</string>
+    <string name="fd_consent_update">حزمة تحديث بيئة التشغيل: نحو 317 ميغابايت</string>
+    <string name="fd_consent_devpack">حزمة Android SDK (اختيارية، لاحقاً): نحو 69 ميغابايت</string>
+    <string name="fd_consent_host">الخادم: github.com (objects.githubusercontent.com). يُنصح بـ Wi-Fi ونحو 4 غيغابايت من المساحة الفارغة.</string>
+    <string name="fd_consent_later">لاحقاً، وفقط عند طلبك: تُثبَّت أدوات الذكاء الاصطناعي بسطر الأوامر (Claude Code وAntigravity وGrok وKiro) من خوادم مطوريها. وهي برمجيات احتكارية، وخدمات الذكاء الاصطناعي التي تستخدمها خدمات شبكية احتكارية.</string>
+    <string name="fd_consent_report">التقرير الاختياري داخل التطبيق يرسل إلى api.nativecode.app ما تختاره فقط. لا توجد تحليلات ولا تقارير أعطال.</string>
+    <string name="fd_consent_check">أوافق على تنزيل هذه الملفات من GitHub Releases.</string>
+    <string name="fd_consent_need_check">ضع علامة في المربع للمتابعة.</string>
+    <string name="fd_download_from_github">نزّل من GitHub</string>
+    <string name="fd_download_runtime_info">GitHub Releases: بيئة Alpaquita (نحو 1.26 غيغابايت) وحزمة التحديث (نحو 317 ميغابايت)، بتحقق SHA-256.</string>
+    <string name="fd_requesting_github">جارٍ الاتصال بـ GitHub Releases…</string>
 </resources>

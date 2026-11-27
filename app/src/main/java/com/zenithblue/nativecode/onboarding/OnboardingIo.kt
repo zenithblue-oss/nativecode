@@ -164,7 +164,7 @@ internal object OnboardingIo {
             if (pendingLongName != null) { name = pendingLongName!!; pendingLongName = null }
             if (pendingLongLink != null) { linkName = pendingLongLink!!; pendingLongLink = null }
 
-            val relPath = name.replace("^data/data/com.zenithblue.nativecode/files/".toRegex(), "").trimStart('/')
+            val relPath = name.replace("^data/data/${Regex.escape(com.zenithblue.nativecode.terminal.TermuxHostPaths.PACKAGE)}/files/".toRegex(), "").trimStart('/')
             if (relPath.isEmpty() || relPath.contains("..")) {
                 val dataBlocks = (size + 511) / 512
                 skipBytes(inputStream, dataBlocks * 512L)

@@ -1645,4 +1645,25 @@
     <string name="cli_login_open_page">Anmeldeseite öffnen</string>
     <string name="cli_login_code">Ihr Code</string>
     <string name="cli_login_use_key">Stattdessen API-Schlüssel verwenden</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">Zuerst ist die Zustimmung zum Download nötig.</string>
+    <string name="fd_mobile_data_title">Mobile Daten</string>
+    <string name="fd_mobile_data_message">Du bist in einem getakteten Netz. Dieser Download ist %1$s groß. WLAN wird empfohlen.</string>
+    <string name="fd_mobile_data_continue">Trotzdem laden</string>
+    <string name="fd_mobile_data_wait">Auf WLAN warten</string>
+    <string name="fd_desktop_coming_later">Der Linux-Desktop braucht den X11-Anzeigeserver, der in einer späteren F-Droid-Version kommt.</string>
+    <string name="fd_consent_title">Externe Downloads</string>
+    <string name="fd_consent_intro">Diese F-Droid-App enthält das Linux-System nicht. Mit deiner Zustimmung lädt sie die folgenden Dateien von GitHub Releases. Es sind ausführbare Dateien, die F-Droid nicht geprüft hat. Jede Datei wird vor der Nutzung gegen ein in dieser App festgelegtes SHA-256 geprüft.</string>
+    <string name="fd_consent_rootfs">Linux-Root-Dateisystem: etwa 1,26 GB</string>
+    <string name="fd_consent_update">Runtime-Update-Paket: etwa 317 MB</string>
+    <string name="fd_consent_devpack">Android-SDK-Paket (optional, später): etwa 69 MB</string>
+    <string name="fd_consent_host">Host: github.com (objects.githubusercontent.com). WLAN und etwa 4 GB freier Speicher werden empfohlen.</string>
+    <string name="fd_consent_later">Später, nur auf deinen Wunsch: KI-Kommandozeilenwerkzeuge (Claude Code, Antigravity, Grok, Kiro) werden von den Servern ihrer Hersteller installiert. Sie sind proprietäre Software, und die genutzten KI-Dienste sind proprietäre Netzwerkdienste.</string>
+    <string name="fd_consent_report">Der optionale In-App-Bericht sendet nur, was du auswählst, an api.nativecode.app. Es gibt keine Analyse und keine Absturzberichte.</string>
+    <string name="fd_consent_check">Ich stimme zu, diese Dateien von GitHub Releases zu laden.</string>
+    <string name="fd_consent_need_check">Setze das Häkchen, um fortzufahren.</string>
+    <string name="fd_download_from_github">Von GitHub laden</string>
+    <string name="fd_download_runtime_info">GitHub Releases: Alpaquita-Runtime (etwa 1,26 GB) und Update-Paket (etwa 317 MB), SHA-256 geprüft.</string>
+    <string name="fd_requesting_github">Verbindung zu GitHub Releases…</string>
 </resources>

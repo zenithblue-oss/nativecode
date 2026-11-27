@@ -43,3 +43,7 @@ termux-packages/*
 !app/src/main/res/**/*.png
 !app/src/main/assets/images/**/*.png
 !app/src/main/assets/xfce/**/*.png
+
+# F-Droid build outputs (bootstrap + native libs built for the .fdroid prefix) and the Play-only Firebase config
+app/src/play/google-services.json
+tools/fdroid/out/

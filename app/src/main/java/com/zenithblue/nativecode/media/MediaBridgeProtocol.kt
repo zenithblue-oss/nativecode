@@ -124,7 +124,7 @@ object MediaBridgeProtocol {
             context.externalCacheDirs.filterNotNull().forEach { roots.add(it) }
         } catch (_: Throwable) {}
 
-        if (!BuildConfig.PLAY_STORE_BUILD) {
+        if (!com.zenithblue.nativecode.ProotOnly.ON) {
             roots.add(File(ChrootCommandBuilder.CHROOT_PATH))
         }
         return roots

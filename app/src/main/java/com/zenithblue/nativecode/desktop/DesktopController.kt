@@ -9,6 +9,8 @@ import android.widget.Toast
 import com.zenithblue.nativecode.BackgroundService
 import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.NativeCodeFgs
+import com.zenithblue.nativecode.R
+import com.zenithblue.nativecode.tr
 import com.zenithblue.nativecode.entitlements.FeatureGate
 import com.zenithblue.nativecode.entitlements.GateResult
 import com.zenithblue.nativecode.entitlements.XfceBudget
@@ -95,6 +97,10 @@ class DesktopController(
     /** Gate, then start. Card flips to STOP on the first healthy log line. */
     fun start() {
         if (running || starting) return
+        if (!BuildConfig.DESKTOP_AVAILABLE) { // fdroid v1: the X11 display server is not shipped yet
+            Toast.makeText(activity, tr(R.string.fd_desktop_coming_later), Toast.LENGTH_LONG).show()
+            return
+        }
         if (!host.desktopInstalled()) {
             Toast.makeText(activity, "Phosh desktop is not installed yet", Toast.LENGTH_LONG).show()
             return

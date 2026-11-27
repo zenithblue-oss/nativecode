@@ -173,7 +173,7 @@ def verify_bootstrap():
         raise Exception("Verification failed. Some required bootstrap files are missing.")
 
 def create_tarball():
-    tar_path = os.path.join(script_dir, "app/src/main/assets/bootstrap.tar")
+    tar_path = os.path.join(script_dir, "app/src/play/assets/bootstrap.tar")
     print(f"[*] Packaging bootstrap into {tar_path}...")
     
     files_dir = os.path.join(extract_dir, target_prefix)
@@ -187,7 +187,7 @@ def create_tarball():
     print(f"[*] Tarball created successfully. Size: {os.path.getsize(tar_path) / 1024 / 1024:.2f} MB")
 
 def copy_to_jni_libs():
-    jni_dir = os.path.join(script_dir, "app/src/main/jniLibs/arm64-v8a")
+    jni_dir = os.path.join(script_dir, "app/src/play/jniLibs/arm64-v8a")
     os.makedirs(jni_dir, exist_ok=True)
     
     mapping = {

@@ -59,7 +59,7 @@ object RuntimeUpdatePack {
     fun resolveArchive(context: Context): File? = pickArchive(
         PlayAssetDeliveryManager.getInstalledPackLocation(context, PlayAssetDeliveryManager.PACK_UPDATE_CORE)
             ?.let { File(it, ARCHIVE_NAME) },
-        localCandidates(context.filesDir, BuildConfig.DEBUG),
+        localCandidates(context.filesDir, BuildConfig.DEBUG && !BuildConfig.FDROID),
     )
 
     /** Dev sideload paths, DEBUG only: a stale world-readable file there must never beat Play in a release build. */
@@ -316,8 +316,8 @@ object RuntimeUpdatePack {
     fun download(activity: Activity, onState: (Progress) -> Unit, onReady: () -> Unit) {
         val app = activity.applicationContext
         if (resolveArchive(app) != null) return onReady()
-        onState(Progress.Running("Requesting the update from Google Play…", null))
-        var listener: com.google.android.play.core.assetpacks.AssetPackStateUpdateListener? = null
+        onState(Progress.Running(if (BuildConfig.FDROID) "Downloading the update from GitHub Releases…" else "Requesting the update from Google Play…", null))
+        var listener: Any? = null
         listener = PlayAssetDeliveryManager.requestDownload(activity, PlayAssetDeliveryManager.PACK_UPDATE_CORE) { state ->
             when (state) {
                 is PlayAssetDeliveryManager.DownloadState.Pending -> onState(Progress.Running("Download pending…", null))

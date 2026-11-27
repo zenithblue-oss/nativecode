@@ -67,7 +67,7 @@ object ProjectManager {
 
     /** Opposite isolation method. */
     fun oppositeMethod(method: String): String =
-        if (BuildConfig.PLAY_STORE_BUILD || method == "chroot") "proot" else "chroot"
+        if (com.zenithblue.nativecode.ProotOnly.ON || method == "chroot") "proot" else "chroot"
 
     /**
      * If [method] host tree lacks `.git` but the opposite rootfs has it,
@@ -78,7 +78,7 @@ object ProjectManager {
         projectPath: String,
         preferredMethod: String
     ): String? {
-        if (BuildConfig.PLAY_STORE_BUILD) {
+        if (com.zenithblue.nativecode.ProotOnly.ON) {
             return "proot".takeIf { hasGitCheckout(ctx, projectPath, it) }
         }
         if (hasGitCheckout(ctx, projectPath, preferredMethod)) return preferredMethod

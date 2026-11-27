@@ -11,7 +11,8 @@ import java.io.File
  * from [PACKAGE]. Never hardcode `com.termux` defaults at call sites.
  */
 object TermuxHostPaths {
-    const val PACKAGE = "com.zenithblue.nativecode"
+    /** The installed applicationId (play: com.zenithblue.nativecode, fdroid: ...nativecode.fdroid): the host prefix is /data/data/<id>. */
+    const val PACKAGE = com.zenithblue.nativecode.BuildConfig.APPLICATION_ID
     const val STOCK_PACKAGE = "com.termux"
 
     /** `/data/data/<package>` */

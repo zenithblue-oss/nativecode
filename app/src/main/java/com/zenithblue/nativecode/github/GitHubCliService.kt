@@ -55,7 +55,7 @@ object GitHubCliService {
 
     /** method + rootfs path + auth generation. Not method alone. */
     private fun statusKey(ctx: Context, method: String): String {
-        val root = if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+        val root = if (!com.zenithblue.nativecode.ProotOnly.ON && method == "chroot") {
             ChrootCommandBuilder.CHROOT_PATH
         } else {
             ProjectPathResolver.prootRootfsDir(ctx).absolutePath
@@ -131,7 +131,7 @@ object GitHubCliService {
                 }
                 val user = status?.username ?: readHostsYmlUser(ctx, method)
 
-                val ok = if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+                val ok = if (!com.zenithblue.nativecode.ProotOnly.ON && method == "chroot") {
                     // Host wipe is SSOT (fast). Full Terminal chroot hung forever.
                     logoutChroot(user)
                 } else {
@@ -157,7 +157,7 @@ object GitHubCliService {
      * Skip full guest `gh auth logout` — was hanging UI for minutes.
      */
     private fun logoutChroot(@Suppress("UNUSED_PARAMETER") user: String?): Boolean {
-        if (BuildConfig.PLAY_STORE_BUILD) return false
+        if (com.zenithblue.nativecode.ProotOnly.ON) return false
         if (!RootShell.isRootAvailable()) return false
         val root = ChrootCommandBuilder.CHROOT_PATH
         val wipe = RootShell.executeSync(
@@ -279,7 +279,7 @@ object GitHubCliService {
 
     private fun probeStatusUncached(ctx: Context, method: String): GhAuthStatus {
         // Chroot home is not app-readable; use RootShell host paths + timed guest probe.
-        if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+        if (!com.zenithblue.nativecode.ProotOnly.ON && method == "chroot") {
             return probeStatusChroot(ctx)
         }
         // proot: one guest start for install check + whoami
@@ -341,7 +341,7 @@ object GitHubCliService {
      * Guest `gh` only if hosts.yml missing (timed RootShell, no hang).
      */
     private fun probeStatusChroot(ctx: Context): GhAuthStatus {
-        if (BuildConfig.PLAY_STORE_BUILD) {
+        if (com.zenithblue.nativecode.ProotOnly.ON) {
             return GhAuthStatus("proot", false, false, error = "chroot unavailable")
         }
         val method = "chroot"
@@ -627,7 +627,7 @@ object GitHubCliService {
             """.trimMargin() + "\n"
         val cfgBody = "git_protocol: https\n"
 
-        if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+        if (!com.zenithblue.nativecode.ProotOnly.ON && method == "chroot") {
             return writeHostsYmlChroot(ctx, body, cfgBody)
         }
 
@@ -651,7 +651,7 @@ object GitHubCliService {
 
     /** Chroot home not app-writable — stage in cache, RootShell copyIntoChroot. */
     private fun writeHostsYmlChroot(ctx: Context, hostsBody: String, cfgBody: String): Boolean {
-        if (BuildConfig.PLAY_STORE_BUILD) return false
+        if (com.zenithblue.nativecode.ProotOnly.ON) return false
         if (!RootShell.isRootAvailable()) return false
         return try {
             val dir = File(ctx.cacheDir, "nc_gh_stage").also { it.mkdirs() }
@@ -688,7 +688,7 @@ object GitHubCliService {
 
     private fun readHostsYmlUser(ctx: Context, method: String): String? {
         return try {
-            val text = if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+            val text = if (!com.zenithblue.nativecode.ProotOnly.ON && method == "chroot") {
                 if (!RootShell.isRootAvailable()) return null
                 val root = ChrootCommandBuilder.CHROOT_PATH
                 RootShell.capture(
@@ -717,7 +717,7 @@ object GitHubCliService {
     ): Boolean {
         val guestPath = "/home/flux/.config/gh/.nc_token_inject"
         return try {
-            if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+            if (!com.zenithblue.nativecode.ProotOnly.ON && method == "chroot") {
                 if (!RootShell.isRootAvailable()) {
                     log("inject: no root")
                     return false
@@ -928,7 +928,7 @@ object GitHubCliService {
      */
     private fun runSetupGit(ctx: Context, method: String) {
         try {
-            if (!BuildConfig.PLAY_STORE_BUILD && method == "chroot") {
+            if (!com.zenithblue.nativecode.ProotOnly.ON && method == "chroot") {
                 if (!RootShell.isRootAvailable()) return
                 RootShell.captureInChroot(
                     GhGuestCommands.authSetupGit(),

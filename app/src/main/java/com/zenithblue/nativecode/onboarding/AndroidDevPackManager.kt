@@ -39,7 +39,7 @@ object AndroidDevPackManager {
             if (f.isFile && f.length() > 2L * 1024L * 1024L) return f
         }
 
-        pickLocal(localCandidates(context.filesDir, BuildConfig.DEBUG))?.let { return it }
+        pickLocal(localCandidates(context.filesDir, BuildConfig.DEBUG && !BuildConfig.FDROID))?.let { return it }
 
         try {
             val list = context.assets.list("") ?: emptyArray()

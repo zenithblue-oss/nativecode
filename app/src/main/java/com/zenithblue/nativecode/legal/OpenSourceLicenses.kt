@@ -140,5 +140,5 @@ object OpenSourceLicenses {
             url = "https://bell-sw.com/alpaquita-linux/",
             licenseSummary = "Base distribution packages are distributed under their individual upstream open-source licenses. Package license texts are included in the delivered runtime."
         )
-    ).filterNot { BuildConfig.PLAY_STORE_BUILD && it.name == "libsuperuser" }
+    ).filterNot { com.zenithblue.nativecode.ProotOnly.ON && it.name == "libsuperuser" }
 }

@@ -10,7 +10,7 @@ import java.io.File
 object ProjectPathResolver {
 
     private fun effectiveMethod(method: String): String =
-        if (BuildConfig.PLAY_STORE_BUILD) "proot" else method
+        if (com.zenithblue.nativecode.ProotOnly.ON) "proot" else method
 
     /** Default guest distribution name (SSOT). Can be overridden by app config. */
     const val DEFAULT_DISTRO = "alpaquita"
@@ -90,13 +90,13 @@ object ProjectPathResolver {
 
     /** True if chroot is installed (marker file exists). */
     fun isChrootInstalled(): Boolean {
-        if (BuildConfig.PLAY_STORE_BUILD) return false
+        if (com.zenithblue.nativecode.ProotOnly.ON) return false
         return File("${ChrootCommandBuilder.CHROOT_PATH}/.flux_configured").exists()
     }
 
     /** Host rootfs directory for Debian chroot (outside app storage). */
     fun chrootRootfsDir(): File =
-        if (BuildConfig.PLAY_STORE_BUILD) File("/disabled/chroot") else File(ChrootCommandBuilder.CHROOT_PATH)
+        if (com.zenithblue.nativecode.ProotOnly.ON) File("/disabled/chroot") else File(ChrootCommandBuilder.CHROOT_PATH)
 
     /** True if chroot rootfs directory exists on host (may be partial install). */
     fun isChrootRootfsPresent(): Boolean = chrootRootfsDir().exists()

@@ -1645,4 +1645,25 @@
     <string name="cli_login_open_page">サインインページを開く</string>
     <string name="cli_login_code">コード</string>
     <string name="cli_login_use_key">代わりにAPIキーを使う</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">先にダウンロードへの同意が必要です。</string>
+    <string name="fd_mobile_data_title">モバイルデータ</string>
+    <string name="fd_mobile_data_message">従量制の接続です。このダウンロードは %1$s です。Wi-Fi をおすすめします。</string>
+    <string name="fd_mobile_data_continue">このままダウンロード</string>
+    <string name="fd_mobile_data_wait">Wi-Fi を待つ</string>
+    <string name="fd_desktop_coming_later">Linux デスクトップには X11 ディスプレイサーバーが必要で、今後の F-Droid 版で提供予定です。</string>
+    <string name="fd_consent_title">外部ダウンロード</string>
+    <string name="fd_consent_intro">この F-Droid 版アプリには Linux システムが含まれていません。同意すると、以下のファイルを GitHub Releases からダウンロードします。これらは F-Droid が審査していない実行ファイルです。各ファイルは使用前に、このアプリに固定された SHA-256 と照合されます。</string>
+    <string name="fd_consent_rootfs">Linux ルートファイルシステム: 約 1.26 GB</string>
+    <string name="fd_consent_update">ランタイム更新パック: 約 317 MB</string>
+    <string name="fd_consent_devpack">Android SDK パック(任意、後で): 約 69 MB</string>
+    <string name="fd_consent_host">ホスト: github.com (objects.githubusercontent.com)。Wi-Fi と約 4 GB の空き容量をおすすめします。</string>
+    <string name="fd_consent_later">後で、ご自身が求めたときだけ: AI コマンドラインツール(Claude Code、Antigravity、Grok、Kiro)が各提供元のサーバーからインストールされます。これらはプロプライエタリなソフトウェアで、利用する AI サービスもプロプライエタリなネットワークサービスです。</string>
+    <string name="fd_consent_report">任意のアプリ内レポートは、選んだ内容だけを api.nativecode.app に送信します。分析やクラッシュレポートはありません。</string>
+    <string name="fd_consent_check">これらのファイルを GitHub Releases からダウンロードすることに同意します。</string>
+    <string name="fd_consent_need_check">続けるにはチェックを入れてください。</string>
+    <string name="fd_download_from_github">GitHub からダウンロード</string>
+    <string name="fd_download_runtime_info">GitHub Releases: Alpaquita ランタイム(約 1.26 GB)と更新パック(約 317 MB)、SHA-256 検証済み。</string>
+    <string name="fd_requesting_github">GitHub Releases に接続中…</string>
 </resources>

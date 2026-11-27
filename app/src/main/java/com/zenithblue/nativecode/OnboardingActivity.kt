@@ -178,7 +178,7 @@ class OnboardingActivity : AppCompatActivity() {
 
         // Optional deep-link from Settings → Chroot install
         intent.getStringExtra("preferred_isolation")?.let { pref ->
-            if (!BuildConfig.PLAY_STORE_BUILD && pref == "chroot") {
+            if (!com.zenithblue.nativecode.ProotOnly.ON && pref == "chroot") {
                 selectedIsolationMethod = pref
             } else if (pref == "proot") {
                 selectedIsolationMethod = pref
@@ -223,6 +223,7 @@ class OnboardingActivity : AppCompatActivity() {
             6 -> buildDebianBasePage()
             7, 8 -> buildCompletePage() // 8 = legacy deep-link after plan insert
             9 -> buildConsentPage()
+            10 -> buildDownloadConsentPage()
             else -> buildIntroPage()
         }
 
@@ -1474,13 +1475,110 @@ class OnboardingActivity : AppCompatActivity() {
         val prevBtn = secondaryButton(tr(R.string.onb_back)) { showPage(3) }
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
         val nextBtn = primaryButton(tr(R.string.onb_continue), R.drawable.ic_arrow_right) {
-            showPage(5)
+            showPage(if (BuildConfig.FDROID) 10 else 5) // fdroid: consent to the GitHub downloads comes first
         }
         nextBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         btnRow.addView(prevBtn); btnRow.addView(nextBtn)
         root.addView(btnRow)
 
         return root
+    }
+
+    // ── Page 10 (fdroid): consent to the GitHub Releases downloads, before any network request ──────────
+    private fun buildDownloadConsentPage(): View {
+        val scroll = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            isFillViewport = true
+            setBackgroundColor(NC.BG)
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(20), dp(16), dp(20))
+        }
+        root.addView(smallHeader(tr(R.string.fd_consent_title), R.drawable.ic_download))
+
+        fun card(vararg lines: String, bold: Boolean = false): LinearLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_CONTAINER,
+                strokeColor = NC.BORDER,
+                shadowColor = NC.SURFACE_BRIGHT,
+                offsetDp = 6,
+                cornerRadiusDp = 0,
+                rightFaceColor = NC.OUTLINE_VAR
+            )
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
+            lines.forEach { line ->
+                addView(TextView(this@OnboardingActivity).apply {
+                    text = line
+                    textSize = 12f
+                    setTextColor(if (bold) NC.ON_SURFACE else NC.ON_SURF_VAR)
+                    typeface = Typeface.MONOSPACE
+                    setLineSpacing(dp(2).toFloat(), 1.15f)
+                    setPadding(0, dp(3), 0, dp(3))
+                })
+            }
+        }
+        root.addView(card(tr(R.string.fd_consent_intro)))
+        root.addView(card(
+            tr(R.string.fd_consent_rootfs), tr(R.string.fd_consent_update), tr(R.string.fd_consent_devpack),
+            tr(R.string.fd_consent_host), bold = true
+        ))
+        root.addView(card(tr(R.string.fd_consent_later), tr(R.string.fd_consent_report)))
+
+        var agreed = false
+        val consentRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = cyberBrutalistBg(
+                fillColor = NC.SURFACE_LOW,
+                strokeColor = NC.OUTLINE_VAR,
+                shadowColor = NC.SURFACE_BRIGHT,
+                offsetDp = 4,
+                cornerRadiusDp = 0
+            )
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = dp(12) }
+        }
+        val check = CheckBox(this).apply {
+            isChecked = false
+            buttonTintList = android.content.res.ColorStateList.valueOf(NC.PRIMARY)
+        }
+        consentRow.addView(check)
+        consentRow.addView(TextView(this).apply {
+            text = tr(R.string.fd_consent_check)
+            textSize = 12f
+            setTextColor(NC.ON_SURF_VAR)
+            typeface = Typeface.MONOSPACE
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = dp(8) }
+        })
+        consentRow.setOnClickListener { check.isChecked = !check.isChecked }
+        root.addView(consentRow)
+
+        val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val prevBtn = secondaryButton(tr(R.string.onb_back)) { showPage(4) }
+        prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
+        val nextBtn = primaryButton(tr(R.string.onb_continue), R.drawable.ic_arrow_right) {
+            if (!agreed) {
+                Toast.makeText(this, tr(R.string.fd_consent_need_check), Toast.LENGTH_SHORT).show()
+                return@primaryButton
+            }
+            com.zenithblue.nativecode.onboarding.DownloadConsent.grant(this)
+            showPage(5)
+        }.apply { isEnabled = false; alpha = 0.45f }
+        nextBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1.4f)
+        check.setOnCheckedChangeListener { _, on ->
+            agreed = on
+            nextBtn.isEnabled = on
+            nextBtn.alpha = if (on) 1f else 0.45f
+        }
+        btnRow.addView(prevBtn)
+        btnRow.addView(nextBtn)
+        root.addView(btnRow)
+
+        scroll.addView(root)
+        return scroll
     }
 
     // ── Page 5: Linux Runtime Delivery (Play Asset Delivery / Local) ─────────
@@ -1497,7 +1595,7 @@ class OnboardingActivity : AppCompatActivity() {
 
         root.addView(smallHeader(tr(R.string.onb_linux_runtime), R.drawable.ic_storage))
         root.addView(TextView(this).apply {
-            text = "// PREBUILT ALPAQUITA GLIBC (AARCH64) · PLAY ASSET DELIVERY"
+            text = if (BuildConfig.FDROID) "// PREBUILT ALPAQUITA GLIBC (AARCH64) · GITHUB RELEASES" else "// PREBUILT ALPAQUITA GLIBC (AARCH64) · PLAY ASSET DELIVERY"
             textSize = 11f
             setTextColor(NC.ON_SURF_VAR)
             typeface = Typeface.MONOSPACE
@@ -1566,7 +1664,7 @@ class OnboardingActivity : AppCompatActivity() {
             AndroidDevPackManager.isApplied(this)
         // The 1.8.0 runtime changes (opencode, gh, zsh, OpenSSH, ccusage) live in nativecode_update_core, applied right
         // after the rootfs is extracted. Debug sideloads without Play packs may skip it.
-        var updatePackReady = BuildConfig.DEBUG || RuntimeUpdatePack.resolveArchive(this) != null
+        var updatePackReady = (BuildConfig.DEBUG && !BuildConfig.FDROID) || RuntimeUpdatePack.resolveArchive(this) != null
         fun deliveryReady() = currentSource != null && devPackReady && updatePackReady
 
         val padCard = LinearLayout(this).apply {
@@ -1608,6 +1706,8 @@ class OnboardingActivity : AppCompatActivity() {
                 "Runtime + Android SDK 36 packs ready: ${currentSource?.archiveFile?.name ?: "Bundled"}$sizeStr\nSHA256: ${currentSource?.expectedSha256?.take(16)}… [VERIFIED]"
             } else if (currentSource != null) {
                 tr(R.string.onb_runtime_pack_ready_android_sdk)
+            } else if (BuildConfig.FDROID) {
+                tr(R.string.fd_download_runtime_info)
             } else {
                 tr(R.string.onb_play_asset_packs_alpaquita_runtime)
             }
@@ -1663,7 +1763,7 @@ class OnboardingActivity : AppCompatActivity() {
 
         fun requestAndroidDevPack() {
             padProgressBar.visibility = View.VISIBLE
-            detailTv.text = tr(R.string.onb_requesting_nativecode_android_dev_fr)
+            detailTv.text = if (BuildConfig.FDROID) tr(R.string.fd_requesting_github) else tr(R.string.onb_requesting_nativecode_android_dev_fr)
             PlayAssetDeliveryManager.requestDownload(this, PlayAssetDeliveryManager.PACK_ANDROID_DEV) { state ->
                 when (state) {
                     is PlayAssetDeliveryManager.DownloadState.Pending -> {
@@ -1712,7 +1812,7 @@ class OnboardingActivity : AppCompatActivity() {
             }
         }
 
-        val downloadBtn = primaryButton(tr(R.string.onb_download_via_google_play), R.drawable.ic_download) {
+        val downloadBtn = primaryButton(if (BuildConfig.FDROID) tr(R.string.fd_download_from_github) else tr(R.string.onb_download_via_google_play), R.drawable.ic_download) {
             if (currentSource != null && BuildConfig.PLAY_STORE_BUILD && !devPackReady) {
                 requestAndroidDevPack()
                 return@primaryButton
@@ -1722,11 +1822,11 @@ class OnboardingActivity : AppCompatActivity() {
                 return@primaryButton
             }
             padProgressBar.visibility = View.VISIBLE
-            detailTv.text = tr(R.string.onb_requesting_nativecode_runtime_from_g)
+            detailTv.text = if (BuildConfig.FDROID) tr(R.string.fd_requesting_github) else tr(R.string.onb_requesting_nativecode_runtime_from_g)
             PlayAssetDeliveryManager.requestDownload(this, PlayAssetDeliveryManager.PACK_RUNTIME) { state ->
                 when (state) {
                     is PlayAssetDeliveryManager.DownloadState.Pending -> {
-                        detailTv.text = tr(R.string.onb_download_pending_in_google_play)
+                        detailTv.text = if (BuildConfig.FDROID) tr(R.string.fd_requesting_github) else tr(R.string.onb_download_pending_in_google_play)
                         padProgressBar.isIndeterminate = true
                     }
                     is PlayAssetDeliveryManager.DownloadState.Downloading -> {
@@ -1808,7 +1908,7 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(consentRow)
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val prevBtn = secondaryButton(tr(R.string.onb_back)) { showPage(4) }
+        val prevBtn = secondaryButton(tr(R.string.onb_back)) { showPage(if (BuildConfig.FDROID) 10 else 4) }
         prevBtn.layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f).apply { rightMargin = dp(8) }
         val startBtn = primaryButton(tr(R.string.onb_install_linux_environment), R.drawable.ic_arrow_right) {
             if (!planAccepted) {
@@ -2421,7 +2521,7 @@ class OnboardingActivity : AppCompatActivity() {
             tr(R.string.onb_installing_alpaquita_linux_setup_scr)
         )
         // ── CHROOT path (full debug build only) ─────────────────────────────
-        if (!BuildConfig.PLAY_STORE_BUILD && selectedIsolationMethod == "chroot") {
+        if (!com.zenithblue.nativecode.ProotOnly.ON && selectedIsolationMethod == "chroot") {
             beginSetupPhases("chroot")
             enterSetupPhase("R0", tr(R.string.onb_verifying_root_access))
             updateBaseStatus(tr(R.string.onb_chroot_checking_root_access))
@@ -2551,7 +2651,7 @@ class OnboardingActivity : AppCompatActivity() {
                 setSetupPhaseFraction(1f, tr(R.string.onb_bootstrap_extracted))
                 if (tarFile.exists()) tarFile.delete()
 
-                val nested = File(filesDir, "data/data/com.zenithblue.nativecode/files")
+                val nested = File(filesDir, "data/data/${com.zenithblue.nativecode.terminal.TermuxHostPaths.PACKAGE}/files")
                 if (nested.exists()) {
                     moveDirectoryContents(nested, filesDir)
                     File(filesDir, "data").deleteRecursively()
@@ -3147,7 +3247,7 @@ class OnboardingActivity : AppCompatActivity() {
                 "uninstall_debian13_chroot.sh",
                 "nativecode_chroot.sh"
             ).let { all ->
-                if (BuildConfig.PLAY_STORE_BUILD) {
+                if (com.zenithblue.nativecode.ProotOnly.ON) {
                     all.filter { it in setOf("setup_termux.sh", "flux_install.sh", "start_gui.sh", "stop_gui.sh") }
                         .toTypedArray()
                 } else all

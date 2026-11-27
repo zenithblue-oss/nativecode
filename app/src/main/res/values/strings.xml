@@ -1688,4 +1688,25 @@
     <string name="cli_login_open_page">Open sign-in page</string>
     <string name="cli_login_code">Your code</string>
     <string name="cli_login_use_key">Use an API key instead</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">Download consent is required first.</string>
+    <string name="fd_mobile_data_title">Mobile data</string>
+    <string name="fd_mobile_data_message">You are on a metered connection. This download is %1$s. Wi-Fi is recommended.</string>
+    <string name="fd_mobile_data_continue">Download anyway</string>
+    <string name="fd_mobile_data_wait">Wait for Wi-Fi</string>
+    <string name="fd_desktop_coming_later">The Linux desktop needs the X11 display server, which is coming in a later F-Droid release.</string>
+    <string name="fd_consent_title">External downloads</string>
+    <string name="fd_consent_intro">This F-Droid app does not bundle the Linux system. With your consent it downloads the files below from GitHub Releases. They are executables that F-Droid has not reviewed. Each file is checked against a SHA-256 pinned in this app before it is used.</string>
+    <string name="fd_consent_rootfs">Linux root filesystem: about 1.26 GB</string>
+    <string name="fd_consent_update">Runtime update pack: about 317 MB</string>
+    <string name="fd_consent_devpack">Android SDK pack (optional, later): about 69 MB</string>
+    <string name="fd_consent_host">Host: github.com (objects.githubusercontent.com). Wi-Fi and about 4 GB of free space are recommended.</string>
+    <string name="fd_consent_later">Later, only when you ask: AI command-line tools (Claude Code, Antigravity, Grok, Kiro) are installed from their vendors\' own servers. They are proprietary software and the AI services they use are proprietary network services.</string>
+    <string name="fd_consent_report">The optional in-app report sends only what you choose to api.nativecode.app. There is no analytics and no crash reporting.</string>
+    <string name="fd_consent_check">I agree to download these files from GitHub Releases.</string>
+    <string name="fd_consent_need_check">Tick the box to continue.</string>
+    <string name="fd_download_from_github">Download from GitHub</string>
+    <string name="fd_download_runtime_info">GitHub Releases: Alpaquita runtime (about 1.26 GB) and update pack (about 317 MB), SHA-256 verified.</string>
+    <string name="fd_requesting_github">Connecting to GitHub Releases…</string>
 </resources>

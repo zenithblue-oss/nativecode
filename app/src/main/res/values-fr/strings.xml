@@ -1645,4 +1645,25 @@
     <string name="cli_login_open_page">Ouvrir la page de connexion</string>
     <string name="cli_login_code">Votre code</string>
     <string name="cli_login_use_key">Utiliser plutôt une clé API</string>
+
+    <!-- F-Droid flavor: GitHub Releases download consent + delivery -->
+    <string name="fd_consent_required">Le consentement au téléchargement est d\'abord requis.</string>
+    <string name="fd_mobile_data_title">Données mobiles</string>
+    <string name="fd_mobile_data_message">Vous êtes sur une connexion limitée. Ce téléchargement fait %1$s. Le Wi-Fi est recommandé.</string>
+    <string name="fd_mobile_data_continue">Télécharger quand même</string>
+    <string name="fd_mobile_data_wait">Attendre le Wi-Fi</string>
+    <string name="fd_desktop_coming_later">Le bureau Linux nécessite le serveur d\'affichage X11, prévu dans une prochaine version F-Droid.</string>
+    <string name="fd_consent_title">Téléchargements externes</string>
+    <string name="fd_consent_intro">Cette application F-Droid n\'inclut pas le système Linux. Avec votre accord, elle télécharge les fichiers ci-dessous depuis GitHub Releases. Ce sont des exécutables que F-Droid n\'a pas examinés. Chaque fichier est comparé à un SHA-256 fixé dans l\'application avant utilisation.</string>
+    <string name="fd_consent_rootfs">Système de fichiers racine Linux : environ 1,26 Go</string>
+    <string name="fd_consent_update">Pack de mise à jour du runtime : environ 317 Mo</string>
+    <string name="fd_consent_devpack">Pack Android SDK (facultatif, plus tard) : environ 69 Mo</string>
+    <string name="fd_consent_host">Hôte : github.com (objects.githubusercontent.com). Le Wi-Fi et environ 4 Go d\'espace libre sont recommandés.</string>
+    <string name="fd_consent_later">Plus tard, uniquement à votre demande : les outils IA en ligne de commande (Claude Code, Antigravity, Grok, Kiro) sont installés depuis les serveurs de leurs éditeurs. Ce sont des logiciels propriétaires et les services IA utilisés sont des services réseau propriétaires.</string>
+    <string name="fd_consent_report">Le rapport facultatif dans l\'application n\'envoie que ce que vous choisissez à api.nativecode.app. Il n\'y a ni analyse d\'usage ni rapport de plantage.</string>
+    <string name="fd_consent_check">J\'accepte de télécharger ces fichiers depuis GitHub Releases.</string>
+    <string name="fd_consent_need_check">Cochez la case pour continuer.</string>
+    <string name="fd_download_from_github">Télécharger depuis GitHub</string>
+    <string name="fd_download_runtime_info">GitHub Releases : runtime Alpaquita (environ 1,26 Go) et pack de mise à jour (environ 317 Mo), vérifiés par SHA-256.</string>
+    <string name="fd_requesting_github">Connexion à GitHub Releases…</string>
 </resources>

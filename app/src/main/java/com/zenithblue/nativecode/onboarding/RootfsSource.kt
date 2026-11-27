@@ -2,7 +2,6 @@ package com.zenithblue.nativecode.onboarding
 
 import android.content.Context
 import android.util.Log
-import com.google.android.play.core.assetpacks.AssetPackManagerFactory
 import com.zenithblue.nativecode.BuildConfig
 import java.io.File
 import java.security.MessageDigest
@@ -68,7 +67,7 @@ object RootfsSourceResolver {
      */
     fun resolve(context: Context, homeDir: File? = null): RootfsSource? {
         // 1. Debug-only local filesystem candidates (dev/test sideload).
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG && !BuildConfig.FDROID) {
             val localCandidates = mutableListOf<File>()
             localCandidates.add(File("/data/local/tmp", ALPAQUITA_NAME))
             if (homeDir != null) {
@@ -99,29 +98,23 @@ object RootfsSourceResolver {
             Log.i(TAG, "Release build: skipping local filesystem rootfs sources (Play-delivered only)")
         }
 
-        // 2. Play Asset Delivery pack: nativecode_runtime
+        // 2. Delivered pack (Play Asset Delivery on play, GitHub download on fdroid): nativecode_runtime
         try {
-            val assetPackManager = AssetPackManagerFactory.getInstance(context)
-            val packLocation = assetPackManager.getPackLocation("nativecode_runtime")
-            if (packLocation != null) {
-                val assetsPath = packLocation.assetsPath()
-                if (assetsPath != null) {
-                    val packFile = File(assetsPath, ALPAQUITA_NAME)
-                    if (packFile.isFile && packFile.length() > 2L * 1024L * 1024L) {
-                        val shaFile = File(assetsPath, ALPAQUITA_SHA_NAME)
-                        val sha = pinnedShaOrWarn(shaFile, packFile.absolutePath)
-                        Log.i(TAG, "Resolved PlayAssetPack rootfs: ${packFile.absolutePath} (${packFile.length()} bytes)")
-                        return RootfsSource.PlayAssetPack(
-                            archive = packFile,
-                            checksum = if (shaFile.isFile) shaFile else null,
-                            expectedSha256 = sha,
-                            distro = "alpaquita"
-                        )
-                    }
-                }
+            val packDir = PlayAssetDeliveryManager.getInstalledPackLocation(context, PlayAssetDeliveryManager.PACK_RUNTIME)
+            val packFile = packDir?.let { File(it, ALPAQUITA_NAME) }
+            if (packDir != null && packFile != null && packFile.isFile && packFile.length() > 2L * 1024L * 1024L) {
+                val shaFile = File(packDir, ALPAQUITA_SHA_NAME)
+                val sha = pinnedShaOrWarn(shaFile, packFile.absolutePath)
+                Log.i(TAG, "Resolved PlayAssetPack rootfs: ${packFile.absolutePath} (${packFile.length()} bytes)")
+                return RootfsSource.PlayAssetPack(
+                    archive = packFile,
+                    checksum = if (shaFile.isFile) shaFile else null,
+                    expectedSha256 = sha,
+                    distro = "alpaquita"
+                )
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Play Asset Delivery resolution check failed: ${e.message}")
+            Log.w(TAG, "Pack resolution check failed: ${e.message}")
         }
 
         // 3. Bundled assets in APK
