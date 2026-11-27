@@ -81,6 +81,9 @@ export NATIVECODE_GPU_LAUNCH="/usr/local/bin/gpu-launch"
             val claudeMd = readAssetOrFallback(context, ASSET_CLAUDE, DEFAULT_CLAUDE_MD)
             val codexMd = readAssetOrFallback(context, ASSET_CODEX, DEFAULT_CODEX_MD)
 
+            // The guest's `/run/nativecode_bridge.json` (bridge socket names for this app's uid).
+            com.zenithblue.nativecode.agent.BridgeRendezvous.writeToRootfs(rootfs)
+
             // 1. System global files
             val etcDir = File(rootfs, "etc")
             if (etcDir.isDirectory || etcDir.mkdirs()) {

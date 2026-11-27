@@ -678,22 +678,7 @@ class AgentBridgeServer(
         }
     }
 
-    private fun writeRendezvousFile() {
-        try {
-            val runDir = File(context.filesDir, "run").apply { mkdirs() }
-            val rendezvousFile = File(runDir, "nativecode_bridge.json")
-            val json = JSONObject().apply {
-                put("v", 1)
-                put("host_uid", Process.myUid())
-                put("media_socket", "@${MediaBridgeServer.SOCKET_NAME_PREFIX}${Process.myUid()}")
-                put("agent_socket", "@$socketName")
-                put("timestamp", System.currentTimeMillis())
-            }
-            rendezvousFile.writeText(json.toString(2))
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to write rendezvous file: ${e.message}")
-        }
-    }
+    private fun writeRendezvousFile() = BridgeRendezvous.write(context)
 
     override fun close() {
         if (!isRunning.getAndSet(false)) return

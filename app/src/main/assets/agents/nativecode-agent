@@ -13,7 +13,6 @@ import sys
 
 RENDEZVOUS_PATHS = [
     "/run/nativecode_bridge.json",
-    "/data/data/com.zenithblue.nativecode/files/run/nativecode_bridge.json",
     os.path.expanduser("~/.nativecode_bridge.json")
 ]
 
@@ -143,7 +142,8 @@ def main():
     # share-file / send-file
     for name in ("share-file", "send-file"):
         share_p = subparsers.add_parser(name, help="Offer a file to the user (share sheet / save)")
-        share_p.add_argument("--path", required=True, help="Path to the file")
+        share_p.add_argument("pos_path", nargs="?", metavar="PATH", help="Path to the file (or use --path)")
+        share_p.add_argument("--path", help="Path to the file")
         share_p.add_argument("--title", default="", help="Card / notification title (default: file name)")
         share_p.add_argument("--message", default="", help="Message text")
 
@@ -209,9 +209,13 @@ def main():
                 "message": args.message
             }
         elif args.cmd in ("share-file", "send-file"):
-            file_path = os.path.abspath(os.path.expanduser(args.path))
+            raw_path = args.path or args.pos_path
+            if not raw_path:
+                print(json.dumps({"v": 1, "ok": False, "error": "Missing file path: nativecode-agent share-file <path>"}, indent=2))
+                sys.exit(1)
+            file_path = os.path.abspath(os.path.expanduser(raw_path))
             if not os.path.isfile(file_path):
-                print(json.dumps({"v": 1, "ok": False, "error": f"File not found: {args.path}"}, indent=2))
+                print(json.dumps({"v": 1, "ok": False, "error": f"File not found: {raw_path}"}, indent=2))
                 sys.exit(1)
             req = {"v": 1, "cmd": "share_file", "path": file_path, "title": args.title, "message": args.message}
         elif args.cmd in ("dismiss-alert", "cancel-alert", "dismiss"):

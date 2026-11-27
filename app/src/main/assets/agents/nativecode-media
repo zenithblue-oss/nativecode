@@ -13,7 +13,6 @@ import sys
 
 RENDEZVOUS_PATHS = [
     "/run/nativecode_bridge.json",
-    "/data/data/com.zenithblue.nativecode/files/run/nativecode_bridge.json",
     os.path.expanduser("~/.nativecode_bridge.json")
 ]
 
