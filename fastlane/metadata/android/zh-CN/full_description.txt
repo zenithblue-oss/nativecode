@@ -3,7 +3,7 @@ NativeCode 把 Android 手机或平板变成便携的 Linux 工作站。无需�
 - PRoot 中的 Alpaquita Linux：glibc 用户空间，带 apk 包管理器、Bash、Node.js、Python、GCC 和 Git。
 - 带标签页和额外按键行的终端。
 - 通过 Termux:X11 在屏幕上显示 Linux 桌面 (Phosh)；设备支持时，可使用 Mesa PanVK (Mali) 或 Turnip (Adreno) 进行 GPU 加速。
-- 在聊天视图或终端中使用 AI 编程助手：opencode (开源)，并可按需安装其他助手命令行工具。
+- 在聊天视图或终端中使用 AI 编程助手：opencode 和 Codex (开源)，以及 Claude Code、Antigravity、Grok 和 Kiro (专有软件，预装在下载的根文件系统中)。
 - Git 工作区：项目树、差异视图和分支切换。
 - 用于登录手机的 SSH 服务器，以及远程主机和密钥。
 - 备份项目和设置。
@@ -12,6 +12,6 @@ NativeCode 把 Android 手机或平板变成便携的 Linux 工作站。无需�
 
 下载：在应用中同意后，Linux 根文件系统 (约 1.26 GB) 和运行时更新包 (约 317 MB) 将从 GitHub Releases 下载。之后仅在你要求时，才会以同样方式下载 Android SDK 包 (约 69 MB) 和 GPU 驱动 (17 至 34 MB)。每个文件都会按固定的大小和 SHA-256 校验。建议使用 Wi-Fi 并预留约 10 GB 可用空间。
 
-反特性：除 opencode 外的 AI 工具 (Claude Code、Antigravity、Grok、Kiro 等) 是专有软件。NativeCode 不包含它们；仅在你要求时才从其厂商服务器安装，它们使用的 AI 服务是专有的网络服务。
+反特性：下载的根文件系统和更新包包含预装的专有 AI 命令行工具 (Claude Code、Antigravity、Grok、Kiro)，各自受其厂商许可证约束，它们使用的 AI 服务是专有的网络服务。Android SDK 包含 Google 的 Android SDK 组件，受 Google 许可证约束。这些下载内容不属于本应用自身的源代码。
 
 需要 arm64 设备上的 Android 8.0 或更高版本。

@@ -3,7 +3,7 @@ O NativeCode transforma um celular ou tablet Android em uma estação de trabalh
 - Alpaquita Linux no PRoot: ambiente glibc com o gerenciador de pacotes apk, Bash, Node.js, Python, GCC e Git.
 - Terminal com abas e uma linha de teclas extras.
 - Desktop Linux (Phosh) na tela via Termux:X11, com aceleração de GPU do Mesa PanVK (Mali) ou Turnip (Adreno) quando o aparelho permite.
-- Agentes de IA para programar em um chat ou no terminal: opencode (código aberto) e, sob demanda, outras ferramentas de linha de comando de agentes.
+- Agentes de programação com IA em uma visualização de chat ou no terminal: opencode e Codex (código aberto), além de Claude Code, Antigravity, Grok e Kiro (proprietários, pré-instalados no sistema de arquivos raiz baixado).
 - Espaço de trabalho Git com árvore de projetos, visualização de diferenças e troca de branch.
 - Servidor SSH para entrar no celular, além de hosts remotos e chaves.
 - Backup dos seus projetos e configurações.
@@ -12,6 +12,6 @@ Tudo é gratuito. Não há paywall, anúncios, análises nem relatórios de falh
 
 Downloads: o sistema de arquivos raiz do Linux (cerca de 1,26 GB) e um pacote de atualização do runtime (cerca de 317 MB) são baixados do GitHub Releases depois que você concorda no app. Mais tarde, e só quando você pedir, o pacote do Android SDK (cerca de 69 MB) e um driver de GPU (17 a 34 MB) são baixados da mesma forma. Cada arquivo é conferido por um tamanho e um SHA-256 fixos. Recomendam-se Wi-Fi e cerca de 10 GB livres.
 
-Características indesejáveis: as ferramentas de IA além do opencode (Claude Code, Antigravity, Grok, Kiro e outras) são software proprietário. O NativeCode não as inclui; elas são instaladas dos servidores dos fabricantes somente quando você pedir, e os serviços de IA que usam são serviços de rede proprietários.
+Anti-recursos: o sistema de arquivos raiz e o pacote de atualização baixados incluem ferramentas de IA de linha de comando proprietárias pré-instaladas (Claude Code, Antigravity, Grok, Kiro), cada uma sob a licença do seu fabricante; os serviços de IA que usam são serviços de rede proprietários. O pacote do SDK do Android contém componentes do SDK do Android do Google sob a licença do Google. Esses downloads não fazem parte do código-fonte do próprio app.
 
 Requer Android 8.0 ou superior em um aparelho arm64.

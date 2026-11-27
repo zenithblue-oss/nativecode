@@ -3,7 +3,7 @@ NativeCode는 Android 휴대폰이나 태블릿을 휴대용 Linux 워크스테�
 - PRoot 위의 Alpaquita Linux: glibc 사용자 영역, apk 패키지 관리자, Bash, Node.js, Python, GCC, Git.
 - 탭과 추가 키 줄이 있는 터미널.
 - Termux:X11을 통해 화면에 표시되는 Linux 데스크톱(Phosh). 기기가 지원하면 Mesa PanVK(Mali) 또는 Turnip(Adreno)으로 GPU 가속.
-- 채팅 화면이나 터미널에서 쓰는 AI 코딩 에이전트: opencode(오픈 소스), 요청 시 다른 에이전트 명령줄 도구.
+- 채팅 화면이나 터미널에서 쓰는 AI 코딩 에이전트: opencode와 Codex(오픈 소스), 그리고 Claude Code, Antigravity, Grok, Kiro(독점 소프트웨어, 다운로드되는 루트 파일 시스템에 사전 설치됨).
 - 프로젝트 트리, 차이 보기, 브랜치 전환을 갖춘 Git 작업 공간.
 - 휴대폰에 로그인하기 위한 SSH 서버, 원격 호스트와 키.
 - 프로젝트와 설정 백업.
@@ -12,6 +12,6 @@ NativeCode는 Android 휴대폰이나 태블릿을 휴대용 Linux 워크스테�
 
 다운로드: Linux 루트 파일 시스템(약 1.26 GB)과 런타임 업데이트 팩(약 317 MB)은 앱에서 동의한 후 GitHub Releases에서 받습니다. 나중에 요청할 때만 Android SDK 팩(약 69 MB)과 GPU 드라이버(17~34 MB)도 같은 방식으로 받습니다. 모든 파일은 고정된 크기와 SHA-256으로 검증합니다. Wi-Fi와 약 10 GB의 여유 공간을 권장합니다.
 
-안티 기능: opencode 외의 AI 도구(Claude Code, Antigravity, Grok, Kiro 등)는 독점 소프트웨어입니다. NativeCode에 포함되어 있지 않으며, 요청할 때만 각 제공업체의 서버에서 설치되고, 이들이 사용하는 AI 서비스는 독점 네트워크 서비스입니다.
+안티 기능: 다운로드되는 루트 파일 시스템과 업데이트 팩에는 사전 설치된 독점 AI 명령줄 도구(Claude Code, Antigravity, Grok, Kiro)가 포함되어 있으며, 각각 제공사의 라이선스를 따르고 이들이 사용하는 AI 서비스는 독점 네트워크 서비스입니다. Android SDK 팩에는 Google 라이선스에 따른 Google의 Android SDK 구성 요소가 들어 있습니다. 이 다운로드는 앱 자체 소스 코드에 포함되지 않습니다.
 
 arm64 기기의 Android 8.0 이상이 필요합니다.

@@ -3,7 +3,7 @@ NativeCode, Android telefonunuzu veya tabletinizi taşınabilir bir Linux iş is
 - PRoot içinde Alpaquita Linux: apk paket yöneticisi, Bash, Node.js, Python, GCC ve Git ile glibc kullanıcı alanı.
 - Sekmeli ve ek tuş satırlı terminal.
 - Termux:X11 ile ekranda Linux masaüstü (Phosh); cihaz izin veriyorsa Mesa PanVK (Mali) veya Turnip (Adreno) ile GPU hızlandırma.
-- Sohbet görünümünde veya terminalde yapay zekâ kodlama ajanları: opencode (açık kaynak) ve istenirse diğer ajan komut satırı araçları.
+- Sohbet görünümünde veya terminalde yapay zekâ kodlama ajanları: opencode ve Codex (açık kaynak), ayrıca Claude Code, Antigravity, Grok ve Kiro (tescilli, indirilen kök dosya sistemine önceden kurulu).
 - Proje ağacı, fark görünümü ve dal değiştirme sunan Git çalışma alanı.
 - Telefona giriş için SSH sunucusu, ayrıca uzak ana bilgisayarlar ve anahtarlar.
 - Projelerinizin ve ayarlarınızın yedeği.
@@ -12,6 +12,6 @@ Her şey ücretsizdir. Ödeme duvarı, reklam, analiz ve çökme raporu yoktur; 
 
 İndirmeler: Linux kök dosya sistemi (yaklaşık 1,26 GB) ve çalışma ortamı güncelleme paketi (yaklaşık 317 MB), uygulamada onayınızdan sonra GitHub Releases'tan indirilir. Daha sonra ve yalnızca siz isterseniz Android SDK paketi (yaklaşık 69 MB) ve bir GPU sürücüsü (17 ile 34 MB) aynı şekilde indirilir. Her dosya sabit bir boyut ve SHA-256 ile doğrulanır. Wi-Fi ve yaklaşık 10 GB boş alan önerilir.
 
-İstenmeyen özellikler: opencode dışındaki yapay zekâ araçları (Claude Code, Antigravity, Grok, Kiro ve diğerleri) tescilli yazılımdır. NativeCode bunları içermez; yalnızca siz isterseniz üreticilerinin sunucularından kurulur ve kullandıkları yapay zekâ hizmetleri tescilli ağ hizmetleridir.
+İstenmeyen özellikler: indirilen kök dosya sistemi ve güncelleme paketi, önceden kurulu tescilli yapay zekâ komut satırı araçlarını (Claude Code, Antigravity, Grok, Kiro) içerir; her biri üreticisinin kendi lisansı altındadır ve kullandıkları yapay zekâ hizmetleri tescilli ağ hizmetleridir. Android SDK paketi, Google'ın Android SDK bileşenlerini Google lisansı altında içerir. Bu indirmeler uygulamanın kendi kaynak kodunun parçası değildir.
 
 arm64 cihazda Android 8.0 veya üstü gerekir.

@@ -3,7 +3,7 @@ NativeCode mengubah ponsel atau tablet Android menjadi workstation Linux portabe
 - Alpaquita Linux di PRoot: userland glibc dengan manajer paket apk, Bash, Node.js, Python, GCC, dan Git.
 - Terminal dengan tab dan baris tombol tambahan.
 - Desktop Linux (Phosh) di layar lewat Termux:X11, dengan akselerasi GPU dari Mesa PanVK (Mali) atau Turnip (Adreno) jika perangkat mendukung.
-- Agen pengodean AI di tampilan obrolan atau terminal: opencode (sumber terbuka) dan, jika diminta, alat baris perintah agen lainnya.
+- Agen pemrograman AI di tampilan obrolan atau terminal: opencode dan Codex (sumber terbuka), serta Claude Code, Antigravity, Grok, dan Kiro (proprietary, sudah terpasang di sistem berkas root yang diunduh).
 - Ruang kerja Git dengan pohon proyek, tampilan diff, dan pergantian branch.
 - Server SSH untuk masuk ke ponsel, serta host jarak jauh dan kunci.
 - Pencadangan proyek dan pengaturan Anda.
@@ -12,6 +12,6 @@ Semuanya gratis. Tidak ada paywall, iklan, analitik, atau laporan crash, dan Nat
 
 Unduhan: sistem berkas root Linux (sekitar 1,26 GB) dan paket pembaruan runtime (sekitar 317 MB) diunduh dari GitHub Releases setelah Anda setuju di aplikasi. Nanti, dan hanya jika diminta, paket Android SDK (sekitar 69 MB) dan driver GPU (17 sampai 34 MB) diunduh dengan cara yang sama. Setiap berkas diperiksa terhadap ukuran dan SHA-256 yang ditetapkan. Disarankan Wi-Fi dan ruang kosong sekitar 10 GB.
 
-Fitur yang tidak diinginkan: alat AI selain opencode (Claude Code, Antigravity, Grok, Kiro, dan lainnya) adalah perangkat lunak proprietari. NativeCode tidak menyertakannya; alat itu dipasang dari server vendornya hanya jika Anda memintanya, dan layanan AI yang mereka pakai adalah layanan jaringan proprietari.
+Anti-fitur: sistem berkas root dan paket pembaruan yang diunduh menyertakan alat baris perintah AI proprietary yang sudah terpasang (Claude Code, Antigravity, Grok, Kiro), masing-masing dengan lisensi vendornya; layanan AI yang digunakan adalah layanan jaringan proprietary. Paket Android SDK berisi komponen Android SDK milik Google dengan lisensi Google. Unduhan ini bukan bagian dari kode sumber aplikasi itu sendiri.
 
 Memerlukan Android 8.0 atau lebih baru pada perangkat arm64.

@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">Пакет обновления среды выполнения: около 317 МБ</string>
     <string name="fd_consent_devpack">Пакет Android SDK (необязательно, позже): около 69 МБ</string>
     <string name="fd_consent_host">Хост: github.com (objects.githubusercontent.com). Рекомендуются Wi-Fi и около 4 ГБ свободного места.</string>
-    <string name="fd_consent_later">Позже, только по вашему запросу: ИИ-инструменты командной строки (Claude Code, Antigravity, Grok, Kiro) устанавливаются с серверов их разработчиков. Это проприетарное ПО, а используемые ИИ-сервисы являются проприетарными сетевыми сервисами.</string>
+    <string name="fd_consent_later">Корневая файловая система и пакет обновления уже включают проприетарные ИИ-инструменты командной строки (Claude Code, Antigravity, Grok, Kiro) под лицензиями их производителей. Используемые ими ИИ-сервисы являются проприетарными сетевыми сервисами. Пакет Android SDK содержит Android SDK от Google под лицензией Google.</string>
     <string name="fd_consent_report">Необязательный отчёт в приложении отправляет на api.nativecode.app только то, что вы выбрали. Аналитики и отчётов о сбоях нет.</string>
     <string name="fd_consent_check">Я согласен скачать эти файлы из GitHub Releases.</string>
     <string name="fd_consent_need_check">Отметьте флажок, чтобы продолжить.</string>

@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">运行时更新包：约 317 MB</string>
     <string name="fd_consent_devpack">Android SDK 包（可选，稍后）：约 69 MB</string>
     <string name="fd_consent_host">主机：github.com（objects.githubusercontent.com）。建议使用 Wi-Fi 并预留约 4 GB 可用空间。</string>
-    <string name="fd_consent_later">之后，仅在你要求时：AI 命令行工具（Claude Code、Antigravity、Grok、Kiro）会从各自厂商的服务器安装。它们是专有软件，所使用的 AI 服务也是专有网络服务。</string>
+    <string name="fd_consent_later">根文件系统和更新包已包含专有 AI 命令行工具 (Claude Code、Antigravity、Grok、Kiro)，受其厂商许可证约束。它们使用的 AI 服务是专有的网络服务。Android SDK 包含 Google 的 Android SDK，受 Google 许可证约束。</string>
     <string name="fd_consent_report">可选的应用内报告只会把你选择的内容发送到 api.nativecode.app。没有统计分析，也没有崩溃报告。</string>
     <string name="fd_consent_check">我同意从 GitHub Releases 下载这些文件。</string>
     <string name="fd_consent_need_check">勾选后才能继续。</string>

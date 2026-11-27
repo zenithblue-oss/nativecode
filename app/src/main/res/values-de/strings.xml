@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">Runtime-Update-Paket: etwa 317 MB</string>
     <string name="fd_consent_devpack">Android-SDK-Paket (optional, später): etwa 69 MB</string>
     <string name="fd_consent_host">Host: github.com (objects.githubusercontent.com). WLAN und etwa 4 GB freier Speicher werden empfohlen.</string>
-    <string name="fd_consent_later">Später, nur auf deinen Wunsch: KI-Kommandozeilenwerkzeuge (Claude Code, Antigravity, Grok, Kiro) werden von den Servern ihrer Hersteller installiert. Sie sind proprietäre Software, und die genutzten KI-Dienste sind proprietäre Netzwerkdienste.</string>
+    <string name="fd_consent_later">Das Root-Dateisystem und das Update-Paket enthalten bereits proprietäre KI-Kommandozeilenwerkzeuge (Claude Code, Antigravity, Grok, Kiro) unter den Lizenzen ihrer Hersteller. Die genutzten KI-Dienste sind proprietäre Netzwerkdienste. Das Android-SDK-Paket enthält Googles Android SDK unter Googles Lizenz.</string>
     <string name="fd_consent_report">Der optionale In-App-Bericht sendet nur, was du auswählst, an api.nativecode.app. Es gibt keine Analyse und keine Absturzberichte.</string>
     <string name="fd_consent_check">Ich stimme zu, diese Dateien von GitHub Releases zu laden.</string>
     <string name="fd_consent_need_check">Setze das Häkchen, um fortzufahren.</string>

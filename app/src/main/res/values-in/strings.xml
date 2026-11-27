@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">Paket pembaruan runtime: sekitar 317 MB</string>
     <string name="fd_consent_devpack">Paket Android SDK (opsional, nanti): sekitar 69 MB</string>
     <string name="fd_consent_host">Host: github.com (objects.githubusercontent.com). Disarankan Wi-Fi dan ruang kosong sekitar 4 GB.</string>
-    <string name="fd_consent_later">Nanti, hanya jika Anda meminta: alat AI baris perintah (Claude Code, Antigravity, Grok, Kiro) dipasang dari server pembuatnya. Itu perangkat lunak proprietari dan layanan AI yang dipakai adalah layanan jaringan proprietari.</string>
+    <string name="fd_consent_later">Sistem berkas root dan paket pembaruan sudah menyertakan alat baris perintah AI proprietary (Claude Code, Antigravity, Grok, Kiro) dengan lisensi vendor masing-masing. Layanan AI yang digunakan adalah layanan jaringan proprietary. Paket Android SDK berisi Android SDK milik Google dengan lisensi Google.</string>
     <string name="fd_consent_report">Laporan opsional dalam aplikasi hanya mengirim yang Anda pilih ke api.nativecode.app. Tidak ada analitik dan tidak ada laporan kerusakan.</string>
     <string name="fd_consent_check">Saya setuju mengunduh berkas ini dari GitHub Releases.</string>
     <string name="fd_consent_need_check">Centang kotak untuk melanjutkan.</string>

@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">Paquete de actualización del runtime: unos 317 MB</string>
     <string name="fd_consent_devpack">Paquete Android SDK (opcional, más tarde): unos 69 MB</string>
     <string name="fd_consent_host">Servidor: github.com (objects.githubusercontent.com). Se recomienda Wi-Fi y unos 4 GB de espacio libre.</string>
-    <string name="fd_consent_later">Más adelante, solo si lo pides: las herramientas de IA de línea de comandos (Claude Code, Antigravity, Grok, Kiro) se instalan desde los servidores de sus fabricantes. Son software propietario y los servicios de IA que usan son servicios de red propietarios.</string>
+    <string name="fd_consent_later">El sistema de archivos raíz y el paquete de actualización ya incluyen herramientas de línea de comandos de IA propietarias (Claude Code, Antigravity, Grok, Kiro) con las licencias de sus fabricantes. Los servicios de IA que usan son servicios de red propietarios. El paquete del SDK de Android contiene el SDK de Android de Google con la licencia de Google.</string>
     <string name="fd_consent_report">El informe opcional dentro de la app solo envía lo que elijas a api.nativecode.app. No hay analítica ni informes de fallos.</string>
     <string name="fd_consent_check">Acepto descargar estos archivos de GitHub Releases.</string>
     <string name="fd_consent_need_check">Marca la casilla para continuar.</string>

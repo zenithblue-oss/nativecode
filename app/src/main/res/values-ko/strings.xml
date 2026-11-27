@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">런타임 업데이트 팩: 약 317 MB</string>
     <string name="fd_consent_devpack">Android SDK 팩(선택, 나중에): 약 69 MB</string>
     <string name="fd_consent_host">호스트: github.com (objects.githubusercontent.com). Wi-Fi와 약 4 GB의 여유 공간을 권장합니다.</string>
-    <string name="fd_consent_later">나중에, 요청할 때만: AI 명령줄 도구(Claude Code, Antigravity, Grok, Kiro)가 각 제공사의 서버에서 설치됩니다. 이들은 독점 소프트웨어이며 사용하는 AI 서비스도 독점 네트워크 서비스입니다.</string>
+    <string name="fd_consent_later">루트 파일 시스템과 업데이트 팩에는 독점 AI 명령줄 도구(Claude Code, Antigravity, Grok, Kiro)가 제공사의 라이선스에 따라 이미 포함되어 있습니다. 이들이 사용하는 AI 서비스는 독점 네트워크 서비스입니다. Android SDK 팩에는 Google 라이선스에 따른 Google의 Android SDK가 들어 있습니다.</string>
     <string name="fd_consent_report">선택 사항인 앱 내 보고서는 선택한 내용만 api.nativecode.app으로 보냅니다. 분석과 비정상 종료 보고는 없습니다.</string>
     <string name="fd_consent_check">이 파일을 GitHub Releases에서 다운로드하는 데 동의합니다.</string>
     <string name="fd_consent_need_check">계속하려면 체크하세요.</string>

@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">حزمة تحديث بيئة التشغيل: نحو 317 ميغابايت</string>
     <string name="fd_consent_devpack">حزمة Android SDK (اختيارية، لاحقاً): نحو 69 ميغابايت</string>
     <string name="fd_consent_host">الخادم: github.com (objects.githubusercontent.com). يُنصح بـ Wi-Fi ونحو 4 غيغابايت من المساحة الفارغة.</string>
-    <string name="fd_consent_later">لاحقاً، وفقط عند طلبك: تُثبَّت أدوات الذكاء الاصطناعي بسطر الأوامر (Claude Code وAntigravity وGrok وKiro) من خوادم مطوريها. وهي برمجيات احتكارية، وخدمات الذكاء الاصطناعي التي تستخدمها خدمات شبكية احتكارية.</string>
+    <string name="fd_consent_later">يتضمن نظام الملفات الجذري وحزمة التحديث بالفعل أدوات سطر أوامر مملوكة للذكاء الاصطناعي (Claude Code وAntigravity وGrok وKiro) بموجب تراخيص الجهات المصنِّعة لها. خدمات الذكاء الاصطناعي التي تستخدمها هي خدمات شبكية مملوكة. تحتوي حزمة Android SDK على Android SDK من Google بموجب ترخيص Google.</string>
     <string name="fd_consent_report">التقرير الاختياري داخل التطبيق يرسل إلى api.nativecode.app ما تختاره فقط. لا توجد تحليلات ولا تقارير أعطال.</string>
     <string name="fd_consent_check">أوافق على تنزيل هذه الملفات من GitHub Releases.</string>
     <string name="fd_consent_need_check">ضع علامة في المربع للمتابعة.</string>

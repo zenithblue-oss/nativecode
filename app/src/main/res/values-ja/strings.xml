@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">ランタイム更新パック: 約 317 MB</string>
     <string name="fd_consent_devpack">Android SDK パック(任意、後で): 約 69 MB</string>
     <string name="fd_consent_host">ホスト: github.com (objects.githubusercontent.com)。Wi-Fi と約 4 GB の空き容量をおすすめします。</string>
-    <string name="fd_consent_later">後で、ご自身が求めたときだけ: AI コマンドラインツール(Claude Code、Antigravity、Grok、Kiro)が各提供元のサーバーからインストールされます。これらはプロプライエタリなソフトウェアで、利用する AI サービスもプロプライエタリなネットワークサービスです。</string>
+    <string name="fd_consent_later">ルートファイルシステムとアップデートパックには、プロプライエタリな AI コマンドラインツール (Claude Code、Antigravity、Grok、Kiro) が提供元のライセンスの下で最初から含まれています。これらが利用する AI サービスはプロプライエタリなネットワークサービスです。Android SDK パックには Google のライセンスに基づく Android SDK が含まれます。</string>
     <string name="fd_consent_report">任意のアプリ内レポートは、選んだ内容だけを api.nativecode.app に送信します。分析やクラッシュレポートはありません。</string>
     <string name="fd_consent_check">これらのファイルを GitHub Releases からダウンロードすることに同意します。</string>
     <string name="fd_consent_need_check">続けるにはチェックを入れてください。</string>

@@ -1655,7 +1655,7 @@
     <string name="fd_consent_update">Çalışma zamanı güncelleme paketi: yaklaşık 317 MB</string>
     <string name="fd_consent_devpack">Android SDK paketi (isteğe bağlı, sonra): yaklaşık 69 MB</string>
     <string name="fd_consent_host">Sunucu: github.com (objects.githubusercontent.com). Wi-Fi ve yaklaşık 4 GB boş alan önerilir.</string>
-    <string name="fd_consent_later">Daha sonra, yalnızca siz isterseniz: yapay zeka komut satırı araçları (Claude Code, Antigravity, Grok, Kiro) üreticilerinin kendi sunucularından kurulur. Bunlar tescilli yazılımdır ve kullandıkları yapay zeka hizmetleri tescilli ağ hizmetleridir.</string>
+    <string name="fd_consent_later">Kök dosya sistemi ve güncelleme paketi, üreticilerinin lisansları altında tescilli yapay zekâ komut satırı araçlarını (Claude Code, Antigravity, Grok, Kiro) zaten içerir. Kullandıkları yapay zekâ hizmetleri tescilli ağ hizmetleridir. Android SDK paketi, Google\'ın Android SDK\'sını Google lisansı altında içerir.</string>
     <string name="fd_consent_report">İsteğe bağlı uygulama içi rapor yalnızca sizin seçtiğinizi api.nativecode.app adresine gönderir. Analiz ve çökme raporu yoktur.</string>
     <string name="fd_consent_check">Bu dosyaları GitHub Releases üzerinden indirmeyi kabul ediyorum.</string>
     <string name="fd_consent_need_check">Devam etmek için kutuyu işaretleyin.</string>
