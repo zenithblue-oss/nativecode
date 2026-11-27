@@ -1653,7 +1653,7 @@
     <string name="fd_mobile_data_continue">このままダウンロード</string>
     <string name="fd_mobile_data_wait">Wi-Fi を待つ</string>
     <string name="fd_consent_title">外部ダウンロード</string>
-    <string name="fd_consent_intro">この F-Droid 版アプリには Linux システムが含まれていません。同意すると、以下のファイルを GitHub Releases からダウンロードします。これらは F-Droid が審査していない実行ファイルです。各ファイルは使用前に、このアプリに固定された SHA-256 と照合されます。</string>
+    <string name="fd_consent_intro">この F-Droid 版アプリには Linux システムが含まれていません。同意すると、以下のファイルを GitHub Releases からダウンロードします。これらは F-Droid が審査していない実行ファイルです。 続行すると、F-Droid のチェックを回避することを自分で選択したことになります。各ファイルは使用前に、このアプリに固定された SHA-256 と照合されます。</string>
     <string name="fd_consent_rootfs">Linux ルートファイルシステム: 約 1.26 GB</string>
     <string name="fd_consent_update">ランタイム更新パック: 約 317 MB</string>
     <string name="fd_consent_devpack">Android SDK パック(任意、後で): 約 69 MB</string>

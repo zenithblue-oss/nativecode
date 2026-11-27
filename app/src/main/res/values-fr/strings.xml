@@ -1653,7 +1653,7 @@
     <string name="fd_mobile_data_continue">Télécharger quand même</string>
     <string name="fd_mobile_data_wait">Attendre le Wi-Fi</string>
     <string name="fd_consent_title">Téléchargements externes</string>
-    <string name="fd_consent_intro">Cette application F-Droid n\'inclut pas le système Linux. Avec votre accord, elle télécharge les fichiers ci-dessous depuis GitHub Releases. Ce sont des exécutables que F-Droid n\'a pas examinés. Chaque fichier est comparé à un SHA-256 fixé dans l\'application avant utilisation.</string>
+    <string name="fd_consent_intro">Cette application F-Droid n\'inclut pas le système Linux. Avec votre accord, elle télécharge les fichiers ci-dessous depuis GitHub Releases. Ce sont des exécutables que F-Droid n\'a pas examinés. En continuant, vous choisissez de contourner les contrôles de F-Droid. Chaque fichier est comparé à un SHA-256 fixé dans l\'application avant utilisation.</string>
     <string name="fd_consent_rootfs">Système de fichiers racine Linux : environ 1,26 Go</string>
     <string name="fd_consent_update">Pack de mise à jour du runtime : environ 317 Mo</string>
     <string name="fd_consent_devpack">Pack Android SDK (facultatif, plus tard) : environ 69 Mo</string>

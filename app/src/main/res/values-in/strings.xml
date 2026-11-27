@@ -1653,7 +1653,7 @@
     <string name="fd_mobile_data_continue">Tetap unduh</string>
     <string name="fd_mobile_data_wait">Tunggu Wi-Fi</string>
     <string name="fd_consent_title">Unduhan eksternal</string>
-    <string name="fd_consent_intro">Aplikasi F-Droid ini tidak menyertakan sistem Linux. Dengan persetujuan Anda, aplikasi mengunduh berkas berikut dari GitHub Releases. Berkas ini adalah program yang belum ditinjau F-Droid. Setiap berkas diperiksa dengan SHA-256 yang tertanam di aplikasi ini sebelum dipakai.</string>
+    <string name="fd_consent_intro">Aplikasi F-Droid ini tidak menyertakan sistem Linux. Dengan persetujuan Anda, aplikasi mengunduh berkas berikut dari GitHub Releases. Berkas ini adalah program yang belum ditinjau F-Droid. Dengan melanjutkan, Anda memilih untuk melewati pemeriksaan F-Droid. Setiap berkas diperiksa dengan SHA-256 yang tertanam di aplikasi ini sebelum dipakai.</string>
     <string name="fd_consent_rootfs">Sistem berkas root Linux: sekitar 1,26 GB</string>
     <string name="fd_consent_update">Paket pembaruan runtime: sekitar 317 MB</string>
     <string name="fd_consent_devpack">Paket Android SDK (opsional, nanti): sekitar 69 MB</string>

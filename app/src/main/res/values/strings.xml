@@ -1696,7 +1696,7 @@
     <string name="fd_mobile_data_continue">Download anyway</string>
     <string name="fd_mobile_data_wait">Wait for Wi-Fi</string>
     <string name="fd_consent_title">External downloads</string>
-    <string name="fd_consent_intro">This F-Droid app does not bundle the Linux system. With your consent it downloads the files below from GitHub Releases. They are executables that F-Droid has not reviewed. Each file is checked against a SHA-256 pinned in this app before it is used.</string>
+    <string name="fd_consent_intro">This F-Droid app does not bundle the Linux system. With your consent it downloads the files below from GitHub Releases. They are executables that F-Droid has not reviewed. By continuing you choose to bypass F-Droid\'s checks. Each file is checked against a SHA-256 pinned in this app before it is used.</string>
     <string name="fd_consent_rootfs">Linux root filesystem: about 1.26 GB</string>
     <string name="fd_consent_update">Runtime update pack: about 317 MB</string>
     <string name="fd_consent_devpack">Android SDK pack (optional, later): about 69 MB</string>

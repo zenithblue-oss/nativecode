@@ -1653,7 +1653,7 @@
     <string name="fd_mobile_data_continue">نزّل على أي حال</string>
     <string name="fd_mobile_data_wait">انتظر Wi-Fi</string>
     <string name="fd_consent_title">تنزيلات خارجية</string>
-    <string name="fd_consent_intro">لا يتضمن تطبيق F-Droid هذا نظام لينكس. بموافقتك ينزّل الملفات التالية من GitHub Releases. هذه ملفات تنفيذية لم يراجعها F-Droid. يُفحص كل ملف قبل استخدامه مقابل SHA-256 مثبّت في هذا التطبيق.</string>
+    <string name="fd_consent_intro">لا يتضمن تطبيق F-Droid هذا نظام لينكس. بموافقتك ينزّل الملفات التالية من GitHub Releases. هذه ملفات تنفيذية لم يراجعها F-Droid. بالمتابعة تختار تجاوز فحوصات F-Droid. يُفحص كل ملف قبل استخدامه مقابل SHA-256 مثبّت في هذا التطبيق.</string>
     <string name="fd_consent_rootfs">نظام ملفات لينكس الجذري: نحو 1.26 غيغابايت</string>
     <string name="fd_consent_update">حزمة تحديث بيئة التشغيل: نحو 317 ميغابايت</string>
     <string name="fd_consent_devpack">حزمة Android SDK (اختيارية، لاحقاً): نحو 69 ميغابايت</string>
