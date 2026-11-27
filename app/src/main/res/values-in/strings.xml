@@ -1670,7 +1670,14 @@
     <string name="fd_components_subtitle">// KOMPONEN PENGEMBANGAN YANG DIUNDUH</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">Marketplace tidak tersedia di build ini</string>
-    <string name="fd_panvk_download">Mengunduh sekitar 21 MB dari GitHub Releases</string>
+    <string name="fd_panvk_download">Mengunduh sekitar 34 MB dari GitHub Releases</string>
     <string name="fd_gpu_driver_failed">Unduhan driver GPU gagal: %1$s</string>
-    <string name="fd_consent_gpu">Driver GPU (opsional, nanti): sekitar 21 MB</string>
+    <string name="fd_consent_gpu">Driver GPU (opsional, nanti): sekitar 17–34 MB</string>
+    <string name="fd_turnip_download">Mengunduh sekitar 17 MB dari GitHub Releases</string>
+    <string name="main_turnip_gpu_driver">Driver GPU Turnip</string>
+    <string name="main_updating_the_turnip_driver">Memperbarui driver Turnip…</string>
+    <string name="fd_cli_tools">ALAT CLI AI</string>
+    <string name="fd_ssh_server">SERVER SSH</string>
+    <string name="fd_ssh_subtitle">Server SSH · host jarak jauh · kunci</string>
+    <string name="fd_ssh_footer">SERVER · KLIEN · KUNCI</string>
 </resources>

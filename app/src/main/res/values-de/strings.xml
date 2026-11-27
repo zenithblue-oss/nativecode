@@ -1670,7 +1670,14 @@
     <string name="fd_components_subtitle">// HERUNTERGELADENE ENTWICKLUNGSKOMPONENTEN</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">Der Marktplatz ist in diesem Build nicht verfügbar</string>
-    <string name="fd_panvk_download">Lädt ca. 21 MB von GitHub Releases herunter</string>
+    <string name="fd_panvk_download">Lädt ca. 34 MB von GitHub Releases herunter</string>
     <string name="fd_gpu_driver_failed">Download des GPU-Treibers fehlgeschlagen: %1$s</string>
-    <string name="fd_consent_gpu">GPU-Treiber (optional, später): ca. 21 MB</string>
+    <string name="fd_consent_gpu">GPU-Treiber (optional, später): ca. 17–34 MB</string>
+    <string name="fd_turnip_download">Lädt ca. 17 MB von GitHub Releases herunter</string>
+    <string name="main_turnip_gpu_driver">Turnip-GPU-Treiber</string>
+    <string name="main_updating_the_turnip_driver">Turnip-Treiber wird aktualisiert…</string>
+    <string name="fd_cli_tools">KI-CLI-TOOLS</string>
+    <string name="fd_ssh_server">SSH-SERVER</string>
+    <string name="fd_ssh_subtitle">SSH-Server · Remote-Hosts · Schlüssel</string>
+    <string name="fd_ssh_footer">SERVER · CLIENT · SCHLÜSSEL</string>
 </resources>

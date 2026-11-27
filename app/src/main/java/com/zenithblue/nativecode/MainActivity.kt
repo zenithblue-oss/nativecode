@@ -2903,8 +2903,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
         // C6: AI Free/Paid only when suite provisioned for current method
         if (showAi) {
-            addSection(tr(R.string.main_free_cli_tools), "// OPEN SOURCE / FREE", freeTools)
-            addSection(tr(R.string.main_paid_cli_tools), "// PRO / SUBSCRIPTION", paidTools)
+            if (BuildConfig.MONETISATION_ENFORCE) {
+                addSection(tr(R.string.main_free_cli_tools), "// OPEN SOURCE / FREE", freeTools)
+                addSection(tr(R.string.main_paid_cli_tools), "// PRO / SUBSCRIPTION", paidTools)
+            } else addSection(tr(R.string.fd_cli_tools), "// AI CLIS", freeTools + paidTools) // fdroid: no free/paid split
         }
         addSection(tr(R.string.main_linux_shell), "// SYSTEM SHELL", shellTools)
 
@@ -3147,8 +3149,10 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
 
         if (showAi) {
-            addSection(tr(R.string.main_free_cli_tools), "// OPEN SOURCE / FREE", freeTools)
-            addSection(tr(R.string.main_paid_cli_tools), "// PRO / SUBSCRIPTION", paidTools)
+            if (BuildConfig.MONETISATION_ENFORCE) {
+                addSection(tr(R.string.main_free_cli_tools), "// OPEN SOURCE / FREE", freeTools)
+                addSection(tr(R.string.main_paid_cli_tools), "// PRO / SUBSCRIPTION", paidTools)
+            } else addSection(tr(R.string.fd_cli_tools), "// AI CLIS", freeTools + paidTools) // fdroid: no free/paid split
         }
         addSection(tr(R.string.main_linux_shell), "// SYSTEM SHELL", shellTools)
     }
@@ -4690,7 +4694,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             settingsHubNavRow(
                 iconRes = R.drawable.ic_lucide_server,
                 title = "SSH",
-                subtitle = tr(R.string.main_ssh_server_pro_remote_hosts),
+                subtitle = tr(if (BuildConfig.MONETISATION_ENFORCE) R.string.main_ssh_server_pro_remote_hosts else R.string.fd_ssh_subtitle),
                 pageId = ID_SSH
             )
         )
@@ -4989,9 +4993,15 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         val panvk = FORCE_COMPONENT_UPDATE_UI || try { PanvkDriverUpdate.needsUpdate(this@MainActivity) } catch (_: Exception) { false }
         if (panvk) add(ComponentUpdate(
             "panvk", R.drawable.ic_display, tr(R.string.main_panvk_gpu_driver),
-            "installed ${(PanvkDriverUpdate.installedSha(this@MainActivity) ?: "unknown").take(8)} to rc3-lowmem ${PanvkDriverUpdate.bundledSha(this@MainActivity).take(8)}",
+            "installed ${(PanvkDriverUpdate.installedSha(this@MainActivity) ?: "unknown").take(8)} to ${PanvkDriverUpdate.VERSION_LABEL} ${PanvkDriverUpdate.bundledSha(this@MainActivity).take(8)}",
             tr(if (BuildConfig.FDROID) R.string.fd_panvk_download else R.string.main_bundled_in_the_app_no),
-            "New PanVK Vulkan driver for Mali GPUs (lowmem mode) and the matching GPU env scripts. Stop the desktop first; the old driver is kept as .so.bak."))
+            "${PanvkDriverUpdate.VERSION_LABEL}: new PanVK Vulkan driver for Mali GPUs and the matching GPU env scripts. Stop the desktop first; the old driver is kept as .so.bak."))
+        val turnip = FORCE_COMPONENT_UPDATE_UI || try { TurnipDriverUpdate.needsUpdate(this@MainActivity) } catch (_: Exception) { false }
+        if (turnip) add(ComponentUpdate(
+            "turnip", R.drawable.ic_display, tr(R.string.main_turnip_gpu_driver),
+            "installed ${(TurnipDriverUpdate.installedSha(this@MainActivity) ?: "unknown").take(8)} to ${TurnipDriverUpdate.VERSION_LABEL} ${TurnipDriverUpdate.bundledSha(this@MainActivity).take(8)}",
+            tr(if (BuildConfig.FDROID) R.string.fd_turnip_download else R.string.main_bundled_in_the_app_no),
+            "${TurnipDriverUpdate.VERSION_LABEL}: new Turnip Vulkan driver for Adreno GPUs. Stop the desktop first; the old driver is kept as .so.bak."))
     }
 
     /** Re-check and repaint the Components cards, the Settings row dot and the home banner. */
@@ -5149,6 +5159,13 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
                     running(tr(R.string.main_updating_the_panvk_driver), null)
                     executor.execute {
                         val (ok, msg) = PanvkDriverUpdate.update(this)
+                        runOnUiThread { finished(ok, msg) }
+                    }
+                }
+                "turnip" -> {
+                    running(tr(R.string.main_updating_the_turnip_driver), null)
+                    executor.execute {
+                        val (ok, msg) = TurnipDriverUpdate.update(this)
                         runOnUiThread { finished(ok, msg) }
                     }
                 }
@@ -5956,6 +5973,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
 
     /** One shared Upgrade sheet: 3 plans (Play-localized prices), restore, manage. */
     private fun showUpgradeSheet(reason: String?) {
+        if (!BuildConfig.MONETISATION_ENFORCE) return // fdroid: no paywall, nothing to upgrade
         Telemetry.log(this, Telemetry.Event.PAYWALL_VIEW)
         val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
         fun line(t: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
@@ -9804,7 +9822,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
             kicker = "SSH",
             title = tr(R.string.main_ssh_server_and_remote_hosts),
             subtitle = tr(R.string.main_log_in_to_this_phone),
-            footer = tr(R.string.main_server_pro_client_keys),
+            footer = tr(if (BuildConfig.MONETISATION_ENFORCE) R.string.main_server_pro_client_keys else R.string.fd_ssh_footer),
             pageId = ID_SSH,
             onSubtitle = { tv ->
                 homeSshSubtitle = tv

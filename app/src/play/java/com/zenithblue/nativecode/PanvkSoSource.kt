@@ -9,5 +9,5 @@ object PanvkSoSource {
     @Suppress("UNUSED_PARAMETER")
     fun ensure(ctx: Context): String? = null
 
-    fun open(ctx: Context): InputStream = ctx.assets.open("panvk-rc3/libvulkan_panfrost_kbase.so")
+    fun open(ctx: Context): InputStream = ctx.assets.open("panvk-26.3.1/libvulkan_panfrost_kbase.so")
 }

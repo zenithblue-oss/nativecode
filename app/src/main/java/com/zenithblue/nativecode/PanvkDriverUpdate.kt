@@ -6,19 +6,21 @@ import java.io.File
 
 /**
  * One-off in-app update of the PanVK (Mali) driver inside the installed guest rootfs.
- * Touches ONLY the 3 files below. Small files bundled in assets/panvk-rc3; the .so comes from [PanvkSoSource] (play: asset, fdroid: GitHub download). Background thread only.
+ * Touches ONLY the 3 files below. Small files bundled in assets/panvk-26.3.1; the .so comes from [PanvkSoSource] (play: asset, fdroid: GitHub download). Background thread only.
  */
 object PanvkDriverUpdate {
-    private const val ASSET_DIR = "panvk-rc3"
+    private const val ASSET_DIR = "panvk-26.3.1"
     private const val SO = "opt/nativecode/panvk/lib/libvulkan_panfrost_kbase.so"
     private const val GPU_ENV = "etc/profile.d/gpu-env.sh"
+    /** Shown on the update card and in the result message; keep in sync with ASSET_DIR and ReleasePins. */
+    const val VERSION_LABEL = "Mesa PanVK 26.3.1"
 
     // asset name -> rootfs-relative target
     private val FILES = listOf(
         "libvulkan_panfrost_kbase.so" to SO,
         "panvk_kbase.json" to "opt/nativecode/panvk/icd.d/panvk_kbase.json",
         "panfrost_kbase_icd.aarch64.json" to "opt/nativecode/panvk/share/vulkan/icd.d/panfrost_kbase_icd.aarch64.json",
-        // rc3 breaks with the old kbase_shim.so preload: ship the guest scripts that no longer set it.
+        // PanVK 26.x breaks with the old kbase_shim.so preload: ship the guest scripts that no longer set it.
         "gpu-env.sh" to GPU_ENV,
         "gpu-backend.sh" to "usr/local/lib/nativecode/gpu-backend.sh"
     )
@@ -26,15 +28,15 @@ object PanvkDriverUpdate {
     fun bundledSha(ctx: Context): String =
         ctx.assets.open("$ASSET_DIR/libvulkan_panfrost_kbase.so.sha256").bufferedReader().readText().trim()
 
-    private fun rootfs(ctx: Context): String = ProjectPathResolver.prootRootfsDir(ctx).absolutePath
+    internal fun rootfs(ctx: Context): String = ProjectPathResolver.prootRootfsDir(ctx).absolutePath
 
-    private fun q(s: String) = "'" + s.replace("'", "'\\''") + "'"
+    internal fun q(s: String) = "'" + s.replace("'", "'\\''") + "'"
 
-    private class Res(val exitCode: Int, val stdout: String)
+    internal class Res(val exitCode: Int, val stdout: String)
 
     /** Run sh script as app uid (proot rootfs is app-private). */
     @Suppress("UNUSED_PARAMETER")
-    private fun sh(cmd: String, timeoutMs: Long): Res = try {
+    internal fun sh(cmd: String, timeoutMs: Long): Res = try {
         val pb = ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true).start()
         val out = pb.inputStream.bufferedReader().readText()
         Res(pb.waitFor(), out)
@@ -96,7 +98,7 @@ object PanvkDriverUpdate {
                 append("[ \"\$(sha256sum ${q("$root/$SO")} | cut -d' ' -f1)\" = ${q(sha)} ] && echo UPDATE_OK")
             }
             val r = sh(cmd, 300_000L)
-            return if (r.stdout.contains("UPDATE_OK")) true to "PanVK driver updated (rc3-lowmem). Backup: .so.bak"
+            return if (r.stdout.contains("UPDATE_OK")) true to "$VERSION_LABEL installed. Backup: .so.bak"
             else false to "Update failed: ${r.stdout.trim().takeLast(160)}"
         } catch (e: Exception) {
             return false to "Update failed: ${e.message}"

@@ -1670,7 +1670,14 @@
     <string name="fd_components_subtitle">// СКАЧАННЫЕ КОМПОНЕНТЫ РАЗРАБОТКИ</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">Маркетплейс недоступен в этой сборке</string>
-    <string name="fd_panvk_download">Загружает около 21 МБ с GitHub Releases</string>
+    <string name="fd_panvk_download">Загружает около 34 МБ с GitHub Releases</string>
     <string name="fd_gpu_driver_failed">Не удалось загрузить драйвер GPU: %1$s</string>
-    <string name="fd_consent_gpu">Драйвер GPU (необязательно, позже): около 21 МБ</string>
+    <string name="fd_consent_gpu">Драйвер GPU (необязательно, позже): около 17–34 МБ</string>
+    <string name="fd_turnip_download">Загружает около 17 МБ с GitHub Releases</string>
+    <string name="main_turnip_gpu_driver">Драйвер GPU Turnip</string>
+    <string name="main_updating_the_turnip_driver">Обновление драйвера Turnip…</string>
+    <string name="fd_cli_tools">ИИ-ИНСТРУМЕНТЫ CLI</string>
+    <string name="fd_ssh_server">SSH-СЕРВЕР</string>
+    <string name="fd_ssh_subtitle">SSH-сервер · удалённые хосты · ключи</string>
+    <string name="fd_ssh_footer">СЕРВЕР · КЛИЕНТ · КЛЮЧИ</string>
 </resources>

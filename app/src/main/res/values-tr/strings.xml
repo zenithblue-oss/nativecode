@@ -1670,7 +1670,14 @@
     <string name="fd_components_subtitle">// İNDİRİLEN GELİŞTİRME BİLEŞENLERİ</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">Pazar yeri bu sürümde kullanılamıyor</string>
-    <string name="fd_panvk_download">GitHub Releases üzerinden yaklaşık 21 MB indirir</string>
+    <string name="fd_panvk_download">GitHub Releases üzerinden yaklaşık 34 MB indirir</string>
     <string name="fd_gpu_driver_failed">GPU sürücüsü indirilemedi: %1$s</string>
-    <string name="fd_consent_gpu">GPU sürücüsü (isteğe bağlı, daha sonra): yaklaşık 21 MB</string>
+    <string name="fd_consent_gpu">GPU sürücüsü (isteğe bağlı, daha sonra): yaklaşık 17–34 MB</string>
+    <string name="fd_turnip_download">GitHub Releases üzerinden yaklaşık 17 MB indirir</string>
+    <string name="main_turnip_gpu_driver">Turnip GPU sürücüsü</string>
+    <string name="main_updating_the_turnip_driver">Turnip sürücüsü güncelleniyor…</string>
+    <string name="fd_cli_tools">YZ CLI ARAÇLARI</string>
+    <string name="fd_ssh_server">SSH SUNUCUSU</string>
+    <string name="fd_ssh_subtitle">SSH sunucusu · uzak ana bilgisayarlar · anahtarlar</string>
+    <string name="fd_ssh_footer">SUNUCU · İSTEMCİ · ANAHTARLAR</string>
 </resources>

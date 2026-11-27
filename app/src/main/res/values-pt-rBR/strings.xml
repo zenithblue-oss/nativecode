@@ -1670,7 +1670,14 @@
     <string name="fd_components_subtitle">// COMPONENTES DE DESENVOLVIMENTO BAIXADOS</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">O marketplace não está disponível nesta versão</string>
-    <string name="fd_panvk_download">Baixa cerca de 21 MB do GitHub Releases</string>
+    <string name="fd_panvk_download">Baixa cerca de 34 MB do GitHub Releases</string>
     <string name="fd_gpu_driver_failed">Falha ao baixar o driver de GPU: %1$s</string>
-    <string name="fd_consent_gpu">Driver de GPU (opcional, depois): cerca de 21 MB</string>
+    <string name="fd_consent_gpu">Driver de GPU (opcional, depois): cerca de 17–34 MB</string>
+    <string name="fd_turnip_download">Baixa cerca de 17 MB do GitHub Releases</string>
+    <string name="main_turnip_gpu_driver">Driver de GPU Turnip</string>
+    <string name="main_updating_the_turnip_driver">Atualizando o driver Turnip…</string>
+    <string name="fd_cli_tools">FERRAMENTAS CLI DE IA</string>
+    <string name="fd_ssh_server">SERVIDOR SSH</string>
+    <string name="fd_ssh_subtitle">Servidor SSH · hosts remotos · chaves</string>
+    <string name="fd_ssh_footer">SERVIDOR · CLIENTE · CHAVES</string>
 </resources>

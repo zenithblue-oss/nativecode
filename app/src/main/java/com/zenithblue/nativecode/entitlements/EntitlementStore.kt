@@ -18,6 +18,7 @@ object EntitlementStore {
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun isPro(ctx: Context): Boolean {
+        if (!BuildConfig.MONETISATION_ENFORCE) return true // fdroid: no plans, Pro is always on (UI labels follow this)
         val p = prefs(ctx)
         if (BuildConfig.DEBUG && p.getBoolean(KEY_FORCE_PRO, false)) return true
         return isCacheValid(p.getBoolean(KEY_PRO, false), p.getLong(KEY_PRO_CHECKED_MS, 0L), System.currentTimeMillis())

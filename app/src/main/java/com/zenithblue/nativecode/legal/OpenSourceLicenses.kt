@@ -141,4 +141,5 @@ object OpenSourceLicenses {
             licenseSummary = "Base distribution packages are distributed under their individual upstream open-source licenses. Package license texts are included in the delivered runtime."
         )
     ).filterNot { com.zenithblue.nativecode.ProotOnly.ON && it.name == "libsuperuser" }
+        .filterNot { BuildConfig.FDROID && it.name == "Firebase Android SDK" } // not compiled into the fdroid flavor
 }

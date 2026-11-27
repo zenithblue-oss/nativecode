@@ -23,6 +23,8 @@ object PlayAssetDeliveryManager {
     const val PACK_UPDATE_CORE = "nativecode_update_core"
     /** The PanVK (Mali) driver .so, fetched on the first GPU driver update (see PanvkSoSource). */
     const val PACK_GPU_DRIVER = "nativecode_gpu_driver"
+    /** The Turnip (Adreno) .so, fetched on the first Adreno driver update (see TurnipSoSource). */
+    const val PACK_TURNIP_DRIVER = "nativecode_turnip_driver"
 
     private const val MAX_ATTEMPTS = 3
     private val main = Handler(Looper.getMainLooper())

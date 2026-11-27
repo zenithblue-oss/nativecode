@@ -1,5 +1,6 @@
 package com.zenithblue.nativecode.cliauth
 
+import com.zenithblue.nativecode.ProotOnly
 import com.zenithblue.nativecode.tr
 import com.zenithblue.nativecode.R
 
@@ -15,9 +16,10 @@ data class LauncherToolDef(
 
 object ToolLauncherCatalog {
 
-    val SHELL: List<LauncherToolDef> = listOf(
+    val SHELL: List<LauncherToolDef> = listOfNotNull(
         LauncherToolDef("shell", tr(R.string.cli_linux_shell), tr(R.string.cli_user_flux)),
-        LauncherToolDef("shell-root", tr(R.string.cli_rooted_linux_shell), tr(R.string.cli_user_root))
+        // proot-only builds (fdroid) have no root shell
+        if (ProotOnly.ON) null else LauncherToolDef("shell-root", tr(R.string.cli_rooted_linux_shell), tr(R.string.cli_user_root))
     )
 
     val FREE: List<LauncherToolDef> = listOf(
@@ -45,9 +47,9 @@ object ToolLauncherCatalog {
 
     /** Dropdown / open-with pairs. */
     fun openWithPairs(method: String, showAi: Boolean): List<Pair<String, String>> {
-        val shells = listOf(
+        val shells = listOfNotNull(
             tr(R.string.cli_linux_shell) to "shell",
-            tr(R.string.cli_rooted_linux_shell) to "shell-root"
+            if (ProotOnly.ON) null else tr(R.string.cli_rooted_linux_shell) to "shell-root"
         )
         if (!showAi) return shells
         val ai = listOf(

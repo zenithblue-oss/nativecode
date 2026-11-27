@@ -1670,7 +1670,14 @@
     <string name="fd_components_subtitle">// 已下载的开发组件</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">此版本不提供应用市场</string>
-    <string name="fd_panvk_download">从 GitHub Releases 下载约 21 MB</string>
+    <string name="fd_panvk_download">从 GitHub Releases 下载约 34 MB</string>
     <string name="fd_gpu_driver_failed">GPU 驱动下载失败：%1$s</string>
-    <string name="fd_consent_gpu">GPU 驱动（可选，稍后）：约 21 MB</string>
+    <string name="fd_consent_gpu">GPU 驱动（可选，稍后）：约 17–34 MB</string>
+    <string name="fd_turnip_download">从 GitHub Releases 下载约 17 MB</string>
+    <string name="main_turnip_gpu_driver">Turnip GPU 驱动</string>
+    <string name="main_updating_the_turnip_driver">正在更新 Turnip 驱动…</string>
+    <string name="fd_cli_tools">AI CLI 工具</string>
+    <string name="fd_ssh_server">SSH 服务器</string>
+    <string name="fd_ssh_subtitle">SSH 服务器 · 远程主机 · 密钥</string>
+    <string name="fd_ssh_footer">服务器 · 客户端 · 密钥</string>
 </resources>

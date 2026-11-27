@@ -1670,7 +1670,14 @@
     <string name="fd_components_subtitle">// 다운로드한 개발 구성 요소</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">이 빌드에서는 마켓플레이스를 사용할 수 없습니다</string>
-    <string name="fd_panvk_download">GitHub Releases에서 약 21 MB를 다운로드합니다</string>
+    <string name="fd_panvk_download">GitHub Releases에서 약 34 MB를 다운로드합니다</string>
     <string name="fd_gpu_driver_failed">GPU 드라이버 다운로드 실패: %1$s</string>
-    <string name="fd_consent_gpu">GPU 드라이버 (선택, 나중에): 약 21 MB</string>
+    <string name="fd_consent_gpu">GPU 드라이버 (선택, 나중에): 약 17–34 MB</string>
+    <string name="fd_turnip_download">GitHub Releases에서 약 17 MB를 다운로드합니다</string>
+    <string name="main_turnip_gpu_driver">Turnip GPU 드라이버</string>
+    <string name="main_updating_the_turnip_driver">Turnip 드라이버 업데이트 중…</string>
+    <string name="fd_cli_tools">AI CLI 도구</string>
+    <string name="fd_ssh_server">SSH 서버</string>
+    <string name="fd_ssh_subtitle">SSH 서버 · 원격 호스트 · 키</string>
+    <string name="fd_ssh_footer">서버 · 클라이언트 · 키</string>
 </resources>

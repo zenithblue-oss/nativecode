@@ -1713,7 +1713,14 @@
     <string name="fd_components_subtitle">// DOWNLOADED DEVELOPMENT COMPONENTS</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">Marketplace is unavailable in this build</string>
-    <string name="fd_panvk_download">Downloads about 21 MB from GitHub Releases</string>
+    <string name="fd_panvk_download">Downloads about 34 MB from GitHub Releases</string>
     <string name="fd_gpu_driver_failed">GPU driver download failed: %1$s</string>
-    <string name="fd_consent_gpu">GPU driver (optional, later): about 21 MB</string>
+    <string name="fd_consent_gpu">GPU driver (optional, later): about 17–34 MB</string>
+    <string name="fd_turnip_download">Downloads about 17 MB from GitHub Releases</string>
+    <string name="main_turnip_gpu_driver">Turnip GPU driver</string>
+    <string name="main_updating_the_turnip_driver">Updating the Turnip driver…</string>
+    <string name="fd_cli_tools">AI CLI TOOLS</string>
+    <string name="fd_ssh_server">SSH SERVER</string>
+    <string name="fd_ssh_subtitle">SSH server · remote hosts · keys</string>
+    <string name="fd_ssh_footer">SERVER · CLIENT · KEYS</string>
 </resources>

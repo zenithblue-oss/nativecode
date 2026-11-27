@@ -1670,7 +1670,14 @@
     <string name="fd_components_subtitle">// مكونات التطوير المُنزَّلة</string>
     <string name="fd_components_badge">GITHUB</string>
     <string name="fd_marketplace_unavailable">المتجر غير متاح في هذا الإصدار</string>
-    <string name="fd_panvk_download">يُنزِّل نحو 21 ميغابايت من GitHub Releases</string>
+    <string name="fd_panvk_download">يُنزِّل نحو 34 ميغابايت من GitHub Releases</string>
     <string name="fd_gpu_driver_failed">فشل تنزيل تعريف وحدة معالجة الرسومات: %1$s</string>
-    <string name="fd_consent_gpu">تعريف وحدة معالجة الرسومات (اختياري، لاحقًا): نحو 21 ميغابايت</string>
+    <string name="fd_consent_gpu">تعريف وحدة معالجة الرسومات (اختياري، لاحقًا): نحو 17–34 ميغابايت</string>
+    <string name="fd_turnip_download">يُنزِّل نحو 17 ميغابايت من GitHub Releases</string>
+    <string name="main_turnip_gpu_driver">برنامج تشغيل GPU Turnip</string>
+    <string name="main_updating_the_turnip_driver">جارٍ تحديث برنامج تشغيل Turnip…</string>
+    <string name="fd_cli_tools">أدوات CLI للذكاء الاصطناعي</string>
+    <string name="fd_ssh_server">خادم SSH</string>
+    <string name="fd_ssh_subtitle">خادم SSH · المضيفون البعيدون · المفاتيح</string>
+    <string name="fd_ssh_footer">الخادم · العميل · المفاتيح</string>
 </resources>

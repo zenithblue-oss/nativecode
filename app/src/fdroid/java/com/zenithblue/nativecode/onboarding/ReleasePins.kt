@@ -17,10 +17,16 @@ object ReleasePins {
     private const val ROOTFS_BYTES = 1_356_467_533L
     private const val UPDATE_BYTES = 316_974_152L
     private const val DEV_BYTES = 69_451_708L
-    // PanVK rc3-lowmem .so: same bytes as app/src/play/assets/panvk-rc3 (sha = libvulkan_panfrost_kbase.so.sha256).
-    private const val GPU_FILE = "panvk-rc3-libvulkan_panfrost_kbase.so"
-    private const val GPU_SHA256 = "96e925761ed23994f8e3ba9f72cbbcc988b69b4166947e58fea4f96b699604b0"
-    private const val GPU_BYTES = 21_908_872L
+    // Mesa PanVK 26.3.1 glibc .so (zenithblue-oss/panvk-kbase-android panvk-kbase-v26.3.1): same bytes as
+    // app/src/play/assets/panvk-26.3.1 (sha = libvulkan_panfrost_kbase.so.sha256).
+    private const val GPU_FILE = "panvk-26.3.1-libvulkan_panfrost_kbase.so"
+    private const val GPU_SHA256 = "063bcf0cacd6605458f01530e7fc4f4de43cda7d7a995d9518e1a6e38f5d0db6"
+    private const val GPU_BYTES = 33_917_432L
+    // LFDev Mesa Turnip 27.0.0-devel-20261025-r2 (lfdevs/mesa-for-android-container, debian_trixie build; MIT):
+    // same bytes as app/src/play/assets/turnip-27.0.0-r2 (sha = libvulkan_freedreno.so.sha256).
+    private const val TURNIP_FILE = "turnip-27.0.0-r2-libvulkan_freedreno.so"
+    private const val TURNIP_SHA256 = "33b4acfbc04205d34e57178301b32f06df1539568fcb1e9b37688a3e777163ab"
+    private const val TURNIP_BYTES = 16_912_208L
 
     /** Debug builds only: first line of `files/debug_pack_base_url` replaces [BASE_URL] (e.g. http://127.0.0.1:8099). */
     private fun baseUrl(ctx: Context): String {
@@ -38,6 +44,7 @@ object ReleasePins {
             "$base/${AndroidDevPackManager.ARCHIVE_NAME}"
         )
         PlayAssetDeliveryManager.PACK_GPU_DRIVER -> ReleaseDownloader.Pin(GPU_FILE, GPU_SHA256, GPU_BYTES, "$base/$GPU_FILE")
+        PlayAssetDeliveryManager.PACK_TURNIP_DRIVER -> ReleaseDownloader.Pin(TURNIP_FILE, TURNIP_SHA256, TURNIP_BYTES, "$base/$TURNIP_FILE")
         PlayAssetDeliveryManager.PACK_UPDATE_CORE -> ReleaseDownloader.Pin(
             RuntimeUpdatePack.ARCHIVE_NAME, RuntimeUpdatePack.PINNED_SHA256, UPDATE_BYTES,
             "$base/${RuntimeUpdatePack.ARCHIVE_NAME}"

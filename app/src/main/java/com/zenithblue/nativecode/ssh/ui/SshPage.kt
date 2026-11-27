@@ -28,6 +28,7 @@ import com.zenithblue.nativecode.ssh.SshServerController
 import com.zenithblue.nativecode.ssh.SshState
 import java.util.concurrent.Executors
 import com.zenithblue.nativecode.tr
+import com.zenithblue.nativecode.BuildConfig
 import com.zenithblue.nativecode.R
 
 /** What the page needs from the activity. */
@@ -148,7 +149,7 @@ internal class SshPage(private val ctx: Context, private val host: SshHostApi) {
         content.addView(bannerCard)
         installBtn.setOnClickListener { host.openComponents() }
 
-        serverCard.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(R.string.ssh_ssh_server_pro) })
+        serverCard.addView(text(15f, NC.PRIMARY, bold = true, mono = true).apply { text = tr(if (BuildConfig.MONETISATION_ENFORCE) R.string.ssh_ssh_server_pro else R.string.fd_ssh_server) })
         serverCard.addView(text(12f, NC.ON_SURF_VAR).apply {
             text = tr(R.string.ssh_log_in_to_this_phone)
             setPadding(0, dp(4), 0, dp(12))
