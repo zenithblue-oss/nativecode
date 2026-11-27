@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit
  */
 object AppDataBackup {
     private const val SNAP = "agent_chat_backup.db"
+    private const val PREFS = "nativecode_prefs"
     private const val SNAP_TIMEOUT_S = 120L
     private val TABLES = listOf("threads" to "id", "runs" to "thread_id", "turn_items" to "thread_id", "requests" to "thread_id")
 
@@ -31,6 +32,8 @@ object AppDataBackup {
         File(dest, "agent").mkdirs()
         var any = false
         for (f in agentFiles(ctx)) { f.copyTo(File(dest, "agent/${f.name}"), overwrite = true); any = true }
+        val prefs = AppPrefsBackup.encode(ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).all)
+        if (prefs != "{}") { File(dest, AppPrefsBackup.FILE).writeText(prefs); any = true }
         if (ctx.getDatabasePath(ChatDb.NAME).exists()) any = snapshotChat(ctx, File(dest, ChatDb.NAME)) || any
         if (!any) dest.deleteRecursively()
         any
@@ -90,6 +93,26 @@ object AppDataBackup {
                 Cursor.FIELD_TYPE_BLOB -> put(n, c.getBlob(i))
                 else -> putNull(n)
             }
+        }
+    }
+
+    /** The staged settings/projects file, read before the restore swap deletes the staging dir; null for an older archive. */
+    fun readPrefs(srcDir: File): String? = runCatching { File(srcDir, AppPrefsBackup.FILE).takeIf { it.isFile }?.readText() }.getOrNull()
+
+    /** Writes [json] (from [readPrefs]) into the live prefs: allowlisted settings overwritten, projects merged. Never throws. */
+    fun applyPrefs(ctx: Context, json: String?) {
+        if (json == null) return
+        runCatching {
+            val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val ed = p.edit()
+            for ((k, v) in AppPrefsBackup.toWrite(p.all, AppPrefsBackup.decode(json))) when (v) {
+                is String -> ed.putString(k, v)
+                is Boolean -> ed.putBoolean(k, v)
+                is Int -> ed.putInt(k, v)
+                is Long -> ed.putLong(k, v)
+                is Float -> ed.putFloat(k, v)
+            }
+            ed.apply()
         }
     }
 

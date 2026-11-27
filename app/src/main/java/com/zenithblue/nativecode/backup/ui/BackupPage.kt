@@ -491,8 +491,10 @@ internal class BackupPage(private val ctx: Context, private val host: BackupHost
                     return@execute
                 }
             }
+            val prefsJson = AppDataBackup.readPrefs(appStaged) // read now: the swap removes the staging dir
             val sw = RestoreSwap.apply(home, staging, plans, stamp)
-            if (!sw.ok) runCatching { DirModel.deleteTree(home, staging) }
+            if (sw.ok) AppDataBackup.applyPrefs(ctx, prefsJson) // projects merged, settings overwritten; only after a good swap
+            else runCatching { DirModel.deleteTree(home, staging) }
             ui.post {
                 if (sw.ok) {
                     showResult(true, tr(R.string.backup_restore_complete), "${sw.moved} items restored, ${sw.kept} existing files kept." +
