@@ -365,6 +365,9 @@ else
       fi
 
       if [ -x /usr/local/bin/nativecode-desktop ]; then
+        # Older baked rootfs: nativecode-desktop preloads kbase_shim.so, which makes PanVK 26.x misread the Mali gpu_id
+        # ("Unknown gpu_id 0xa8671030") -> 0 Vulkan devices -> software GL. Drop that line.
+        grep -q kbase_shim /usr/local/bin/nativecode-desktop 2>/dev/null && sed -i "/kbase_shim\\.so/d" /usr/local/bin/nativecode-desktop 2>/dev/null
         exec /usr/local/bin/nativecode-desktop
       else
         exec startxfce4
