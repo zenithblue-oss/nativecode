@@ -2477,6 +2477,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         } else if (type == "shell" || type == "shell-root") {
             LinuxCommandBuilder.buildInteractive(this, user = user, workDir = workDir, method = method)
         } else if (method != "chroot") {
+            if (type == "claude-code") runCatching { com.zenithblue.nativecode.cliauth.ClaudeOnboarding.ensureDone(ProjectPathResolver.guestHomeDir(this, method)) }
             LinuxCommandBuilder.buildToolDirect(
                 this, listOf(ChrootCommandBuilder.toolBinaryName(type)), user = user, workDir = workDir
             )
