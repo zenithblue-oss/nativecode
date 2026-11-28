@@ -33,14 +33,14 @@ def connect_media_socket(override_socket=None, override_uid=None):
     if override_uid:
         candidates.append(f"@nativecode.media.v1.{override_uid}")
 
-    # Primary well-known abstract socket
-    candidates.append("@nativecode.media.v1")
-
     rendezvous = find_rendezvous()
     if rendezvous and "media_socket" in rendezvous:
         candidates.append(rendezvous["media_socket"])
     if rendezvous and "host_uid" in rendezvous:
         candidates.append(f"@nativecode.media.v1.{rendezvous['host_uid']}")
+
+    # Last: the plain name can belong to the other NativeCode build (Play / F-Droid), which refuses our uid.
+    candidates.append("@nativecode.media.v1")
 
     for sock_name in candidates:
         if sock_name.startswith("@"):

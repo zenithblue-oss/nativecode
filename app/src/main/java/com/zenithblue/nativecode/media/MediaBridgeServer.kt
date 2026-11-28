@@ -27,10 +27,10 @@ class MediaBridgeServer(
     private val activeClients = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<LocalSocket, Boolean>())
 
     @Volatile
-    var boundSocketName: String = PRIMARY_SOCKET_NAME
+    var boundSocketName: String? = null
         private set
 
-    val socketName: String get() = boundSocketName
+    val socketName: String? get() = boundSocketName
 
     fun start() {
         if (isRunning.getAndSet(true)) return
@@ -38,10 +38,10 @@ class MediaBridgeServer(
         val thread = Thread({
             try {
                 val server = try {
-                    LocalServerSocket(PRIMARY_SOCKET_NAME).also { boundSocketName = PRIMARY_SOCKET_NAME }
+                    LocalServerSocket(PRIMARY_SOCKET_NAME).also { boundSocketName = PRIMARY_SOCKET_NAME; com.zenithblue.nativecode.agent.BridgeRendezvous.mediaBound = PRIMARY_SOCKET_NAME }
                 } catch (e: IOException) {
                     val fallback = "$SOCKET_NAME_PREFIX${Process.myUid()}"
-                    LocalServerSocket(fallback).also { boundSocketName = fallback }
+                    LocalServerSocket(fallback).also { boundSocketName = fallback; com.zenithblue.nativecode.agent.BridgeRendezvous.mediaBound = fallback }
                 }
                 serverSocket = server
                 Log.i(TAG, "MediaBridgeServer listening on abstract socket @$boundSocketName")
@@ -283,6 +283,8 @@ class MediaBridgeServer(
             serverSocket?.close()
         } catch (ignored: Throwable) {}
         serverSocket = null
+        boundSocketName = null
+        com.zenithblue.nativecode.agent.BridgeRendezvous.mediaBound = null
         for (client in activeClients) {
             try { client.close() } catch (ignored: Throwable) {}
         }

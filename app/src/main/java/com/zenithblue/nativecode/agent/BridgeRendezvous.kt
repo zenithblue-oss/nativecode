@@ -3,6 +3,7 @@ package com.zenithblue.nativecode.agent
 import android.content.Context
 import android.os.Process
 import android.util.Log
+import com.zenithblue.nativecode.media.MediaBridgeServer
 import com.zenithblue.nativecode.terminal.ProjectPathResolver
 import java.io.File
 import org.json.JSONObject
@@ -10,7 +11,7 @@ import org.json.JSONObject
 /**
  * `nativecode_bridge.json`: how guest CLIs (`nativecode-agent` / `nativecode-media`) find this app's bridge sockets.
  * Play and F-Droid builds share the abstract namespace: the first app owns the plain `@nativecode.*.v1` names and
- * the other binds `@nativecode.*.v1.<uid>`, so the guest must be told the uid. The guest reads `/run/...` (proot
+ * the other binds `@nativecode.*.v1.<uid>`, so the guest is told the names this app actually bound. The guest reads `/run/...` (proot
  * rootfs `run/`); it cannot see the app's `files/run`, which stays only for host tools.
  */
 object BridgeRendezvous {
@@ -19,11 +20,20 @@ object BridgeRendezvous {
 
     private fun warn(msg: String) { runCatching { Log.w(TAG, msg) } } // android.util.Log is a stub in JVM tests
 
-    internal fun json(uid: Int): String = JSONObject().apply {
+    /** Names this app really bound (null = not bound yet), set by each server; the plain name may be the OTHER app's. */
+    @Volatile var agentBound: String? = null
+    @Volatile var mediaBound: String? = null
+
+    /** Unbound sockets get the uid name: never the other build's plain name. */
+    internal fun json(
+        uid: Int,
+        agent: String? = agentBound,
+        media: String? = mediaBound
+    ): String = JSONObject().apply {
         put("v", 1)
         put("host_uid", uid)
-        put("agent_socket", "@${AgentBridgeServer.SOCKET_NAME_PREFIX}$uid")
-        put("media_socket", "@nativecode.media.v1.$uid")
+        put("agent_socket", "@${agent ?: "${AgentBridgeServer.SOCKET_NAME_PREFIX}$uid"}")
+        put("media_socket", "@${media ?: "${MediaBridgeServer.SOCKET_NAME_PREFIX}$uid"}")
     }.toString(2)
 
     /** Host copy + the proot rootfs copy (`/run` in the guest, if a rootfs is installed). */

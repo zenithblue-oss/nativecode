@@ -105,10 +105,10 @@ class AgentBridgeServer(
     private val activeClients = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<LocalSocket, Boolean>())
 
     @Volatile
-    var boundSocketName: String = PRIMARY_SOCKET_NAME
+    var boundSocketName: String? = null
         private set
 
-    val socketName: String get() = boundSocketName
+    val socketName: String? get() = boundSocketName
 
     @Volatile
     var uiDelegate: UiDelegate? = null
@@ -126,10 +126,10 @@ class AgentBridgeServer(
         val thread = Thread({
             try {
                 val server = try {
-                    LocalServerSocket(PRIMARY_SOCKET_NAME).also { boundSocketName = PRIMARY_SOCKET_NAME }
+                    LocalServerSocket(PRIMARY_SOCKET_NAME).also { boundSocketName = PRIMARY_SOCKET_NAME; BridgeRendezvous.agentBound = PRIMARY_SOCKET_NAME }
                 } catch (e: IOException) {
                     val fallback = "$SOCKET_NAME_PREFIX${Process.myUid()}"
-                    LocalServerSocket(fallback).also { boundSocketName = fallback }
+                    LocalServerSocket(fallback).also { boundSocketName = fallback; BridgeRendezvous.agentBound = fallback }
                 }
                 serverSocket = server
                 Log.i(TAG, "AgentBridgeServer listening on abstract socket @$boundSocketName")
@@ -688,6 +688,8 @@ class AgentBridgeServer(
             serverSocket?.close()
         } catch (ignored: Throwable) {}
         serverSocket = null
+        boundSocketName = null
+        BridgeRendezvous.agentBound = null
         workerThread?.interrupt()
         workerThread = null
     }

@@ -32,6 +32,21 @@ class GuestBridgeCliTest {
     }
 
     @Test
+    fun rendezvousNamesWhatIsBound() {
+        val j = JSONObject(BridgeRendezvous.json(10355, agent = "nativecode.agent.v1", media = "nativecode.media.v1.10355"))
+        assertEquals("@nativecode.agent.v1", j.getString("agent_socket"))
+        assertEquals("@nativecode.media.v1.10355", j.getString("media_socket"))
+    }
+
+    @Test
+    fun cliScriptsTryPlainNameAfterRendezvous() {
+        for ((n, k) in listOf("nativecode-agent" to "agent", "nativecode-media" to "media")) {
+            val s = script(n)
+            assertTrue("$n tries the plain name before the rendezvous", s.indexOf("candidates.append(\"@nativecode.$k.v1\")") > s.indexOf("rendezvous[\"host_uid\"]") )
+        }
+    }
+
+    @Test
     fun shareFileAcceptsPositionalPath() {
         assertTrue(script("nativecode-agent").contains("""add_argument("pos_path", nargs="?""""))
     }
