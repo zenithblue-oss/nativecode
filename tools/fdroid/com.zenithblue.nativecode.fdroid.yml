@@ -99,10 +99,53 @@ Builds:
       - NDK=$$NDK$$ tools/fdroid/build_bootstrap.sh --install
       - NDK=$$NDK$$ tools/fdroid/build_xlorie.sh --install
     ndk: r29
+  - versionName: 1.8.6   # app/build.gradle.kts defaultConfig (flavor fdroid)
+    versionCode: 27      # app/build.gradle.kts defaultConfig
+    commit: v1.8.6       # ASSUMPTION: tag name; create it on the release commit
+    submodules: false
+    sudo:
+      # Termux build deps (termux-packages scripts/setup-ubuntu.sh, trimmed to tools/fdroid/package-lists)
+      # plus libXlorie (cmake, ninja, bison, patch). openjdk-17 from bookworm: termux-am's gradle build
+      # hardcodes the JDK 17 path. fuse-overlayfs: termux mounts the NDK toolchain with it (/dev/fuse).
+      # TODO: trim after a `fdroid build` run in registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie.
+      - echo "deb https://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list
+      - apt-get update
+      - apt-get install -y --no-install-recommends openjdk-17-jdk-headless autoconf autoconf-archive
+        automake autopoint bison bzip2 clang cmake curl ed file flex fuse-overlayfs g++ gawk gettext
+        git gperf groff help2man intltool jq libbz2-dev libffi-dev liblzma-dev libltdl-dev
+        libreadline-dev libsqlite3-dev libssl-dev libtool-bin lld lzip m4 make ninja-build pandoc
+        patch perl pkg-config python-is-python3 python3 python3-setuptools rsync tcl texinfo unzip
+        xz-utils zip zlib1g-dev zstd
+      # termux-packages hardcodes the install prefix; the build user must own it.
+      - mkdir -p /data/data/com.zenithblue.nativecode.fdroid/files/usr
+      - chown -R vagrant:vagrant /data
+    gradle:
+      - fdroid
+    # Prebuilt blobs in the tree that the fdroid flavor does not use; the scanner would
+    # flag them (.so/.aar/.zip/.tar.gz/.jar). Replace with `git rm` before submission.
+    scandelete:
+      - app/libs
+      - app/src/play
+      - termux-app/app/dev_keystore.jks
+      - termux-app/gradle/wrapper/gradle-wrapper.jar
+      - shell-loader-debug.apk
+      - packages/phosh-lite
+      - tools/rootfs/overlay
+      - docs/skills
+      - app/src/main/assets/xfce
+    # Prefer an empty scanignore; add only paths the scanner proves unavoidable.
+    scanignore: []
+    # `build:` runs after the scanner: nothing built here has to be in git.
+    build:
+      - umask 022
+      - NDK=$$NDK$$ tools/fdroid/build_native.sh --install
+      - NDK=$$NDK$$ tools/fdroid/build_bootstrap.sh --install
+      - NDK=$$NDK$$ tools/fdroid/build_xlorie.sh --install
+    ndk: r29
 
 AllowedAPKSigningKeys: TBD   # TODO: sha256 of the release cert (reproducible-build verification)
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.8.5
-CurrentVersionCode: 26
+CurrentVersion: 1.8.6
+CurrentVersionCode: 27

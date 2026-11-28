@@ -1,0 +1,6 @@
+1.8.6
+- codex tile starts again with older codex versions
+- Claude Code opens without the first-run wizard when signed in
+- Agent bridge finds the right socket with one or both builds installed
+- Play: desktop audio works (AAudio sink)
+- README and licence notice updated

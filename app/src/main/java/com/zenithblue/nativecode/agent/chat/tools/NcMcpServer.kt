@@ -252,7 +252,7 @@ class NcMcpServer(private val handler: Handler) {
 
     companion object {
         const val PREFIX = "ncmcp_"
-        const val SERVER_VERSION = "1.8.5"
+        const val SERVER_VERSION = "1.8.6"
         val VERSIONS = listOf("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
         private const val MAX_CONNECTIONS = 64
         private const val MAX_HEADER = 16 * 1024
