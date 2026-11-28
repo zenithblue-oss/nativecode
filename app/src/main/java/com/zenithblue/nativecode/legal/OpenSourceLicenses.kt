@@ -23,10 +23,10 @@ object OpenSourceLicenses {
         OssLicenseItem(
             name = "NativeCode / FluxLinux",
             component = "Core Android Workspace & Orchestrator",
-            licenseType = "GPL-3.0-only",
-            copyright = "Copyright (C) 2024-2026 Zenith Blue / zenithblue",
-            url = "",
-            licenseSummary = "GNU General Public License v3.0. Permissions include commercial use, modification, distribution, patent use, and private use, with requirements to disclose source, license and copyright notice, and same license (copyleft)."
+            licenseType = "GPL-3.0-or-later",
+            copyright = "Copyright (C) 2024-2026 ZenithBlue",
+            url = "https://github.com/zenithblue-oss/nativecode",
+            licenseSummary = "GNU General Public License v3.0 or later. Permissions include commercial use, modification, distribution, patent use, and private use, with requirements to disclose source, license and copyright notice, and same license (copyleft)."
         ),
         OssLicenseItem(
             name = "Termux App",
