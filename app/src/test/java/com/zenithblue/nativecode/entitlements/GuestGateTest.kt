@@ -103,6 +103,16 @@ class GuestGateTest {
     }
 
     @Test
+    fun codexGetsNoDaemonOnlyWhenItsHelpListsIt() {
+        pro()
+        val codex = File(dir, "real/codex")
+        codex.writeText("#!/bin/sh\n[ \"\$1\" = --help ] && echo '      --no-daemon'\necho REAL codex \"\$@\"\n")
+        assertEquals(true, run("codex", "resume").second.endsWith("REAL codex --no-daemon resume"))
+        codex.writeText("#!/bin/sh\n[ \"\$1\" = --help ] && echo usage\necho REAL codex \"\$@\"\n")
+        assertEquals(true, run("codex", "resume").second.endsWith("REAL codex resume"))
+    }
+
+    @Test
     fun versionAndHelpPassThrough() {
         free()
         assertEquals(0 to "REAL codex --version", run("codex", "--version"))

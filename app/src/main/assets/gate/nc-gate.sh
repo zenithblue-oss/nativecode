@@ -27,7 +27,8 @@ deny() { [ -n "$locked" ] && rmdir "$REG/.lock" 2>/dev/null; echo "NativeCode: $
 case "$1" in --version|-V|-v|--help|-h|version|help) exec "$real" "$@" ;; esac
 # codex 0.168+ TUI (bare, resume, fork) starts a pid-managed app-server daemon that runs `ps -p PID -o lstart=`;
 # the guest ps is BusyBox (no -p), so the TUI dies. --no-daemon keeps it in process (same rule as launch_tool.sh).
-if [ "$tool" = codex ]; then case "${1:-}" in ""|resume|fork) set -- --no-daemon "$@" ;; esac; fi
+# Older codex (0.153) has no such flag and exits 2 on it, so only a codex whose --help lists it gets it.
+if [ "$tool" = codex ]; then case "${1:-}" in ""|resume|fork) "$real" --help 2>/dev/null | grep -q -e --no-daemon && set -- --no-daemon "$@" ;; esac; fi
 
 enforce=1 pro=0 exp=0 free_tool=opencode max_free=1 max_pro=5 mac= ok=0
 if [ -r "$ENT" ]; then

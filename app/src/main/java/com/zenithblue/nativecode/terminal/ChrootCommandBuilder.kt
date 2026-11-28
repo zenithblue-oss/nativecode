@@ -30,7 +30,7 @@ object ChrootCommandBuilder {
     /** Session executable — must be a system binary (SELinux blocks exec of app-data scripts). */
     const val SESSION_EXEC = "/system/bin/sh"
 
-    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v7"
+    const val LAUNCH_TOOL_VERSION = "nativecode-launch-tool v8"
     private const val TERM_WRAPPER_VERSION = "nativecode-chroot-term-wrapper v3"
     private val launcherPrepLock = Any()
     private var launcherPrepGeneration = 0L
@@ -343,9 +343,12 @@ case "${'$'}cmd" in
   codex)
     # codex 0.168+ spawns a pid-managed app-server daemon and dies in PRoot (cannot read its start time).
     # --no-daemon is a TUI-only flag: the tab launch and the TUI subcommands (resume, fork) get it,
-    # everything else (login, app-server...) stays plain.
+    # everything else (login, app-server...) stays plain. codex 0.153 has no such flag and exits 2 on it,
+    # so only a codex whose --help lists it gets it.
     case "${'$'}{1:-}" in
-      ""|resume|fork) exec codex --no-daemon "${'$'}@" ;;
+      ""|resume|fork)
+        if codex --help 2>/dev/null | grep -q -e --no-daemon; then exec codex --no-daemon "${'$'}@"; fi
+        ;;
     esac
     exec codex "${'$'}@"
     ;;

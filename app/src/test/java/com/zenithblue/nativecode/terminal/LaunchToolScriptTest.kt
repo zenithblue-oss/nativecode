@@ -9,13 +9,18 @@ import java.nio.file.Files
 /** Runs the generated launch_tool.sh with stub CLIs and checks the argv each one receives. */
 class LaunchToolScriptTest {
 
-    private fun run(vararg args: String): String {
+    /** [oldCodex]: a codex 0.153 stand-in that rejects --no-daemon (exit 2) and does not list it in --help. */
+    private fun run(vararg args: String, oldCodex: Boolean = false): String {
         assumeTrue(File("/bin/bash").canExecute())
         val home = Files.createTempDirectory("lt").toFile()
         try {
             val bin = File(home, ".local/bin").apply { mkdirs() }
             for (tool in listOf("opencode", "codex")) {
-                File(bin, tool).apply { writeText("#!/bin/sh\necho \"$tool \$*\"\n"); setExecutable(true) }
+                val body = if (tool == "codex") {
+                    "case \"\$1\" in\n  --help) " + (if (oldCodex) "echo usage" else "echo '      --no-daemon'") + " ;;\n" +
+                        "  --no-daemon) " + (if (oldCodex) "echo 'error: unexpected argument' >&2; exit 2" else "echo \"codex \$*\"") + " ;;\n  *) echo \"codex \$*\" ;;\nesac\n"
+                } else "echo \"$tool \$*\"\n"
+                File(bin, tool).apply { writeText("#!/bin/sh\n$body"); setExecutable(true) }
             }
             val script = File(home, "launch_tool.sh")
             script.writeText(ChrootCommandBuilder.launcherScript().replace("export HOME=/home/flux", "export HOME=${home.path}"))
@@ -37,5 +42,7 @@ class LaunchToolScriptTest {
     @Test fun codexForkGetsNoDaemon() = assertEquals("codex --no-daemon fork abc", run("codex", "fork", "abc"))
     @Test fun codexAppServerStaysPlain() = assertEquals("codex app-server", run("codex", "app-server"))
     @Test fun codexLoginStaysPlain() = assertEquals("codex login", run("codex", "login"))
-    @Test fun versionIsV7() = assertEquals(true, ChrootCommandBuilder.launcherScript().contains("nativecode-launch-tool v7"))
+    @Test fun oldCodexTabStaysPlain() = assertEquals("codex", run("codex", oldCodex = true))
+    @Test fun oldCodexResumeStaysPlain() = assertEquals("codex resume abc", run("codex", "resume", "abc", oldCodex = true))
+    @Test fun versionIsV8() = assertEquals(true, ChrootCommandBuilder.launcherScript().contains("nativecode-launch-tool v8"))
 }
