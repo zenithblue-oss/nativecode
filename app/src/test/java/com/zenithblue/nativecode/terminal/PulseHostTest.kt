@@ -1,6 +1,7 @@
 package com.zenithblue.nativecode.terminal
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,16 +41,45 @@ class PulseHostTest {
         val base = "export A=\"1\"\nexport B=\"2\"\n"
         assertEquals(base, TermuxHostPaths.withPulseEnv(base, 4713))
         val fd = TermuxHostPaths.withPulseEnv(base, 4813)
-        assertEquals(base + "export NC_PULSE_PORT=\"4813\"\nexport NC_PULSE_SERVER=\"127.0.0.1:4813\"\nexport NC_PULSE_AAUDIO=\"1\"\n", fd)
+        assertEquals(base + "export NC_PULSE_PORT=\"4813\"\nexport NC_PULSE_SERVER=\"127.0.0.1:4813\"\n", fd)
+        assertEquals(fd, TermuxHostPaths.withPulseEnv(fd + "export NC_PULSE_AAUDIO=\"1\"\n", 4813)) // legacy line dropped
         assertEquals(fd, TermuxHostPaths.withPulseEnv(fd, 4813)) // idempotent
         assertEquals(base, TermuxHostPaths.withPulseEnv(fd, 4713)) // back to Play
     }
 
     @Test
-    fun pulseArgvMatchesThisBuildsPort() {
+    fun pulseArgvLoadsTcpThenAaudioAndSurvivesSinkFailure() {
         val argv = HostServerController.pulseArgv("/x/pulseaudio")
+        assertEquals("/system/bin/linker64", argv.first())
         assertTrue(argv.contains("module-native-protocol-tcp " + PulseHost.tcpArgs()))
-        assertEquals(PulseHost.USES_AAUDIO, argv.contains("module-aaudio-sink"))
-        assertEquals(PulseHost.PORT != PulseHost.DEFAULT_PORT, PulseHost.USES_AAUDIO)
+        assertTrue(argv.contains("--fail=no"))
+        val loads = argv.indices.filter { argv[it] == "--load" }.map { argv[it + 1] }
+        assertEquals(listOf("module-native-protocol-tcp " + PulseHost.tcpArgs(), "module-aaudio-sink"), loads)
+        assertTrue(argv.none { it.contains("sles") })
+    }
+
+    @Test
+    fun playAndFdroidBothUseAaudioWithSystemLibsFirst() {
+        for (port in listOf(4713, 4813)) assertTrue(PulseHost.tcpArgs(port).startsWith("auth-ip-acl=127.0.0.1"))
+        assertEquals("/system/lib64:/p/usr/lib", PulseHost.ldPath("/p/usr/lib"))
+        assertEquals("module-aaudio-sink", PulseHost.SINK_MODULE)
+        assertEquals("module-sles-sink", PulseHost.FALLBACK_SINK_MODULE)
+    }
+
+    @Test
+    fun slesFallbackOnlyWhenNoSinkRow() {
+        assertTrue(PulseHost.needsFallback(""))
+        assertTrue(PulseHost.needsFallback("Connection failure: Connection refused\n"))
+        assertTrue(PulseHost.needsFallback("\n"))
+        assertFalse(PulseHost.needsFallback("0\tAAudio_sink\tmodule-aaudio-sink.c\ts16le 2ch 48000Hz\tIDLE\n"))
+    }
+
+    @Test
+    fun desktopStartScriptAlsoUsesAaudioForEveryBuild() {
+        val sh = java.io.File("src/main/assets/scripts/start_gui.sh").readText()
+        assertTrue(sh.contains("LD_LIBRARY_PATH=/system/lib64:"))
+        assertTrue(sh.contains("--load=module-aaudio-sink"))
+        assertTrue(sh.contains("--fail=no"))
+        assertFalse(sh.contains("NC_PULSE_AAUDIO"))
     }
 }

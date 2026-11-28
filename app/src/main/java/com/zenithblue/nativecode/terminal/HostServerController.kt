@@ -270,10 +270,13 @@ object HostServerController {
                 binary,
                 "--daemonize=no",
                 "--disallow-exit",
+                // a sink module that fails to load must not take the whole daemon (and its TCP port) down
+                "--fail=no",
                 "--dl-search-path", "${TermuxHostPaths.LIB}/pulseaudio/modules",
                 "--load", TCP_MODULE,
+                "--load", PulseHost.SINK_MODULE,
                 "--exit-idle-time=-1"
-            ) + if (PulseHost.USES_AAUDIO) listOf("--load", "module-aaudio-sink") else emptyList()
+            )
         )
     }
 
@@ -322,11 +325,31 @@ object HostServerController {
             )
             p2.waitFor(4, TimeUnit.SECONDS)
         }
+        if (proc.isAlive && PulseHost.needsFallback(pactl(ctx, "list", "short", "sinks"))) {
+            Log.w(TAG, "no sink after ${PulseHost.SINK_MODULE}; trying ${PulseHost.FALLBACK_SINK_MODULE}")
+            pactl(ctx, "load-module", PulseHost.FALLBACK_SINK_MODULE)
+        }
         val st = status(Kind.PULSE)
         return if (st.running) {
             "PulseAudio: ${st.detail} (exit=$code)"
         } else {
             "PulseAudio: start failed (${st.detail}, exit=$code)"
+        }
+    }
+
+    /** `pactl -s <this build's server> args...` with the pulse env; returns its output ("" on any failure). */
+    private fun pactl(ctx: Context, vararg args: String): String {
+        val bin = File(TermuxHostPaths.BIN, "pactl")
+        if (!bin.isFile) return ""
+        return try {
+            val pb = hostBuilder(ctx, withLinker(listOf(bin.absolutePath, "-s", PulseHost.server()) + args))
+            val p = pb.start()
+            val out = p.inputStream.bufferedReader().readText()
+            p.waitFor(4, TimeUnit.SECONDS)
+            out
+        } catch (e: Exception) {
+            Log.w(TAG, "pactl failed", e)
+            ""
         }
     }
 
@@ -349,7 +372,7 @@ object HostServerController {
         }
     }
 
-    private fun spawn(ctx: Context, argv: List<String>): Process {
+    private fun hostBuilder(ctx: Context, argv: List<String>): ProcessBuilder {
         val pb = ProcessBuilder(argv)
         HostCommandBuilder.applyTo(ctx, pb)
         val env = pb.environment()
@@ -358,8 +381,7 @@ object HostServerController {
             it.endsWith("pulseaudio") || it.endsWith("/pacmd") || it.endsWith("/pactl")
         }
         if (isPulse) {
-            // PREFIX/lib alone shadows system libs the AAudio module pulls in (Xzs_Construct): system first off-Play.
-            env["LD_LIBRARY_PATH"] = if (PulseHost.USES_AAUDIO) "/system/lib64:${TermuxHostPaths.LIB}" else TermuxHostPaths.LIB
+            env["LD_LIBRARY_PATH"] = PulseHost.ldPath(TermuxHostPaths.LIB)
         } else {
             // PREFIX/lib shadows Android libEGL/libvulkan and breaks vtest (Xzs_Construct).
             env["LD_LIBRARY_PATH"] = "/system/lib64:${TermuxHostPaths.PREFIX}/opt/virglrenderer-android/lib"
@@ -376,7 +398,11 @@ object HostServerController {
         pb.redirectErrorStream(true)
         File(TermuxHostPaths.TMPDIR).mkdirs()
         pb.directory(File(TermuxHostPaths.HOME))
-        val proc = pb.start()
+        return pb
+    }
+
+    private fun spawn(ctx: Context, argv: List<String>): Process {
+        val proc = hostBuilder(ctx, argv).start()
         Thread({
             try {
                 proc.inputStream.bufferedReader().use { r ->

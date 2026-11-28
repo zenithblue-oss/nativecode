@@ -15,11 +15,22 @@ object PulseHost {
     val PORT: Int = portFor(TermuxHostPaths.PACKAGE)
 
     /**
-     * Non-Play builds play through AAudio: termux's default module-sles-sink needs OpenSL ES vendor libs that a
-     * linker64-spawned process cannot load (MIUI: libcodec2_client / libskuparser), which leaves only the null sink.
-     * Play keeps its stock sles setup untouched.
+     * Every build plays through AAudio, with OpenSL ES (module-sles-sink) only as the fallback when it fails to load.
+     * The stock sles sink alone leaves only the null sink on phones where a linker64-spawned process cannot load
+     * OpenSL ES vendor libs (MIUI: libcodec2_client / libskuparser).
      */
-    val USES_AAUDIO: Boolean = PORT != DEFAULT_PORT
+    const val SINK_MODULE = "module-aaudio-sink"
+    const val FALLBACK_SINK_MODULE = "module-sles-sink"
+
+    /**
+     * PulseAudio's `LD_LIBRARY_PATH`: system libs first. The bootstrap's own liblzma/libz/libcrypto/libexpat in PREFIX/lib
+     * shadow the system ones that libaaudio/libOpenSLES pull in (libunwindstack -> Xzs_Construct), so either sink fails
+     * with "Failed to open module" when PREFIX/lib leads. Scoped to the pulseaudio/pactl/pacmd processes only.
+     */
+    fun ldPath(lib: String): String = "/system/lib64:$lib"
+
+    /** True when `pactl list short sinks` printed no sink row ("<index>\t<name>..."), so the OpenSL ES fallback should be tried. */
+    fun needsFallback(shortSinks: String): Boolean = shortSinks.lines().none { it.firstOrNull()?.isDigit() == true }
 
     /** Guest `PULSE_SERVER` value; Play stays the bare "127.0.0.1" it always was. */
     fun server(port: Int = PORT): String = if (port == DEFAULT_PORT) "127.0.0.1" else "127.0.0.1:$port"

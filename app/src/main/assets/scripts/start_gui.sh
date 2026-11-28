@@ -47,13 +47,10 @@ LINKER=""
 PA_BIN="$TERMUX_PREFIX/bin/pulseaudio"
 PA_CMD="$PA_BIN"
 [ -n "$LINKER" ] && [ -f "$PA_BIN" ] && PA_CMD="$LINKER $PA_BIN"
-# Non-Play builds (NC_PULSE_AAUDIO, from fluxlinux-host.env): the stock sles sink cannot load via linker64, play through AAudio
-# and keep system libs ahead of PREFIX/lib (it shadows Xzs_Construct for the AAudio module).
-PA_EXTRA=""
-if [ -n "${NC_PULSE_AAUDIO:-}" ]; then
-  PA_CMD="env LD_LIBRARY_PATH=/system/lib64:$LD_LIBRARY_PATH $PA_CMD"
-  PA_EXTRA="--load=module-aaudio-sink"
-fi
+# Play through AAudio (the stock sles sink cannot load via linker64) with system libs ahead of PREFIX/lib: its
+# liblzma/libz/libcrypto shadow the system ones libaaudio needs (Xzs_Construct). --fail=no keeps the TCP port up if the sink fails.
+PA_CMD="env LD_LIBRARY_PATH=/system/lib64:$LD_LIBRARY_PATH $PA_CMD"
+PA_EXTRA="--fail=no --load=module-aaudio-sink"
 
 if ! "$TB" pidof pulseaudio >/dev/null 2>&1; then
   echo "FluxLinux: Starting PulseAudio..."

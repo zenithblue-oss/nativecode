@@ -18226,7 +18226,7 @@ class MainActivity : AppCompatActivity(), AgentBridgeServer.UiDelegate {
         }
         paint(
             pulseServerBadge, pulseServerDetailTv, pulse, "PulseAudio", optional = false,
-            extra = "\n" + tr(R.string.hw_pulse_port, PulseHost.PORT, if (PulseHost.USES_AAUDIO) "AAudio" else "OpenSL ES")
+            extra = "\n" + tr(R.string.hw_pulse_port, PulseHost.PORT, "AAudio")
         )
     }
 
